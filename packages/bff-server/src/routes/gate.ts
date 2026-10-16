@@ -26,11 +26,17 @@ function getGatePassword(): string {
 }
 
 function getHmacSecret(): string {
-  return (
+  const configured =
     process.env.SITE_GATE_HMAC_SECRET ||
     process.env.SESSION_ENCRYPTION_KEY ||
-    'cg_default_hmac_secret_must_be_set_in_production_env_32_bytes!'
-  );
+    process.env.SUPABASE_JWT_SECRET;
+  if (configured && configured.length >= 32) {
+    return configured;
+  }
+  if (process.env.NODE_ENV === 'production' && getGatePassword().length > 0) {
+    throw new Error('FATAL SECURITY CONFIGURATION: SITE_GATE_HMAC_SECRET or SESSION_ENCRYPTION_KEY (>=32 chars) must be configured in production.');
+  }
+  return configured || 'cg_dev_only_hmac_secret_fallback_minimum_32_bytes_long!';
 }
 
 function isGateEnabled(): boolean {

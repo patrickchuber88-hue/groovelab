@@ -144,7 +144,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h2 id="herrenberg-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-                  Herrenberg-Compliance & Enthaftungs-Cockpit
+                  Technisches Architektur-Merkblatt: Herrenberg-Modell
                 </h2>
                 <span style={{
                   fontSize: '0.68rem',
@@ -160,7 +160,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                 </span>
               </div>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                Leitfaden zur rechtssicheren Beschäftigung von Honorarkräften an {schoolName}
+                Unverbindliche Fachinformation zur technischen Systemarchitektur für {schoolName} (keine Rechtsberatung gem. § 3 RDG · Übergangsregelung § 127 SGB IV)
               </p>
             </div>
           </div>
@@ -307,9 +307,10 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                   erzwungenen Lehrmaterialien, keine Anwesenheitstracker und neutrale Ausfallmeldungen ohne ärztliche Attestpflicht (§ 26 BDSG).
                 </p>
                 <p style={{ margin: 0, fontSize: '0.84rem', lineHeight: 1.6, color: '#1e3a8a' }}>
-                  <strong>Was der Schulleitung obliegt:</strong> Die alleinige Nutzung der Software befreit eine Musikschule
-                  nicht von rechtlichen Risiken, wenn im physischen Schulalltag vor Ort Weisungen erteilt oder
-                  Eingliederungsmerkmale praktiziert werden. Die Schulleitung verantwortet die gelebte Praxis vor Ort.
+                  <strong>Was der Schulleitung obliegt & Hinweis gem. § 3 RDG:</strong> Dieses Merkblatt dient ausschließlich als
+                  unverbindliche technische Fachinformation und stellt <strong>keine Rechtsberatung im Sinne des § 3 RDG</strong> dar. Die alleinige Nutzung der Software befreit eine Musikschule
+                  nicht von sozialversicherungsrechtlichen Risiken, wenn im physischen Schulalltag vor Ort Weisungen erteilt oder
+                  Eingliederungsmerkmale praktiziert werden. Im Statusfeststellungsverfahren nach § 7a SGB IV prüft die Clearingstelle der Deutschen Rentenversicherung Bund stets die gelebte Gesamtpraxis im Einzelfall. Für bestehende Honorarverträge ist zudem die gesetzliche Übergangsregelung nach § 127 SGB IV (befristet bis zum 31.12.2026) zu beachten.
                 </p>
               </div>
 
@@ -448,10 +449,10 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
               }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a' }}>
-                    Praxis-Audit für Schulleitungen
+                    Unverbindliche Orientierungs-Checkliste für Schulleitungen
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    Überprüfen Sie die Arbeitsweise vor Ort an Ihrer Musikschule:
+                    Selbstprüfung der organisatorischen Rahmenbedingungen (ersetzt keine Rechtsberatung gem. § 3 RDG · Übergangsregelung gem. § 127 SGB IV beachten):
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -460,7 +461,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                       {completedChecks} / {totalChecks} erfüllt
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      {complianceScore === 100 ? 'Rechtssicher aufgestellt' : 'Optimierung empfohlen'}
+                      {complianceScore === 100 ? 'Orientierungspunkte aktiv' : 'Prüfung empfohlen'}
                     </div>
                   </div>
                 </div>
@@ -546,8 +547,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
                 <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.5 }}>
-                  💡 <strong>Rechtssichere Bausteine:</strong> Nutzen Sie diese Musterklauseln für Ihre Honorarverträge.
-                  Kopieren Sie die Klauseln mit einem Klick heraus.
+                  💡 <strong>Unverbindliche Formulierungsmuster (keine Rechtsberatung gem. § 3 RDG):</strong> Diese Textbausteine dienen als unverbindliche Diskussionsgrundlage für die Prüfung durch Ihren Rechtsbeistand oder Fachanwalt für Sozialrecht (unter Beachtung von § 7a & § 127 SGB IV).
                 </span>
               </div>
 
@@ -646,7 +646,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#64748b' }}>
             <ShieldCheck size={16} color="#059669" />
-            <span>Rechtlicher Stand: 2026 · BSG B 12 R 3/20 R · DIN EN 301 549 & BFSG 2025 konform</span>
+            <span>Unverbindliche Fachinformation gem. § 3 RDG · BSG B 12 R 3/20 R · § 127 SGB IV Übergangsregelung · Keine Rechtsberatung</span>
           </div>
 
           <button

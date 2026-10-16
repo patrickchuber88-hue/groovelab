@@ -1,26 +1,28 @@
 import React, { Suspense, lazy, useRef } from 'react';
-import { CampusLevelSelectModal } from '../../campus/CampusLevelSelectModal';
-import { GlobalParentPinModal } from './GlobalParentPinModal';
-import { SiblingPinUnlockModal } from './SiblingPinUnlockModal';
-import { AddSiblingModal } from '../../campus/AddSiblingModal';
-import { StudentJuniorPreFlightModal } from './StudentJuniorPreFlightModal';
-import { StudentJuniorStickerModal, JuniorStickerCategory } from './StudentJuniorStickerModal';
-import { StudentJuniorStickerDetailModal } from './StudentJuniorStickerDetailModal';
-import { StudentJuniorStickerAwardModal } from './StudentJuniorStickerAwardModal';
-import { StudentSessionCelebrationModal, StudentSessionCelebrationModalProps } from './StudentSessionCelebrationModal';
-import { StudentMatchCelebrationModal } from './StudentMatchCelebrationModal';
-import { CampusAppointmentShoutboxModal } from '../../CampusAppointmentShoutboxModal';
-import { StudentRescheduleBottomSheetModal } from './StudentRescheduleBottomSheetModal';
-import { DigitalDetoxOverlay } from './DigitalDetoxOverlay';
-import { StudentContributionsModal } from './StudentContributionsModal';
-import { StudentRulesModal } from './StudentRulesModal';
-import { StudentCrisisNotifsModal } from './StudentCrisisNotifsModal';
-import { StudentSongDetailModal } from './StudentSongDetailModal';
-import { StudentLehrwerkDetailModal } from './StudentLehrwerkDetailModal';
-import { FocusAbortedModal } from '../../focus/FocusAbortedModal';
+import type { JuniorStickerCategory } from './StudentJuniorStickerModal';
+import type { StudentSessionCelebrationModalProps } from './StudentSessionCelebrationModal';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { formatStudentPureFirstName, formatTeacherFullName } from '../../../utils/nameHelper';
 
+const CampusLevelSelectModal = lazy(() => import('../../campus/CampusLevelSelectModal').then(m => ({ default: m.CampusLevelSelectModal })));
+const GlobalParentPinModal = lazy(() => import('./GlobalParentPinModal').then(m => ({ default: m.GlobalParentPinModal })));
+const SiblingPinUnlockModal = lazy(() => import('./SiblingPinUnlockModal').then(m => ({ default: m.SiblingPinUnlockModal })));
+const AddSiblingModal = lazy(() => import('../../campus/AddSiblingModal').then(m => ({ default: m.AddSiblingModal })));
+const StudentJuniorPreFlightModal = lazy(() => import('./StudentJuniorPreFlightModal').then(m => ({ default: m.StudentJuniorPreFlightModal })));
+const StudentJuniorStickerModal = lazy(() => import('./StudentJuniorStickerModal').then(m => ({ default: m.StudentJuniorStickerModal })));
+const StudentJuniorStickerDetailModal = lazy(() => import('./StudentJuniorStickerDetailModal').then(m => ({ default: m.StudentJuniorStickerDetailModal })));
+const StudentJuniorStickerAwardModal = lazy(() => import('./StudentJuniorStickerAwardModal').then(m => ({ default: m.StudentJuniorStickerAwardModal })));
+const StudentSessionCelebrationModal = lazy(() => import('./StudentSessionCelebrationModal').then(m => ({ default: m.StudentSessionCelebrationModal })));
+const StudentMatchCelebrationModal = lazy(() => import('./StudentMatchCelebrationModal').then(m => ({ default: m.StudentMatchCelebrationModal })));
+const CampusAppointmentShoutboxModal = lazy(() => import('../../CampusAppointmentShoutboxModal').then(m => ({ default: m.CampusAppointmentShoutboxModal })));
+const StudentRescheduleBottomSheetModal = lazy(() => import('./StudentRescheduleBottomSheetModal').then(m => ({ default: m.StudentRescheduleBottomSheetModal })));
+const DigitalDetoxOverlay = lazy(() => import('./DigitalDetoxOverlay').then(m => ({ default: m.DigitalDetoxOverlay })));
+const StudentContributionsModal = lazy(() => import('./StudentContributionsModal').then(m => ({ default: m.StudentContributionsModal })));
+const StudentRulesModal = lazy(() => import('./StudentRulesModal').then(m => ({ default: m.StudentRulesModal })));
+const StudentCrisisNotifsModal = lazy(() => import('./StudentCrisisNotifsModal').then(m => ({ default: m.StudentCrisisNotifsModal })));
+const StudentSongDetailModal = lazy(() => import('./StudentSongDetailModal').then(m => ({ default: m.StudentSongDetailModal })));
+const StudentLehrwerkDetailModal = lazy(() => import('./StudentLehrwerkDetailModal').then(m => ({ default: m.StudentLehrwerkDetailModal })));
+const FocusAbortedModal = lazy(() => import('../../focus/FocusAbortedModal').then(m => ({ default: m.FocusAbortedModal })));
 const PushNotificationSoftPromptModal = lazy(() => import('../../ui/PushNotificationSoftPromptModal').then(m => ({ default: m.PushNotificationSoftPromptModal })));
 const StudentToolboxModal = lazy(() => import('../../campus/StudentToolboxModal').then(m => ({ default: m.StudentToolboxModal })));
 const ParentCampusActivationModal = lazy(() => import('../../ParentCampusActivationModal').then(m => ({ default: m.ParentCampusActivationModal })));
@@ -314,7 +316,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
   const internalCanvasRef = useRef<any>(null);
 
   return (
-    <>
+    <Suspense fallback={null}>
       {/* 1. Level Modal */}
       {showLevelModal && (
         <CampusLevelSelectModal
@@ -325,17 +327,19 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       )}
 
       {/* 2. Global Parent PIN Modal */}
-      <GlobalParentPinModal
-        isOpen={showGlobalParentPinModal}
-        studentUiLevel={studentUiLevel}
-        globalPinError={globalPinError}
-        globalPinInput={globalPinInput}
-        setGlobalPinInput={setGlobalPinInput}
-        setGlobalPinError={setGlobalPinError}
-        onVerify={handleVerifyGlobalParentPin}
-        onBiometricUnlock={handleBiometricUnlockForGlobalPin}
-        onClose={() => setShowGlobalParentPinModal(false)}
-      />
+      {showGlobalParentPinModal && (
+        <GlobalParentPinModal
+          isOpen={showGlobalParentPinModal}
+          studentUiLevel={studentUiLevel}
+          globalPinError={globalPinError}
+          globalPinInput={globalPinInput}
+          setGlobalPinInput={setGlobalPinInput}
+          setGlobalPinError={setGlobalPinError}
+          onVerify={handleVerifyGlobalParentPin}
+          onBiometricUnlock={handleBiometricUnlockForGlobalPin}
+          onClose={() => setShowGlobalParentPinModal(false)}
+        />
+      )}
 
       {/* 3. Sibling PIN Modal */}
       {pendingSiblingUnlock && (
@@ -369,38 +373,44 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       )}
 
       {/* 4. Junior Pre-Flight Modal */}
-      <StudentJuniorPreFlightModal
-        isOpen={showJuniorPreFlightModal}
-        onClose={() => setShowJuniorPreFlightModal(false)}
-        missionInfo={juniorMissionDetails}
-        targetMins={targetMins}
-        juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-        onSelectTrackIndex={setJuniorSelectedTrackIndex}
-        onStartMission={onStartJuniorMission}
-      />
+      {showJuniorPreFlightModal && (
+        <StudentJuniorPreFlightModal
+          isOpen={showJuniorPreFlightModal}
+          onClose={() => setShowJuniorPreFlightModal(false)}
+          missionInfo={juniorMissionDetails}
+          targetMins={targetMins}
+          juniorSelectedTrackIndex={juniorSelectedTrackIndex}
+          onSelectTrackIndex={setJuniorSelectedTrackIndex}
+          onStartMission={onStartJuniorMission}
+        />
+      )}
 
       {/* 5. Junior Sticker Modal */}
-      <StudentJuniorStickerModal
-        isOpen={showJuniorStickerModal}
-        onClose={() => setShowJuniorStickerModal(false)}
-        allStickers={ALL_STICKERS}
-        unifiedStickersMap={unifiedStickersMap}
-        juniorStickerCategory={juniorStickerCategory}
-        setJuniorStickerCategory={setJuniorStickerCategory}
-        onSelectSticker={(st) => setJuniorSelectedPreviewSticker(st)}
-        onStartInstrument={onStartJuniorInstrument}
-      />
+      {showJuniorStickerModal && (
+        <StudentJuniorStickerModal
+          isOpen={showJuniorStickerModal}
+          onClose={() => setShowJuniorStickerModal(false)}
+          allStickers={ALL_STICKERS}
+          unifiedStickersMap={unifiedStickersMap}
+          juniorStickerCategory={juniorStickerCategory}
+          setJuniorStickerCategory={setJuniorStickerCategory}
+          onSelectSticker={(st) => setJuniorSelectedPreviewSticker(st)}
+          onStartInstrument={onStartJuniorInstrument}
+        />
+      )}
 
       {/* 6. Junior Sticker Detail */}
-      <StudentJuniorStickerDetailModal
-        sticker={juniorSelectedPreviewSticker}
-        onClose={() => setJuniorSelectedPreviewSticker(null)}
-        assignedCampusSongs={assignedCampusSongs}
-        progressItems={progressItems}
-        isSongMastered={isSongMastered}
-        onStartRocket={onStartRocket}
-        onDownloadJpg={downloadJuniorStickerJpg || (() => {})}
-      />
+      {juniorSelectedPreviewSticker && (
+        <StudentJuniorStickerDetailModal
+          sticker={juniorSelectedPreviewSticker}
+          onClose={() => setJuniorSelectedPreviewSticker(null)}
+          assignedCampusSongs={assignedCampusSongs}
+          progressItems={progressItems}
+          isSongMastered={isSongMastered}
+          onStartRocket={onStartRocket}
+          onDownloadJpg={downloadJuniorStickerJpg || (() => {})}
+        />
+      )}
 
       {/* 7. Junior Sticker Award Celebration */}
       {studentUiLevel === 'junior' && juniorAwardedStickerToCelebrate && (
@@ -421,22 +431,26 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       )}
 
       {/* 8. Session Celebration */}
-      <StudentSessionCelebrationModal
-        isOpen={showCelebration}
-        celebrationDetails={celebrationDetails}
-        validationMode={validationMode || celebrationDetails?.validationMode}
-        studentUiLevel={studentUiLevel}
-        personalAverageMinutes={15}
-        celebrationCanvasRef={internalCanvasRef}
-        celebrationRingProgress={celebrationRingProgress}
-        onClose={() => setShowCelebration(false)}
-      />
+      {showCelebration && (
+        <StudentSessionCelebrationModal
+          isOpen={showCelebration}
+          celebrationDetails={celebrationDetails}
+          validationMode={validationMode || celebrationDetails?.validationMode}
+          studentUiLevel={studentUiLevel}
+          personalAverageMinutes={15}
+          celebrationCanvasRef={internalCanvasRef}
+          celebrationRingProgress={celebrationRingProgress}
+          onClose={() => setShowCelebration(false)}
+        />
+      )}
 
       {/* 9. Match Celebration */}
-      <StudentMatchCelebrationModal
-        data={matchCelebrationData}
-        onClose={() => setMatchCelebrationData(null)}
-      />
+      {matchCelebrationData && (
+        <StudentMatchCelebrationModal
+          data={matchCelebrationData}
+          onClose={() => setMatchCelebrationData(null)}
+        />
+      )}
 
       {/* 10. Appointment Quick Chat (Shoutbox) */}
       {showAppointmentChat && appointmentChatData && (
@@ -468,7 +482,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
             await handleConfirmReschedule(occId);
             closeRescheduleBottomSheet();
           }}
-          onOpenChatInquiry={(teacher, suggestedText) => {
+          onOpenChatInquiry={(teacher, _suggestedText) => {
             const occ = activeRescheduleBottomSheetOcc;
             if (!occ) return;
             setAppointmentChatData({
@@ -488,194 +502,190 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       )}
 
       {/* 12. Detox Overlay */}
-      <DigitalDetoxOverlay
-        isOpen={showDetox}
-        onClose={() => setShowDetox(false)}
-        detoxCompleted={detoxCompleted}
-        setDetoxCompleted={setDetoxCompleted}
-        detoxMinutes={detoxMinutes}
-        detoxSecondsLeft={detoxSecondsLeft}
-        isFaceDown={isFaceDown}
-        setIsDetoxActive={setIsDetoxActive}
-        xpActive={xpActive}
-      />
+      {showDetox && (
+        <DigitalDetoxOverlay
+          isOpen={showDetox}
+          onClose={() => setShowDetox(false)}
+          detoxCompleted={detoxCompleted}
+          setDetoxCompleted={setDetoxCompleted}
+          detoxMinutes={detoxMinutes}
+          detoxSecondsLeft={detoxSecondsLeft}
+          isFaceDown={isFaceDown}
+          setIsDetoxActive={setIsDetoxActive}
+          xpActive={xpActive}
+        />
+      )}
 
       {/* 13. Contributions Modal */}
-      <StudentContributionsModal
-        data={contributionsModalData}
-        loading={loadingContributions}
-        onClose={() => setContributionsModalData(null)}
-      />
+      {contributionsModalData && (
+        <StudentContributionsModal
+          data={contributionsModalData}
+          loading={loadingContributions}
+          onClose={() => setContributionsModalData(null)}
+        />
+      )}
 
       {/* 14. Rules Modal */}
-      <StudentRulesModal
-        isOpen={showRulesModal}
-        evolutionLevel={avatar?.evolution_level || 1}
-        onClose={() => setShowRulesModal(false)}
-      />
+      {showRulesModal && (
+        <StudentRulesModal
+          isOpen={showRulesModal}
+          evolutionLevel={avatar?.evolution_level || 1}
+          onClose={() => setShowRulesModal(false)}
+        />
+      )}
 
       {/* 15. Crisis Notifications */}
-      <StudentCrisisNotifsModal
-        unreadCrisisNotifs={unreadCrisisNotifs}
-        onDismiss={() => setUnreadCrisisNotifs([])}
-        onAcknowledgeSuccess={(acknowledgedIds) => {
-          setUnreadCrisisNotifs(unreadCrisisNotifs.filter(n => !acknowledgedIds.includes(n.id)));
-        }}
-      />
+      {unreadCrisisNotifs && unreadCrisisNotifs.length > 0 && (
+        <StudentCrisisNotifsModal
+          unreadCrisisNotifs={unreadCrisisNotifs}
+          onDismiss={() => setUnreadCrisisNotifs([])}
+          onAcknowledgeSuccess={(acknowledgedIds) => {
+            setUnreadCrisisNotifs(unreadCrisisNotifs.filter(n => !acknowledgedIds.includes(n.id)));
+          }}
+        />
+      )}
 
       {/* 16. Push Soft Prompt */}
       {showPushSoftPrompt && (
-        <Suspense fallback={null}>
-          <PushNotificationSoftPromptModal
-            isOpen={showPushSoftPrompt}
-            onClose={() => setShowPushSoftPrompt(false)}
-            userId={studentId}
-            initialScheduleChanges={pushNotifScheduleChanges}
-            initialHomework={pushNotifHomework}
-            initialStreakAndNews={pushNotifAllFeatures}
-            onSuccess={() => {
-              setPushEnabled(true);
-              if (onRefreshData) onRefreshData();
-            }}
-          />
-        </Suspense>
+        <PushNotificationSoftPromptModal
+          isOpen={showPushSoftPrompt}
+          onClose={() => setShowPushSoftPrompt(false)}
+          userId={studentId}
+          initialScheduleChanges={pushNotifScheduleChanges}
+          initialHomework={pushNotifHomework}
+          initialStreakAndNews={pushNotifAllFeatures}
+          onSuccess={() => {
+            setPushEnabled(true);
+            if (onRefreshData) onRefreshData();
+          }}
+        />
       )}
 
       {/* 17. Praxis Toolbox */}
       {showStudentToolbox && (
-        <Suspense fallback={null}>
-          <StudentToolboxModal
-            isOpen={showStudentToolbox}
-            onClose={() => setShowStudentToolbox(false)}
-            ageGroup={studentUiLevel || 'pro'}
-          />
-        </Suspense>
+        <StudentToolboxModal
+          isOpen={showStudentToolbox}
+          onClose={() => setShowStudentToolbox(false)}
+          ageGroup={studentUiLevel || 'pro'}
+        />
       )}
 
       {/* 18. Parent Activation Modal */}
       {showParentActivationModal && (
-        <Suspense fallback={null}>
-          <ParentCampusActivationModal
-            student={studentUser || { id: studentId }}
-            schoolData={{
-              ...(studentUser?.schools || {}),
-              name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule'
-            }}
-            onClose={() => setShowParentActivationModal(false)}
-            onPaymentSubmitted={() => {
-              setShowParentActivationModal(false);
-              if (onRefreshData) onRefreshData();
-            }}
-          />
-        </Suspense>
+        <ParentCampusActivationModal
+          student={studentUser || { id: studentId }}
+          schoolData={{
+            ...(studentUser?.schools || {}),
+            name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule'
+          }}
+          onClose={() => setShowParentActivationModal(false)}
+          onPaymentSubmitted={() => {
+            setShowParentActivationModal(false);
+            if (onRefreshData) onRefreshData();
+          }}
+        />
       )}
 
       {/* 19. Soft Lock Modal */}
       {showSoftLockModal && (
-        <Suspense fallback={null}>
-          <PaymentGracePeriodSoftLockModal
-            student={studentUser || { id: studentId }}
-            schoolData={{
-              ...(studentUser?.schools || {}),
-              name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule'
-            }}
-            onClose={() => setShowSoftLockModal(false)}
-            onOpenActivationModal={() => {
-              setShowSoftLockModal(false);
-              setShowParentActivationModal(true);
-            }}
-          />
-        </Suspense>
+        <PaymentGracePeriodSoftLockModal
+          student={studentUser || { id: studentId }}
+          schoolData={{
+            ...(studentUser?.schools || {}),
+            name: studentUser?.schools?.name || 'Campus-Groovelab Partner-Musikschule'
+          }}
+          onClose={() => setShowSoftLockModal(false)}
+          onOpenActivationModal={() => {
+            setShowSoftLockModal(false);
+            setShowParentActivationModal(true);
+          }}
+        />
       )}
 
       {/* 20. Help Center */}
       {isHelpCenterOpen && (
-        <Suspense fallback={null}>
-          <HelpCenterModal
-            isOpen={isHelpCenterOpen}
-            onClose={() => setIsHelpCenterOpen(false)}
-            userRole="student"
-            activePlatform={currentPlatform}
-            schoolName={resolvedSchoolName || 'Meine Musikschule'}
-            initialBoardId={activeTab || 'briefing'}
-            onNavigateBoard={(target) => {
-              if (target) setActiveTab(target);
-            }}
-          />
-        </Suspense>
+        <HelpCenterModal
+          isOpen={isHelpCenterOpen}
+          onClose={() => setIsHelpCenterOpen(false)}
+          userRole="student"
+          activePlatform={currentPlatform}
+          schoolName={resolvedSchoolName || 'Meine Musikschule'}
+          initialBoardId={activeTab || 'briefing'}
+          onNavigateBoard={(target) => {
+            if (target) setActiveTab(target);
+          }}
+        />
       )}
 
       {/* 21. Feedback Hub */}
       {isFeedbackModalOpen && (
-        <Suspense fallback={null}>
-          <FeedbackHubModal
-            isOpen={isFeedbackModalOpen}
-            onClose={() => setIsFeedbackModalOpen(false)}
-            userRole="student"
-            userId={studentId}
-            userName={studentUser?.first_name || 'Schüler'}
-            schoolId={studentUser?.school_id}
-            schoolName={(studentUser as any)?.school_name}
-            activePlatform={currentPlatform}
-          />
-        </Suspense>
+        <FeedbackHubModal
+          isOpen={isFeedbackModalOpen}
+          onClose={() => setIsFeedbackModalOpen(false)}
+          userRole="student"
+          userId={studentId}
+          userName={studentUser?.first_name || 'Schüler'}
+          schoolId={studentUser?.school_id}
+          schoolName={(studentUser as any)?.school_name}
+          activePlatform={currentPlatform}
+        />
       )}
 
       {/* 22. Meisterwerk Certificate */}
       {certificateSong && (
-        <Suspense fallback={null}>
-          <MeisterwerkCertificateModal
-            studentName={formatStudentPureFirstName(studentUser?.first_name, 'Musikschüler')}
-            songTitle={certificateSong.title || 'Meisterwerk'}
-            instrument={studentUser?.instrument || 'Instrument'}
-            schoolName={resolvedSchoolName}
-            teacherName={formatTeacherFullName(studentUser?.teacher_name || briefingData?.todayLesson?.teacher_name || 'Deine Lehrkraft')}
-            masteredDate={certificateSong.masteredDate}
-            certificateId={certificateSong.certificateId}
-            onClose={() => setCertificateSong(null)}
-          />
-        </Suspense>
+        <MeisterwerkCertificateModal
+          studentName={formatStudentPureFirstName(studentUser?.first_name, 'Musikschüler')}
+          songTitle={certificateSong.title || 'Meisterwerk'}
+          instrument={studentUser?.instrument || 'Instrument'}
+          schoolName={resolvedSchoolName}
+          teacherName={formatTeacherFullName(studentUser?.teacher_name || briefingData?.todayLesson?.teacher_name || 'Deine Lehrkraft')}
+          masteredDate={certificateSong.masteredDate}
+          certificateId={certificateSong.certificateId}
+          onClose={() => setCertificateSong(null)}
+        />
       )}
 
       {/* 23. Song & Lehrwerk Details */}
-      <StudentSongDetailModal
-        song={selectedSongForDetail}
-        onClose={() => setSelectedSongForDetail(null)}
-        studentId={studentId}
-        progressItems={progressItems}
-        handleTabChangeLocal={handleTabChangeLocal}
-        setSelectedTopic={setSelectedTopic}
-      />
+      {selectedSongForDetail && (
+        <StudentSongDetailModal
+          song={selectedSongForDetail}
+          onClose={() => setSelectedSongForDetail(null)}
+          studentId={studentId}
+          progressItems={progressItems}
+          handleTabChangeLocal={handleTabChangeLocal}
+          setSelectedTopic={setSelectedTopic}
+        />
+      )}
 
-      <StudentLehrwerkDetailModal
-        book={selectedLehrwerkForDetail}
-        onClose={() => setSelectedLehrwerkForDetail(null)}
-        lehrwerke={lehrwerke}
-        progressItems={progressItems}
-        localProgress={localProgress}
-        studentId={studentId}
-        isMobile={isMobile}
-        handleTabChangeLocal={handleTabChangeLocal}
-        setSelectedTopic={setSelectedTopic}
-      />
+      {selectedLehrwerkForDetail && (
+        <StudentLehrwerkDetailModal
+          book={selectedLehrwerkForDetail}
+          onClose={() => setSelectedLehrwerkForDetail(null)}
+          lehrwerke={lehrwerke}
+          progressItems={progressItems}
+          localProgress={localProgress}
+          studentId={studentId}
+          isMobile={isMobile}
+          handleTabChangeLocal={handleTabChangeLocal}
+          setSelectedTopic={setSelectedTopic}
+        />
+      )}
 
       {/* 24. Wrapped Story */}
       {showWrapped && !!wrappedData && (
-        <Suspense fallback={null}>
-          <CampusWrappedStoryModal
-            isOpen={Boolean(showWrapped && !!wrappedData)}
-            onClose={() => setShowWrapped && setShowWrapped(false)}
-            wrappedData={wrappedData}
-            avatar={avatar}
-            currentLevel={currentLevel || 1}
-            studentId={studentId}
-            levelTitle={levelTitle || ''}
-          />
-        </Suspense>
+        <CampusWrappedStoryModal
+          isOpen={Boolean(showWrapped && !!wrappedData)}
+          onClose={() => setShowWrapped && setShowWrapped(false)}
+          wrappedData={wrappedData}
+          avatar={avatar}
+          currentLevel={currentLevel || 1}
+          studentId={studentId}
+          levelTitle={levelTitle || ''}
+        />
       )}
 
       {/* 25. Focus Interruption Guard Modal */}
-      {focusGuard && (
+      {focusGuard?.isAborted && (
         <FocusAbortedModal
           isOpen={focusGuard.isAborted}
           reason={focusGuard.abortReason}
@@ -685,6 +695,6 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
           }}
         />
       )}
-    </>
+    </Suspense>
   );
 };

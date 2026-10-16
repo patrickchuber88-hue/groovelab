@@ -220,21 +220,46 @@ export function useAdminDashboardData({
         const cacheKey = `${adminData.school_id}_${activePlatform}_${effectiveRole}`;
         const shouldFetchCore = force || hasFetchedCoreRef.current !== cacheKey;
 
-        if (shouldFetchCore) {
-          // Parallel fetch core data: teachers, rooms, stations, schoolRoster, schedules
-          const [tRes, rRes, stRes, schoolRoster, schedRes] = await Promise.all([
-            supabase
-              .from('users')
-              .select('*')
-              .eq('school_id', adminData.school_id)
-              .in('role', ['teacher', 'admin', 'secretary'])
-              .order('first_name'),
-            supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
-            supabase.from('stations').select('*, rooms!stations_room_id_fkey(*)').eq('school_id', adminData.school_id).order('name'),
-            fetchSchoolRoster(adminData.school_id, supabase, force, { includePending: effectiveRole !== 'teacher' }),
-            supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
-          ]);
+        const corePromise = shouldFetchCore
+          ? Promise.all([
+              supabase
+                .from('users')
+                .select('*')
+                .eq('school_id', adminData.school_id)
+                .in('role', ['teacher', 'admin', 'secretary'])
+                .order('first_name'),
+              supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
+              supabase.from('stations').select('*, rooms!stations_room_id_fkey(*)').eq('school_id', adminData.school_id).order('name'),
+              fetchSchoolRoster(adminData.school_id, supabase, force, { includePending: effectiveRole !== 'teacher' }),
+              supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
+            ])
+          : Promise.resolve(null);
 
+        const subViewPromise = !isRoomsOnly
+          ? Promise.all([
+              effectiveTab === 'bands' || effectiveTab === 'live'
+                ? supabase
+                    .from('bands')
+                    .select('*, songs(id, title, artist, instrumentation), coach:users!coach_id(id, first_name, last_name, photo_url), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))')
+                    .eq('school_id', adminData.school_id)
+                    .order('name')
+                : Promise.resolve({ data: null }),
+              effectiveTab === 'songs' || effectiveTab === 'live'
+                ? supabase.from('songs').select('*').or(`school_id.eq.${adminData.school_id},school_id.is.null`).order('title')
+                : Promise.resolve({ data: null }),
+              activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup')
+                ? supabase.from('sessions').select('*, profiles:users!inner(*), stations(*)').eq('profiles.school_id', adminData.school_id).is('check_out_time', null)
+                : Promise.resolve({ data: null }),
+              activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live')
+                ? supabase.from('user_song_skills').select('*, users!user_song_skills_user_id_fkey!inner(*), songs!inner(*)').eq('is_pending_approval', true)
+                : Promise.resolve({ data: null })
+            ])
+          : Promise.resolve(null);
+
+        const [coreResults, subViewResults] = await Promise.all([corePromise, subViewPromise]);
+
+        if (coreResults) {
+          const [tRes, rRes, stRes, schoolRoster, schedRes] = coreResults;
           if (tRes.data) {
             const platformTeachers = activePlatform === 'groovelab'
               ? tRes.data.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
@@ -267,27 +292,8 @@ export function useAdminDashboardData({
           hasFetchedCoreRef.current = cacheKey;
         }
 
-        // Fetch heavy sub-view data only when needed (skip completely if rooms-only view)
-        if (!isRoomsOnly) {
-          const [bRes, sngRes, sessRes, subRes] = await Promise.all([
-            effectiveTab === 'bands' || effectiveTab === 'live'
-              ? supabase
-                  .from('bands')
-                  .select('*, songs(id, title, artist, instrumentation), coach:users!coach_id(id, first_name, last_name, photo_url), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))')
-                  .eq('school_id', adminData.school_id)
-                  .order('name')
-              : Promise.resolve({ data: null }),
-            effectiveTab === 'songs' || effectiveTab === 'live'
-              ? supabase.from('songs').select('*').or(`school_id.eq.${adminData.school_id},school_id.is.null`).order('title')
-              : Promise.resolve({ data: null }),
-            activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup')
-              ? supabase.from('sessions').select('*, profiles:users!inner(*), stations(*)').eq('profiles.school_id', adminData.school_id).is('check_out_time', null)
-              : Promise.resolve({ data: null }),
-            activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live')
-              ? supabase.from('user_song_skills').select('*, users!user_song_skills_user_id_fkey!inner(*), songs!inner(*)').eq('is_pending_approval', true)
-              : Promise.resolve({ data: null })
-          ]);
-
+        if (subViewResults) {
+          const [bRes, sngRes, sessRes, subRes] = subViewResults;
           if (bRes.data) {
             const realBands = bRes.data.filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_'));
             setAllBands(realBands);

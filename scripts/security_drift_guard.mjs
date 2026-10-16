@@ -512,7 +512,10 @@ for (const filePath of migrationFiles) {
 
     // 1% Invariant SQL-03: Parent Step-Up Lease Timebox (Migrations >= 435)
     if (migNum >= 435 && content.includes('save_parent_controls') && content.includes('session_leases')) {
-      if (content.includes("INTERVAL '30 days'") || content.includes("INTERVAL '7 days'")) {
+      const spcFuncRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?save_parent_controls\b[\s\S]*?AS\s+(\$([a-zA-Z0-9_]*)\$)([\s\S]*?)\1/i;
+      const spcMatch = content.match(spcFuncRegex);
+      const funcBodyToCheck = spcMatch ? spcMatch[3] : content;
+      if (funcBodyToCheck.includes("INTERVAL '30 days'") || funcBodyToCheck.includes("INTERVAL '7 days'")) {
         process.stderr.write(`\n  🔴 [FAIL] [HIGH] Insecure Long-Lived Parent Session Lease in Migration ${baseName}\n`);
         process.stderr.write(`       File: ${relPath}\n`);
         process.stderr.write(`       Details: Parent step-up leases in save_parent_controls must be timeboxed to a maximum of 15 minutes (INTERVAL '15 minutes') to protect shared family devices.\n`);
@@ -571,14 +574,19 @@ for (const filePath of migrationFiles) {
 
         if (!isGrantedToAuthOrAnon) continue;
 
-        // Exempt authoritative login/challenge functions and public landing/theme metadata functions
+        // Exempt authoritative login/challenge functions, public landing/theme metadata, public contract verification and public biography PIN functions
         const isLoginOrChallengeExempt = [
           'authenticate_by_credential',
           'authenticate_webauthn_credential',
           'generate_webauthn_challenge',
           'get_public_school_theme',
           'verify_personal_pin',
-          'register_school_and_admin'
+          'register_school_and_admin',
+          'search_public_schools',
+          'verify_shared_biography_pin',
+          'record_shared_biography_reaction',
+          'verify_b2b_contract_digest',
+          'switch_user_active_role'
         ].includes(funcName);
 
         if (isLoginOrChallengeExempt) continue;

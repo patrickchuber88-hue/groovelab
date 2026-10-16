@@ -85,7 +85,12 @@ export async function createMasterSessionLease(
     sessionStorage.setItem('groovelab_is_master_admin', 'true');
     sessionStorage.setItem('groovelab_user_id', userId);
     try {
-      registerClientSessionLease({ id: userId, role: 'admin' }, '00000000-0000-0000-0000-000000000000').catch(() => {});
+      localStorage.setItem('groovelab_user_id', userId);
+      const validSchoolId = sessionStorage.getItem('groovelab_school_id')
+        || localStorage.getItem('groovelab_school_id')
+        || localStorage.getItem('groovelab_last_school_id')
+        || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+      await registerClientSessionLease({ id: userId, role: 'admin' }, validSchoolId).catch(() => {});
     } catch (e) {}
   }
 

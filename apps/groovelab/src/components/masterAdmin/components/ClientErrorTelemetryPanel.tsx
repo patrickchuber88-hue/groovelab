@@ -35,15 +35,27 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
     loadLogs();
 
     // Listen for live client errors dispatched in current window/tabs
-    const handleLiveEvent = (e: any) => {
-      if (e.detail) {
-        setLogs(prev => [e.detail, ...prev.filter(l => l.id !== e.detail.id)]);
+    const handleLiveEvent = (e: Event) => {
+      const customEvt = e as CustomEvent<ClientErrorLog>;
+      if (customEvt.detail) {
+        setLogs(prev => [customEvt.detail, ...prev.filter(l => l.id !== customEvt.detail.id)]);
       }
     };
 
     window.addEventListener('campus_groovelab_telemetry_event', handleLiveEvent);
     return () => window.removeEventListener('campus_groovelab_telemetry_event', handleLiveEvent);
   }, []);
+
+  useEffect(() => {
+    if (!selectedLog) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedLog(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedLog]);
 
   const handleResolve = async (id: string) => {
     await markErrorResolved(id);
@@ -103,7 +115,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
       {logs.length === 0 ? (
         <div style={{
           background: '#ecfdf5',
-          border: '1.5px solid #10b981',
+          border: 'none',
           borderRadius: '20px',
           padding: '24px 28px',
           display: 'flex',
@@ -129,11 +141,11 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#065f46', fontFamily: '"Outfit", sans-serif' }}>
+                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#065f46', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
                   Client Incident Monitor: 100% Fehlerfrei
                 </h4>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#a7f3d0', color: '#065f46' }}>
-                  Zero-PII &amp; DSGVO
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#a7f3d0', color: '#065f46', border: 'none' }}>
+                  Zero-PII
                 </span>
               </div>
               <p style={{ margin: '3px 0 0 0', fontSize: '0.84rem', color: '#047857', fontWeight: 550 }}>
@@ -201,13 +213,13 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                 }}>
                   <ShieldAlert size={16} />
                 </div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
                   Client Error-Stream &amp; Incident Monitor
                 </h3>
                 <span style={{
                   background: '#fef2f2',
                   color: '#dc2626',
-                  border: '1px solid #fecaca',
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: '100px',
                   fontSize: '0.68rem',
@@ -253,7 +265,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                     alignItems: 'center',
                     gap: '6px',
                     background: '#fef2f2',
-                    border: '1px solid #fecaca',
+                    border: 'none',
                     padding: '7px 14px',
                     borderRadius: '10px',
                     fontSize: '0.78rem',
@@ -310,7 +322,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Kategorie:</span>
               <select
                 value={tagFilter}
-                onChange={e => setTagFilter(e.target.value as any)}
+                onChange={e => setTagFilter(e.target.value as 'ALL' | 'AUDIO' | 'RPC' | 'CIRCUIT' | 'UNHANDLED')}
                 style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
               >
                 <option value="ALL">Alle Kategorien</option>
@@ -325,7 +337,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Schweregrad:</span>
               <select
                 value={severityFilter}
-                onChange={e => setSeverityFilter(e.target.value as any)}
+                onChange={e => setSeverityFilter(e.target.value as 'ALL' | 'CRITICAL' | 'WARNING' | 'INFO')}
                 style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
               >
                 <option value="ALL">Alle Schweregrade</option>
@@ -339,7 +351,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Status:</span>
               <select
                 value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as any)}
+                onChange={e => setStatusFilter(e.target.value as 'ALL' | 'UNRESOLVED' | 'RESOLVED')}
                 style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
               >
                 <option value="ALL">Alle Status</option>
@@ -358,7 +370,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               Keine aktiven Fehlereinträge vorhanden
             </h4>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-              Alle Systeme laufen stabil im optimalen Bereich. Du kannst oben einen Test-Fehler simulieren.
+              Alle Systeme laufen stabil im optimalen Bereich.
             </p>
           </div>
         ) : (
@@ -399,12 +411,12 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                           width: 'fit-content',
                           background: log.severity === 'CRITICAL' ? '#fee2e2' : log.severity === 'WARNING' ? '#fef3c7' : '#eff6ff',
                           color: log.severity === 'CRITICAL' ? '#dc2626' : log.severity === 'WARNING' ? '#d97706' : '#2563eb',
-                          border: `1px solid ${log.severity === 'CRITICAL' ? '#fca5a5' : log.severity === 'WARNING' ? '#fde68a' : '#bfdbfe'}`
+                          border: 'none'
                         }}>
                           {log.severity}
                         </span>
                         <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                          {new Date(log.timestamp).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} MESZ
+                          {new Date(log.timestamp).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}
                         </span>
                       </div>
                     </td>
@@ -500,7 +512,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                             style={{
                               background: '#ecfdf5',
                               color: '#059669',
-                              border: '1px solid #a7f3d0',
+                              border: 'none',
                               padding: '6px 10px',
                               borderRadius: '10px',
                               fontSize: '0.74rem',
@@ -526,28 +538,38 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
 
       {/* ─── 4. DETAIL STACK TRACE MODAL ─── */}
       {selectedLog && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 99999,
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            width: '100%',
-            maxWidth: '750px',
-            maxHeight: '90vh',
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Fehlerbericht und Diagnostik"
+          onClick={() => setSelectedLog(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
-            overflow: 'hidden'
-          }} className="animate-scale-up">
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '750px',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
+              overflow: 'hidden'
+            }}
+            className="animate-scale-up"
+          >
             
             {/* Modal Header */}
             <div style={{
@@ -569,6 +591,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
 
               <button
                 onClick={() => setSelectedLog(null)}
+                aria-label="Schließen"
                 style={{
                   background: 'none',
                   border: 'none',
@@ -588,7 +611,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               {/* Message Banner */}
               <div style={{
                 background: selectedLog.severity === 'CRITICAL' ? '#fff1f2' : '#fffbeb',
-                border: `1px solid ${selectedLog.severity === 'CRITICAL' ? '#fecdd3' : '#fde68a'}`,
+                border: 'none',
                 borderRadius: '16px',
                 padding: '16px 20px',
                 color: selectedLog.severity === 'CRITICAL' ? '#9f1239' : '#92400e',
@@ -603,7 +626,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.80rem' }}>
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Zeitpunkt:</span><br />
-                  <strong>{new Date(selectedLog.timestamp).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} MESZ</strong>
+                  <strong>{new Date(selectedLog.timestamp).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</strong>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Route / Screen:</span><br />

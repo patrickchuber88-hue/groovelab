@@ -10,6 +10,7 @@ import { getSchoolProfileDTO } from '../api/bffClient';
 import { formatUserDisplayName } from '../utils/userDisplayName';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { downloadAppleWalletPass, openGoogleWalletPass } from '../services/wallet/appleWalletPassService';
+import { resolveUserCampusId } from '../utils/campusIdHelper';
 
 interface QRCodeModalProps {
   user: {
@@ -407,9 +408,10 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         {(() => {
           const isStudentUser = (user.role || '').toLowerCase() === 'student';
           const isCampus = activePlatform === 'campus';
+          const canonicalId = resolveUserCampusId(user);
           const effectiveToken = isStudentUser
-            ? (localQrToken || user.qr_token || user.ausweis_nummer || user.id || '')
-            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || user.ausweis_nummer || user.id || '');
+            ? (localQrToken || user.qr_token || user.ausweis_nummer || canonicalId || user.id || '')
+            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || user.ausweis_nummer || canonicalId || user.id || '');
           const canonicalQrLandingUrl = getCanonicalQrLandingUrl(effectiveToken);
           const loggedInUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
           const isSelfView = Boolean(loggedInUserId && user.id && loggedInUserId === user.id);

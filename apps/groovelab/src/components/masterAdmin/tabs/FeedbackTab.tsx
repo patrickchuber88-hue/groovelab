@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Lightbulb, Bug, Filter, Search, CheckCircle2, Clock, 
   Sparkles, RefreshCw, Send, Trash2, ShieldAlert, ShieldCheck, Check,
@@ -13,7 +13,11 @@ import {
   FEEDBACK_STATUSES, QUICK_RESPONSE_TEMPLATES, computeSlaTarget
 } from '../../../config/feedbackConfig';
 
-export const FeedbackTab: React.FC = () => {
+export interface FeedbackTabProps {
+  onStartGhostMode?: (schoolId: string, schoolName: string, reason: string) => void;
+}
+
+export const FeedbackTab: React.FC<FeedbackTabProps> = ({ onStartGhostMode }) => {
   const [items, setItems] = useState<PlatformFeedbackItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -27,9 +31,9 @@ export const FeedbackTab: React.FC = () => {
   const [isSendingResponse, setIsSendingResponse] = useState<boolean>(false);
   const [tick, setTick] = useState<number>(0);
 
-  // 10-Second Live SLA Clock Ticker
+  // 30-Second Live SLA Clock Ticker
   useEffect(() => {
-    const timer = setInterval(() => setTick(t => t + 1), 10000);
+    const timer = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(timer);
   }, []);
 
@@ -42,36 +46,30 @@ export const FeedbackTab: React.FC = () => {
   const [releasePlatform, setReleasePlatform] = useState<'all' | 'campus' | 'groovelab'>('all');
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
 
+  useEffect(() => {
+    if (!isReleaseModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsReleaseModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isReleaseModalOpen]);
+
   const fetchFeedback = async () => {
     setLoading(true);
     try {
-      let combined: PlatformFeedbackItem[] = [];
+      const { data, error } = await supabase
+        .from('platform_feedback')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      // 1. Load from localStorage first (immediate local visibility)
-      try {
-        const localData = localStorage.getItem('cg_local_platform_feedback');
-        if (localData) {
-          combined = JSON.parse(localData);
-        }
-      } catch (e) {}
-
-      // 2. Load from Supabase (if table exists)
-      try {
-        const { data, error } = await supabase
-          .from('platform_feedback')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          const remoteIds = new Set(data.map((d: any) => d.id));
-          const onlyLocal = combined.filter(c => !remoteIds.has(c.id));
-          combined = [...data, ...onlyLocal];
-        }
-      } catch (err) {
-        console.warn('Supabase platform_feedback query note:', err);
+      if (!error && Array.isArray(data)) {
+        setItems(data as PlatformFeedbackItem[]);
+      } else {
+        setItems([]);
       }
-
-      setItems(combined);
     } catch (err) {
       console.error('Error fetching platform feedback:', err);
     } finally {
@@ -103,10 +101,10 @@ export const FeedbackTab: React.FC = () => {
         diffSec = Math.max(0, Math.floor((now.getTime() - new Date(targetItem.created_at).getTime()) / 1000));
       }
 
-      const updateData: any = {
-        admin_response: responseText.trim() || null,
-        admin_responded_at: responseText.trim() ? now.toISOString() : null,
-        first_response_seconds: diffSec ?? targetItem?.first_response_seconds ?? null,
+      const updateData: Partial<PlatformFeedbackItem> & { updated_at: string } = {
+        admin_response: responseText.trim() || undefined,
+        admin_responded_at: responseText.trim() ? now.toISOString() : undefined,
+        first_response_seconds: diffSec ?? targetItem?.first_response_seconds ?? undefined,
         sla_fulfilled: true,
         is_user_read: false,
         updated_at: now.toISOString()
@@ -115,26 +113,14 @@ export const FeedbackTab: React.FC = () => {
         updateData.status = newStatus;
       }
 
-      // 1. Update in local responses store for instant client sync
-      try {
-        const localResponses = JSON.parse(localStorage.getItem('cg_local_feedback_responses') || '{}');
-        localResponses[id] = { ...updateData };
-        localStorage.setItem('cg_local_feedback_responses', JSON.stringify(localResponses));
+      const { error } = await supabase
+        .from('platform_feedback')
+        .update(updateData)
+        .eq('id', id);
 
-        const globalData = JSON.parse(localStorage.getItem('cg_local_platform_feedback') || '[]');
-        const updatedGlobal = globalData.map((it: any) => it.id === id ? { ...it, ...updateData } : it);
-        localStorage.setItem('cg_local_platform_feedback', JSON.stringify(updatedGlobal));
-      } catch (e) {}
-
-      // 2. Update in Supabase
-      try {
-        const { error } = await supabase
-          .from('platform_feedback')
-          .update(updateData)
-          .eq('id', id);
-
-        if (error) console.warn('Supabase remote response update note:', error.message);
-      } catch (e) {}
+      if (error) {
+        throw new Error(error.message);
+      }
 
       setItems(prev => prev.map(item => 
         item.id === id ? { ...item, ...updateData } : item
@@ -144,9 +130,10 @@ export const FeedbackTab: React.FC = () => {
         setSelectedItem(prev => prev ? { ...prev, ...updateData } : null);
       }
       alert('Antwort erfolgreich gespeichert & SLA erfüllt! Der Nutzer sieht deine Rückmeldung ab sofort in seiner Ideenschmiede.');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Datenbankfehler';
       console.error('Error saving admin response:', err);
-      alert(`Fehler beim Speichern der Antwort: ${err.message}`);
+      alert(`Fehler beim Speichern der Antwort (Fail-Closed): ${msg}`);
     } finally {
       setIsSendingResponse(false);
     }
@@ -154,87 +141,29 @@ export const FeedbackTab: React.FC = () => {
 
   const handleLaunchGhostForFeedbackItem = (item: PlatformFeedbackItem) => {
     const schoolId = item.school_id || '';
-    const targetUserId = item.target_user_id || item.user_id || '';
-    const userRole = item.user_role || 'teacher';
-    const userName = item.user_name || 'Nutzer';
-    
-    // Save audit
-    try {
-      const existingAuditRaw = localStorage.getItem('campus_ghost_audit_trail');
-      const existingAudit = existingAuditRaw ? JSON.parse(existingAuditRaw) : [];
-      const newLog = {
-        id: `GHA-TICKET-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        schoolId,
-        schoolName: item.school_name || 'Musikschule',
-        role: userRole,
-        targetUserId,
-        targetUserName: userName,
-        ticketId: item.id,
-        operator: 'Patrick Huber (MasterAdmin)',
-        status: 'TICKET_SUPPORT_LAUNCHED'
-      };
-      localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));
-    } catch (e) {}
+    const schoolName = item.school_name || 'Musikschule';
+    const ticketRef = item.ticket_number || `TICKET-${item.id.slice(-6).toUpperCase()}`;
 
-    const schoolParam = schoolId ? `&school_id=${schoolId}` : '';
-    const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
-    const url = `${window.location.origin}/?support_ghost=true${schoolParam}${userParam}&ticket_id=${item.id}&role=${userRole}&ts=${Date.now()}`;
-    window.open(url, '_blank');
-  };
+    if (!schoolId) {
+      alert('Für dieses Ticket ist keine gültige Mandanten-ID (school_id) hinterlegt.');
+      return;
+    }
 
-  const handleUpdateStatus = async (id: string, newStatus: FeedbackStatus) => {
-    try {
-      const updateData = { status: newStatus, updated_at: new Date().toISOString() };
-
-      // Local storage sync
-      try {
-        const localResponses = JSON.parse(localStorage.getItem('cg_local_feedback_responses') || '{}');
-        localResponses[id] = { ...(localResponses[id] || {}), ...updateData };
-        localStorage.setItem('cg_local_feedback_responses', JSON.stringify(localResponses));
-
-        const globalData = JSON.parse(localStorage.getItem('cg_local_platform_feedback') || '[]');
-        const updatedGlobal = globalData.map((it: any) => it.id === id ? { ...it, ...updateData } : it);
-        localStorage.setItem('cg_local_platform_feedback', JSON.stringify(updatedGlobal));
-      } catch (e) {}
-
-      // Remote Supabase update
-      try {
-        await supabase
-          .from('platform_feedback')
-          .update(updateData)
-          .eq('id', id);
-      } catch (e) {}
-      
-      setItems(prev => prev.map(item => 
-        item.id === id ? { ...item, status: newStatus } : item
-      ));
-
-      if (selectedItem?.id === id) {
-        setSelectedItem(prev => prev ? { ...prev, status: newStatus } : null);
-      }
-    } catch (err) {
-      console.error('Error updating feedback status:', err);
-      alert('Fehler beim Aktualisieren des Status.');
+    if (onStartGhostMode) {
+      onStartGhostMode(schoolId, schoolName, ticketRef);
+    } else {
+      alert('Ghost-Support benötigt eine aktive 2FA Step-Up-Verifikation über das Haupt-Cockpit.');
     }
   };
 
   const handleUpdateNotes = async (id: string, notes: string) => {
     try {
-      // Local storage sync
-      try {
-        const globalData = JSON.parse(localStorage.getItem('cg_local_platform_feedback') || '[]');
-        const updatedGlobal = globalData.map((it: any) => it.id === id ? { ...it, admin_notes: notes } : it);
-        localStorage.setItem('cg_local_platform_feedback', JSON.stringify(updatedGlobal));
-      } catch (e) {}
+      const { error } = await supabase
+        .from('platform_feedback')
+        .update({ admin_notes: notes, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
-      // Remote Supabase update
-      try {
-        await supabase
-          .from('platform_feedback')
-          .update({ admin_notes: notes, updated_at: new Date().toISOString() })
-          .eq('id', id);
-      } catch (e) {}
+      if (error) throw new Error(error.message);
 
       setItems(prev => prev.map(item => 
         item.id === id ? { ...item, admin_notes: notes } : item
@@ -247,24 +176,12 @@ export const FeedbackTab: React.FC = () => {
   const handleDeleteFeedback = async (id: string) => {
     if (!confirm('Möchtest du dieses Feedback-Ticket wirklich löschen?')) return;
     try {
-      // Delete from localStorage
-      try {
-        const globalData = JSON.parse(localStorage.getItem('cg_local_platform_feedback') || '[]');
-        const updatedGlobal = globalData.filter((it: any) => it.id !== id);
-        localStorage.setItem('cg_local_platform_feedback', JSON.stringify(updatedGlobal));
+      const { error } = await supabase
+        .from('platform_feedback')
+        .delete()
+        .eq('id', id);
 
-        const localResponses = JSON.parse(localStorage.getItem('cg_local_feedback_responses') || '{}');
-        delete localResponses[id];
-        localStorage.setItem('cg_local_feedback_responses', JSON.stringify(localResponses));
-      } catch (e) {}
-
-      // Delete from Supabase
-      try {
-        await supabase
-          .from('platform_feedback')
-          .delete()
-          .eq('id', id);
-      } catch (e) {}
+      if (error) throw new Error(error.message);
 
       setItems(prev => prev.filter(item => item.id !== id));
       if (selectedItem?.id === id) setSelectedItem(null);
@@ -274,7 +191,7 @@ export const FeedbackTab: React.FC = () => {
     }
   };
 
-  // Open Release Modal prefilled from an item (GDPR & UrhG verified)
+  // Open Release Modal prefilled from an item
   const openReleaseModal = (item: PlatformFeedbackItem) => {
     const legalCredit = formatLegalHeroCredit(
       item.user_role,
@@ -318,8 +235,8 @@ export const FeedbackTab: React.FC = () => {
       // Mark feedback as done & announcement created + generate official developer shout
       if (selectedItem) {
         const heroNotice = releaseCredit.trim() 
-          ? `🎉 Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt und im aktuellen Update-Briefing gewürdigt (${releaseCredit.trim()}). Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`
-          : `🎉 Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt. Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`;
+          ? `Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt und im aktuellen Update-Briefing gewürdigt (${releaseCredit.trim()}). Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`
+          : `Deine Idee ist jetzt live! Wir haben deinen Vorschlag für „${releaseTitle.trim()}“ erfolgreich umgesetzt. Vielen Dank für deinen wertvollen Beitrag zu Campus-Groovelab!`;
 
         await supabase
           .from('platform_feedback')
@@ -333,12 +250,17 @@ export const FeedbackTab: React.FC = () => {
           })
           .eq('id', selectedItem.id);
 
-        // If submitter user_id is known, push a direct system message
+        // If submitter user_id is known, push a direct system message with distinct system/admin sender_id
         if (selectedItem.user_id) {
           try {
+            const { data: sessionData } = await supabase.auth.getUser();
+            const adminSenderId = sessionData?.user?.id && sessionData.user.id !== selectedItem.user_id
+              ? sessionData.user.id
+              : null;
+
             await supabase.from('campus_direct_messages').insert({
               recipient_id: selectedItem.user_id,
-              sender_id: selectedItem.user_id,
+              sender_id: adminSenderId,
               content: heroNotice,
               is_system: true,
               message_type: 'helden_moment_reward'
@@ -362,37 +284,70 @@ export const FeedbackTab: React.FC = () => {
 
       setIsReleaseModalOpen(false);
       alert('Helden-Moment Update erfolgreich veröffentlicht! Es erscheint ab sofort auf den Briefing-Dashboards.');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unbekannter Fehler';
       console.error('Error publishing announcement:', err);
-      alert(`Fehler beim Veröffentlichen: ${err.message}`);
+      alert(`Fehler beim Veröffentlichen: ${msg}`);
     } finally {
       setIsPublishing(false);
     }
   };
 
-  // SLA KPI Metrics
-  const answeredWithSla = items.filter(i => Boolean(i.admin_responded_at));
-  const avgResponseMinutes = answeredWithSla.length > 0
-    ? Math.round(answeredWithSla.reduce((acc, i) => {
-        const diff = Math.max(0, (new Date(i.admin_responded_at!).getTime() - new Date(i.created_at).getTime()) / 60000);
-        return acc + diff;
-      }, 0) / answeredWithSla.length)
-    : 11;
+  // SLA KPI Metrics (Memoized, Dynamic & Zero-Fake)
+  const {
+    avgResponseMinutes,
+    slaCompliancePct,
+    openSlaCount,
+    criticalSlaCount,
+    totalCount,
+    bugsCount,
+    ideasCount
+  } = useMemo(() => {
+    const answeredWithSla = items.filter(i => Boolean(i.admin_responded_at));
+    const responseTimes = answeredWithSla.map(i =>
+      Math.max(0, (new Date(i.admin_responded_at!).getTime() - new Date(i.created_at).getTime()) / 60000)
+    );
+    const avgResp = responseTimes.length > 0
+      ? Math.round(responseTimes.reduce((acc, v) => acc + v, 0) / responseTimes.length)
+      : null;
 
-  const openSlaCount = items.filter(i => {
-    if (i.admin_responded_at || i.status === 'done') return false;
-    const target = computeSlaTarget(i.created_at);
-    return target.isWithinBusinessHours && !target.isExpired;
-  }).length;
+    const openSla = items.filter(i => {
+      if (i.admin_responded_at || i.status === 'done') return false;
+      const target = computeSlaTarget(i.created_at);
+      return target.isWithinBusinessHours && !target.isExpired;
+    }).length;
 
-  const criticalSlaCount = items.filter(i => {
-    if (i.admin_responded_at || i.status === 'done') return false;
-    const target = computeSlaTarget(i.created_at);
-    return target.urgencyLevel === 'critical';
-  }).length;
+    const critSla = items.filter(i => {
+      if (i.admin_responded_at || i.status === 'done') return false;
+      const target = computeSlaTarget(i.created_at);
+      return target.urgencyLevel === 'critical';
+    }).length;
 
-  // Filter & SLA-Priority Sorting
-  const filteredItems = items.filter(item => {
+    const expiredOpenCount = items.filter(i => {
+      if (i.admin_responded_at || i.status === 'done') return false;
+      const target = computeSlaTarget(i.created_at);
+      return target.isExpired;
+    }).length;
+
+    const withinSlaAnswered = responseTimes.filter(m => m <= 60).length;
+    const totalEvaluated = responseTimes.length + expiredOpenCount;
+    const slaPct = totalEvaluated > 0
+      ? ((withinSlaAnswered / totalEvaluated) * 100).toFixed(1)
+      : '100';
+
+    return {
+      avgResponseMinutes: avgResp,
+      slaCompliancePct: slaPct,
+      openSlaCount: openSla,
+      criticalSlaCount: critSla,
+      totalCount: items.length,
+      bugsCount: items.filter(i => i.type === 'bug' && i.status !== 'done').length,
+      ideasCount: items.filter(i => i.type === 'feature_idea' && i.status !== 'done').length
+    };
+  }, [items, tick]);
+
+  // Filter & SLA-Priority Sorting (Memoized)
+  const filteredItems = useMemo(() => items.filter(item => {
     if (typeFilter !== 'all' && item.type !== typeFilter) return false;
     if (boardFilter !== 'all' && item.board_id !== boardFilter) return false;
     if (statusFilter !== 'all' && item.status !== statusFilter) return false;
@@ -427,13 +382,7 @@ export const FeedbackTab: React.FC = () => {
     const diff = (weightMap[slaA.urgencyLevel] || 99) - (weightMap[slaB.urgencyLevel] || 99);
     if (diff !== 0) return diff;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  // Metrics
-  const totalCount = items.length;
-  const bugsCount = items.filter(i => i.type === 'bug' && i.status !== 'done').length;
-  const ideasCount = items.filter(i => i.type === 'feature_idea' && i.status !== 'done').length;
-  const doneCount = items.filter(i => i.status === 'done').length;
+  }), [items, typeFilter, boardFilter, statusFilter, slaFilter, searchQuery, tick]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
@@ -453,7 +402,7 @@ export const FeedbackTab: React.FC = () => {
         {/* 60-Minute SLA Compliance Card */}
         <div style={{
           background: '#ecfdf5',
-          border: '1.5px solid #10b981',
+          border: 'none',
           borderRadius: '16px',
           padding: '16px 18px',
           boxShadow: 'none'
@@ -462,14 +411,17 @@ export const FeedbackTab: React.FC = () => {
             <Zap size={14} /> 60-Min. SLA Quote
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#065f46', marginTop: '4px' }}>
-            99.8% <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>(Ø {avgResponseMinutes} Min.)</span>
+            {slaCompliancePct}%{' '}
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>
+              {avgResponseMinutes !== null ? `(Ø ${avgResponseMinutes} Min.)` : '(0 Überschreitungen)'}
+            </span>
           </div>
         </div>
 
         {/* Active SLA Fristen Card */}
         <div style={{
           background: criticalSlaCount > 0 ? '#fef2f2' : '#ffffff',
-          border: criticalSlaCount > 0 ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+          border: criticalSlaCount > 0 ? 'none' : '1px solid #e2e8f0',
           borderRadius: '16px',
           padding: '16px 18px',
           boxShadow: '0 2px 8px rgba(15, 23, 42, 0.02)'
@@ -545,11 +497,11 @@ export const FeedbackTab: React.FC = () => {
           {/* SLA Filter Dropdown */}
           <select
             value={slaFilter}
-            onChange={(e) => setSlaFilter(e.target.value as any)}
+            onChange={(e) => setSlaFilter(e.target.value as 'all' | 'critical' | 'active_sla' | 'fulfilled')}
             style={{
               padding: '8px 12px',
               borderRadius: '10px',
-              border: slaFilter !== 'all' ? '1.5px solid #059669' : '1px solid #cbd5e1',
+              border: slaFilter !== 'all' ? 'none' : '1px solid #cbd5e1',
               background: slaFilter !== 'all' ? '#f0fdf4' : '#ffffff',
               color: slaFilter !== 'all' ? '#15803d' : '#334155',
               fontSize: '0.85rem',
@@ -558,14 +510,14 @@ export const FeedbackTab: React.FC = () => {
           >
             <option value="all">Alle SLA-Stati</option>
             <option value="critical">SLA Dringend (&lt; 15 Min.)</option>
-            <option value="active_sla">⏳ SLA Aktiv (&lt; 60 Min.)</option>
+            <option value="active_sla">SLA Aktiv (&lt; 60 Min.)</option>
             <option value="fulfilled">SLA Erfüllt (Beantwortet)</option>
           </select>
 
           {/* Type Filter */}
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
+            onChange={(e) => setTypeFilter(e.target.value as 'all' | FeedbackType)}
             style={{
               padding: '8px 12px',
               borderRadius: '10px',
@@ -603,7 +555,7 @@ export const FeedbackTab: React.FC = () => {
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | FeedbackStatus)}
             style={{
               padding: '8px 12px',
               borderRadius: '10px',
@@ -622,6 +574,7 @@ export const FeedbackTab: React.FC = () => {
 
         {/* Right: Refresh Button */}
         <button
+          type="button"
           onClick={fetchFeedback}
           style={{
             display: 'flex',
@@ -683,7 +636,15 @@ export const FeedbackTab: React.FC = () => {
               return (
                 <div
                   key={item.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedItem(item)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedItem(item);
+                    }
+                  }}
                   style={{
                     background: '#ffffff',
                     border: isSelected ? '2px solid #3b82f6' : '1px solid #e2e8f0',
@@ -713,7 +674,8 @@ export const FeedbackTab: React.FC = () => {
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         backgroundColor: item.type === 'support_request' ? '#ecfeff' : (isBug ? '#fee2e2' : '#fef3c7'),
-                        color: item.type === 'support_request' ? '#0891b2' : (isBug ? '#b91c1c' : '#92400e')
+                        color: item.type === 'support_request' ? '#0891b2' : (isBug ? '#b91c1c' : '#92400e'),
+                        border: 'none'
                       }}>
                         {item.type === 'support_request' ? <ShieldCheck size={12} /> : (isBug ? <Bug size={12} /> : <Lightbulb size={12} />)}
                         {item.type === 'support_request' ? 'Ghost-Support' : (isBug ? 'Fehler' : 'Idee')}
@@ -740,7 +702,7 @@ export const FeedbackTab: React.FC = () => {
                           fontWeight: 800,
                           backgroundColor: '#f0fdf4',
                           color: '#16a34a',
-                          border: '1px solid #bbf7d0'
+                          border: 'none'
                         }}>
                           <ShieldCheck size={10} />
                           Freigabe
@@ -767,7 +729,7 @@ export const FeedbackTab: React.FC = () => {
                             fontWeight: 800,
                             backgroundColor: sla.badgeBg,
                             color: sla.badgeColor,
-                            border: `1px solid ${sla.badgeColor}30`
+                            border: 'none'
                           }}>
                             <Zap size={10} />
                             <span>{sla.label}</span>
@@ -785,7 +747,7 @@ export const FeedbackTab: React.FC = () => {
                             fontWeight: 700,
                             backgroundColor: stMeta.badgeBg,
                             color: stMeta.badgeColor,
-                            border: '1px solid rgba(0,0,0,0.06)'
+                            border: 'none'
                           }}>
                             {stMeta.label}
                           </span>
@@ -890,7 +852,9 @@ export const FeedbackTab: React.FC = () => {
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedItem(null)}
+                aria-label="Schließen"
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
               >
                 <X size={18} />
@@ -903,7 +867,7 @@ export const FeedbackTab: React.FC = () => {
               return (
                 <div style={{
                   background: sla.urgencyLevel === 'critical' ? '#fef2f2' : (sla.urgencyLevel === 'fulfilled' ? '#f0fdf4' : '#f8fafc'),
-                  border: `1.5px solid ${sla.badgeColor}40`,
+                  border: 'none',
                   borderRadius: '14px',
                   padding: '12px 16px',
                   display: 'flex',
@@ -955,7 +919,7 @@ export const FeedbackTab: React.FC = () => {
             {(selectedItem.grant_ghost_access || selectedItem.type === 'support_request') && (
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%)',
-                border: '1.5px solid #a5f3fc',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '14px',
                 display: 'flex',
@@ -1065,7 +1029,7 @@ export const FeedbackTab: React.FC = () => {
                       style={{
                         padding: '7px 10px',
                         borderRadius: '10px',
-                        border: isCurrent ? `2px solid ${st.badgeColor}` : '1px solid #cbd5e1',
+                        border: isCurrent ? 'none' : '1px solid #cbd5e1',
                         background: isCurrent ? st.badgeBg : '#ffffff',
                         color: isCurrent ? st.badgeColor : '#475569',
                         fontSize: '0.74rem',
@@ -1124,35 +1088,23 @@ export const FeedbackTab: React.FC = () => {
                     const isSlaTouch = tpl.category === 'sla_first_touch';
                     const isSelected = currentResponseText === tpl.text;
                     let bg = '#ffffff';
-                    let border = '#cbd5e1';
                     let textCol = '#334155';
-                    let hoverBorder = '#94a3b8';
 
                     if (isSlaTouch) {
                       bg = isSelected ? '#d1fae5' : '#ecfdf5';
-                      border = isSelected ? '#059669' : '#a7f3d0';
                       textCol = '#065f46';
-                      hoverBorder = '#34d399';
                     } else if (tpl.category === 'positive') {
                       bg = isSelected ? '#ecfdf5' : '#f0fdf4';
-                      border = isSelected ? '#10b981' : '#a7f3d0';
                       textCol = '#059669';
-                      hoverBorder = '#10b981';
                     } else if (tpl.category === 'info') {
                       bg = isSelected ? '#dbeafe' : '#eff6ff';
-                      border = isSelected ? '#2563eb' : '#bfdbfe';
                       textCol = '#1d4ed8';
-                      hoverBorder = '#93c5fd';
                     } else if (tpl.category === 'legal') {
                       bg = isSelected ? '#fee2e2' : '#fef2f2';
-                      border = isSelected ? '#dc2626' : '#fecaca';
                       textCol = '#b91c1c';
-                      hoverBorder = '#fca5a5';
                     } else if (tpl.category === 'scope') {
                       bg = isSelected ? '#e2e8f0' : '#f8fafc';
-                      border = isSelected ? '#64748b' : '#cbd5e1';
                       textCol = '#475569';
-                      hoverBorder = '#94a3b8';
                     }
 
                     return (
@@ -1166,7 +1118,7 @@ export const FeedbackTab: React.FC = () => {
                         style={{
                           padding: '6px 10px',
                           borderRadius: '8px',
-                          border: `1.5px solid ${border}`,
+                          border: 'none',
                           background: bg,
                           color: textCol,
                           fontSize: '0.72rem',
@@ -1177,12 +1129,6 @@ export const FeedbackTab: React.FC = () => {
                           gap: '5px',
                           boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                           transition: 'all 0.15s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          if (!isSelected) e.currentTarget.style.borderColor = hoverBorder;
-                        }}
-                        onMouseOut={(e) => {
-                          if (!isSelected) e.currentTarget.style.borderColor = border;
                         }}
                         title={`Klicken, um diesen Text ins Textfeld einzufügen und Status "${FEEDBACK_STATUSES.find(s => s.id === tpl.status)?.label}" vorzuwählen`}
                       >
@@ -1323,30 +1269,39 @@ export const FeedbackTab: React.FC = () => {
 
       {/* Release Modal Dialog */}
       {isReleaseModalOpen && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 999999,
-          backgroundColor: 'rgba(15, 23, 42, 0.7)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px'
-        }}>
-          <div style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '20px',
-            width: '100%',
-            maxWidth: '540px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden',
-            padding: '24px',
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Update im Briefing-Dashboard veröffentlichen"
+          onClick={() => setIsReleaseModalOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999999,
+            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '540px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Megaphone size={20} color="#0f172a" />
@@ -1354,7 +1309,12 @@ export const FeedbackTab: React.FC = () => {
                   Update im Briefing-Dashboard veröffentlichen
                 </h3>
               </div>
-              <button onClick={() => setIsReleaseModalOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <button
+                type="button"
+                aria-label="Schließen"
+                onClick={() => setIsReleaseModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+              >
                 <X size={18} color="#64748b" />
               </button>
             </div>
@@ -1394,7 +1354,7 @@ export const FeedbackTab: React.FC = () => {
                   type="text"
                   value={releaseCredit}
                   onChange={(e) => setReleaseCredit(e.target.value)}
-                  placeholder="z.B. Realisiert dank der Idee von Severin Landenberger (Musikschule SoundArt)"
+                  placeholder="z.B. Realisiert dank einer Idee aus dem Partner-Netzwerk"
                   style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box', background: '#f8fafc' }}
                 />
               </div>
@@ -1417,10 +1377,10 @@ export const FeedbackTab: React.FC = () => {
                   </label>
                   <select
                     value={releasePlatform}
-                    onChange={(e) => setReleasePlatform(e.target.value as any)}
+                    onChange={(e) => setReleasePlatform(e.target.value as 'all' | 'campus' | 'groovelab')}
                     style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   >
-                    <option value="all">Alle (Campus & GrooveLab)</option>
+                    <option value="all">Alle (Campus &amp; GrooveLab)</option>
                     <option value="campus">Nur Campus</option>
                     <option value="groovelab">Nur GrooveLab</option>
                   </select>

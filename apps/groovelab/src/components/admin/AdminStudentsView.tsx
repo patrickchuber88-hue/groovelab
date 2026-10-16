@@ -170,15 +170,15 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
             gap: '16px' 
           }}
         >
-          <div className="schueler-header-wrap" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobileLayout ? 'stretch' : 'center', gap: '12px', marginBottom: '4px', width: '100%' }}>
+          <div className="schueler-header-wrap" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobileLayout ? 'stretch' : 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '4px', width: '100%' }}>
             <h2 style={{ fontSize: isMobileLayout ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({activeStudentsCount})
             </h2>
-            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', gap: '10px', width: isMobileLayout ? '100%' : 'auto', alignItems: 'center' }}>
-              <div className="schueler-header-actions" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', width: windowWidth < 768 ? '100%' : 'auto' }}>
+            <div className="schueler-header-controls" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', gap: '10px', flexWrap: 'wrap', width: isMobileLayout ? '100%' : 'auto', alignItems: 'center' }}>
+              <div className="schueler-header-actions" style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', gap: '8px', flexWrap: 'wrap', width: windowWidth < 768 ? '100%' : 'auto' }}>
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
@@ -343,7 +343,17 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                 );
               }
 
-              return displayStudents.map(s => {
+              return (
+                <>
+                  <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }} aria-hidden="true">
+                    <defs>
+                      <linearGradient id="bookHeaderGradShared" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#34a853" />
+                        <stop offset="100%" stopColor="#4f46e5" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  {displayStudents.map(s => {
                 const studentRainbowColor = studentRosterColorMap.get(s.id) || brandColor;
 
                 return (
@@ -362,7 +372,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       borderTop: '1px solid #e2e8f0', 
                       borderRight: '1px solid #e2e8f0', 
                       borderBottom: '1px solid #e2e8f0', 
-                      borderLeft: `3px solid ${studentRainbowColor}`, 
+                      borderLeft: `4px solid ${studentRainbowColor}`, 
                       boxShadow: '0 2px 8px -1px rgba(0, 0, 0, 0.04), 0 1px 3px -1px rgba(0, 0, 0, 0.02)',
                       transition: 'transform 0.2s, box-shadow 0.2s', 
                       cursor: 'default',
@@ -485,13 +495,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         className="hover-scale-mini"
                         title="Hausaufgabenheft & Schüler-Protokoll öffnen"
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={`url(#bookHeaderGrad-${s.id})`} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <defs>
-                            <linearGradient id={`bookHeaderGrad-${s.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                              <stop offset="0%" stopColor="#34a853" />
-                              <stop offset="100%" stopColor="#4f46e5" />
-                            </linearGradient>
-                          </defs>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="url(#bookHeaderGradShared)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                           <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                         </svg>
@@ -561,7 +565,9 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                   </div>
                 </div>
               );
-            });
+            })}
+                </>
+              );
           })()}
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Calendar, FileCheck, CheckCircle2, Download, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Calendar, FileCheck, CheckCircle2, Download, RotateCcw } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { getEffectiveInstrument, isGenericInstrument } from '../../utils/avatarResolutionEngine';
 import { generateSchoolLicenseCertificatePDF } from '../../utils/schoolLicenseCertificatePdfGenerator';
 
@@ -8,10 +9,14 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
   const isHardship = Boolean(studentUser?.is_hardship_exempt);
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawDone, setWithdrawDone] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
-  // Authoritative Instrument Resolution (0,1% Goldstandard)
+  // Authoritative Instrument Resolution (0,1% Goldstandard: Kein 'Gitarre' Dummy-Fallback)
   const rawInst = getEffectiveInstrument(studentUser) || studentUser?.instrument;
-  const instrument = (!rawInst || isGenericInstrument(rawInst)) ? 'Gitarre' : rawInst;
+  const instrument = (!rawInst || isGenericInstrument(rawInst)) ? 'Instrumental- / Vokalunterricht' : rawInst;
 
   const studentName = `${studentUser?.first_name || 'Schüler'} ${(studentUser?.last_name ? studentUser.last_name.slice(0, 1) + '.' : '')}`.trim();
   const schoolName = studentUser?.school_name || 'Musikschule';
@@ -53,6 +58,42 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
       console.error('Failed to generate contract PDF:', err);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleConfirmWithdrawal = async () => {
+    try {
+      setIsWithdrawing(true);
+      setWithdrawError(null);
+      const { data, error } = await supabase.rpc('withdraw_student_b2c_campus_contract', {
+        p_student_id: effectiveStudentId,
+        p_reason: 'Elektronischer Widerruf im Elternbereich (14-Tage-Widerrufsrecht)'
+      });
+      if (error || (data && typeof data === 'object' && 'success' in data && !(data as { success?: boolean }).success)) {
+        throw new Error(error?.message || 'Widerruf konnte serverseitig nicht verarbeitet werden.');
+      }
+      setWithdrawDone(true);
+      setShowWithdrawConfirm(false);
+
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const nowStr = new Date().toLocaleString('de-DE');
+      const refId = `WIDERRUF-${effectiveStudentId.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('Eingangsbestaetigung Ihres elektronischen Widerrufs', 20, 25);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Referenznummer: ${refId}`, 20, 36);
+      doc.text(`Zeitstempel des Eingangs: ${nowStr}`, 20, 43);
+      doc.text(`Schuelerprofil: ${studentName} (${schoolName})`, 20, 50);
+      doc.text('Vertragsgegenstand: Campus-Groovelab (Modul Campus - Befristeter Schuljahresbeitrag)', 20, 57);
+      doc.text('Status: Fristgerechter Widerruf registriert (0,00 EUR Wertersatz im kostenfreien Schnuppermonat).', 20, 67);
+      doc.save(`Widerrufsbestaetigung_${refId}.pdf`);
+    } catch (err: unknown) {
+      setWithdrawError(err instanceof Error ? err.message : 'Widerruf fehlgeschlagen.');
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -107,7 +148,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
             : 'Deine Musikschule übernimmt alle Bereitstellungs- und Infrastrukturkosten für dieses Profil. Für dich fallen 0,00 € Gebühren an.'}
         </p>
 
-        {/* Amtlicher Nachweis Download Bereich */}
+        {/* Offizieller Nachweis Download Bereich */}
         <div style={{
           marginTop: '6px',
           paddingTop: '16px',
@@ -120,12 +161,12 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
         }}>
           <div>
             <div style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
-              {isDirectBilled ? 'Gesetzliche Vertragsbestätigung (BGB 312f)' : 'Amtlicher Schullizenz-Nachweis (BuT / Behörden)'}
+              {isDirectBilled ? 'Gesetzliche Vertragsbestätigung (BGB 312f)' : 'Offizielle Teilnahme- & Gebührenbescheinigung (BuT / SGB II / Kommune / Arbeitgeber)'}
             </div>
             <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', maxWidth: '440px', lineHeight: 1.45 }}>
               {isDirectBilled
                 ? '2-seitiges Dokument mit Bereitstellungsnachweis, GoBD-Siegel & gesetzlicher Widerrufsbelehrung.'
-                : 'Offizielles Zertifikat zur Vorlage bei Behörden, Jobcenter (BuT gem. SGB II), Arbeitgebern oder Finanzamt.'}
+                : 'Offizielle Teilnahme- & Gebührenbescheinigung (Vorlage für Bildung & Teilhabe / SGB II / Kommune / Arbeitgeber).'}
             </div>
           </div>
 
@@ -149,7 +190,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
               boxShadow: downloadSuccess ? '0 2px 8px rgba(16, 185, 129, 0.28)' : '0 2px 6px rgba(15, 23, 42, 0.12)',
               transition: 'all 0.18s ease-in-out'
             }}
-            title={isDirectBilled ? 'Vertragsbeleg herunterladen' : 'Amtlichen Schullizenz-Nachweis als PDF herunterladen'}
+            title={isDirectBilled ? 'Vertragsbeleg herunterladen' : 'Offizielle Teilnahme- und Gebührenbescheinigung als PDF herunterladen'}
           >
             {downloadSuccess ? (
               <>
@@ -162,7 +203,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
                 <span>
                   {isGenerating
                     ? 'Wird generiert...'
-                    : (isDirectBilled ? 'Vertragsbeleg (PDF) laden' : 'Schullizenz-Nachweis (PDF)')}
+                    : (isDirectBilled ? 'Vertragsbeleg (PDF) laden' : 'Teilnahmebescheinigung (PDF)')}
                 </span>
                 <Download size={14} style={{ opacity: 0.8 }} />
               </>
@@ -225,6 +266,102 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
         <p style={{ margin: 0, fontSize: '0.80rem', color: '#475569', lineHeight: 1.55 }}>
           Es gibt <strong>keine automatische Vertragsverlängerung und keine Kündigungsfristen</strong>. Der Zugang läuft nach Ablauf des Schuljahres automatisch aus. Eine Kündigung ist daher nicht erforderlich.
         </p>
+
+        {/* Elektronische 1-Klick-Widerrufsfunktion (BGB 356a / EU-Richtlinie 2023/2673) */}
+        <div style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '14px',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+                Elektronische Widerrufsfunktion (14-Tage-Widerrufsrecht)
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                Innerhalb von 14 Tagen ab Vertragsschluss kostenfrei widerrufen (inkl. sofortiger PDF-Eingangsbestätigung).
+              </div>
+            </div>
+            {!withdrawDone && !showWithdrawConfirm && (
+              <button
+                type="button"
+                onClick={() => setShowWithdrawConfirm(true)}
+                style={{
+                  background: '#ffffff',
+                  color: '#be123c',
+                  border: '1.5px solid #fecdd3',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <RotateCcw size={14} />
+                <span>Vertrag widerrufen (14-Tage-Widerrufsrecht)</span>
+              </button>
+            )}
+          </div>
+
+          {showWithdrawConfirm && !withdrawDone && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '6px', borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 600 }}>
+                Möchten Sie die Campus-Modul-Freischaltung für {studentName} jetzt verbindlich widerrufen? Sie erhalten sofort eine PDF-Eingangsbestätigung.
+              </div>
+              {withdrawError && (
+                <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 700 }}>{withdrawError}</div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  disabled={isWithdrawing}
+                  onClick={handleConfirmWithdrawal}
+                  style={{
+                    background: '#be123c',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: isWithdrawing ? 'wait' : 'pointer'
+                  }}
+                >
+                  {isWithdrawing ? 'Wird widerrufen...' : 'Jetzt verbindlich widerrufen'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawConfirm(false)}
+                  style={{
+                    background: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {withdrawDone && (
+            <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 800 }}>
+              ✓ Widerruf erfolgreich registriert. Die PDF-Eingangsbestätigung wurde heruntergeladen.
+            </div>
+          )}
+        </div>
 
         <div style={{
           background: '#f8fafc',

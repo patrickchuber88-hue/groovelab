@@ -1,4 +1,11 @@
-import { supabase } from './supabase';
+const getSupabaseClient = async () => {
+  try {
+    const mod = await import('./supabase');
+    return mod.supabase;
+  } catch {
+    return null;
+  }
+};
 
 export interface ClientErrorLog {
   id: string;
@@ -157,25 +164,28 @@ export const reportClientError = async (
 
     // 3. Attempt silent write to Supabase if table exists (graceful non-blocking)
     try {
-      await supabase.from('system_error_logs').insert([{
-        id: logEntry.id,
-        created_at: logEntry.timestamp,
-        error_message: logEntry.message,
-        error_stack: logEntry.stack,
-        component_stack: logEntry.componentStack,
-        route: logEntry.route,
-        browser_name: logEntry.browserName,
-        os_name: logEntry.osName,
-        device_type: logEntry.deviceType,
-        severity: logEntry.severity,
-        tag: logEntry.tag,
-        school_id: logEntry.schoolId,
-        user_role: logEntry.userRole,
-        ui_level: logEntry.uiLevel,
-        module: logEntry.module,
-        user_agent: logEntry.userAgent,
-        is_resolved: false
-      }]);
+      const sb = await getSupabaseClient();
+      if (sb) {
+        await sb.from('system_error_logs').insert([{
+          id: logEntry.id,
+          created_at: logEntry.timestamp,
+          error_message: logEntry.message,
+          error_stack: logEntry.stack,
+          component_stack: logEntry.componentStack,
+          route: logEntry.route,
+          browser_name: logEntry.browserName,
+          os_name: logEntry.osName,
+          device_type: logEntry.deviceType,
+          severity: logEntry.severity,
+          tag: logEntry.tag,
+          school_id: logEntry.schoolId,
+          user_role: logEntry.userRole,
+          ui_level: logEntry.uiLevel,
+          module: logEntry.module,
+          user_agent: logEntry.userAgent,
+          is_resolved: false
+        }]);
+      }
     } catch {
       // Graceful fallback to local buffer
     }
@@ -228,43 +238,46 @@ export const fetchErrorLogs = async (): Promise<ClientErrorLog[]> => {
   const localLogs = getLocalLogs();
 
   try {
-    const { data, error } = await supabase
-      .from('system_error_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const sb = await getSupabaseClient();
+    if (sb) {
+      const { data, error } = await sb
+        .from('system_error_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    if (!error && data && data.length > 0) {
-      const dbLogs: ClientErrorLog[] = data.map(row => ({
-        id: row.id,
-        timestamp: row.created_at,
-        message: row.error_message,
-        stack: row.error_stack,
-        componentStack: row.component_stack,
-        route: row.route,
-        userAgent: row.user_agent || 'Client',
-        browserName: row.browser_name || 'Browser',
-        osName: row.os_name || 'OS',
-        deviceType: row.device_type || 'Desktop',
-        severity: row.severity || 'CRITICAL',
-        tag: row.tag || 'UNHANDLED',
-        schoolId: row.school_id,
-        userRole: row.user_role,
-        uiLevel: row.ui_level,
-        module: row.module,
-        resolved: Boolean(row.is_resolved),
-        resolvedAt: row.resolved_at
-      }));
+      if (!error && data && data.length > 0) {
+        const dbLogs: ClientErrorLog[] = data.map(row => ({
+          id: row.id,
+          timestamp: row.created_at,
+          message: row.error_message,
+          stack: row.error_stack,
+          componentStack: row.component_stack,
+          route: row.route,
+          userAgent: row.user_agent || 'Client',
+          browserName: row.browser_name || 'Browser',
+          osName: row.os_name || 'OS',
+          deviceType: row.device_type || 'Desktop',
+          severity: row.severity || 'CRITICAL',
+          tag: row.tag || 'UNHANDLED',
+          schoolId: row.school_id,
+          userRole: row.user_role,
+          uiLevel: row.ui_level,
+          module: row.module,
+          resolved: Boolean(row.is_resolved),
+          resolvedAt: row.resolved_at
+        }));
 
-      // Merge unique logs
-      const combined = [...dbLogs];
-      const seenIds = new Set(dbLogs.map(l => l.id));
-      for (const loc of localLogs) {
-        if (!seenIds.has(loc.id)) {
-          combined.push(loc);
+        // Merge unique logs
+        const combined = [...dbLogs];
+        const seenIds = new Set(dbLogs.map(l => l.id));
+        for (const loc of localLogs) {
+          if (!seenIds.has(loc.id)) {
+            combined.push(loc);
+          }
         }
+        return combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       }
-      return combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
   } catch {
     // If Supabase table query fails, return local logs
@@ -283,10 +296,13 @@ export const markErrorResolved = async (id: string): Promise<void> => {
   saveLocalLogs(local);
 
   try {
-    await supabase
-      .from('system_error_logs')
-      .update({ is_resolved: true, resolved_at: new Date().toISOString() })
-      .eq('id', id);
+    const sb = await getSupabaseClient();
+    if (sb) {
+      await sb
+        .from('system_error_logs')
+        .update({ is_resolved: true, resolved_at: new Date().toISOString() })
+        .eq('id', id);
+    }
   } catch {
     // Fallback
   }
@@ -298,7 +314,10 @@ export const markErrorResolved = async (id: string): Promise<void> => {
 export const clearAllErrorLogs = async (): Promise<void> => {
   saveLocalLogs([]);
   try {
-    await supabase.from('system_error_logs').delete().neq('id', 'keep_schema');
+    const sb = await getSupabaseClient();
+    if (sb) {
+      await sb.from('system_error_logs').delete().neq('id', 'keep_schema');
+    }
   } catch {
     // Fallback
   }

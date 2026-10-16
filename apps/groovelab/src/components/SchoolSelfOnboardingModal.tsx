@@ -183,7 +183,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           last_name: lastName.trim(),
           role: 'admin',
           roles: ['admin'],
-          ausweis_nummer: rpcData.pin,
+          ausweis_nummer: null,
+          has_personal_pin: true,
           qr_token: rpcData.qr_token,
           photo_url: '/campus_login_hero.png',
           avatar_url: '/campus_login_hero.png'
@@ -192,7 +193,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         throw new Error(rpcErr?.message || rpcData?.error || 'Registrierung fehlgeschlagen. Bitte prüfe deine Angaben.');
       }
 
-      // 3. Set Session in LocalStorage & SessionStorage for immediate access
+      // 3. Set Session in LocalStorage & SessionStorage for immediate access (Zero-Secret-Leakage: 0 PINs in Storage)
       const sessionData = {
         user: userRecord,
         school: schoolRecord,
@@ -214,8 +215,37 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
 
       // Revisionssicheres Audit-Logging der B2B-Unternehmer-Bestätigung gem. § 14 BGB & AGB-Zustimmung (§ 371a ZPO)
       const canonicalContractText = LEGAL_DOCUMENTS.terms_b2b_avv?.fullTextMarkdown || 'TERMS_B2B_AVV';
+      const avvContractText = LEGAL_DOCUMENTS.avv_standalone?.fullTextMarkdown || 'AVV_STANDALONE';
+      const termsB2bHash = await computeSha256(canonicalContractText);
       const auditPayload = canonicalContractText + String(schoolRecord.id) + String(userRecord.id) + ACTIVE_LEGAL_VERSION;
       const auditChecksum = await computeSha256(auditPayload);
+      const avvChecksum = await computeSha256(avvContractText);
+
+      try {
+        await supabase.rpc('record_user_legal_consent', {
+          p_user_id: userRecord.id,
+          p_school_id: schoolRecord.id,
+          p_role: 'admin',
+          p_consent_types: ['terms_b2b_avv', 'avv_standalone'],
+          p_version: ACTIVE_LEGAL_VERSION,
+          p_document_hashes: {
+            terms_b2b_avv: termsB2bHash,
+            avv_standalone: avvChecksum
+          },
+          p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'SchoolSelfOnboardingModal',
+          p_ip_hash: null,
+          p_metadata: {
+            b2b_confirmed: true,
+            agb_avv_confirmed: true,
+            country,
+            subdomain: slug,
+            audit_checksum: auditChecksum
+          }
+        });
+      } catch (consentErr) {
+        console.warn('[SchoolSelfOnboardingModal] Legal consent RPC warning:', consentErr);
+      }
+
       await logSecurityEvent({
         action: 'SCHOOL_ONBOARDING_B2B_TERMS_ACCEPTED',
         schoolId: String(schoolRecord.id),
@@ -235,12 +265,13 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
 
       // Transition to Stage 2 (Ausweis & Biometrie Stage)
       setStep(2);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Fehler bei der Schul-Registrierung:', err);
-      let friendlyMsg = err.message || 'Bitte versuchen Sie es erneut.';
-      if (err.code === '23505') {
+      const errObj = err as { message?: string; code?: string; status?: number };
+      let friendlyMsg = errObj?.message || 'Bitte versuchen Sie es erneut.';
+      if (errObj?.code === '23505') {
         friendlyMsg = 'Eine Musikschule mit diesem Namen oder dieser Subdomain existiert bereits. Bitte wählen Sie eine leichte Variation.';
-      } else if (err.message?.toLowerCase().includes('unauthorized') || err.code === '42501' || err.status === 401 || err.status === 403) {
+      } else if (errObj?.message?.toLowerCase().includes('unauthorized') || errObj?.code === '42501' || errObj?.status === 401 || errObj?.status === 403) {
         friendlyMsg = 'Die Registrierung konnte nicht abgeschlossen werden. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut.';
       }
       setError(friendlyMsg);

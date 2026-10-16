@@ -205,7 +205,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Campus-Groovelab ist eine spezialisierte didaktische Software-Plattform für Musikschulen, die als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung dient. Sie ersetzt weder amtliche Schulverwaltungssysteme (ERP) noch offizielle städtische Dienstwege. Die Software wurde nach dem Grundsatz "Privacy by Design & by Default" (Art. 25 DSGVO) entwickelt. Zur Gewährleistung maximalen Schutzes für Minderjährige speichert die Plattform KEINE E-Mail-Adressen, KEINE Telefonnummern und KEINE Zahlungsdaten von Schülern. Schülernamen werden im Lehrerbereich standardmäßig auf Vorname + Initiale (z. B. Max M.) pseudonymisiert. 100% deutsches Hosting (ISO 27001, Hetzner), 0% Drittlandtransfer.';
+    const summaryText = 'Campus-Groovelab ist eine spezialisierte didaktische Software-Plattform für Musikschulen, die als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung dient. Sie ersetzt weder amtliche Schulverwaltungssysteme (ERP) noch offizielle städtische Dienstwege. Die Software wurde nach dem Grundsatz "Privacy by Design & by Default" (Art. 25 DSGVO) entwickelt. Zur Gewährleistung maximalen Schutzes für Minderjährige speichert die Plattform KEINE E-Mail-Adressen, KEINE Telefonnummern und KEINE Zahlungsdaten von Schülern. Schülernamen werden im Lehrerbereich standardmäßig auf Vorname + Initiale (z. B. Max M.) pseudonymisiert. 100% deutsches Hosting (ISO 27001, IONOS SE & Hetzner), 0% Drittlandtransfer.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 12);
     doc.text(splitSummary, margin + 6, curY + 15);
 
@@ -219,7 +219,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const pillars = [
       {
         title: 'A. 100% Rechenzentren in Deutschland (ISO 27001)',
-        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der Hetzner Online GmbH (Falkenstein & Nürnberg) mit integrierter PIMS-Datenschutzarchitektur nach ISO/IEC 27701. 100% autarker Technologie-Stack – 0,00% Drittlandtransfer, vollständige Immunität gegen US-FISA 702 und den US CLOUD Act.'
+        desc: 'Ausschließliche Datenverarbeitung in ISO 27001 zertifizierten Hochsicherheits-Rechenzentren der IONOS SE (Montabaur, Primär-Cluster) sowie der Hetzner Online GmbH (Falkenstein & Nürnberg, Georedundantes Backup & Storage Box) nach ISO/IEC 27701. 100% autarker Stack – 0,00% Drittlandtransfer, volle Immunität gegen US-FISA 702 und US CLOUD Act.'
       },
       {
         title: 'B. Radikale Datenminimierung Minderjähriger',
@@ -281,12 +281,12 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const vvtRows = [
       ['Bezeichnung der Tätigkeit:', 'Digitale Musikschulverwaltung, Raumplanung & didaktische Übebegleitung (Campus-Groovelab)'],
       ['Verantwortlicher Träger:', `${cleanSchoolName} (vertreten durch Schulleitung / Schulverwaltung)`],
-      ['Auftragsverarbeiter (Art. 28):', 'Campus-Groovelab (Einzelunternehmen Patrick Huber, 79618 Rheinfelden, Deutschland)'],
+      ['Auftragsverarbeiter (Art. 28):', 'Patrick Huber, Softwareentwicklung & Cloud-Dienstleistungen (Einzelunternehmen), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland (Campus-Groovelab)'],
       ['Zweckbestimmung der Verarbeitung:', 'Didaktisches Convenience- & Beschleunigungswerkzeug („Fast-Track“) zur Raum- & Terminabstimmung, Bereitstellung digitaler Hausaufgabennotizen & didaktische Audio-Übebegleitung ohne Werbefunktionen. Subsidiaritäts- & Herrenberg-Doktrin: Primäre Schulverwaltung (ERP), Honorarabrechnungen und städtische Dienstwege verbleiben beim Träger. Gehostete Schüleraufnahmen (Cover) dienen rein didaktischem Feedback und dem privaten Familienkreis (§ 53 Abs. 1, § 60a UrhG).'],
       ['Rechtsgrundlagen (DSGVO):', 'Art. 6 Abs. 1 lit. b DSGVO (Unterrichtsvertrag der Erziehungsberechtigten)\nArt. 6 Abs. 1 lit. e DSGVO i.V.m. Landes-SchulG (Kommunale Bildungsaufgabe)\nArt. 6 Abs. 1 lit. a / Art. 8 DSGVO (Einwilligung für optionale Audioaufnahmen)'],
       ['Kategorien betroffener Personen:', 'Musikschüler/innen (Minderjährige), Erziehungsberechtigte, Lehrkräfte (Herrenberg-geschützt), Sekretariats- & Schulleitungspersonal'],
       ['Verarbeitete Datenkategorien:', 'Vorname, Nachname (im Lehrerbereich pseudonymisiert auf Anfangsbuchstabe "Max M."), Instrument, Raum- und Zeitdisposition, didaktische Übenotizen, freiwillige Audioaufnahmen.\nExplizit KEINE Speicherung von: Schüler-E-Mails, Passwörtern, Bankverbindungen oder Lehrer-Arbeitszeiten.'],
-      ['Empfänger / Sub-Auftragsverarbeiter:', '1. Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland – ISO 27001 zertifiziert)\n2. Hetzner DNS / Rechenzentrumsnetzwerk (Deutschland)\n3. 100% Self-Hosted Open-Source Technologie-Stack (PostgreSQL RLS, Supabase Auth/Storage Engine auf dediziertem Hetzner Bare-Metal VPS, 0,00% US-Cloudtransfer)'],
+      ['Empfänger / Sub-Auftragsverarbeiter:', '1. IONOS SE (Elgendorfer Str. 57, 56410 Montabaur, Deutschland – Primärer Produktions-Cluster, ISO 27001 zertifiziert)\n2. Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland – Georedundantes Backup, Failover & Storage Box, ISO 27001 zertifiziert)\n3. 100% Self-Hosted Open-Source Technologie-Stack (PostgreSQL RLS, Auth/Storage Engine auf dediziertem deutschem VPS, 0,00% US-Cloudtransfer)'],
       ['Drittlandübermittlung (Art. 44 ff.):', '0,00 % (NEIN) – Die Datenverarbeitung erfolgt ausnahmslos in Rechenzentren innerhalb der Bundesrepublik Deutschland. Volle Immunität gegen US CLOUD Act und FISA 702 (Schrems II konform).'],
       ['Regellöschfristen (DIN 66398):', 'Unterrichtsdaten: Dauer des Ausbildungsverhältnisses (Löschung 30 Tage nach Abmeldung)\nInaktive Profile: Automatische Inaktivierung nach 60 Tagen (Fair-Play Kostenschutz)\nAudio-Micro-TTL: TTL <= 1800s für Medienstream / temporäre Session-Caches']
     ];
@@ -441,7 +441,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     const toms = [
       {
         t: '1. Vertraulichkeit & Mandanten-Airgap (Art. 32 / ISO 27001 A.8.20 & A.8.24)',
-        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs; PBKDF2/Bcrypt-Hashing im isolierten Schema private_auth.'
+        d: 'Strikte PostgreSQL Row-Level-Security (FORCE RLS) auf allen Tabellen. Physischer Airgap durch REVOKE ALL ON users_raw und Ausführung gehärteter Security-Views mit security_barrier und security_invoker. Schülernamen-Pseudonymisierung (Max M.). Keine Plaintext-Passwörter/PINs; Bcrypt-Hashing (10 Runden Blowfish gem. BSI TR-02102) im isolierten Schema private_auth.'
       },
       {
         t: '2. Integrität & Datenhygiene (Art. 32 / ISO 27001 A.8.28 & ISO 27701 7.4.4)',
@@ -491,7 +491,7 @@ export async function generateDpoComplianceDossierPDF(options: DpoDossierOptions
     curY += 5;
     const lks = [
       { lk: 'Löschklasse 1: Session & Temp-Daten', frist: 'Sofort bei Sitzungsende', desc: 'Sichere Session-Tokens verfallen; flüchtige RAM-Bereinigung.' },
-      { lk: 'Löschklasse 2: Didaktische Audioaufnahmen', frist: 'Laufendes Schuljahr (bis 31.08.)', desc: 'Hausaufgaben-Audios bleiben während des Schuljahres erhalten; sofortige physische Löschung bei Nutzerabmeldung.' },
+      { lk: 'Löschklasse 2: Didaktische Audioaufnahmen', frist: 'Laufendes Schuljahr (+1 Mo. Exportfrist)', desc: 'Hausaufgaben-Audios bleiben während des Schuljahres inkl. 1 Monat Exportfrist erhalten; sofortige Löschung bei Abmeldung.' },
       { lk: 'Löschklasse 3: Abrechnungs-Inaktivitätsstopp', frist: '60 Tage Inaktivität', desc: 'Automatischer Sparmodus auf Basis-Bereitstellung (0,09 €) zum Kostenschutz. Kein Datenverlust.' },
       { lk: 'Löschklasse 4: Meisterwerke & Bildungsbiografie', frist: 'Dauer des Ausbildungsverhältnisses', desc: 'Gemeisterte Stücke bleiben bis zum Austritt erhalten; vollständige Datenlöschung 30 Tage nach Exmatrikulation.' },
       { lk: 'Löschklasse 5: Rechnungsbelege (B2B)', frist: '10 Jahre gem. § 147 AO', desc: 'Gilt ausschließlich für Sammelrechnungen der Musikschule; 0% Schüler-Klarnamen auf Belegen.' }

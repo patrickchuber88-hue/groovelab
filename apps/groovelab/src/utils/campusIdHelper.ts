@@ -23,6 +23,11 @@ const KNOWN_SCHOOL_IDS: Record<string, number> = {
   // Musäk Bad Säckingen (Flagship- / Gründungsschule #1)
   '74713df2-6176-4a41-a8cd-9fbebe34e9b8': 1,
   '53e83805-1d5a-4ed8-988e-1fb0b8200b9c': 1,
+  'cc05137f-5904-4774-80be-6a172c52bf99': 2,
+  'cc9dd3d6-749d-40d6-a72e-dccca286724a': 3,
+  '69063a6c-4a0f-49fc-8dd7-3ae72c401406': 4,
+  'b2247ea9-118c-42f3-b408-49c023c3a505': 5,
+  'a6bdcc01-7b3f-4dc3-8c46-c458f0270b66': 6,
 };
 
 /**
@@ -174,7 +179,7 @@ export const resolveUserCampusId = (user?: any, fallbackSchoolId?: string | null
 
   // 2. Bestimme Schulnummer (Default: 1 -> "001")
   const rawSchoolId = user.school_id || user.schoolId || fallbackSchoolId || null;
-  const schoolNum = user.school_numeric_id || user.schoolNumericId || getSchoolNumericId(rawSchoolId);
+  const schoolNum = user.school_number || user.schools?.school_number || user.school_numeric_id || user.schoolNumericId || getSchoolNumericId(rawSchoolId);
 
   // 3. Bestimme Rollen-Code (V, L, S) nach Höchstrang-Prinzip
   const roleCode = getCampusRoleCode(user.role, user.roles);

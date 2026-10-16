@@ -1,56 +1,26 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  CreditCard, Search, Tag, Shield, Clock, RefreshCw, Check, CheckCircle, 
-  Upload, FileText, Copy, AlertCircle, Building2, User, ChevronRight, X,
-  Download, FileSpreadsheet, Sparkles
+import React, { useState } from 'react';
+import {
+  CheckSquare, Search, RefreshCw, CreditCard, Banknote,
+  ShieldCheck, Clock, FileText, ChevronRight, X, Download, Building, CheckCircle2,
+  Landmark, Sparkles, Check
 } from 'lucide-react';
+import { OPERATOR_BANKING_CONFIG } from '../../../config/operatorBanking';
 import { supabase } from '../../../lib/supabase';
-
-interface PendingUser {
-  id: string;
-  first_name?: string;
-  last_name?: string;
-  school_id: string;
-  role?: string;
-  is_campus_active?: boolean;
-  is_groovelab_active?: boolean;
-  is_active?: boolean;
-  ausweis_nummer?: string;
-  is_pin_activated?: boolean;
-  created_at?: string;
-  payment_status?: string;
-  is_hardship_exempt?: boolean;
-  student_billing_payment_method?: string;
-  student_billing_cash_paid?: boolean;
-  operator_notes?: string;
-  [key: string]: any;
-}
-
-interface School {
-  id: string;
-  name: string;
-  primary_color?: string;
-  logo_url?: string | null;
-  student_billing_option?: string;
-  [key: string]: any;
-}
-
-interface MasterPricing {
-  priceCampus: number;
-  priceGroovelab: number;
-  priceKombi: number;
-  priceTeacher: number;
-  priceStudent: number;
-}
+import { generateB2CParentContractPDF } from '../../../utils/pdfGenerator';
+import { CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
+import type { PendingUser, School } from '../MasterAdminTypes';
 
 interface ReconciliationTabProps {
   pendingUsers: PendingUser[];
   schools: School[];
-  masterPricing: MasterPricing;
+  masterPricing: CanonicalBillingRates;
   loadingPending: boolean;
   onRefresh: () => void;
-  onBatchActivate: (ids: string[]) => Promise<void>;
-  onSingleActivate: (id: string) => Promise<void>;
+  onBatchActivate: (userIds: string[]) => Promise<void>;
+  onSingleActivate: (userId: string) => Promise<void>;
+  taxMode?: 'small_business' | 'standard_vat';
+  vatRatePercent?: number;
+  onNavigateBilling?: () => void;
 }
 
 export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
@@ -60,1107 +30,1223 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
   loadingPending,
   onRefresh,
   onBatchActivate,
-  onSingleActivate
+  onSingleActivate,
+  taxMode: propTaxMode,
+  vatRatePercent = 19,
+  onNavigateBilling
 }) => {
-  const [activeFilterTab, setActiveFilterTab] = useState<'open' | 'active' | 'exempt' | 'all'>('open');
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [toastNotice, setToastNotice] = useState<{ type: 'success' | 'error'; title: string; message: string } | null>(null);
+  const notify = (payload: { type: 'success' | 'error'; title: string; message: string }) => {
+    setToastNotice(payload);
+    setTimeout(() => setToastNotice(null), 4000);
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSchoolFilter, setSelectedSchoolFilter] = useState<string>('ALL');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'bank_transfer' | 'cash' | 'exempt'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'PAID' | 'ALL'>('PENDING');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [selectedUser, setSelectedUser] = useState<PendingUser | null>(null);
-  
-  // Operator internal notes state per student (persisted in localStorage)
-  const [userNotes, setUserNotes] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem('cg_operator_student_notes');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [activating, setActivating] = useState(false);
 
-  const handleUpdateNote = (userId: string, note: string) => {
-    const next = { ...userNotes, [userId]: note };
-    setUserNotes(next);
-    try {
-      localStorage.setItem('cg_operator_student_notes', JSON.stringify(next));
-    } catch {}
-  };
-  
-  // CSV / CAMT.053 Import Modal State
-  const [showCsvModal, setShowCsvModal] = useState<boolean>(false);
-  const [csvText, setCsvText] = useState<string>('');
-  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [matchedResults, setMatchedResults] = useState<{ 
-    hash: string; 
-    userId: string; 
-    name: string; 
-    amount?: string; 
-    confidence: 'exact' | 'fuzzy';
-    rawNote?: string;
-  }[]>([]);
+  // Split-Screen Inspector State
+  const [inspectedUser, setInspectedUser] = useState<PendingUser | null>(null);
+  const [operatorNotes, setOperatorNotes] = useState<Record<string, string>>({});
+  const [savingNote, setSavingNote] = useState(false);
 
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3200);
+  const effectiveTaxMode: 'small_business' | 'standard_vat' = propTaxMode || (
+    typeof window !== 'undefined'
+      ? ((localStorage.getItem('cg_tax_mode') as 'small_business' | 'standard_vat') || 'small_business')
+      : 'small_business'
+  );
+  const effectiveVatDivisor = 1 + (vatRatePercent > 0 ? vatRatePercent : 19) / 100;
+
+  // Helper to get school object and name
+  const getSchoolObj = (schoolId?: string): School | undefined => {
+    if (!schoolId) return undefined;
+    return schools.find(s => s.id === schoolId);
   };
 
-  // Helper to generate unique GoBD reference CG-[HASH8]-[YYMM]
-  const getReferenceCode = (user: PendingUser) => {
-    const rawHash = (user.ausweis_nummer || user.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    return `CG-${rawHash}-${yy}${mm}`;
+  const getSchoolName = (schoolId?: string): string => {
+    if (!schoolId) return 'Unbekannte Musikschule';
+    const found = getSchoolObj(schoolId);
+    return found ? found.name : 'Unbekannte Musikschule';
   };
 
-  // Helper to anonymize student name to "Vorname N." (DSGVO compliant according to platform rules)
-  const getAnonymizedName = (user: PendingUser) => {
-    if (!user.first_name) return `Direktkunde ${user.id.slice(0, 8).toUpperCase()}`;
-    const first = user.first_name.trim();
-    const lastInitial = user.last_name ? ` ${user.last_name.trim()[0]}.` : '';
-    return `${first}${lastInitial}`;
+  const getStudentAnnualRate = (schoolId?: string): { gross: number; net: number; vat: number; currencySymbol: '€' | 'CHF'; formattedGross: string } => {
+    const school = getSchoolObj(schoolId);
+    const isChf = school?.country === 'CH' || school?.currency === 'CHF';
+    const currencySymbol: '€' | 'CHF' = isChf ? 'CHF' : '€';
+    // 11 Schulmonate (12. Monat kostenfrei): 5,39 € (0,49 € * 11) bzw. CHF 11.00 (CHF 1.00 * 11)
+    const unitMonthly = isChf ? 1.00 : Number(masterPricing?.priceStudent ?? 0.49);
+    const gross = Number((unitMonthly * 11).toFixed(2));
+    const net = effectiveTaxMode === 'standard_vat' && !isChf
+      ? Number((gross / effectiveVatDivisor).toFixed(2))
+      : gross;
+    const vat = effectiveTaxMode === 'standard_vat' && !isChf
+      ? Number((gross - net).toFixed(2))
+      : 0;
+    const formattedGross = isChf
+      ? `CHF ${gross.toFixed(2)}`
+      : `${gross.toFixed(2).replace('.', ',')} €`;
+    return { gross, net, vat, currencySymbol, formattedGross };
   };
 
-  // Filter pending users
-  const filteredUsers = useMemo(() => {
-    return pendingUsers.filter(u => {
-      // 1. Status Filter
-      if (activeFilterTab === 'open' && u.is_campus_active) return false;
-      if (activeFilterTab === 'active' && !u.is_campus_active) return false;
-      if (activeFilterTab === 'exempt' && !u.is_hardship_exempt) return false;
-
-      // 2. School Filter
-      if (selectedSchoolId !== 'all' && u.school_id !== selectedSchoolId) return false;
-
-      // 3. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const school = schools.find(s => s.id === u.school_id);
-        const ref = getReferenceCode(u).toLowerCase();
-        const name = `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase();
-        const matches = name.includes(q) || 
-                        (school?.name || '').toLowerCase().includes(q) ||
-                        ref.includes(q) ||
-                        (u.ausweis_nummer || '').toLowerCase().includes(q);
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [pendingUsers, activeFilterTab, selectedSchoolId, searchQuery, schools]);
-
-  // Keep selectedUser in sync with filtered list
-  useEffect(() => {
-    if (selectedUser) {
-      const updated = pendingUsers.find(u => u.id === selectedUser.id);
-      if (updated) setSelectedUser(updated);
-    } else if (filteredUsers.length > 0) {
-      setSelectedUser(filteredUsers[0]);
-    }
-  }, [pendingUsers]);
-
-  // Keyboard navigation (macOS HIG: Up/Down arrows to step through items)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
-      if (filteredUsers.length === 0) return;
-
-      const currentIndex = selectedUser ? filteredUsers.findIndex(u => u.id === selectedUser.id) : -1;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = currentIndex < filteredUsers.length - 1 ? currentIndex + 1 : 0;
-        setSelectedUser(filteredUsers[nextIndex]);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = currentIndex > 0 ? currentIndex - 1 : filteredUsers.length - 1;
-        setSelectedUser(filteredUsers[prevIndex]);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [filteredUsers, selectedUser]);
-
-  // Statistics counters
-  const openCount = pendingUsers.filter(u => !u.is_campus_active).length;
-  const activeCount = pendingUsers.filter(u => u.is_campus_active).length;
-  const exemptCount = pendingUsers.filter(u => u.is_hardship_exempt).length;
-  const totalOpenAmount = (openCount * (masterPricing.priceStudent || 0.49) * 12).toFixed(2).replace('.', ',');
-
-  // Smart CAMT.053 XML and Bank-CSV Parsing Engine
-  const parseBankData = (rawText: string) => {
-    if (!rawText.trim()) return;
-    const results: { 
-      hash: string; 
-      userId: string; 
-      name: string; 
-      amount?: string; 
-      confidence: 'exact' | 'fuzzy';
-      rawNote?: string;
-    }[] = [];
-    const seenIds = new Set<string>();
-
-    const isXml = rawText.includes('<BkToCstmrStmt>') || rawText.includes('<Stmt>');
-    if (isXml) {
-      const entryRegex = /<Ntry>([\s\S]*?)<\/Ntry>/g;
-      let entryMatch;
-      while ((entryMatch = entryRegex.exec(rawText)) !== null) {
-        const entryBlock = entryMatch[1];
-        const amtMatch = entryBlock.match(/<Amt[^>]*>([\d.,]+)<\/Amt>/);
-        const amount = amtMatch ? `${amtMatch[1]} €` : '5,39 €';
-
-        const ustrdMatches = Array.from(entryBlock.matchAll(/<Ustrd>([\s\S]*?)<\/Ustrd>/g));
-        for (const uMatch of ustrdMatches) {
-          const textLine = uMatch[1];
-          matchTextToStudent(textLine, amount, results, seenIds);
-        }
-      }
-    } else {
-      const lines = rawText.split(/\r?\n/);
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const amtMatch = line.match(/(\d+[.,]\d{2})\s*(?:EUR|€)?/i);
-        const amount = amtMatch ? `${amtMatch[1].replace('.', ',')} €` : '5,39 €';
-        matchTextToStudent(line, amount, results, seenIds);
-      }
-    }
-
-    setMatchedResults(results);
+  // Persist operator note in DB
+  const handleUpdateNote = async (userId: string, note: string) => {
+    setOperatorNotes(prev => ({ ...prev, [userId]: note }));
   };
 
-  const matchTextToStudent = (
-    textLine: string, 
-    amount: string, 
-    results: any[], 
-    seenIds: Set<string>
-  ) => {
-    const exactRegex = /CG-([A-Z0-9]{6,12})-(\d{4})/gi;
-    const exactMatches = Array.from(textLine.matchAll(exactRegex));
-    
-    for (const match of exactMatches) {
-      const fullCode = match[0].toUpperCase();
-      const hashPart = match[1].toUpperCase();
-
-      const foundUser = pendingUsers.find(u => {
-        const uHash = (u.ausweis_nummer || u.id).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        return uHash.startsWith(hashPart) || hashPart.startsWith(uHash.slice(0, 8));
-      });
-
-      if (foundUser && !seenIds.has(foundUser.id)) {
-        seenIds.add(foundUser.id);
-        results.push({
-          hash: fullCode,
-          userId: foundUser.id,
-          name: getAnonymizedName(foundUser),
-          amount,
-          confidence: 'exact',
-          rawNote: textLine.slice(0, 80)
-        });
-        return;
-      }
-    }
-
-    const fuzzyRegex = /CG[\s-_]*([A-Z0-9]{6,10})/gi;
-    const fuzzyMatches = Array.from(textLine.matchAll(fuzzyRegex));
-    for (const fMatch of fuzzyMatches) {
-      const hashPart = fMatch[1].toUpperCase();
-      const foundUser = pendingUsers.find(u => {
-        const uHash = (u.ausweis_nummer || u.id).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-        return uHash.startsWith(hashPart) || hashPart.startsWith(uHash.slice(0, 8));
-      });
-
-      if (foundUser && !seenIds.has(foundUser.id)) {
-        seenIds.add(foundUser.id);
-        results.push({
-          hash: getReferenceCode(foundUser),
-          userId: foundUser.id,
-          name: getAnonymizedName(foundUser),
-          amount,
-          confidence: 'fuzzy',
-          rawNote: textLine.slice(0, 80)
-        });
-        return;
-      }
-    }
-  };
-
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDraggingFile(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      readFileContent(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      readFileContent(e.target.files[0]);
-    }
-  };
-
-  const readFileContent = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        setCsvText(content);
-        parseBankData(content);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleCopyCode = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showToast(`Verwendungszweck "${text}" in Zwischenablage kopiert!`);
-  };
-
-  const handleExemptStudent = async (user: PendingUser) => {
+  const handleSaveNoteToDb = async (userId: string) => {
+    const note = operatorNotes[userId] ?? (inspectedUser?.operator_notes || '');
+    setSavingNote(true);
     try {
       const { error } = await supabase
         .from('users')
-        .update({ is_hardship_exempt: true, is_campus_active: true })
+        .update({ operator_notes: note })
+        .eq('id', userId);
+      if (error) throw error;
+      notify({
+        type: 'success',
+        title: 'Notiz gespeichert',
+        message: 'Interne Betreiber-Notiz wurde revisionssicher in der Datenbank hinterlegt.'
+      });
+    } catch (err) {
+      console.error('Error saving operator note:', err);
+      notify({
+        type: 'error',
+        title: 'Speicherfehler',
+        message: 'Notiz konnte nicht in der Datenbank gespeichert werden.'
+      });
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  // Generate Deterministic Payment Reference Code
+  const getReferenceCode = (u: PendingUser): string => {
+    if (u.payment_reference) return u.payment_reference;
+    const cleanId = (u.id || '0000').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+    const year = new Date().getFullYear();
+    return `CG-${year}-${cleanId}`;
+  };
+
+  // Filter logic
+  const filteredUsers = pendingUsers.filter(u => {
+    const matchesSchool = selectedSchoolFilter === 'ALL' || u.school_id === selectedSchoolFilter;
+
+    const method = u.student_billing_payment_method || 'bank_transfer';
+    const isExempt = Boolean(u.is_hardship_exempt || u.exempt_from_direct_billing);
+    const matchesMethod =
+      paymentMethodFilter === 'ALL' ||
+      (paymentMethodFilter === 'exempt' && isExempt) ||
+      (paymentMethodFilter !== 'exempt' && !isExempt && method === paymentMethodFilter);
+
+    const isPaid = Boolean(u.is_campus_active || u.student_billing_cash_paid || isExempt);
+    const matchesStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'PENDING' && !isPaid) ||
+      (statusFilter === 'PAID' && isPaid);
+
+    const refCode = getReferenceCode(u).toLowerCase();
+    const fullName = `${u.first_name || ''} ${u.last_name || ''} ${u.name || ''}`.toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const sName = getSchoolName(u.school_id).toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+
+    const matchesSearch = !q || fullName.includes(q) || email.includes(q) || sName.includes(q) || refCode.includes(q);
+    return matchesSchool && matchesMethod && matchesStatus && matchesSearch;
+  });
+
+  const handleToggleSelect = (userId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedUserIds.length === filteredUsers.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(filteredUsers.map(u => u.id));
+    }
+  };
+
+  const handleExecuteBatch = async () => {
+    if (selectedUserIds.length === 0) return;
+    setActivating(true);
+    try {
+      await onBatchActivate(selectedUserIds);
+      setSelectedUserIds([]);
+      if (inspectedUser && selectedUserIds.includes(inspectedUser.id)) {
+        setInspectedUser(null);
+      }
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleSingleActivateClick = async (userId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setActivating(true);
+    try {
+      await onSingleActivate(userId);
+      setSelectedUserIds(prev => prev.filter(id => id !== userId));
+      if (inspectedUser?.id === userId) {
+        setInspectedUser(prev => prev ? { ...prev, is_campus_active: true } : null);
+      }
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Exempt student (Sozialfonds / Kulanz-Freischaltung) persisted in DB
+  const handleExemptStudent = async (user: PendingUser) => {
+    setActivating(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          is_hardship_exempt: true,
+          exempt_from_direct_billing: true,
+          is_campus_active: true
+        })
         .eq('id', user.id);
       if (error) throw error;
-      showToast(`Schüler "${getAnonymizedName(user)}" als Härtefall befreit & freigeschaltet.`);
-      onRefresh();
-    } catch (err: any) {
-      showToast('Fehler bei Härtefall-Befreiung: ' + err.message);
+
+      await onSingleActivate(user.id);
+      setInspectedUser(prev => prev ? {
+        ...prev,
+        is_hardship_exempt: true,
+        exempt_from_direct_billing: true,
+        is_campus_active: true
+      } : null);
+      notify({
+        type: 'success',
+        title: 'Kulanz-Freistellung gespeichert',
+        message: 'Schüler wurde gebührenfrei gestellt (0,00 €) und für Campus aktiviert.'
+      });
+    } catch (err) {
+      console.error('Error exempting student:', err);
+      notify({
+        type: 'error',
+        title: 'Fehler bei Kulanz-Freistellung',
+        message: 'Status konnte nicht in der Datenbank aktualisiert werden.'
+      });
+    } finally {
+      setActivating(false);
     }
   };
 
-  const handleExportDatevCSV = () => {
-    if (filteredUsers.length === 0) {
-      showToast('Keine Schülerdaten zum Exportieren vorhanden.');
-      return;
-    }
-
-    const headers = [
-      'Belegnummer_GoBD',
-      'Belegdatum',
-      'Buchungstext',
-      'Umsatz_Brutto_EUR',
-      'Umsatz_Netto_EUR',
-      'USt_Satz_Prozent',
-      'USt_Betrag_EUR',
-      'Zahlungsstatus',
-      'Schueler_Hash',
-      'Musikschule',
-      'Plattform_Modul'
-    ];
-
-    const rows = filteredUsers.map(u => {
-      const school = schools.find(s => s.id === u.school_id);
-      const ref = getReferenceCode(u);
-      const date = u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-      const status = u.is_campus_active ? 'Bezahlt_Aktiv' : (u.is_hardship_exempt ? 'Befreit_Haertefall' : 'Offen_Ausstehend');
-      const gross = '5.39';
-      const net = '4.53';
-      const vatRate = '19';
-      const vat = '0.86';
-      const schoolName = (school?.name || 'Musikschule').replace(/;/g, ',');
-      const bookingText = `Campus-Groovelab Jahresbeitrag ${ref} ${schoolName}`;
-
-      return [
-        ref,
-        date,
-        `"${bookingText}"`,
-        gross,
-        net,
-        vatRate,
-        vat,
-        status,
-        u.id.slice(0, 8).toUpperCase(),
-        `"${schoolName}"`,
-        'Campus'
-      ].join(';');
+  // Generate Official GoBD Receipt PDF for Student/Parents
+  const handleDownloadStudentReceipt = (user: PendingUser) => {
+    const rate = getStudentAnnualRate(user.school_id);
+    const isExempt = Boolean(user.is_hardship_exempt || user.exempt_from_direct_billing);
+    void generateB2CParentContractPDF({
+      studentName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Schüler/in',
+      studentId: user.id,
+      schoolName: getSchoolName(user.school_id),
+      isDirectBilled: !isExempt,
+      isHardship: isExempt,
+      referenceCode: getReferenceCode(user),
+      totalAmountStr: isExempt ? '0,00' : rate.gross.toFixed(2).replace('.', ','),
+      currencySuffix: rate.currencySymbol === 'CHF' ? 'CHF' : 'EUR',
+      remainingMonths: 11,
+      monthlyRate: rate.currencySymbol === 'CHF' ? 'CHF 1.00' : '0,49 €'
     });
-
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    link.href = url;
-    link.setAttribute('download', `campus_groovelab_datev_gobd_export_${today}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('DATEV / GoBD Revisions-Export erfolgreich heruntergeladen!');
   };
 
-  const handleGenerateReceiptPDF = async (user: PendingUser) => {
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF();
-      const school = schools.find(s => s.id === user.school_id);
-      const refCode = getReferenceCode(user);
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('de-DE');
+  // KPIs Calculation (11 school months canonical formula)
+  const pendingCount = pendingUsers.filter(u => !u.is_campus_active && !u.is_hardship_exempt && !u.exempt_from_direct_billing).length;
+  const paidCount = pendingUsers.filter(u => u.is_campus_active && !u.is_hardship_exempt && !u.exempt_from_direct_billing).length;
+  const exemptCount = pendingUsers.filter(u => u.is_hardship_exempt || u.exempt_from_direct_billing).length;
 
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 24, 'F');
+  const totalOpenAmount = pendingUsers
+    .filter(u => !u.is_campus_active && !u.is_hardship_exempt && !u.exempt_from_direct_billing)
+    .reduce((acc, u) => acc + getStudentAnnualRate(u.school_id).gross, 0);
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.text('Campus-Groovelab', 16, 15);
-      
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Offizielle Zahlungsbestätigung & GoBD-Beleg', 130, 15);
+  const totalPaidGross = pendingUsers
+    .filter(u => u.is_campus_active && !u.is_hardship_exempt && !u.exempt_from_direct_billing)
+    .reduce((acc, u) => acc + getStudentAnnualRate(u.school_id).gross, 0);
 
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Zahlungsquittung', 16, 40);
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Ausstellungsdatum: ${dateStr}`, 16, 47);
-      doc.text(`Beleg-Referenz: ${refCode}`, 16, 52);
-
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(16, 60, 178, 38, 3, 3, 'FD');
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('Empfänger & Zuordnung:', 22, 70);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Schüler/Kunde: ${getAnonymizedName(user)}`, 22, 78);
-      doc.text(`Musikschule: ${school?.name || 'Partner-Musikschule'}`, 22, 85);
-      doc.text(`Verwendungszweck: ${refCode}`, 22, 92);
-
-      doc.setDrawColor(203, 213, 225);
-      doc.line(16, 110, 194, 110);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(9);
-      doc.text('Position / Leistung', 16, 118);
-      doc.text('Intervall', 110, 118);
-      doc.text('USt.', 145, 118);
-      doc.text('Gesamtbetrag', 170, 118);
-
-      doc.line(16, 122, 194, 122);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(51, 65, 85);
-      doc.text('Cloud- & Modul-Bereitstellung: Campus', 16, 132);
-      doc.text('Jahresbeitrag (11 Mon.)', 110, 132);
-      doc.text('19%', 145, 132);
-      doc.text('5,39 EUR', 170, 132);
-
-      doc.line(16, 140, 194, 140);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text('Nettobetrag:', 130, 150);
-      doc.text('4,53 EUR', 170, 150);
-
-      doc.text('USt. (19%):', 130, 157);
-      doc.text('0,86 EUR', 170, 157);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.text('Gesamtbetrag (Brutto):', 130, 166);
-      doc.text('5,39 EUR', 170, 166);
-
-      doc.setDrawColor(16, 185, 129);
-      doc.setFillColor(240, 253, 244);
-      doc.roundedRect(16, 185, 178, 28, 3, 3, 'FD');
-
-      doc.setTextColor(21, 128, 61);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('✓ ZAHLUNGSEINGANG VERBUCHT & FREIGESCHALTET', 22, 197);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(22, 101, 52);
-      doc.text(`Der Betrag wurde erfolgreich verbucht. Das Profil ist für das gesamte Schuljahr aktiv.`, 22, 205);
-
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Campus-Groovelab Cloud Platform • Revisionssicherer GoBD-Beleg • DSGVO-konform ohne Klartext-Kontoübermittlung', 16, 280);
-
-      doc.save(`Zahlungsquittung_${refCode}.pdf`);
-      showToast(`GoBD-Quittung für ${getAnonymizedName(user)} als PDF heruntergeladen!`);
-    } catch (err: any) {
-      showToast('Fehler bei PDF-Generierung: ' + err.message);
-    }
-  };
+  const totalPaidNet = effectiveTaxMode === 'standard_vat'
+    ? Number((totalPaidGross / effectiveVatDivisor).toFixed(2))
+    : totalPaidGross;
+  const totalPaidVat = effectiveTaxMode === 'standard_vat'
+    ? Number((totalPaidGross - totalPaidNet).toFixed(2))
+    : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }} className="animate-fade-in">
-      
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 999999,
-          background: '#0f172a',
-          color: '#ffffff',
-          padding: '12px 20px',
-          borderRadius: '12px',
-          boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontSize: '0.86rem',
-          fontWeight: 700
-        }}>
-          <CheckCircle size={16} color="#10b981" />
-          <span>{toastMessage}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
+      {toastNotice && (
+        <div
+          role="status"
+          style={{
+            background: toastNotice.type === 'error' ? '#fef2f2' : '#ecfdf5',
+            color: toastNotice.type === 'error' ? '#991b1b' : '#065f46',
+            padding: '12px 18px',
+            borderRadius: '14px',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.84rem',
+            fontWeight: 700
+          }}
+        >
+          <span><strong>{toastNotice.title}:</strong> {toastNotice.message}</span>
+          <button
+            type="button"
+            aria-label="Hinweis schließen"
+            onClick={() => setToastNotice(null)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit' }}
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
 
-      {/* Header Panel */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CreditCard size={20} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
-                Zahlungsabgleich &amp; Aktivierungen
-              </h2>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.86rem', color: '#64748b', fontWeight: 550 }}>
-                Zahlungseingänge für Schüler-Aktivierungen abgleichen, Bankauszüge importieren und Zugänge freischalten.
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        {/* Action Buttons Toolbar */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {selectedUserIds.length > 0 && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a', background: 'rgba(59, 130, 246, 0.1)', padding: '6px 12px', borderRadius: '8px' }}>
-                {selectedUserIds.length} ausgewählt
+      {/* 1. HEADER & EXECUTIVE FINANCIAL SUMMARY */}
+      <div style={{
+        background: '#ffffff',
+        borderRadius: '24px',
+        padding: '28px 32px',
+        border: '1px solid rgba(15, 23, 42, 0.08)',
+        boxShadow: '0 4px 24px rgba(15, 23, 42, 0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '24px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{
+                fontSize: '0.70rem',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#047857',
+                background: '#ecfdf5',
+                padding: '4px 10px',
+                borderRadius: '100px',
+                border: 'none'
+              }}>
+                Direktabrechnung (B2C) • Eltern &amp; volljährige Schüler
               </span>
+              <span style={{
+                fontSize: '0.70rem',
+                fontWeight: 700,
+                color: '#475569',
+                background: '#f1f5f9',
+                padding: '4px 10px',
+                borderRadius: '100px'
+              }}>
+                Schuljahres-Beitrag: 5,39 € (DE/AT) • CHF 11.00 (CH)
+              </span>
+            </div>
+
+            <h2 style={{ margin: '10px 0 4px 0', fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>
+              Zahlungsabgleich &amp; Schüler-Freischaltung
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', maxWidth: '720px', lineHeight: 1.5 }}>
+              Prüfe eingehende Eltern-Überweisungen (11 Schulmonate, 12. Monat kostenfrei), schalte Schülerprofile frei und erstelle revisionssichere Zahlungsbelege. Für CAMT.053-Bankimporte und den DATEV-Buchungsstapel nutze bitte den Tab <strong>Financial Control</strong>.
+            </p>
+          </div>
+
+          {/* Action Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {onNavigateBilling && (
               <button
-                onClick={() => onBatchActivate(selectedUserIds)}
-                disabled={loadingPending}
+                type="button"
+                onClick={onNavigateBilling}
                 style={{
-                  padding: '9px 15px',
-                  borderRadius: '10px',
-                  background: '#10b981',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: '#0f172a',
                   border: 'none',
                   color: '#ffffff',
-                  fontSize: '0.80rem',
                   fontWeight: 800,
+                  fontSize: '0.82rem',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: 'none',
-                  transition: 'all 0.15s ease'
+                  gap: '6px'
                 }}
               >
-                <Check size={14} /> Ausgewählte freischalten ({selectedUserIds.length})
+                <Landmark size={15} />
+                <span>CAMT.053 &amp; DATEV (Financial Control)</span>
               </button>
-              <button
-                onClick={() => setSelectedUserIds([])}
-                style={{
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  background: '#f1f5f9',
-                  border: 'none',
-                  color: '#64748b',
-                  fontSize: '0.80rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                Aufheben
-              </button>
+            )}
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loadingPending}
+              aria-label="Liste aktualisieren"
+              style={{
+                padding: '10px 14px',
+                borderRadius: '12px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              className="hover-scale-mini"
+              title="Liste aktualisieren"
+            >
+              <RefreshCw size={15} className={loadingPending ? 'animate-spin' : ''} />
+              <span>Aktualisieren</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Financial KPI Scorecards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '14px'
+        }}>
+          {/* KPI 1: Offene Freischaltungen */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setStatusFilter('PENDING')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStatusFilter('PENDING');
+              }
+            }}
+            style={{
+              background: statusFilter === 'PENDING' ? '#fffbeb' : '#f8fafc',
+              borderRadius: '18px',
+              padding: '16px 20px',
+              border: statusFilter === 'PENDING' ? 'none' : '1px solid #e2e8f0',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Wartend (Offen)
+              </span>
+              <Clock size={16} color="#d97706" />
             </div>
-          )}
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              {pendingCount} <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#64748b' }}>Schüler</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', marginTop: '4px' }}>
+              Offenes Volumen: {totalOpenAmount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+            </div>
+          </div>
 
-          {/* DATEV / GoBD CSV Export Button */}
-          <button
-            onClick={handleExportDatevCSV}
-            style={{
-              padding: '9px 14px',
-              borderRadius: '10px',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-              transition: 'all 0.15s ease'
-            }}
-            title="Exportiert Buchungsdaten nach GoBD/DATEV Revisionsstandard"
-          >
-            <Download size={14} /> DATEV / GoBD-Export
-          </button>
-
-          {/* CAMT.053 & Bank CSV Import Button */}
-          <button
-            onClick={() => {
-              setCsvText('');
-              setMatchedResults([]);
-              setShowCsvModal(true);
+          {/* KPI 2: Bezahlt & Aktiviert */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setStatusFilter('PAID')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStatusFilter('PAID');
+              }
             }}
             style={{
-              padding: '9px 16px',
-              borderRadius: '10px',
-              background: '#0f172a',
-              color: '#ffffff',
-              border: 'none',
-              fontSize: '0.82rem',
-              fontWeight: 800,
+              background: statusFilter === 'PAID' ? '#ecfdf5' : '#f8fafc',
+              borderRadius: '18px',
+              padding: '16px 20px',
+              border: statusFilter === 'PAID' ? 'none' : '1px solid #e2e8f0',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)',
               transition: 'all 0.15s ease'
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.25)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.15)';
-            }}
           >
-            <Upload size={14} /> CAMT.053 &amp; Bank-CSV abgleichen
-          </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Bezahlt &amp; Freigeschaltet
+              </span>
+              <CheckCircle2 size={16} color="#059669" />
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              {paidCount} <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#64748b' }}>Schüler</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
+              Umsatz (Brutto): {totalPaidGross.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+            </div>
+          </div>
 
-          {/* Refresh Button */}
-          <button
-            onClick={onRefresh}
-            disabled={loadingPending}
+          {/* KPI 3: Netto & Steuer-Aufschlüsselung */}
+          <div style={{
+            background: '#f8fafc',
+            borderRadius: '18px',
+            padding: '16px 20px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Netto-Erlös / Steuerstatus
+              </span>
+              <Landmark size={16} color="#475569" />
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              {totalPaidNet.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+            </div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginTop: '4px' }}>
+              {effectiveTaxMode === 'small_business'
+                ? 'Umsatzsteuerbefreit (Kleinunternehmerregelung)'
+                : `inkl. ${totalPaidVat.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € USt. (19%)`}
+            </div>
+          </div>
+
+          {/* KPI 4: Sozialfonds & Kulanz */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => { setStatusFilter('ALL'); setPaymentMethodFilter('exempt'); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStatusFilter('ALL');
+                setPaymentMethodFilter('exempt');
+              }
+            }}
             style={{
-              padding: '9px 14px',
-              borderRadius: '10px',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#475569',
-              fontSize: '0.82rem',
-              fontWeight: 800,
+              background: paymentMethodFilter === 'exempt' ? '#eff6ff' : '#f8fafc',
+              borderRadius: '18px',
+              padding: '16px 20px',
+              border: paymentMethodFilter === 'exempt' ? 'none' : '1px solid #e2e8f0',
               cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
               transition: 'all 0.15s ease'
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = '#94a3b8';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
           >
-            <RefreshCw size={13} className={loadingPending ? 'animate-spin' : ''} /> Aktualisieren
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          padding: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-        }} className="hover-scale-mini">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Clock size={14} color="#475569" /> Offene Zahlungen
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
-            <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>{openCount}</span>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>({totalOpenAmount} € fällig)</span>
-          </div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          padding: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-        }} className="hover-scale-mini">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <CheckCircle size={14} color="#475569" /> Gematcht & Aktiv
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
-            <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981', fontFamily: '"Outfit", sans-serif' }}>{activeCount}</span>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>Profile aktiv</span>
-          </div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          padding: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-        }} className="hover-scale-mini">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Shield size={14} color="#475569" /> Härtefälle / Befreit
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
-            <span style={{ fontSize: '1.6rem', fontWeight: 900, color: '#3b82f6', fontFamily: '"Outfit", sans-serif' }}>{exemptCount}</span>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>Befreite Schüler</span>
-          </div>
-        </div>
-
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '14px',
-          padding: '16px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
-          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-        }} className="hover-scale-mini">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '0.70rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <Tag size={14} color="#64748b" /> GoBD Referenzschema
-          </div>
-          <div style={{ marginTop: '6px' }}>
-            <code style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', background: '#f1f5f9', padding: '3px 6px', borderRadius: '4px' }}>
-              CG-[HASH]-[YYMM]
-            </code>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Sozialfonds / Kulanz
+              </span>
+              <Sparkles size={16} color="#2563eb" />
+            </div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              {exemptCount} <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#64748b' }}>Freiplätze</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#2563eb', marginTop: '4px' }}>
+              100% Beitragsbefreit (0,00 €)
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
+      {/* 2. FILTER & SEARCH BAR */}
       <div style={{
         background: '#ffffff',
-        borderRadius: '14px',
-        padding: '12px 16px',
-        border: '1px solid #e2e8f0',
+        borderRadius: '20px',
+        padding: '18px 24px',
+        border: '1px solid rgba(15, 23, 42, 0.08)',
+        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.02)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
-        gap: '12px'
+        gap: '14px'
       }}>
-        {/* Status Filter Tabs */}
-        <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '8px', gap: '2px' }}>
-          <button
-            onClick={() => setActiveFilterTab('open')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              background: activeFilterTab === 'open' ? '#ffffff' : 'transparent',
-              color: activeFilterTab === 'open' ? '#0f172a' : '#64748b',
-              boxShadow: activeFilterTab === 'open' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            Offen ({openCount})
-          </button>
-          <button
-            onClick={() => setActiveFilterTab('active')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              background: activeFilterTab === 'active' ? '#ffffff' : 'transparent',
-              color: activeFilterTab === 'active' ? '#0f172a' : '#64748b',
-              boxShadow: activeFilterTab === 'active' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            Aktiv & Bezahlt ({activeCount})
-          </button>
-          <button
-            onClick={() => setActiveFilterTab('exempt')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              background: activeFilterTab === 'exempt' ? '#ffffff' : 'transparent',
-              color: activeFilterTab === 'exempt' ? '#0f172a' : '#64748b',
-              boxShadow: activeFilterTab === 'exempt' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            Befreit ({exemptCount})
-          </button>
-          <button
-            onClick={() => setActiveFilterTab('all')}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              background: activeFilterTab === 'all' ? '#ffffff' : 'transparent',
-              color: activeFilterTab === 'all' ? '#0f172a' : '#64748b',
-              boxShadow: activeFilterTab === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
-            }}
-          >
-            Alle ({pendingUsers.length})
-          </button>
-        </div>
+        {/* Left: Search + School Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 420px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 260px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Suche nach Name, Verwendungszweck (CG-2026-...), Schule..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px 14px 10px 38px',
+                borderRadius: '12px',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+                fontSize: '0.84rem',
+                color: '#0f172a',
+                fontWeight: 600,
+                outline: 'none'
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Suche zurücksetzen"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '2px'
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-        {/* School Dropdown Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Building2 size={15} color="#64748b" />
           <select
-            value={selectedSchoolId}
-            onChange={(e) => setSelectedSchoolId(e.target.value)}
+            value={selectedSchoolFilter}
+            onChange={(e) => setSelectedSchoolFilter(e.target.value)}
+            aria-label="Musikschule filtern"
             style={{
-              padding: '6px 12px',
-              borderRadius: '8px',
+              padding: '10px 14px',
+              borderRadius: '12px',
               border: '1px solid #cbd5e1',
               background: '#f8fafc',
-              fontSize: '0.78rem',
+              fontSize: '0.84rem',
               fontWeight: 700,
               color: '#0f172a',
-              outline: 'none'
+              cursor: 'pointer'
             }}
           >
-            <option value="all">Alle Musikschulen ({schools.length})</option>
+            <option value="ALL">Alle Musikschulen ({schools.length})</option>
             {schools.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </div>
 
-        {/* Search Field */}
-        <div style={{ position: 'relative', width: '260px' }}>
-          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Name, Schule, CG-Code..."
-            style={{
-              width: '100%',
-              padding: '6px 10px 6px 30px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              background: '#f8fafc',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              color: '#0f172a',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }}
-          />
+        {/* Right: Segmented Pills for Status & Payment Method */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+            {([
+              { id: 'PENDING', label: `Offen (${pendingCount})` },
+              { id: 'PAID', label: `Bezahlt (${paidCount})` },
+              { id: 'ALL', label: 'Alle' }
+            ] as const).map(st => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setStatusFilter(st.id)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: statusFilter === st.id ? '#ffffff' : 'transparent',
+                  color: statusFilter === st.id ? '#0f172a' : '#64748b',
+                  fontSize: '0.78rem',
+                  fontWeight: statusFilter === st.id ? 800 : 600,
+                  cursor: 'pointer',
+                  boxShadow: statusFilter === st.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'inline-flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', gap: '4px' }}>
+            {([
+              { id: 'ALL', label: 'Alle Wege' },
+              { id: 'bank_transfer', label: 'Überweisung' },
+              { id: 'cash', label: 'Vor Ort (Bar)' },
+              { id: 'exempt', label: 'Kulanz' }
+            ] as const).map(pm => (
+              <button
+                key={pm.id}
+                type="button"
+                onClick={() => setPaymentMethodFilter(pm.id)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: paymentMethodFilter === pm.id ? '#ffffff' : 'transparent',
+                  color: paymentMethodFilter === pm.id ? '#0f172a' : '#64748b',
+                  fontSize: '0.78rem',
+                  fontWeight: paymentMethodFilter === pm.id ? 800 : 600,
+                  cursor: 'pointer',
+                  boxShadow: paymentMethodFilter === pm.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                }}
+              >
+                {pm.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Main Split-Screen: Master List & Apple HIG Inset-Grouped Detail Stage */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', minHeight: '560px' }}>
-        
-        {/* Left: Students Master List */}
+      {/* 3. BATCH SELECTION BAR (Visible when items are selected) */}
+      {selectedUserIds.length > 0 && (
         <div style={{
-          background: '#ffffff',
-          borderRadius: '20px',
-          border: '1px solid #e2e8f0',
+          background: '#0f172a',
+          color: '#ffffff',
+          borderRadius: '18px',
+          padding: '14px 24px',
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 8px 24px -4px rgba(0,0,0,0.04)'
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.18)',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}>
-          {/* List Header */}
-          <div style={{
-            padding: '12px 18px',
-            background: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.76rem',
-            color: '#64748b',
-            fontWeight: 700
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedUserIds(filteredUsers.map(u => u.id));
-                  } else {
-                    setSelectedUserIds([]);
-                  }
-                }}
-                style={{ width: '15px', height: '15px', borderRadius: '4px', cursor: 'pointer' }}
-              />
-              <span>Alle {filteredUsers.length} auswählen</span>
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.70rem', color: '#94a3b8' }}>↑/↓ Navigieren</span>
-              <span>{filteredUsers.length} Einträge</span>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{
+              background: '#10b981',
+              color: '#ffffff',
+              fontWeight: 900,
+              fontSize: '0.80rem',
+              padding: '4px 10px',
+              borderRadius: '8px'
+            }}>
+              {selectedUserIds.length} ausgewählt
+            </span>
+            <span style={{ fontSize: '0.86rem', color: '#cbd5e1', fontWeight: 600 }}>
+              Gesamtsumme der Auswahl:{' '}
+              <strong style={{ color: '#ffffff' }}>
+                {selectedUserIds
+                  .reduce((sum, id) => {
+                    const u = pendingUsers.find(p => p.id === id);
+                    return sum + getStudentAnnualRate(u?.school_id).gross;
+                  }, 0)
+                  .toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              </strong>
+            </span>
           </div>
 
-          {/* List Content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px', maxHeight: '620px' }}>
-            {loadingPending ? (
-              <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748b' }}>
-                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px', color: '#0f172a' }} />
-                <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Lade Schüler- und Zahlungsdaten...</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setSelectedUserIds([])}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                color: '#cbd5e1',
+                fontSize: '0.80rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Auswahl aufheben
+            </button>
+            <button
+              type="button"
+              onClick={handleExecuteBatch}
+              disabled={activating}
+              style={{
+                padding: '9px 20px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '0.84rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <CheckSquare size={16} />
+              <span>{activating ? 'Schalte frei...' : `Jetzt ${selectedUserIds.length} Profile freischalten`}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MAIN WORKSPACE: SPLIT-SCREEN TABLE & INSPECTOR DRAWER */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: inspectedUser ? 'minmax(0, 1.35fr) minmax(360px, 0.85fr)' : '1fr',
+        gap: '20px',
+        alignItems: 'start',
+        transition: 'all 0.25s ease'
+      }}>
+
+        {/* LEFT COLUMN: STUDENT LEDGER LIST */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)',
+          overflow: 'hidden'
+        }}>
+          {/* Table Header */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '42px 1.6fr 1.2fr 1.1fr 0.9fr 130px',
+            padding: '14px 20px',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            color: '#64748b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            alignItems: 'center'
+          }}>
+            <div>
+              <input
+                type="checkbox"
+                aria-label="Alle sichtbaren Schüler auswählen"
+                checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
+                onChange={handleSelectAll}
+                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+              />
+            </div>
+            <div>Schüler / Musikschule</div>
+            <div>Verwendungszweck</div>
+            <div>Zahlungsweg</div>
+            <div>Status / Betrag</div>
+            <div style={{ textAlign: 'right' }}>Aktion</div>
+          </div>
+
+          {/* Table Body */}
+          {filteredUsers.length === 0 ? (
+            <div style={{
+              padding: '64px 24px',
+              textAlign: 'center',
+              color: '#64748b'
+            }}>
+              <ShieldCheck size={44} style={{ color: '#10b981', margin: '0 auto 12px auto', opacity: 0.85 }} />
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+                Keine Einträge in dieser Ansicht
               </div>
-            ) : filteredUsers.length === 0 ? (
-              <div style={{ padding: '70px 20px', textAlign: 'center', color: '#64748b' }}>
-                <CheckCircle size={36} color="#10b981" style={{ margin: '0 auto 12px' }} />
-                <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>Keine Zahlungsrückstände</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>Alle angezeigten Schüler-Zahlungen sind abgeglichen.</div>
+              <div style={{ fontSize: '0.84rem', maxWidth: '420px', margin: '0 auto' }}>
+                {statusFilter === 'PENDING'
+                  ? 'Aktuell warten keine offenen Direktzahler-Profile auf eine Zahlungsfreigabe.'
+                  : 'Keine Schülerprofile für die gewählten Filterkriterien gefunden.'}
               </div>
-            ) : (
-              filteredUsers.map(u => {
-                const school = schools.find(s => s.id === u.school_id);
+            </div>
+          ) : (
+            <div style={{ maxHeight: '640px', overflowY: 'auto' }}>
+              {filteredUsers.map((u) => {
                 const isSelected = selectedUserIds.includes(u.id);
-                const isFocused = selectedUser?.id === u.id;
+                const isInspected = inspectedUser?.id === u.id;
+                const isExempt = Boolean(u.is_hardship_exempt || u.exempt_from_direct_billing);
+                const isPaid = Boolean(u.is_campus_active || u.student_billing_cash_paid || isExempt);
+                const method = u.student_billing_payment_method || 'bank_transfer';
                 const refCode = getReferenceCode(u);
+                const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.name || 'Unbekannter Schüler';
+                const rate = getStudentAnnualRate(u.school_id);
 
                 return (
                   <div
                     key={u.id}
-                    onClick={() => setSelectedUser(u)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setInspectedUser(u)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setInspectedUser(u);
+                      }
+                    }}
                     style={{
-                      display: 'flex',
+                      display: 'grid',
+                      gridTemplateColumns: '42px 1.6fr 1.2fr 1.1fr 0.9fr 130px',
+                      padding: '14px 20px',
+                      borderBottom: '1px solid #f1f5f9',
                       alignItems: 'center',
-                      gap: '12px',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
+                      background: isInspected
+                        ? '#f0fdf4'
+                        : isSelected
+                        ? '#f8fafc'
+                        : '#ffffff',
                       cursor: 'pointer',
-                      background: isFocused ? '#eff6ff' : '#ffffff',
-                      border: isFocused ? '1px solid #bfdbfe' : '1px solid #f1f5f9',
-                      marginBottom: '6px',
-                      transition: 'all 0.15s ease',
-                      boxShadow: isFocused ? '0 2px 8px rgba(59, 130, 246, 0.08)' : 'none'
+                      transition: 'background 0.12s ease'
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedUserIds(prev => [...prev, u.id]);
-                        } else {
-                          setSelectedUserIds(prev => prev.filter(id => id !== u.id));
-                        }
-                      }}
-                      style={{ width: '15px', height: '15px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0 }}
-                    />
-
-                    {/* Monogram / Avatar */}
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '10px',
-                      background: school?.primary_color ? `${school.primary_color}18` : '#e0f2fe',
-                      color: school?.primary_color || '#0284c7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.80rem',
-                      fontWeight: 800,
-                      flexShrink: 0
-                    }}>
-                      <User size={16} />
+                    {/* Checkbox */}
+                    <div onClick={(e) => handleToggleSelect(u.id, e)}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Auswählen: ${fullName}`}
+                        checked={isSelected}
+                        onChange={() => {}}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#10b981' }}
+                      />
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <strong style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 800 }}>
-                          {getAnonymizedName(u)}
-                        </strong>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: u.is_campus_active ? '#15803d' : '#d97706' }}>
-                          5,39 € / J.
-                        </span>
+                    {/* Student & School */}
+                    <div style={{ paddingRight: '10px', minWidth: 0 }}>
+                      <div style={{
+                        fontWeight: 800,
+                        color: '#0f172a',
+                        fontSize: '0.88rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {fullName}
                       </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.70rem', fontWeight: 700, color: '#64748b' }}>
-                          {school?.name || 'Musikschule'}
-                        </span>
-                        <span style={{ color: '#cbd5e1' }}>•</span>
-                        <code style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '1px 5px', borderRadius: '4px' }}>
-                          {refCode}
-                        </code>
-                        {u.is_campus_active ? (
-                          <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#15803d', background: '#f0fdf4', padding: '1px 6px', borderRadius: '4px' }}>
-                            Aktiv
-                          </span>
-                        ) : u.is_hardship_exempt ? (
-                          <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', padding: '1px 6px', borderRadius: '4px' }}>
-                            Befreit
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 6px', borderRadius: '4px' }}>
-                            Offen
-                          </span>
-                        )}
+                      <div style={{
+                        fontSize: '0.74rem',
+                        color: '#64748b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        marginTop: '2px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        <Building size={11} />
+                        <span>{getSchoolName(u.school_id)}</span>
                       </div>
                     </div>
 
-                    <ChevronRight size={14} color={isFocused ? '#3b82f6' : '#94a3b8'} />
+                    {/* Reference Code */}
+                    <div>
+                      <span style={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.76rem',
+                        fontWeight: 800,
+                        color: '#334155',
+                        background: '#f1f5f9',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: 'none'
+                      }}>
+                        {refCode}
+                      </span>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '3px' }}>
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString('de-DE') : 'Neu angelegt'}
+                      </div>
+                    </div>
+
+                    {/* Payment Method */}
+                    <div>
+                      {isExempt ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.73rem',
+                          fontWeight: 800,
+                          color: '#1d4ed8',
+                          background: '#eff6ff',
+                          padding: '4px 9px',
+                          borderRadius: '8px',
+                          border: 'none'
+                        }}>
+                          <Sparkles size={12} />
+                          <span>Sozialfonds</span>
+                        </span>
+                      ) : method === 'cash' ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.73rem',
+                          fontWeight: 700,
+                          color: '#b45309',
+                          background: '#fffbeb',
+                          padding: '4px 9px',
+                          borderRadius: '8px',
+                          border: 'none'
+                        }}>
+                          <Banknote size={12} />
+                          <span>Vor Ort (Schule)</span>
+                        </span>
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.73rem',
+                          fontWeight: 700,
+                          color: '#0369a1',
+                          background: '#f0f9ff',
+                          padding: '4px 9px',
+                          borderRadius: '8px',
+                          border: 'none'
+                        }}>
+                          <CreditCard size={12} />
+                          <span>Überweisung</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Status & Amount */}
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: '0.86rem', color: isExempt ? '#2563eb' : '#0f172a' }}>
+                        {isExempt ? '0,00 €' : rate.formattedGross}
+                      </div>
+                      {isExempt ? (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Check size={10} /> Befreit
+                        </span>
+                      ) : isPaid ? (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Check size={10} /> Bezahlt &amp; Aktiv
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#d97706', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={10} /> Zahlung offen
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Quick Action */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                      {!isPaid ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleSingleActivateClick(u.id, e)}
+                          disabled={activating}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: '10px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontWeight: 800,
+                            fontSize: '0.75rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <Check size={12} />
+                          <span>Freigeben</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDownloadStudentReceipt(u); }}
+                          style={{
+                            padding: '7px 10px',
+                            borderRadius: '10px',
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            border: '1px solid #cbd5e1',
+                            fontWeight: 700,
+                            fontSize: '0.74rem',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="GoBD-Zahlungsbeleg als PDF herunterladen"
+                        >
+                          <Download size={12} />
+                          <span>Beleg</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`Details für ${fullName} öffnen`}
+                        onClick={(e) => { e.stopPropagation(); setInspectedUser(u); }}
+                        style={{
+                          padding: '7px',
+                          borderRadius: '10px',
+                          background: isInspected ? '#dcfce7' : 'transparent',
+                          color: isInspected ? '#047857' : '#94a3b8',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
                   </div>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Right: Apple HIG Inset-Grouped Detail Stage */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '20px',
-          border: '1px solid #e2e8f0',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          boxShadow: '0 8px 24px -4px rgba(0,0,0,0.06)'
-        }}>
-          {selectedUser ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              
-              {/* Detail Header Hero */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <div style={{
-                    width: '46px',
-                    height: '46px',
-                    borderRadius: '14px',
+        {/* RIGHT COLUMN: 360° STUDENT PAYMENT INSPECTOR */}
+        {inspectedUser && (() => {
+          const inspectedRate = getStudentAnnualRate(inspectedUser.school_id);
+          const isExempt = Boolean(inspectedUser.is_hardship_exempt || inspectedUser.exempt_from_direct_billing);
+          const isPaid = Boolean(inspectedUser.is_campus_active || inspectedUser.student_billing_cash_paid || isExempt);
+          return (
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              border: '1px solid rgba(15, 23, 42, 0.1)',
+              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)',
+              padding: '24px',
+              position: 'sticky',
+              top: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              {/* Inspector Header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                <div>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: '#059669',
+                    background: '#ecfdf5',
+                    padding: '3px 8px',
+                    borderRadius: '6px'
+                  }}>
+                    Beleg- &amp; Profil-Inspektor
+                  </span>
+                  <h3 style={{ margin: '8px 0 2px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                    {`${inspectedUser.first_name || ''} ${inspectedUser.last_name || ''}`.trim() || inspectedUser.name}
+                  </h3>
+                  <div style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
+                    {getSchoolName(inspectedUser.school_id)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Inspektor schließen"
+                  onClick={() => setInspectedUser(null)}
+                  style={{
                     background: '#f1f5f9',
-                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '1rem',
-                    fontWeight: 900
-                  }}>
-                    {selectedUser.first_name ? selectedUser.first_name[0].toUpperCase() : 'C'}
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Schüler-Zahlungsakte &amp; GoBD-Status
-                    </span>
-                    <h3 style={{ margin: '2px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                      {getAnonymizedName(selectedUser)}
-                    </h3>
-                    <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                      {schools.find(s => s.id === selectedUser.school_id)?.name || 'Musikschule'}
-                    </span>
-                  </div>
-                </div>
-
-                {selectedUser.is_campus_active ? (
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '4px 10px', borderRadius: '8px' }}>
-                    ● Aktiv / Bezahlt
-                  </span>
-                ) : selectedUser.is_hardship_exempt ? (
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: '8px' }}>
-                    ● Härtefall befreit
-                  </span>
-                ) : (
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '4px 10px', borderRadius: '8px' }}>
-                    ● Zahlung Ausstehend
-                  </span>
-                )}
+                    cursor: 'pointer',
+                    color: '#64748b'
+                  }}
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              {/* Apple Action Bar */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {!selectedUser.is_campus_active && (
+              {/* Payment Reference & Breakdown Box */}
+              <div style={{
+                background: '#f8fafc',
+                borderRadius: '16px',
+                padding: '16px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Verwendungszweck:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem', color: '#0f172a', background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px' }}>
+                    {getReferenceCode(inspectedUser)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Empfänger-IBAN:</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#334155' }}>
+                    {OPERATOR_BANKING_CONFIG.ibanFormatted}
+                  </span>
+                </div>
+                <div style={{ height: '1px', background: '#e2e8f0', margin: '2px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
+                  <span>Nettobetrag (11 Schulmonate, 12. Monat frei):</span>
+                  <strong>{isExempt ? '0,00' : inspectedRate.net.toFixed(2).replace('.', ',')} {inspectedRate.currencySymbol}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
+                  <span>
+                    {effectiveTaxMode === 'small_business' || inspectedRate.currencySymbol === 'CHF'
+                      ? 'Umsatzsteuer (Kleinunternehmerregelung 0%):'
+                      : 'Umsatzsteuer (19% MwSt.):'}
+                  </span>
+                  <strong>{isExempt ? '0,00' : inspectedRate.vat.toFixed(2).replace('.', ',')} {inspectedRate.currencySymbol}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', paddingTop: '4px', borderTop: '1px dashed #cbd5e1' }}>
+                  <span>Gesamtbetrag (Brutto):</span>
+                  <span style={{ color: '#059669' }}>
+                    {isExempt ? `0,00 ${inspectedRate.currencySymbol} (Kulanz)` : inspectedRate.formattedGross}
+                  </span>
+                </div>
+              </div>
+
+              {/* Operator Notes */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                    Interne Betreiber-Notiz (Kulanz / Überweisungsdetails)
+                  </label>
                   <button
-                    onClick={async () => {
-                      await onSingleActivate(selectedUser.id);
-                      showToast(`Zahlung für ${getAnonymizedName(selectedUser)} bestätigt & Schüler freigeschaltet.`);
+                    type="button"
+                    onClick={() => handleSaveNoteToDb(inspectedUser.id)}
+                    disabled={savingNote}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer'
                     }}
+                  >
+                    {savingNote ? 'Speichert...' : 'Notiz speichern'}
+                  </button>
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="z.B. Überweisung durch Großmutter (abweichender Kontoinhaber) oder Sozialfonds-Vermerk..."
+                  value={operatorNotes[inspectedUser.id] ?? (inspectedUser.operator_notes || '')}
+                  onChange={(e) => handleUpdateNote(inspectedUser.id, e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* Inspector Actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {!isPaid && (
+                  <button
+                    type="button"
+                    onClick={() => handleSingleActivateClick(inspectedUser.id)}
+                    disabled={activating}
                     style={{
                       width: '100%',
-                      padding: '11px',
-                      borderRadius: '10px',
-                      background: '#10b981',
-                      border: 'none',
+                      padding: '12px 16px',
+                      borderRadius: '14px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       color: '#ffffff',
-                      fontSize: '0.84rem',
+                      border: 'none',
                       fontWeight: 800,
+                      fontSize: '0.88rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: 'none',
-                      transition: 'all 0.15s ease'
+                      gap: '8px'
                     }}
                   >
-                    <Check size={16} /> Zahlungseingang bestätigen &amp; freischalten
+                    <CheckCircle2 size={17} />
+                    <span>Zahlung bestätigen &amp; Profil freischalten</span>
                   </button>
                 )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  {!selectedUser.is_hardship_exempt && (
-                    <button
-                      onClick={() => handleExemptStudent(selectedUser)}
-                      style={{
-                        padding: '9px',
-                        borderRadius: '10px',
-                        background: '#f8fafc',
-                        border: '1px solid #cbd5e1',
-                        color: '#475569',
-                        fontSize: '0.76rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <Shield size={13} /> Härtefall-Befreiung
-                    </button>
-                  )}
-
                   <button
-                    onClick={() => handleGenerateReceiptPDF(selectedUser)}
+                    type="button"
+                    onClick={() => handleDownloadStudentReceipt(inspectedUser)}
                     style={{
-                      padding: '9px',
-                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      borderRadius: '12px',
                       background: '#f8fafc',
                       border: '1px solid #cbd5e1',
                       color: '#0f172a',
-                      fontSize: '0.76rem',
                       fontWeight: 800,
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1168,262 +1254,41 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                       gap: '6px'
                     }}
                   >
-                    <FileText size={13} /> GoBD-Quittung (PDF)
+                    <FileText size={14} />
+                    <span>Quittung (PDF)</span>
                   </button>
+
+                  {!isExempt && (
+                    <button
+                      type="button"
+                      onClick={() => handleExemptStudent(inspectedUser)}
+                      disabled={activating}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '12px',
+                        background: '#eff6ff',
+                        border: 'none',
+                        color: '#1d4ed8',
+                        fontWeight: 800,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                      title="Befreit den Schüler im Rahmen des Sozialfonds / Kulanz vollständig von der Jahresgebühr (0,00 €)"
+                    >
+                      <Sparkles size={14} />
+                      <span>Kulanz (0,00 €)</span>
+                    </button>
+                  )}
                 </div>
               </div>
-
-              {/* Apple Inset Group 1: Verwendungszweck & Revisionscode */}
-              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Offizieller GoBD Verwendungszweck
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
-                  <code style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0284c7', fontFamily: 'monospace' }}>
-                    {getReferenceCode(selectedUser)}
-                  </code>
-                  <button
-                    onClick={() => handleCopyCode(getReferenceCode(selectedUser))}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '5px 10px',
-                      borderRadius: '6px',
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      color: '#475569'
-                    }}
-                  >
-                    <Copy size={12} /> Kopieren
-                  </button>
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '6px' }}>
-                  DSGVO-Datenminimierung: Keine Klarnamen von Minderjährigen auf Bankauszügen.
-                </div>
-              </div>
-
-              {/* Apple Inset Group 2: Abrechnung & Steueraufschlüsselung */}
-              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.78rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Cloud- &amp; Modul-Bereitstellung (Campus)</span>
-                  <strong style={{ color: '#0f172a' }}>0,49 € / Mo.</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Modul GrooveLab (Band &amp; Songs)</span>
-                  <strong style={{ color: '#10b981' }}>0,00 € (Schule zahlt)</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Abrechnungsintervall</span>
-                  <strong style={{ color: '#0f172a' }}>Jahresbeitrag (11 Monate, 1. Mo. frei)</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                  <span>Nettobetrag (19% MwSt.)</span>
-                  <strong style={{ color: '#0f172a' }}>4,53 € Netto + 0,86 € USt.</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '8px', fontSize: '0.90rem' }}>
-                  <span style={{ fontWeight: 800, color: '#0f172a' }}>Gesamtbetrag Überweisung</span>
-                  <strong style={{ fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>5,39 €</strong>
-                </div>
-              </div>
-
-              {/* Apple Inset Group 3: Interne Betreiber-Notiz */}
-              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '12px 14px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>
-                  Interne Betreiber-Notiz (GoBD-Vermerk)
-                </div>
-                <input
-                  type="text"
-                  placeholder="z. B. Überweisung eingegangen am 03.09., Quittung #104..."
-                  value={userNotes[selectedUser.id] || selectedUser.operator_notes || ''}
-                  onChange={(e) => handleUpdateNote(selectedUser.id, e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.76rem',
-                    color: '#0f172a',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', color: '#94a3b8', margin: 'auto' }}>
-              <User size={40} color="#cbd5e1" style={{ margin: '0 auto 12px' }} />
-              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#475569' }}>Kein Schüler ausgewählt</div>
-              <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>Wähle einen Schüler aus der Liste aus oder nutze ↑/↓ zur Navigation.</div>
-            </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
-
-      {/* Smart CAMT.053 & Bank-CSV Abgleich Modal */}
-      {showCsvModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 999999,
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            maxWidth: '660px',
-            width: '100%',
-            padding: '28px',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Upload size={18} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                    CAMT.053 &amp; Bank-CSV Zahlungsabgleich
-                  </h3>
-                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                    Automatisches Matching mit Zero-Retention (Keine Speicherung von Eltern-IBANs)
-                  </span>
-                </div>
-              </div>
-              <button onClick={() => setShowCsvModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Native Drag & Drop Zone */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDraggingFile(true);
-              }}
-              onDragLeave={() => setIsDraggingFile(false)}
-              onDrop={handleFileDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: isDraggingFile ? '2px dashed #3b82f6' : '2px dashed #cbd5e1',
-                background: isDraggingFile ? '#eff6ff' : '#f8fafc',
-                borderRadius: '16px',
-                padding: '28px 20px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.txt,.xml"
-                style={{ display: 'none' }}
-                onChange={handleFileInputChange}
-              />
-              <FileSpreadsheet size={32} color={isDraggingFile ? '#3b82f6' : '#64748b'} style={{ margin: '0 auto 10px' }} />
-              <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                Kontoauszug hier hineinziehen oder klicken
-              </div>
-              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px' }}>
-                Unterstützt CAMT.053 XML (SEPA-Standard) sowie alle deutschen Bank-CSVs (Sparkasse, Deutsche Bank, ING, DKB, N26).
-              </div>
-            </div>
-
-            {/* Textarea Fallback */}
-            <div>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Oder Auszugstext direkt einfügen:
-              </div>
-              <textarea
-                value={csvText}
-                onChange={(e) => {
-                  setCsvText(e.target.value);
-                  parseBankData(e.target.value);
-                }}
-                placeholder="Beispiel: 2026-08-13; Überweisung; 5,39 EUR; Verwendungszweck: CG-F63B8EDE-2607..."
-                rows={4}
-                style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '10px',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.78rem',
-                  fontFamily: 'monospace',
-                  outline: 'none'
-                }}
-              />
-            </div>
-
-            {/* Match Results */}
-            {matchedResults.length > 0 ? (
-              <div style={{ background: '#f0fdf4', borderRadius: '16px', padding: '16px', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CheckCircle size={16} /> {matchedResults.length} Zahlungen erfolgreich erkannt:
-                </div>
-                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
-                  {matchedResults.map((r, i) => (
-                    <div key={i} style={{ fontSize: '0.76rem', color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong>{r.name}</strong>
-                        <code style={{ fontSize: '0.70rem', color: '#0284c7' }}>{r.hash}</code>
-                        {r.confidence === 'fuzzy' && (
-                          <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#92400e', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
-                            Tippfehler korrigiert
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontWeight: 800 }}>{r.amount || '5,39 €'}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={async () => {
-                    await onBatchActivate(matchedResults.map(r => r.userId));
-                    setShowCsvModal(false);
-                    showToast(`${matchedResults.length} Schüler per Bankabgleich freigeschaltet.`);
-                  }}
-                  style={{
-                    marginTop: '14px',
-                    width: '100%',
-                    padding: '11px',
-                    borderRadius: '10px',
-                    background: '#10b981',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: '0.84rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: 'none'
-                  }}
-                >
-                  Alle {matchedResults.length} gematchten Schüler jetzt freischalten
-                </button>
-              </div>
-            ) : csvText.trim() ? (
-              <div style={{ background: '#fffbeb', borderRadius: '12px', padding: '12px', border: '1px solid #fde68a', fontSize: '0.78rem', color: '#92400e' }}>
-                Keine passenden CG-Verwendungszwecke im eingefügten Text gefunden. Bitte prüfen, ob die Codes das Format <code>CG-[HASH]-[YYMM]</code> aufweisen.
-              </div>
-            ) : null}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };

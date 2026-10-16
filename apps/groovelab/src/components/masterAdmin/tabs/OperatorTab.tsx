@@ -151,7 +151,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
               height: '36px',
               borderRadius: '10px',
               background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -175,7 +175,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
             padding: '6px 14px',
             borderRadius: '100px',
             background: '#f1f5f9',
-            border: '1px solid #e2e8f0',
+            border: 'none',
             color: '#475569',
             fontSize: '0.80rem',
             fontWeight: 700
@@ -212,21 +212,23 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
               borderRadius: '100px',
               background: taxMode === 'standard_vat' ? '#dbeafe' : '#f0fdf4',
               color: taxMode === 'standard_vat' ? '#1e40af' : '#15803d',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               gap: '5px'
             }}>
-              {taxMode === 'standard_vat' ? <Landmark size={12} color="#475569" /> : <Building size={12} color="#475569" />}
-              <span>{taxMode === 'standard_vat' ? 'Regelbesteuerung (19% MwSt)' : 'Kleinunternehmer (0% MwSt)'}</span>
+              {taxMode === 'standard_vat' ? <Landmark size={12} color="#1e40af" /> : <Building size={12} color="#15803d" />}
+              <span>{taxMode === 'standard_vat' ? `Regelbesteuerung (${vatRatePercent}% MwSt)` : 'Kleinunternehmer (0% MwSt)'}</span>
             </span>
           </div>
 
           <form onSubmit={onUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label htmlFor="operator-billing-company" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                 Firma / Betreibergesellschaft
               </label>
               <input
+                id="operator-billing-company"
                 type="text"
                 value={billingCompany}
                 onChange={(e) => setBillingCompany(e.target.value)}
@@ -249,110 +251,225 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                <label htmlFor="operator-billing-contact" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Ansprechpartner / Inhaber
                 </label>
                 <input
+                  id="operator-billing-contact"
                   type="text"
                   value={billingContact}
                   onChange={(e) => setBillingContact(e.target.value)}
                   placeholder="Patrick Huber"
                   required
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.88rem', fontWeight: 700 }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                <label htmlFor="operator-billing-street" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Straße &amp; Hausnummer
                 </label>
                 <input
+                  id="operator-billing-street"
                   type="text"
                   value={billingStreet}
                   onChange={(e) => setBillingStreet(e.target.value)}
                   placeholder="Karl-Fürstenberg-Str. 59"
                   required
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.88rem', fontWeight: 700 }}
                 />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                <label htmlFor="operator-billing-zip" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   PLZ
                 </label>
                 <input
+                  id="operator-billing-zip"
                   type="text"
                   value={billingZip}
                   onChange={(e) => setBillingZip(e.target.value)}
                   placeholder="79618"
                   required
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.88rem', fontWeight: 700 }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                <label htmlFor="operator-billing-city" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                   Ort
                 </label>
                 <input
+                  id="operator-billing-city"
                   type="text"
                   value={billingCity}
                   onChange={(e) => setBillingCity(e.target.value)}
                   placeholder="Rheinfelden"
                   required
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.88rem', fontWeight: 700 }}
                 />
               </div>
             </div>
 
-            {/* Besteuerungsmodus */}
-            <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#475569', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
-                Besteuerungs-Modell (UStG)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  background: taxMode === 'small_business' ? '#ffffff' : 'transparent',
-                  border: `1.5px solid ${taxMode === 'small_business' ? '#16a34a' : '#cbd5e1'}`,
-                  cursor: 'pointer',
-                  fontSize: '0.80rem',
-                  fontWeight: 700
-                }}>
-                  <input
-                    type="radio"
-                    name="tax_mode"
-                    checked={taxMode === 'small_business'}
-                    onChange={() => setTaxMode('small_business')}
-                  />
-                  <span>Kleinunternehmer (0% MwSt)</span>
-                </label>
+            {/* Besteuerungsmodus & Steuer-Stammdaten */}
+            <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <span style={{ display: 'block', fontSize: '0.70rem', color: '#475569', fontWeight: 800, marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Besteuerungs-Modell (USt-Status)
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: taxMode === 'small_business' ? '#ffffff' : 'transparent',
+                    border: `1.5px solid ${taxMode === 'small_business' ? '#16a34a' : '#cbd5e1'}`,
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#0f172a'
+                  }}>
+                    <input
+                      type="radio"
+                      name="tax_mode"
+                      checked={taxMode === 'small_business'}
+                      onChange={() => setTaxMode('small_business')}
+                    />
+                    <span>Kleinunternehmer (0% MwSt)</span>
+                  </label>
 
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  background: taxMode === 'standard_vat' ? '#ffffff' : 'transparent',
-                  border: `1.5px solid ${taxMode === 'standard_vat' ? '#16a34a' : '#cbd5e1'}`,
-                  cursor: 'pointer',
-                  fontSize: '0.80rem',
-                  fontWeight: 700
-                }}>
-                  <input
-                    type="radio"
-                    name="tax_mode"
-                    checked={taxMode === 'standard_vat'}
-                    onChange={() => setTaxMode('standard_vat')}
-                  />
-                  <span>Regel (19% MwSt)</span>
-                </label>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: taxMode === 'standard_vat' ? '#ffffff' : 'transparent',
+                    border: `1.5px solid ${taxMode === 'standard_vat' ? '#16a34a' : '#cbd5e1'}`,
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#0f172a'
+                  }}>
+                    <input
+                      type="radio"
+                      name="tax_mode"
+                      checked={taxMode === 'standard_vat'}
+                      onChange={() => setTaxMode('standard_vat')}
+                    />
+                    <span>Regelbesteuerung ({vatRatePercent}% MwSt)</span>
+                  </label>
+                </div>
               </div>
+
+              {/* Sichtbare Steuer-Inputs: Steuernummer & USt-IdNr. */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label htmlFor="operator-tax-number" style={{ display: 'block', fontSize: '0.68rem', color: '#475569', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
+                    Steuernummer (Finanzamt)
+                  </label>
+                  <input
+                    id="operator-tax-number"
+                    type="text"
+                    value={taxNumber}
+                    onChange={(e) => setTaxNumber(e.target.value)}
+                    placeholder="z.B. 11/123/45678"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '9px 11px',
+                      borderRadius: '8px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      color: '#0f172a',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="operator-vat-id" style={{ display: 'block', fontSize: '0.68rem', color: '#475569', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
+                    USt-IdNr. (EU / Optional)
+                  </label>
+                  <input
+                    id="operator-vat-id"
+                    type="text"
+                    value={vatId}
+                    onChange={(e) => setVatId(e.target.value.toUpperCase())}
+                    placeholder="z.B. DE123456789"
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '9px 11px',
+                      borderRadius: '8px',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      color: '#0f172a',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Zusatzfelder bei Regelbesteuerung */}
+              {taxMode === 'standard_vat' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '12px', paddingTop: '4px', borderTop: '1px solid #e2e8f0' }}>
+                  <div>
+                    <label htmlFor="operator-vat-rate" style={{ display: 'block', fontSize: '0.68rem', color: '#475569', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
+                      MwSt.-Satz (%)
+                    </label>
+                    <input
+                      id="operator-vat-rate"
+                      type="number"
+                      min="0"
+                      max="30"
+                      step="0.1"
+                      value={vatRatePercent}
+                      onChange={(e) => setVatRatePercent(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '9px 11px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        fontSize: '0.84rem',
+                        fontWeight: 800
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="operator-price-display-mode" style={{ display: 'block', fontSize: '0.68rem', color: '#475569', fontWeight: 800, marginBottom: '5px', textTransform: 'uppercase' }}>
+                      Preisauszeichnung auf Rechnungen
+                    </label>
+                    <select
+                      id="operator-price-display-mode"
+                      value={priceDisplayMode}
+                      onChange={(e) => setPriceDisplayMode(e.target.value as 'net_plus_vat' | 'gross_incl_vat')}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '9px 11px',
+                        borderRadius: '8px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        color: '#0f172a',
+                        fontSize: '0.82rem',
+                        fontWeight: 700
+                      }}
+                    >
+                      <option value="net_plus_vat">Netto zzgl. MwSt. (B2B Standard)</option>
+                      <option value="gross_incl_vat">Brutto inkl. MwSt.</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
@@ -373,7 +490,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                 gap: '8px'
               }}
             >
-              <Check size={16} /> {updatingBilling ? 'Speichert...' : 'Stammdaten speichern'}
+              <Check size={16} /> {updatingBilling ? 'Speichert...' : 'Stammdaten & Steuern speichern'}
             </button>
           </form>
         </div>
@@ -400,7 +517,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                 padding: '4px 10px',
                 borderRadius: '8px',
                 background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
+                border: 'none',
                 fontSize: '0.74rem',
                 fontWeight: 800,
                 color: '#0f172a',
@@ -413,14 +530,15 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
 
           <form onSubmit={onUpdateBillingSettings} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label htmlFor="operator-billing-iban" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                 IBAN (Auszahlungskonto)
               </label>
               <input
+                id="operator-billing-iban"
                 type="text"
                 value={billingIban}
                 onChange={(e) => setBillingIban(formatIbanBlocks(e.target.value))}
-                placeholder="DE89 3704 0044 0532 0130 00"
+                placeholder="IBAN in Einrichtung (wird vor Rechnungsstellung hinterlegt)"
                 required
                 style={{
                   width: '100%',
@@ -439,14 +557,15 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label htmlFor="operator-billing-bic" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                 BIC / SWIFT-Code
               </label>
               <input
+                id="operator-billing-bic"
                 type="text"
                 value={billingBic}
                 onChange={(e) => setBillingBic(e.target.value.toUpperCase())}
-                placeholder="GENODEF1S38"
+                placeholder="BIC in Einrichtung"
                 required
                 style={{
                   width: '100%',
@@ -463,8 +582,11 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
               />
             </div>
 
-            <div style={{ padding: '14px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '0.78rem', color: '#166534', lineHeight: 1.4 }}>
-              💳 <strong>Rechnungs-Aufdruck:</strong> Diese Bankverbindung wird auf allen PDF-Rechnungen und für automatische SEPA-Lastschriften verwendet.
+            <div style={{ padding: '14px', borderRadius: '12px', background: '#f0fdf4', border: 'none', fontSize: '0.78rem', color: '#166534', lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <CreditCard size={16} color="#166534" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <strong>Rechnungs-Aufdruck &amp; EPC-GiroCode:</strong> Diese Bankverbindung wird auf allen PDF-Rechnungen, in XRechnung-3.0-Exporten und für den SEPA-Überweisungs-GiroCode verwendet.
+              </div>
             </div>
 
             <button
@@ -510,21 +632,25 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
             <Key size={18} color="#0f172a" /> Master-Admin Identität
           </h3>
 
-          <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.80rem', color: '#334155', lineHeight: 1.5, marginBottom: '16px' }}>
-            🛡️ <strong>100% Passwortlose FIDO2-Doktrin:</strong> Klassische Passwörter wurden im Master-Admin-Leitstand vollständig abgeschafft. Zugänge sind durch hardwaregebundene FIDO2 Passkeys (Touch ID, YubiKey) und TOTP geschützt.
+          <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.80rem', color: '#334155', lineHeight: 1.5, marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <ShieldCheck size={16} color="#0f172a" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>100% Passwortlose FIDO2-Doktrin:</strong> Klassische Passwörter wurden im Master-Admin-Leitstand vollständig abgeschafft. Zugänge sind durch hardwaregebundene FIDO2 Passkeys (Touch ID, YubiKey) und TOTP geschützt.
+            </div>
           </div>
 
           <form onSubmit={onUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+              <label htmlFor="operator-admin-username" style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
                 Master-Benutzername / Alias
               </label>
               <input
+                id="operator-admin-username"
                 type="text"
                 value={adminUsername}
                 onChange={(e) => setAdminUsername(e.target.value)}
                 required
-                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', color: '#0f172a', fontSize: '0.88rem', fontWeight: 700 }}
               />
             </div>
 
@@ -620,7 +746,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
 
             {/* Break-Glass Recovery Codes */}
             {onGenerateRecoveryCodes && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#fff1f2', border: '1px solid #fecdd3' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#fff1f2', border: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <ShieldAlert size={20} color="#e11d48" />
                   <div>

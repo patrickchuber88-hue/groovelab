@@ -349,6 +349,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
           });
 
           if (masterResult && masterResult.masteredBlob) {
+            if (finalUrl && finalUrl !== masterResult.masteredUrl) {
+              try { URL.revokeObjectURL(finalUrl); } catch {}
+            }
             finalBlob = masterResult.masteredBlob;
             finalUrl = masterResult.masteredUrl;
             if (masterResult.durationSec) {

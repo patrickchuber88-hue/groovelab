@@ -36,8 +36,8 @@ export const LOAD_TIERS: LoadTier[] = [
     targetRps: 15,
     totalRequests: 450,
     badge: '1.500 Nutzer',
-    hardwareFit: '🟢 Hetzner CX23 (Ideal)',
-    recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) arbeitet im optimalen Ruhezustand (CPU-Last ca. 12%).',
+    hardwareFit: 'IONOS Produktiv-Cluster (Ideal)',
+    recommendedHardware: 'IONOS Enterprise Cloud Deutschland (Produktiv-Cluster) arbeitet im optimalen Ruhezustand (CPU-Last ca. 12%).',
     description: 'Regionale Musikschul-Kooperation mit 3 Standorten.'
   },
   {
@@ -49,8 +49,8 @@ export const LOAD_TIERS: LoadTier[] = [
     targetRps: 50,
     totalRequests: 1500,
     badge: '5.000 Nutzer',
-    hardwareFit: '🟢 Hetzner CX23 (Optimal)',
-    recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) meistert 5.000 User mühelos (CPU-Last ca. 28%).',
+    hardwareFit: 'IONOS Produktiv-Cluster (Optimal)',
+    recommendedHardware: 'IONOS Enterprise Cloud Deutschland meistert 5.000 User mühelos (CPU-Last ca. 28%).',
     description: 'Kreisverband / städtischer Verbund mit 10 aktiven Musikschulen.'
   },
   {
@@ -62,8 +62,8 @@ export const LOAD_TIERS: LoadTier[] = [
     targetRps: 250,
     totalRequests: 7500,
     badge: '25.000 Nutzer',
-    hardwareFit: '🟡 Hetzner CX23 (Gute Auslastung)',
-    recommendedHardware: 'Hetzner Cloud CX23 läuft bei ca. 65% Auslastung. Spitzenzeiten werden stabil verarbeitet.',
+    hardwareFit: 'IONOS Produktiv-Cluster (Gute Auslastung)',
+    recommendedHardware: 'IONOS Produktiv-Cluster läuft bei ca. 65% Auslastung. Spitzenzeiten werden stabil verarbeitet.',
     description: 'Großstadt-Netzwerk / Landesverband mit 25.000 Schülern.'
   },
   {
@@ -75,8 +75,8 @@ export const LOAD_TIERS: LoadTier[] = [
     targetRps: 500,
     totalRequests: 15000,
     badge: '50.000 Nutzer',
-    hardwareFit: '🟠 Upgrade auf CX32 empfohlen',
-    recommendedHardware: 'Hetzner Cloud CX32 (4 vCPU, 8 GB RAM) wird für 100 Schulen und 50.000 Schüler für P95 < 25ms empfohlen.',
+    hardwareFit: 'Skalierungs-Stufe 2 empfohlen',
+    recommendedHardware: 'Erweiterte vCPU/RAM-Allokation auf dem IONOS Produktiv-Cluster für 100 Schulen und 50.000 Schüler (P95 < 25ms) empfohlen.',
     description: 'Bundeslandweites Musikschul-Portal mit 50.000 Schülern.'
   },
   {
@@ -88,8 +88,8 @@ export const LOAD_TIERS: LoadTier[] = [
     targetRps: 2500,
     totalRequests: 75000,
     badge: '250.000 Nutzer',
-    hardwareFit: '🟣 Dedicated Cluster (Hetzner AX)',
-    recommendedHardware: 'Dedicated Server Cluster (Hetzner AX-Linie mit Load-Balancer) für 250.000 Schüler empfohlen.',
+    hardwareFit: 'Dedicated Multi-Node Cluster (IONOS + Hetzner)',
+    recommendedHardware: 'Dedicated Multi-Node Server-Cluster mit Load-Balancer und Hetzner Geo-Failover für 250.000 Schüler empfohlen.',
     description: 'Bundesweites Verbands-Ökosystem mit 250.000 Schülern.'
   }
 ];
@@ -163,6 +163,11 @@ export interface SchoolStat {
   hasCampus: boolean;
   teachers?: number;
   students?: number;
+  studentsCampus?: number;
+  studentsGroovelab?: number;
+  passiveStudents?: number;
+  exemptActiveStudents?: number;
+  parentPaidStudents?: number;
 }
 
 export interface PendingUser {

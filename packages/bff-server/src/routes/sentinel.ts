@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { DeadLetterSentinel } from '../services/deadLetterSentinel';
 import { validateBody } from '../middleware/validateIngress';
 import { idempotencyBarrier } from '../middleware/idempotencyMiddleware';
@@ -14,13 +15,15 @@ function authenticateSentinelInternal(req: Request, res: Response, next: () => v
   const sharedSecret = process.env.SENTINEL_SHARED_SECRET || process.env.BFF_INTERNAL_SECRET;
   const authHeader = req.headers['authorization'] || req.headers['x-sentinel-key'];
 
-  // If a shared secret is configured, require either matching Bearer token or exact header
+  // If a shared secret is configured, require either matching Bearer token or exact header in constant time
   if (sharedSecret) {
     const bearer = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
       ? authHeader.slice(7)
-      : authHeader;
+      : (typeof authHeader === 'string' ? authHeader : '');
 
-    if (bearer !== sharedSecret) {
+    const aBuf = Buffer.from(bearer);
+    const bBuf = Buffer.from(sharedSecret);
+    if (aBuf.length !== bBuf.length || !crypto.timingSafeEqual(aBuf, bBuf)) {
       return res.status(403).json({ error: 'FORBIDDEN_SENTINEL_UNAUTHORIZED' });
     }
   } else {

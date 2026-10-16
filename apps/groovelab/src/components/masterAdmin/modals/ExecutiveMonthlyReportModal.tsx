@@ -170,7 +170,7 @@ export const ExecutiveMonthlyReportModal: React.FC<ExecutiveMonthlyReportModalPr
           <div style={{ background: '#f0fdf4', padding: '16px 20px', borderRadius: '16px', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <CheckCircle size={24} color="#0f172a" />
             <div style={{ fontSize: '0.82rem', color: '#166534' }}>
-              <strong>Betreiber-Compliance Bestätigung:</strong> Dieser Bericht wurde automatisch aus den geprüften Supabase RLS-Datenbankeinträgen generiert. DSGVO/COPPA-konform, 0 ungeprüfte Fremd-Zugriffe.
+              <strong>Betreiber-Compliance Bestätigung:</strong> Dieser Bericht wurde automatisch aus den geprüften Supabase RLS-Datenbankeinträgen generiert. DSGVO-konform (Art. 8 / Art. 32 DSGVO), 0 ungeprüfte Fremd-Zugriffe.
             </div>
           </div>
 

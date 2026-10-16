@@ -5,34 +5,40 @@ Dein Maßstab ist kompromissloser B2B-Enterprise+ Goldstandard (OWASP ASVS L3, B
 
 ---
 
-## 1. DIE 7 UNUMSTÖSSLICHEN ARCHITEKTUR-AXIOME (ABBRUCHKRITERIEN)
+## 1. DIE 8 UNUMSTÖSSLICHEN ARCHITEKTUR-AXIOME (ABBRUCHKRITERIEN)
 
 Verstößt eine geplante Aktion gegen eines dieser Axiome, stoppe sofort:
 
-1. **HERRENBERG-SCHUTZ & ZERO-PAYROLL (§ 7 SGB IV):**
+1. **0% US-CLOUD-DOKTRIN (Zero US-Cloud Exposure):**
+   * 100 % der Datenverarbeitung, des Hostings und der Backups verbleiben ausnahmslos in ISO/IEC 27001 zertifizierten deutschen Rechenzentren (IONOS Ingress `85.215.73.216`, Hetzner Disaster Recovery `nbg1`/`fsn1` & Storage Box via Age X25519).
+   * Keine US-Dienste (AWS, GCP, Azure, Cloudflare, Vercel, Supabase-US). Zero US CLOUD Act, Zero FISA 702.
+2. **KLARE TRENNUNG DER BOUNDED CONTEXTS (Zero Cross-Bleed):**
+   * 🟢 **Campus-Modul (Didaktik, Kommunikation & Akustik-Labor):** Digitales Hausaufgabenheft (`MeisterwerkDocumentationModal.tsx`), Messenger (§ 8a SGB VIII / § 832 BGB), Terminkalender, VDM-Kataloge und die gesamte didaktische Audio-DSP-Engine (`CampusTuner`, `EarLabStudioModal`, `CampusLoopstation`, `AudioBiographyView`).
+   * 🟡 **GrooveLab-Modul (Band-, Stations- & Song-Management):** Live Lab (Stations-Präsenz & Check-In via QR), Übungsbegleiter (Repertoire, BPM, Songkarten), Song-Bibliothek, Band-Matching. GrooveLab besitzt KEINE eigene DSP-Engine!
+   * 🔴 **Verwaltung & Schulleitung:** Stundenplansolver, SEPA PAIN.008, GoBD WORM-Archiv, B2B-Verträge.
+   * 🛡️ **Master-Admin Citadel:** FIDO2 WebAuthn Passkeys, 15m Idle-Lockout, WORM `master_audit_trail`.
+3. **HERRENBERG-SCHUTZ & ZERO-PAYROLL (§ 7 SGB IV, § 266a StGB):**
    * Es werden NIEMALS Lohn-, Honorar-, Stundensatz-, Deputats- oder Bankdaten (IBAN) erfasst, verarbeitet oder in Schemata angelegt.
    * Campus-Groovelab ist ein rein didaktisches Cockpit. Alle Personalabrechnungsdaten verbleiben zu 100% in externen ERP-/Kämmerei-Systemen der Schulträger.
-2. **SCHEMA-PARITÄT (IST-BESTAND 503+ MIGRATIONEN):**
+4. **ZERO-TRUST FRONTEND & AUTORITATIVE AUTH-RPCS:**
+   * Browser-JavaScript, `localStorage`, `sessionStorage` und React-State besitzen NIEMALS Autorisierungswirkung. Keine sicherheitsrelevanten Entscheidungen im Frontend!
+   * Logins (Ausweis, QR, Passkey, Master-Admin) laufen AUSNAHMSLOS über autoritative PostgreSQL-RPCs (`authenticate_by_credential`, `authenticate_webauthn_credential`, `switch_user_active_role`). Direkte Tabellenabfragen (`.from('users').select(...)` zur Credential-Suche) sind streng verboten.
+   * PIN-Prüfungen (`verify_parent_pin_with_lease`, `verify_personal_pin`) erfolgen zu 100 % serverseitig.
+5. **ZERO-SECRET-LEAKAGE & SCHEMA-PARITÄT:**
+   * Die Spalten `parent_pin`, `personal_pin`, `master_admin_password`, `two_factor_secret` und `password_hash` sind physisch aus allen lesbaren Tabellen-Sichten verbannt (`user_security_view` / `users_view`). Der Client empfängt ausschließlich vorberechnete Boolesche Flags (`has_parent_pin`, `is_pin_activated`, `is_2fa_enabled`).
    * Keine Phantom-Tabellen erfinden! Die Identitäts-Wahrheit liegt in `users_raw`, geschützt durch die Security-View `users` (`trg_users_view_dml`).
-   * Es existieren KEINE Tabellen wie `student_profiles` oder `teacher_profiles`.
-   * Raumkollisionen werden ausschließlich über den bestehenden GiST-Constraint `(school_id WITH =, room_id WITH =, booking_slot WITH &&)` abgesichert.
-3. **MINDERJÄHRIGENSCHUTZ (Art. 5 & Art. 8 DSGVO):**
-   * Schüler haben KEINE Pflicht-E-Mails und KEINE Telefonnummern.
-   * Schüler-Authentifizierung erfolgt ausschließlich via pseudonymisiertem QR-Token und 4-Stift-PIN ("Wer übt heute?").
-4. **MANDANTENTRENNUNG & ZERO-LEAKAGE (RLS-FIRST):**
+6. **MANDANTENTRENNUNG & RLS-FIRST (DEFAULT-DENY):**
    * Jede Abfrage erzwingt Mandantenisolation über `school_id = get_current_user_school_id()`.
    * Direkter API-Zugriff auf `users_raw` ist verboten (`REVOKE ALL`).
-   * PINs, Passwörter und Secrets dürfen NIEMALS in lesbaren SELECT-Statements oder Client-Objekten enthalten sein.
-5. **ZERO-TRUST EDGE, VIP-GATE & MARKENRECHT:**
-   * Die unauthentifizierte Einstiegsseite ist markenrechtlich neutral als „Campus • Partnerschulen-Portal“ geschirmt (strikte Trennung von Drittmarken).
-   * VIP-Zugangscodes werden ausschließlich über den PostgreSQL-RPC `verify_vip_invite_code` gegen gesalzene SHA-256 Hashes geprüft. Zero Klartext-Secrets im Client-Bundle.
-6. **BARRIEREFREIHEIT (BFSG 2025 / WCAG 2.2 AA) & DESKTOP IMMUNITY:**
-   * Jedes interaktive Element besitzt Tastatur-Vollbedienbarkeit (`role="button"`, `tabIndex={0}`, `onKeyDown` für Enter/Space) und sichtbaren Fokus.
-   * Desktop-Grid-Layouts (`>= 769px`) sind unantastbar; responsive Optimierungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
-7. **MONOLITH CEILING, ZERO-INLINE-FEATURE & ZERO-SHREDDING DOKTRIN:**
-   * **Absolutes Zersäge-Verbot**: Bestehende Groß-Monolithen (u. a. `CampusEventsBoard.tsx`, `ScheduleCalendarView.tsx`, `MeisterwerkDocumentTab.tsx`) dürfen NIEMALS eigenständig oder ungefragt refaktorisiert, aufgesplittet oder in Micro-Dateien zerkleinert werden.
+   * `FORCE ROW LEVEL SECURITY` ist auf allen Mandantentabellen aktiv.
+7. **MINDERJÄHRIGENSCHUTZ & SAMMELZAHLER-GARANTIE (0 € FÜR SCHÜLER):**
+   * Schüler haben KEINE Pflicht-E-Mails und KEINE Telefonnummern.
+   * KUG § 22 Zero-Photo Doktrin: Striktes Verbot privater Kinderfotos; zwingende Nutzung von 3D-Instrumenten-Avataren.
+   * Schülern dürfen NIEMALS Preise, Bezahlschranken oder Kreditkartenfelder angezeigt werden (Sammelzahler ist immer der Schulträger).
+8. **MONOLITH CEILING, ZERO-INLINE-FEATURE & ZERO-SHREDDING DOKTRIN:**
+   * **Absolutes Zersäge-Verbot**: Bestehende Groß-Monolithen (u. a. `CampusEventsBoard.tsx`, `ScheduleCalendarView.tsx`, `CampusLoopstation.tsx`, `MeisterwerkDocumentTab.tsx`) dürfen NIEMALS eigenständig oder ungefragt refaktorisiert, aufgesplittet oder in Micro-Dateien zerkleinert werden.
    * **Präventiver Pre-Flight Check**: VOR dem Schreiben prüfen, ob eine Bestandsdatei in `scripts/monolith_baseline.json` steht oder $\ge 1.500$ Zeilen hat. Wenn ja: Sofortiger Inlining-Stopp!
-   * Jede neue didaktische oder administrative Funktion MUSS als eigenständiger Feature-Monolith in einer separaten Datei angelegt werden (Budget: maximal 1.500 Zeilen, darüber zwingend Sub-Monolithen wie `tabs/`).
+   * Jede neue didaktische oder administrative Funktion MUSS als eigenständiger Feature-Monolith in einer separaten Datei angelegt werden (Budget: 300–1.000 Zeilen, maximal 1.500 Zeilen).
    * Bestehende Screens agieren ausschließlich als schlanke Host-Orchestratoren (Mounting per Einzeiler, maximal 15 Zeilen technischer Verdrahtungs-Puffer).
 
 ---

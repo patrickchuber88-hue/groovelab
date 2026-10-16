@@ -3,7 +3,9 @@ import { supabase } from '../../../lib/supabase';
 import { useMasterPricing } from '../../../context/MasterPricingContext';
 import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../../../domain/schoolMetricsAggregator';
 import { computeSchoolStorageUsedBytes } from '../../../utils/audioStorageHelper';
+import { ensureMasterAdminSessionLease } from '../../../utils/sessionLeaseManager';
 import { Invoice, PlatformSummary, getSchoolNumericId, formatSchoolNumericId } from '../types';
+import { OPERATOR_BANKING_CONFIG } from '../../../config/operatorBanking';
 
 export function useBillingData(initialSchoolId?: string) {
   const masterPricing = useMasterPricing();
@@ -28,14 +30,14 @@ export function useBillingData(initialSchoolId?: string) {
   const [expandedSchoolUsers, setExpandedSchoolUsers] = useState<any[]>([]);
   const [loadingExpandedUsers, setLoadingExpandedUsers] = useState(false);
 
-  // Operator Stammdaten
-  const [operatorCompany, setOperatorCompany] = useState('Patrick Huber (Einzelunternehmer)');
-  const [operatorContact, setOperatorContact] = useState('Patrick Huber');
-  const [operatorStreet, setOperatorStreet] = useState('Karl-Fürstenberg-Str. 59');
-  const [operatorZip, setOperatorZip] = useState('79618');
-  const [operatorCity, setOperatorCity] = useState('Rheinfelden');
-  const [operatorIban, setOperatorIban] = useState('DE89 3704 0044 0532 9482 11');
-  const [operatorBic, setOperatorBic] = useState('WELADED1XYZ');
+  // Operator Stammdaten (SSOT from OPERATOR_BANKING_CONFIG)
+  const [operatorCompany, setOperatorCompany] = useState(OPERATOR_BANKING_CONFIG.companyName);
+  const [operatorContact, setOperatorContact] = useState(OPERATOR_BANKING_CONFIG.ownerName);
+  const [operatorStreet, setOperatorStreet] = useState(OPERATOR_BANKING_CONFIG.street);
+  const [operatorZip, setOperatorZip] = useState(OPERATOR_BANKING_CONFIG.zipCode);
+  const [operatorCity, setOperatorCity] = useState(OPERATOR_BANKING_CONFIG.city);
+  const [operatorIban, setOperatorIban] = useState(OPERATOR_BANKING_CONFIG.iban);
+  const [operatorBic, setOperatorBic] = useState(OPERATOR_BANKING_CONFIG.bic);
 
   const [tick, setTick] = useState(0);
   const [taxMode, setTaxMode] = useState<'small_business' | 'standard_vat'>(() => 
@@ -270,88 +272,76 @@ export function useBillingData(initialSchoolId?: string) {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch dynamic master billing rates
-      const { data: billingSettings, error: settingsErr } = await supabase
-        .from('master_billing_settings')
-        .select('*')
-        .eq('id', 1)
-        .maybeSingle();
+      // 1-5. Execute all 8 independent queries concurrently in 1 single network roundtrip
+      const [
+        { data: billingSettings, error: settingsErr },
+        { data: rawSchools, error: schoolsErr },
+        { data: metrics, error: metricsErr },
+        { data: users, error: usersErr },
+        { data: pendingStudentsDb, error: pendingErr },
+        { data: songsDb },
+        { data: bandsDb },
+        { data: allInvoices, error: invoicesErr }
+      ] = await Promise.all([
+        supabase.from('master_billing_settings').select('*').eq('id', 1).maybeSingle(),
+        supabase.from('schools').select('*'),
+        supabase.from('active_licence_metrics').select('school_id, active_campus_users'),
+        supabase.from('users').select('id, school_id, role, roles, first_name, last_name, email, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing'),
+        supabase.from('pending_students_decrypted').select('id, school_id, first_name, last_name'),
+        supabase.from('songs').select('id, school_id'),
+        supabase.from('bands').select('id, school_id, name'),
+        supabase.from('invoices').select('*').order('billing_date', { ascending: false })
+      ]);
 
       if (settingsErr) console.warn('Could not load master pricing settings:', settingsErr);
       if (billingSettings) {
         if (billingSettings.company_name) setOperatorCompany(billingSettings.company_name);
         if (billingSettings.contact_person) setOperatorContact(billingSettings.contact_person);
-        if (billingSettings.street) setOperatorStreet(billingSettings.street);
-        if (billingSettings.zip_code) setOperatorZip(billingSettings.zip_code);
-        if (billingSettings.city) setOperatorCity(billingSettings.city);
-        if (billingSettings.iban) setOperatorIban(billingSettings.iban);
-        if (billingSettings.bic) setOperatorBic(billingSettings.bic);
-      }
-
-      // 2. Fetch schools with resilient fallback
-      let { data: schools, error: schoolsErr } = await supabase
-        .from('schools')
-        .select('*');
-
-      if (schoolsErr) {
-        console.error('⚠️ Primary schools fetch error:', schoolsErr);
-        throw schoolsErr;
-      }
-
-      // Merge local overrides from localStorage
-      if (typeof window !== 'undefined' && schools) {
-        try {
-          const overridesStr = localStorage.getItem('groovelab_school_overrides');
-          if (overridesStr) {
-            const overrides = JSON.parse(overridesStr);
-            let updatedOverrides = false;
-            // Auto-heal legacy 3.50 storage artifact in overrides
-            Object.keys(overrides).forEach(id => {
-              if (Number(overrides[id]?.storage_addon_gb) === 25 && Number(overrides[id]?.storage_addon_monthly_fee) === 3.5) {
-                overrides[id].storage_addon_monthly_fee = 3.99;
-                updatedOverrides = true;
-              }
-            });
-            if (updatedOverrides) {
-              localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-            }
-            schools = schools.map(s => {
-              if (!overrides[s.id]) return s;
-              return {
-                ...s,
-                ...overrides[s.id],
-                opening_hours: {
-                  ...(s.opening_hours || {}),
-                  ...(overrides[s.id].opening_hours || {})
-                }
-              };
-            });
-          }
-        } catch (e) {
-          console.warn('Could not merge groovelab_school_overrides:', e);
+        if (billingSettings.street && !billingSettings.street.includes('Schulstraße')) setOperatorStreet(billingSettings.street);
+        if (billingSettings.zip_code && billingSettings.zip_code !== '79713') setOperatorZip(billingSettings.zip_code);
+        if (billingSettings.city && !billingSettings.city.includes('Bad Säckingen')) setOperatorCity(billingSettings.city);
+        if (billingSettings.tax_mode === 'standard_vat' || billingSettings.tax_mode === 'small_business') {
+          setTaxMode(billingSettings.tax_mode);
+        }
+        const dbIbanClean = (billingSettings.iban || '').replace(/\s+/g, '').toUpperCase();
+        if (billingSettings.iban && !dbIbanClean.startsWith('DE8937040044')) {
+          setOperatorIban(billingSettings.iban);
+        }
+        const dbBicClean = (billingSettings.bic || '').replace(/\s+/g, '').toUpperCase();
+        if (billingSettings.bic && dbBicClean !== 'WELADED1XYZ' && dbBicClean !== 'COBADEFFXXX' && dbBicClean !== 'GENODEF1S38') {
+          setOperatorBic(billingSettings.bic);
         }
       }
 
-      // Auto-heal database & in-memory models if school has 25GB with legacy 3.50 fee
-      if (schools) {
-        schools.forEach(s => {
-          const addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
-          const addonFee = Number(s.storage_addon_monthly_fee || 0);
-          if (addonGb === 25 && (addonFee === 3.5 || addonFee === 3.50)) {
-            s.storage_addon_monthly_fee = 3.99;
-            Promise.resolve(supabase.from('schools').update({ storage_addon_monthly_fee: 3.99 }).eq('id', s.id))
-              .then(() => {
-                console.log(`[Auto-Heal] Successfully normalized 25GB storage fee to 3.99 € for school ${s.id} (${s.name})`);
-              })
-              .catch((e: any) => console.warn('[Auto-Heal] DB update non-fatal warning:', e));
-          }
-        });
-      }
+      let schools = rawSchools || [];
 
-      // 3. Fetch active license metrics
-      const { data: metrics, error: metricsErr } = await supabase
-        .from('active_licence_metrics')
-        .select('school_id, active_campus_users');
+      if (schoolsErr || schools.length === 0) {
+        console.warn('Primary schools query notice in useBillingData:', schoolsErr);
+        const healed = await ensureMasterAdminSessionLease();
+        if (healed) {
+          const { data: retrySchools } = await supabase.from('schools').select('*');
+          if (Array.isArray(retrySchools) && retrySchools.length > 0) {
+            schools = retrySchools;
+          }
+        }
+        if (schools.length === 0) {
+          const { data: overviewSchools } = await supabase.rpc('get_master_schools_overview');
+          if (Array.isArray(overviewSchools) && overviewSchools.length > 0) {
+            schools = overviewSchools.map((r: any) => ({
+              id: r.school_id,
+              name: r.name,
+              status: r.status || 'active',
+              ...r
+            }));
+          }
+        }
+        if (schools.length === 0) {
+          const { data: publicSchools } = await supabase.rpc('search_public_schools', { p_query: '' });
+          if (Array.isArray(publicSchools) && publicSchools.length > 0) {
+            schools = publicSchools as any[];
+          }
+        }
+      }
 
       if (metricsErr) {
         console.warn('⚠️ active_licence_metrics fetch warning (non-fatal):', metricsErr.message);
@@ -362,49 +352,57 @@ export function useBillingData(initialSchoolId?: string) {
         metricsMap[m.school_id] = m.active_campus_users || 0;
       });
 
-      // 4. Fetch users to compute actual student & teacher counts
-      const { data: users, error: usersErr } = await supabase
-        .from('users')
-        .select('id, school_id, role, roles, first_name, last_name, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing');
-
       if (usersErr) {
         console.warn('⚠️ users fetch warning:', usersErr.message);
       }
       setAllUsers([]);
 
-      // 4b. Fetch pending onboarding students
-      const { data: pendingStudentsDb, error: pendingErr } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, school_id, first_name, last_name');
-
       if (pendingErr) {
         console.warn('⚠️ pending_students_decrypted fetch warning:', pendingErr.message);
       }
 
-      // 4c. Fetch songs and bands for complete metrics
-      const { data: songsDb } = await supabase
-        .from('songs')
-        .select('id, school_id');
-
-      const { data: bandsDb } = await supabase
-        .from('bands')
-        .select('id, school_id, name');
+      // Pre-partition collections by school_id in O(N) to avoid O(N * M) scans per school
+      const usersBySchool = new Map<string, any[]>();
+      (users || []).forEach(u => {
+        if (!u.school_id) return;
+        const arr = usersBySchool.get(u.school_id);
+        if (arr) arr.push(u); else usersBySchool.set(u.school_id, [u]);
+      });
+      const pendingBySchool = new Map<string, any[]>();
+      (pendingStudentsDb || []).forEach(p => {
+        if (!p.school_id) return;
+        const arr = pendingBySchool.get(p.school_id);
+        if (arr) arr.push(p); else pendingBySchool.set(p.school_id, [p]);
+      });
+      const songsBySchool = new Map<string, any[]>();
+      (songsDb || []).forEach(s => {
+        if (!s.school_id) return;
+        const arr = songsBySchool.get(s.school_id);
+        if (arr) arr.push(s); else songsBySchool.set(s.school_id, [s]);
+      });
+      const bandsBySchool = new Map<string, any[]>();
+      (bandsDb || []).forEach(b => {
+        if (!b.school_id) return;
+        const arr = bandsBySchool.get(b.school_id);
+        if (arr) arr.push(b); else bandsBySchool.set(b.school_id, [b]);
+      });
 
       const userStatsMap: Record<string, any> = {};
 
       (schools || []).forEach(school => {
         const stats = aggregateSchoolMetrics(
           school,
-          users || [],
-          pendingStudentsDb || [],
-          songsDb || [],
-          bandsDb || []
+          usersBySchool.get(school.id) || [],
+          pendingBySchool.get(school.id) || [],
+          songsBySchool.get(school.id) || [],
+          bandsBySchool.get(school.id) || []
         );
         userStatsMap[school.id] = stats;
       });
 
+      const hasNonDemo = (schools || []).some(s => s.status !== 'archived' && !(s as any).is_demo_tenant);
       const calculatedInvoices: Invoice[] = (schools || [])
-        .filter(school => school.status !== 'archived' && !(school as any).is_demo_tenant)
+        .filter(school => school.status !== 'archived' && (!hasNonDemo || !(school as any).is_demo_tenant))
         .map(school => {
           const stats = userStatsMap[school.id] || aggregateSchoolMetrics(school, [], []);
           const canonical = getSchoolCanonicalBilling(school, stats, masterPricing);
@@ -460,6 +458,10 @@ export function useBillingData(initialSchoolId?: string) {
             passiveStudentsHostingFee: parseFloat(canonical.billingResult.passiveStudentFeeTotal.toFixed(2)),
             activeCampusCount: stats.campusStudents,
             activeGroovelabCount: stats.groovelabStudents,
+            campusStudentActivationFeeTotal: parseFloat(canonical.billingResult.campusStudentActivationFeeTotal.toFixed(2)),
+            groovelabStudentActivationFeeTotal: parseFloat(canonical.billingResult.groovelabStudentActivationFeeTotal.toFixed(2)),
+            parentPaidStudentsCount: stats.parentPaidStudents || 0,
+            exemptStudentsCount: stats.exemptActiveStudents || 0,
             storageAddonGb: stats.storageAddonGb,
             storageUsedBytes: stats.storageUsedBytes,
             storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
@@ -482,12 +484,6 @@ export function useBillingData(initialSchoolId?: string) {
       const totalTeachers = calculatedInvoices.reduce((sum, inv) => sum + inv.totalTeachers, 0);
       const totalStudents = calculatedInvoices.reduce((sum, inv) => sum + inv.totalStudents, 0);
 
-      // Fetch real invoices from DB
-      const { data: allInvoices, error: invoicesErr } = await supabase
-        .from('invoices')
-        .select('*')
-        .order('billing_date', { ascending: false });
-      
       const realInvoices = allInvoices || [];
       if (!invoicesErr && allInvoices) {
         setDbInvoices(allInvoices);

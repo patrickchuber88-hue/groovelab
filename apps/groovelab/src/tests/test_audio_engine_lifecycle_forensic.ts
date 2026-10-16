@@ -214,14 +214,16 @@ async function runDeepAudioLifecycleSuite() {
     assert.ok(meisterwerkContent.includes('stopWebAudio'), 'MeisterwerkAudioPlayers stops WebAudio on cleanup');
   });
 
-  test('GrooveLoopstation: Time-Stamp Synchronized Playback-Beat Scheduler (GRV-40)', () => {
-    const loopFile = path.resolve('apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx');
+  test('CampusLoopstation: Time-Stamp Synchronized Playback-Beat Scheduler (GRV-40)', () => {
+    const loopFile = fs.existsSync(path.resolve('apps/groovelab/src/components/campus/CampusLoopstation.tsx'))
+      ? path.resolve('apps/groovelab/src/components/campus/CampusLoopstation.tsx')
+      : path.resolve('apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx');
     const content = fs.readFileSync(loopFile, 'utf-8');
-    assert.ok(content.includes('schedulePlaybackBeats'), 'GrooveLoopstation uses lookahead playback beat scheduler');
-    assert.ok(content.includes('togglePlaybackBeatSync'), 'GrooveLoopstation provides 1-tap beat sync toggle');
-    assert.ok(content.includes('playbackBeatTimerRef'), 'GrooveLoopstation manages playbackBeatTimer ref');
-    assert.ok(content.includes('nextPlaybackBeatTimeRef'), 'GrooveLoopstation tracks sample-accurate next beat time');
-    assert.ok(!content.includes('clickIntervalRef.current = setInterval'), 'GrooveLoopstation has eliminated jittery setInterval for playback beat');
+    assert.ok(content.includes('schedulePlaybackBeats'), 'CampusLoopstation uses lookahead playback beat scheduler');
+    assert.ok(content.includes('togglePlaybackBeatSync'), 'CampusLoopstation provides 1-tap beat sync toggle');
+    assert.ok(content.includes('playbackBeatTimerRef'), 'CampusLoopstation manages playbackBeatTimer ref');
+    assert.ok(content.includes('nextPlaybackBeatTimeRef'), 'CampusLoopstation tracks sample-accurate next beat time');
+    assert.ok(!content.includes('clickIntervalRef.current = setInterval'), 'CampusLoopstation has eliminated jittery setInterval for playback beat');
     assert.ok(content.includes('shouldDuckAcousticBleed = isCurrentlyRecording && hasTrack1 && !useHeadphonesRef.current'), 'Acoustic bleed ducking must strictly be scoped to active recording');
   });
 

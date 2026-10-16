@@ -52,6 +52,10 @@ export interface Invoice {
   passiveStudentsHostingFee: number;
   activeCampusCount?: number;
   activeGroovelabCount?: number;
+  campusStudentActivationFeeTotal?: number;
+  groovelabStudentActivationFeeTotal?: number;
+  parentPaidStudentsCount?: number;
+  exemptStudentsCount?: number;
   storageAddonGb: number;
   storageUsedBytes: number;
   storageAddonMonthlyFee: number;

@@ -3042,7 +3042,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       style={{
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
-                        borderRadius: '16px',
+                        minHeight: '82px',
+                        borderRadius: '18px',
                         background: isSelected ? '#f0fdf4' : 'transparent',
                         border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
                         boxShadow: 'none',
@@ -3051,12 +3052,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
+                        gap: '14px',
                         textAlign: 'left',
                         boxSizing: 'border-box'
                       }}
                     >
-                      <CampusDynamicAvatar user={group} size={42} />
+                      <CampusDynamicAvatar user={group} size={48} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -3171,7 +3172,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         style={{
                           width: '100%',
                           padding: isMobile ? '12px 14px' : '14px 16px',
-                          borderRadius: '16px',
+                          minHeight: '82px',
+                          borderRadius: '18px',
                           background: isSelected ? '#f0fdf4' : 'transparent',
                           border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
                           boxShadow: 'none',
@@ -3180,12 +3182,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           transition: 'all 0.2s',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '12px',
+                          gap: '14px',
                           textAlign: 'left',
                           boxSizing: 'border-box'
                         }}
                       >
-                        <CampusDynamicAvatar user={item} size={42} />
+                        <CampusDynamicAvatar user={item} size={48} />
 
                         <div style={{ flex: 1, overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -3254,7 +3256,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       style={{
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
-                        borderRadius: '16px',
+                        minHeight: '82px',
+                        borderRadius: '18px',
                         background: isSelected ? '#f0fdf4' : 'transparent',
                         border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
                         boxShadow: 'none',
@@ -3263,12 +3266,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '12px',
+                        gap: '14px',
                         textAlign: 'left',
                         boxSizing: 'border-box'
                       }}
                     >
-                      <CampusDynamicAvatar user={item} size={42} showPresence isQuietHours={isRecipientInQuietHours} customGradient={studentRosterColorMap.get(item.id)} />
+                      <CampusDynamicAvatar user={item} size={48} showPresence isQuietHours={isRecipientInQuietHours} customGradient={studentRosterColorMap.get(item.id)} />
 
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -4866,7 +4869,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 })()}
 
                 {/* 🌙 Ambient Quiet Hours Status Pill (0.1% Goldstandard) */}
-                {isRecipientInQuietHours && isStudent && (
+                {isRecipientInQuietHours && (isStudent || !isTeacherOrStaff) && (
                   <div style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -4881,7 +4884,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     fontWeight: 650
                   }}>
                     <Moon size={12} color="#d97706" style={{ flexShrink: 0 }} />
-                    <span>{formatTeacherFullName(selectedRecipient)} hat Feierabend • Nachricht wird zugestellt und am nächsten Schultag beantwortet</span>
+                    <span>{formatTeacherFullName(selectedRecipient)} hat Feierabend (Ruhezeit) • Nachricht wird zugestellt und am nächsten Schultag beantwortet</span>
                   </div>
                 )}
 

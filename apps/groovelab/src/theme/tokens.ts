@@ -16,6 +16,22 @@ export const DESIGN_TOKENS = {
     circle: '50%'
   },
 
+  // 📏 0,1% Luxury Height Matrix (Apple HIG / Linear Standard)
+  heights: {
+    chatItem: '82px',       // Großzügige Nachrichten-Zeile mit 48px Avatar & 2-Zeilen-Preview
+    entityCard: '88px',     // Der unangefochtene Goldstandard: Schüler-, Termin-, Ferien- & Tagesplan-Karten
+    roomCard: '94px',       // Großzügige Raum-Karten mit Headroom & Ausstattungs-Tags
+    heroCard: '136px',      // iCal-Abo-Banner, Dashboard-Action-Heros
+    metricCard: '128px'     // Master-Admin & Sekretariats-KPIs
+  },
+
+  // 🎨 0,1% Standard Borders & Accents
+  borders: {
+    accentLeft: '4px solid', // Einheitlicher 4px Farbbalken (eliminiert 3px vs. 5px Drift)
+    cardBorder: '1px solid #e2e8f0',
+    cardBorderHover: '1px solid #cbd5e1'
+  },
+
   // 💡 Studio Diffusion Shadows & Inset Glows
   shadows: {
     appleDiffusion: '0 8px 24px -4px rgba(0, 0, 0, 0.06)',

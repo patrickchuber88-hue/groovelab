@@ -42,9 +42,16 @@ function fetchHead(urlObj, options = {}) {
   return new Promise((resolve, reject) => {
     const isHttps = urlObj.protocol === 'https:';
     const client = isHttps ? https : http;
-    const req = client.request(urlObj, {
+    const resolveIp = process.env.RESOLVE_IP;
+    const req = client.request({
+      protocol: urlObj.protocol,
+      hostname: resolveIp || urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: `${urlObj.pathname}${urlObj.search}`,
+      servername: urlObj.hostname,
       method: options.method || 'GET',
       headers: {
+        'Host': urlObj.host,
         'User-Agent': 'CampusGroovelab-PerimeterAudit/3.0 (Enterprise-Tri-Observatory-Guard)',
         'Accept': options.accept || 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         ...(options.headers || {})
@@ -121,7 +128,8 @@ function fetchJson(urlStr, timeoutMs = 3500) {
 function probeNativeTls(hostname, port = 443) {
   return new Promise((resolve) => {
     const start = Date.now();
-    const socket = tls.connect(port, hostname, {
+    const resolveIp = process.env.RESOLVE_IP;
+    const socket = tls.connect(port, resolveIp || hostname, {
       servername: hostname,
       rejectUnauthorized: true,
       timeout: 6000

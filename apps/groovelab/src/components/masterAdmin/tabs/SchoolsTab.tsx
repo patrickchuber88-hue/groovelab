@@ -1,34 +1,31 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Building2, Search, Plus, RefreshCw, Eye, Trash2, Download, Check, Copy, 
-  ExternalLink, ShieldCheck, AlertTriangle, Clock, Sliders, Smartphone, 
-  CheckCircle, Info, Zap, MapPin, Mail, Sparkles, Filter, ChevronDown, 
-  CheckCircle2, Calendar, Award, UserCheck, Power, ShieldAlert, Users, 
-  HardDrive, Activity, ArrowUpRight, Phone, Edit3, X, MessageSquare, 
-  AlertCircle, LayoutGrid, LayoutList
+import {
+  Building2, Search, Plus, RefreshCw, Eye, Trash2, Download, Check, Copy,
+  ShieldCheck, Clock, Zap, CheckCircle2, ShieldAlert, Phone, Edit3, X, AlertCircle
 } from 'lucide-react';
-import { calculateCampusGroovelabBilling } from '../../../domain/billingCalculator';
 import { isSchoolBypassActive } from '../../../domain/pricingEngine';
-import { isSchoolTrialActive, resolveStorageAddonFee } from '../../../domain/schoolMetricsAggregator';
-
-import type { School } from '../MasterAdminTypes';
+import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
+import { computeSchoolBillingMetrics, CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
+import type { School, SchoolStat } from '../MasterAdminTypes';
 import { ProvisionSchoolModal } from '../modals/ProvisionSchoolModal';
+import { MagicInviteKitModal, MagicInviteKitData } from '../modals/MagicInviteKitModal';
+import { SuspendSchoolModal } from '../modals/SuspendSchoolModal';
 
 interface SchoolsTabProps {
   schools: School[];
-  schoolStats: Record<string, any>;
+  schoolStats: Record<string, Partial<SchoolStat>>;
   loading: boolean;
-  masterPricing: any;
+  masterPricing: CanonicalBillingRates;
   onRefresh: () => void;
   onSelectSchool: (school: School) => void;
   onStartGhostMode: (school: School) => void;
   onDeleteSchool: (school: School) => void;
   onToggleSchoolStatus: (school: School, newStatus: string) => Promise<void>;
   onTogglePauseSchool?: (school: School) => Promise<void>;
-  onProvisionSchool: (data: any) => Promise<any>;
+  onProvisionSchool: (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
   onUpdateOperatorNotes?: (schoolId: string, notes: string) => Promise<void>;
   onExtendTrial?: (schoolId: string, days: number) => Promise<void>;
-  onRegenerateInvite?: (schoolId: string) => Promise<any>;
+  onRegenerateInvite?: (schoolId: string) => Promise<{ invite_token?: string }>;
   onSuspendWithAudit?: (schoolId: string, reason: string) => Promise<void>;
 }
 
@@ -42,16 +39,12 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   onStartGhostMode,
   onDeleteSchool,
   onToggleSchoolStatus,
-  onTogglePauseSchool,
   onProvisionSchool,
   onUpdateOperatorNotes,
   onExtendTrial,
   onRegenerateInvite,
   onSuspendWithAudit
 }) => {
-  // Apple HIG View Mode: Table (Data-Grid) vs. Cards
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
-
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [moduleFilter, setModuleFilter] = useState<'all' | 'kombi' | 'campus' | 'groovelab'>('all');
@@ -59,20 +52,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   const [actionFilter, setActionFilter] = useState<'all' | 'expiring_trial' | 'missing_avv' | 'inactive' | 'high_activity'>('all');
   const [sortOption, setSortOption] = useState<'students' | 'name' | 'newest' | 'mrr' | 'churn'>('students');
 
-  // Slide-Over Provisioning Modal
+  // Modals
   const [showProvisionModal, setShowProvisionModal] = useState(false);
-
-  // Success Kit Modal after Provisioning
-  const [magicInviteData, setMagicInviteData] = useState<{
-    schoolName: string;
-    loginUrl: string;
-    email: string;
-    contactPerson: string;
-  } | null>(null);
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [briefingCopied, setBriefingCopied] = useState(false);
-
-  // Safety Suspend Modal
+  const [magicInviteData, setMagicInviteData] = useState<MagicInviteKitData | null>(null);
   const [suspendTargetSchool, setSuspendTargetSchool] = useState<School | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [suspending, setSuspending] = useState(false);
@@ -87,41 +69,65 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   const [extendingTrialId, setExtendingTrialId] = useState<string | null>(null);
   const [activeMrrTooltipSchoolId, setActiveMrrTooltipSchoolId] = useState<string | null>(null);
 
-  // Filter out inactive or demo schools
+  // Keep archived schools in sanitizedSchools so archivedCount and statusTab === 'archived' work truthfully!
   const sanitizedSchools = useMemo(() => {
-    return (schools || []).filter(s => {
-      return !(s as any).is_demo_tenant && s.status !== 'archived';
-    });
+    const hasNonDemo = (schools || []).some(s => !s.is_demo_tenant);
+    return (schools || []).filter(s => !hasNonDemo || !s.is_demo_tenant);
   }, [schools]);
 
+  const nonArchivedSchools = useMemo(() => {
+    return sanitizedSchools.filter(s => s.status !== 'archived');
+  }, [sanitizedSchools]);
+
+  // Precompute canonical billing metrics for every school (SSOT)
+  const schoolMetricsMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof computeSchoolBillingMetrics>>();
+    sanitizedSchools.forEach(s => {
+      map.set(s.id, computeSchoolBillingMetrics(s, schoolStats[s.id], masterPricing));
+    });
+    return map;
+  }, [sanitizedSchools, schoolStats, masterPricing]);
+
   // Aggregate Metrics for Header Scorecards & Operator Action Center
-  const totalPayingSchools = sanitizedSchools.filter(s => s.status === 'active' && !isSchoolTrialActive(s) && !isSchoolBypassActive(s) && !s.is_paused).length;
-  const totalTrialSchools = sanitizedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false).length;
-  const totalBypassedSchools = sanitizedSchools.filter(s => isSchoolBypassActive(s)).length;
-  const totalPendingSchools = sanitizedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
+  const {
+    totalPayingSchools,
+    totalCombinedMrr,
+    totalActiveStudentsCount,
+    totalPassiveStudentsCount,
+    totalSignedAvvCount
+  } = useMemo(() => {
+    let paying = 0;
+    let combinedMrr = 0;
+    let activeStudentsCnt = 0;
+    let passiveStudentsCnt = 0;
+    let signedAvvCnt = 0;
 
-  let totalCombinedMrr = 0;
-  let totalActiveStudentsCount = 0;
-  let totalPassiveStudentsCount = 0;
-  let totalSignedAvvCount = 0;
+    nonArchivedSchools.forEach(s => {
+      const m = schoolMetricsMap.get(s.id);
+      if (!m) return;
 
-  // Telemetry helper: Churn & Session Activity
+      const activeStudents = Math.max(m.activeCampusStudentsCount, m.activeGroovelabStudentsCount);
+      activeStudentsCnt += activeStudents;
+      passiveStudentsCnt += m.passiveStudentsCount;
+      if (s.avv_signed_at) signedAvvCnt += 1;
+
+      if (!m.isTrialOrBypass && !m.isSuspendedOrArchived && s.status === 'active') {
+        paying += 1;
+        combinedMrr += m.totalMonthlyNet;
+      }
+    });
+
+    return {
+      totalPayingSchools: paying,
+      totalCombinedMrr: combinedMrr,
+      totalActiveStudentsCount: activeStudentsCnt,
+      totalPassiveStudentsCount: passiveStudentsCnt,
+      totalSignedAvvCount: signedAvvCnt
+    };
+  }, [nonArchivedSchools, schoolMetricsMap]);
+
+  // Pure Telemetry Helper (Zero Hardcoded School Names)
   const getSchoolActivityStatus = (school: School) => {
-    // 1. Check if this school is the active development school or operator session
-    const isDevActive = Boolean(
-      (school.name && school.name.toLowerCase().includes('bad säckingen')) ||
-      (school.billing_email && school.billing_email.toLowerCase().includes('musaek'))
-    );
-    if (isDevActive) {
-      return { 
-        level: 'active', 
-        label: 'Gerade aktiv', 
-        color: '#059669', 
-        bg: '#ecfdf5', 
-        daysAgo: 0 
-      };
-    }
-
     const lastSeenStr = school.last_session_at || school.created_at;
     if (!lastSeenStr) return { level: 'unknown', label: 'Unbekannt', color: '#94a3b8', bg: '#f1f5f9', daysAgo: 999 };
     const diffMs = Date.now() - new Date(lastSeenStr).getTime();
@@ -129,33 +135,32 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
     if (diffHours < 48) {
-      return { 
-        level: 'active', 
-        label: diffHours < 2 ? 'Gerade aktiv' : `Vor ${diffHours}h`, 
-        color: '#059669', 
-        bg: '#ecfdf5', 
-        daysAgo: 0 
+      return {
+        level: 'active',
+        label: diffHours < 2 ? 'Gerade aktiv' : `Vor ${diffHours}h`,
+        color: '#059669',
+        bg: '#ecfdf5',
+        daysAgo: 0
       };
     } else if (diffDays <= 14) {
-      return { 
-        level: 'idle', 
-        label: `Vor ${diffDays}d`, 
-        color: '#d97706', 
-        bg: '#fffbeb', 
-        daysAgo: diffDays 
+      return {
+        level: 'idle',
+        label: `Vor ${diffDays}d`,
+        color: '#d97706',
+        bg: '#fffbeb',
+        daysAgo: diffDays
       };
     } else {
-      return { 
-        level: 'inactive', 
-        label: `Inaktiv (${diffDays}d)`, 
-        color: '#dc2626', 
-        bg: '#fef2f2', 
-        daysAgo: diffDays 
+      return {
+        level: 'inactive',
+        label: `Inaktiv (${diffDays}d)`,
+        color: '#dc2626',
+        bg: '#fef2f2',
+        daysAgo: diffDays
       };
     }
   };
 
-  // Helper for Trial Expiry Days
   const getDaysUntilTrialExpires = (school: School) => {
     const expiryDate = school.trial_until || school.trial_ends_at;
     if (!expiryDate) return null;
@@ -163,84 +168,33 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   };
 
-  sanitizedSchools.forEach(s => {
-    const stats = schoolStats[s.id] || {};
-    const teachers = stats.teachers !== undefined ? stats.teachers : 0;
-    const totalStudents = stats.students || 0;
-    const campusActive = stats.studentsCampus || 0;
-    const groovelabActive = stats.studentsGroovelab || 0;
-    const activeStudents = Math.max(campusActive, groovelabActive);
-    const passiveStudents = Math.max(0, totalStudents - activeStudents);
-
-    totalActiveStudentsCount += activeStudents;
-    totalPassiveStudentsCount += passiveStudents;
-    if (s.avv_signed_at) totalSignedAvvCount += 1;
-
-    if (!isSchoolTrialActive(s) && !isSchoolBypassActive(s) && !s.is_paused && s.status === 'active') {
-      const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
-        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
-        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
-        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
-        priceTeacher: s.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
-        priceStudent: s.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
-        pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
-      };
-
-      const storageAddonGbVal = (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive') ? 0 : Number(s.storage_addon_gb || 0);
-      const storageAddonFeeVal = (s.storage_addon_status === 'none' || s.storage_addon_status === 'inactive' || storageAddonGbVal === 0) 
-        ? 0 
-        : resolveStorageAddonFee(storageAddonGbVal, s.storage_addon_monthly_fee);
-
-      const isBookedSchool = Boolean(s.is_billing_booked) || s.status === 'active';
-      const hasCampusMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
-      const hasGrooveMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_groovelab_subscription;
-
-      const billing = calculateCampusGroovelabBilling({
-        hasCampusModule: hasCampusMod,
-        hasGroovelabModule: hasGrooveMod,
-        activeTeacherCount: teachers,
-        activeStudentCount: activeStudents,
-        campusStudentCount: campusActive,
-        groovelabStudentCount: groovelabActive,
-        passiveStudentCount: passiveStudents,
-        storageAddonMonthlyFee: storageAddonFeeVal,
-        rates: {
-          priceCampus: rates.priceCampus,
-          priceGroovelab: rates.priceGroovelab,
-          priceKombi: rates.priceKombi,
-          priceTeacher: rates.priceTeacher,
-          priceStudent: rates.priceStudent,
-          pricePassiveStudent: rates.pricePassiveStudent
-        }
-      });
-      totalCombinedMrr += billing.totalMonthlySchoolInvoice;
-    }
-  });
-
-  // Operator Action Center: Compute urgent task categories
   const expiringTrialSchools = useMemo(() => {
-    return sanitizedSchools.filter(s => {
+    return nonArchivedSchools.filter(s => {
       if (!isSchoolTrialActive(s)) return false;
       const days = getDaysUntilTrialExpires(s);
       return days !== null && days <= 7;
     });
-  }, [sanitizedSchools]);
+  }, [nonArchivedSchools]);
 
   const missingAvvSchools = useMemo(() => {
-    return sanitizedSchools.filter(s => !s.avv_signed_at && s.status !== 'archived');
-  }, [sanitizedSchools]);
+    return nonArchivedSchools.filter(s => !s.avv_signed_at);
+  }, [nonArchivedSchools]);
 
   const inactiveSchools = useMemo(() => {
-    return sanitizedSchools.filter(s => {
+    return nonArchivedSchools.filter(s => {
       const act = getSchoolActivityStatus(s);
       return act.level === 'inactive' && s.status === 'active';
     });
-  }, [sanitizedSchools]);
+  }, [nonArchivedSchools]);
 
   // Combined Filter and Sort Logic
   const filteredSchools = useMemo(() => {
     return sanitizedSchools.filter(s => {
-      // 1. Search Query (Name, Contact, Phone, Email, City, Zip)
+      // Exclude archived schools unless statusTab === 'archived'
+      if (statusTab !== 'archived' && s.status === 'archived') {
+        return false;
+      }
+
       const q = searchQuery.toLowerCase().trim();
       if (q) {
         const matchesName = (s.name || '').toLowerCase().includes(q);
@@ -255,7 +209,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         }
       }
 
-      // 2. Status Tab Filter
       if (statusTab === 'active') {
         if (s.status !== 'active' || isSchoolTrialActive(s) || s.is_approved === false || s.is_paused) return false;
       } else if (statusTab === 'trial') {
@@ -266,7 +219,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         if (s.status !== 'archived' && !s.is_paused && s.status !== 'suspended') return false;
       }
 
-      // 3. Module Filter
       if (moduleFilter === 'kombi') {
         if (!s.has_campus_subscription || !s.has_groovelab_subscription) return false;
       } else if (moduleFilter === 'campus') {
@@ -275,7 +227,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         if (!s.has_groovelab_subscription || s.has_campus_subscription) return false;
       }
 
-      // 4. Operator Action Filter
       if (actionFilter === 'expiring_trial') {
         const days = getDaysUntilTrialExpires(s);
         if (!isSchoolTrialActive(s) || days === null || days > 7) return false;
@@ -292,82 +243,36 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       } else if (sortOption === 'newest') {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       } else if (sortOption === 'mrr') {
-        const statsA = schoolStats[a.id];
-        const statsB = schoolStats[b.id];
-        const actA = Math.max(statsA?.studentsCampus || 0, statsA?.studentsGroovelab || 0);
-        const actB = Math.max(statsB?.studentsCampus || 0, statsB?.studentsGroovelab || 0);
-        return actB - actA;
+        const mrrA = schoolMetricsMap.get(a.id)?.totalMonthlyNet ?? 0;
+        const mrrB = schoolMetricsMap.get(b.id)?.totalMonthlyNet ?? 0;
+        return mrrB - mrrA;
       } else if (sortOption === 'churn') {
         return getSchoolActivityStatus(b).daysAgo - getSchoolActivityStatus(a).daysAgo;
       } else {
-        // default: students
         const actA = Math.max(schoolStats[a.id]?.studentsCampus || 0, schoolStats[a.id]?.studentsGroovelab || 0);
         const actB = Math.max(schoolStats[b.id]?.studentsCampus || 0, schoolStats[b.id]?.studentsGroovelab || 0);
         return actB - actA;
       }
     });
-  }, [sanitizedSchools, searchQuery, moduleFilter, statusTab, actionFilter, sortOption, schoolStats]);
+  }, [sanitizedSchools, searchQuery, moduleFilter, statusTab, actionFilter, sortOption, schoolStats, schoolMetricsMap]);
 
-  // Counts for status tabs
-  const pendingCount = sanitizedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
-  const trialCount = sanitizedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false).length;
-  const activeCount = sanitizedSchools.filter(s => s.status === 'active' && !isSchoolTrialActive(s) && s.is_approved !== false && !s.is_paused).length;
+  const pendingCount = nonArchivedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
+  const trialCount = nonArchivedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false).length;
+  const activeCount = nonArchivedSchools.filter(s => s.status === 'active' && !isSchoolTrialActive(s) && s.is_approved !== false && !s.is_paused).length;
   const archivedCount = sanitizedSchools.filter(s => s.status === 'archived' || s.is_paused || s.status === 'suspended').length;
 
-  // 1-Click CSV Export of filtered view
+  // 1-Click CSV Export using SSOT computeSchoolBillingMetrics
   const handleExportFilteredCsv = () => {
     const headers = [
-      'Schul-ID', 'Name', 'PLZ', 'Ort', 'Schulleitung', 'Telefon', 'E-Mail', 
-      'Status', 'Aktivitaet', 'Testphase', 'AVV_Status', 'Modul_Campus', 
-      'Modul_GrooveLab', 'Lehrer', 'Aktive_Schueler', 'Passive_Schueler', 
-      'MRR_EUR', 'Betreiber_Notiz'
+      'Schul-ID', 'Name', 'PLZ', 'Ort', 'Schulleitung', 'Telefon', 'E-Mail',
+      'Status', 'Aktivitaet', 'Testphase', 'AVV_Status', 'Modul_Campus',
+      'Modul_GrooveLab', 'Lehrer', 'Aktive_Schueler', 'Passive_Schueler',
+      'MRR_Netto', 'Waehrung', 'Betreiber_Notiz'
     ];
 
     const rows = filteredSchools.map(s => {
-      const stats = schoolStats[s.id] || {};
-      const teachers = stats.teachers || 0;
-      const totalStudents = stats.students || 0;
-      const campusActive = stats.studentsCampus || 0;
-      const groovelabActive = stats.studentsGroovelab || 0;
-      const activeStudents = Math.max(campusActive, groovelabActive);
-      const passiveStudents = Math.max(0, totalStudents - activeStudents);
-
-      const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(s) : {
-        priceCampus: s.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
-        priceGroovelab: s.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
-        priceKombi: s.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
-        priceTeacher: s.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
-        priceStudent: s.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
-        pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
-      };
-
-      const storageAddonGbVal = Number(s.storage_addon_gb || 0);
-      const storageAddonFeeVal = Number(s.storage_addon_monthly_fee || (storageAddonGbVal === 20 ? 5.49 : storageAddonGbVal === 10 ? 2.99 : storageAddonGbVal === 5 ? 1.49 : storageAddonGbVal === 50 ? 9.99 : 0));
-
-      const isBookedSchool = Boolean(s.is_billing_booked) || s.status === 'active';
-      const hasCampusMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_campus_subscription;
-      const hasGrooveMod = (isBookedSchool && !s.has_campus_subscription && !s.has_groovelab_subscription) ? true : !!s.has_groovelab_subscription;
-
-      const billingCalc = calculateCampusGroovelabBilling({
-        hasCampusModule: hasCampusMod,
-        hasGroovelabModule: hasGrooveMod,
-        activeTeacherCount: teachers,
-        activeStudentCount: activeStudents,
-        campusStudentCount: campusActive,
-        groovelabStudentCount: groovelabActive,
-        passiveStudentCount: passiveStudents,
-        storageAddonMonthlyFee: storageAddonFeeVal,
-        rates: {
-          priceCampus: rates.priceCampus,
-          priceGroovelab: rates.priceGroovelab,
-          priceKombi: rates.priceKombi,
-          priceTeacher: rates.priceTeacher,
-          priceStudent: rates.priceStudent,
-          pricePassiveStudent: rates.pricePassiveStudent
-        }
-      });
-
-      const mrr = (isSchoolTrialActive(s) || isSchoolBypassActive(s) || s.is_paused) ? 0 : billingCalc.totalMonthlySchoolInvoice;
+      const m = schoolMetricsMap.get(s.id) || computeSchoolBillingMetrics(s, schoolStats[s.id], masterPricing);
+      const activeStudents = Math.max(m.activeCampusStudentsCount, m.activeGroovelabStudentsCount);
       const act = getSchoolActivityStatus(s);
 
       return [
@@ -382,12 +287,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         `"${act.label}"`,
         `"${isSchoolTrialActive(s) ? 'Ja' : 'Nein'}"`,
         `"${s.avv_signed_at ? 'Gezeichnet' : 'Ausstehend'}"`,
-        `"${s.has_campus_subscription ? 'Aktiv' : 'Inaktiv'}"`,
-        `"${s.has_groovelab_subscription ? 'Aktiv' : 'Inaktiv'}"`,
-        teachers,
+        `"${m.hasCampus ? 'Aktiv' : 'Inaktiv'}"`,
+        `"${m.hasGroovelab ? 'Aktiv' : 'Inaktiv'}"`,
+        m.teachersCount,
         activeStudents,
-        passiveStudents,
-        mrr.toFixed(2),
+        m.passiveStudentsCount,
+        m.totalMonthlyNet.toFixed(2),
+        `"${m.currency}"`,
         `"${(s.operator_notes || '').replace(/"/g, '""')}"`
       ].join(';');
     });
@@ -402,21 +308,19 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // 1-Click Kulanz Extension (+14d / +30d)
   const handleQuickExtendTrial = async (school: School, days: number) => {
     try {
       setExtendingTrialId(school.id);
       if (onExtendTrial) {
         await onExtendTrial(school.id, days);
       }
-    } catch (e: any) {
-      alert('Fehler bei Kulanz-Verlängerung: ' + (e.message || e));
+    } catch (e: unknown) {
+      alert('Fehler bei Kulanz-Verlängerung: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setExtendingTrialId(null);
     }
   };
 
-  // 1-Click Magic-Invite Token Regenerate & Briefing Copy
   const handleRegenerateAndCopyInvite = async (school: School) => {
     try {
       setCopiedInviteId(school.id);
@@ -428,17 +332,16 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
       const inviteUrl = `${window.location.origin}/?school_id=${school.id}&invite=school_onboarding${token ? `&token=${token}` : ''}`;
       const contactName = school.billing_contact_person || 'Schulleitung';
-      const text = `Guten Tag ${contactName},\n\nhier ist Ihr persönlicher Einrichtungs- und Aktivierungszugang für Campus-Groovelab an der Musikschule ${school.name}:\n👉 ${inviteUrl}\n\nDieser gesicherte Einladungslink ist für 14 Tage gültig. Der 3-Schritte-Assistent führt Sie direkt durch das Setup und die DSGVO-AVV-Gegenzeichnung.\n\nBei Fragen unterstützen wir Sie jederzeit gerne!\n\nHerzliche Grüße,\nPatrick Huber | Campus-Groovelab Leitstand`;
+      const text = `Guten Tag ${contactName},\n\nhier ist Ihr persönlicher Einrichtungs- und Aktivierungszugang für Campus-Groovelab an der Musikschule ${school.name}:\n${inviteUrl}\n\nDieser gesicherte Einladungslink ist für 14 Tage gültig. Der 3-Schritte-Assistent führt Sie direkt durch das Setup und die DSGVO-AVV-Gegenzeichnung.\n\nBei Fragen unterstützen wir Sie jederzeit gerne!\n\nHerzliche Grüße,\nPatrick Huber | Campus-Groovelab Leitstand`;
 
       await navigator.clipboard.writeText(text);
       setTimeout(() => setCopiedInviteId(null), 3000);
-    } catch (err: any) {
-      alert('Fehler beim Kopieren: ' + (err.message || err));
+    } catch (err: unknown) {
+      alert('Fehler beim Kopieren: ' + (err instanceof Error ? err.message : String(err)));
       setCopiedInviteId(null);
     }
   };
 
-  // Inline Note Save
   const handleSaveNote = async (schoolId: string) => {
     try {
       setSavingNote(true);
@@ -446,14 +349,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         await onUpdateOperatorNotes(schoolId, noteDraft.trim());
       }
       setEditingNoteSchoolId(null);
-    } catch (e: any) {
-      alert('Fehler beim Speichern der Notiz: ' + (e.message || e));
+    } catch (e: unknown) {
+      alert('Fehler beim Speichern der Notiz: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSavingNote(false);
     }
   };
 
-  // Safety Suspend Confirmation Submit
   const handleConfirmSuspend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!suspendTargetSchool) return;
@@ -471,13 +373,12 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       }
       setSuspendTargetSchool(null);
       setSuspendReason('');
-    } catch (err: any) {
-      alert('Fehler bei der Mandanten-Sperrung: ' + (err.message || err));
+    } catch (err: unknown) {
+      alert('Fehler bei der Mandanten-Sperrung: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSuspending(false);
     }
   };
-
 
   return (
     <div style={{
@@ -488,24 +389,22 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Outfit", sans-serif'
     }} className="animate-fade-in">
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 1. APPLE HIG MASTER HEADER BAR                                          */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        flexWrap: 'wrap', 
-        gap: '16px' 
+      {/* 1. MASTER HEADER BAR */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '16px'
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h2 style={{ 
-              fontSize: '2.1rem', 
-              fontWeight: 800, 
-              color: '#0f172a', 
-              margin: 0, 
-              letterSpacing: '-0.035em' 
+            <h2 style={{
+              fontSize: '2.1rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              margin: 0,
+              letterSpacing: '-0.035em'
             }}>
               Schulen &amp; Tenants Register
             </h2>
@@ -519,7 +418,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               border: '1px solid #e2e8f0',
               fontVariantNumeric: 'tabular-nums'
             }}>
-              {sanitizedSchools.length} Mandanten
+              {nonArchivedSchools.length} Aktive / {archivedCount} Archiv
             </span>
           </div>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
@@ -527,10 +426,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </p>
         </div>
 
-        {/* Header Actions */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          
-          {/* CSV Export Button (Filtered) */}
           <button
             type="button"
             onClick={handleExportFilteredCsv}
@@ -546,15 +442,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
             }}
             title="Exportiert exakt die derzeit gefilterte Mandantenliste"
           >
             <Download size={14} color="#475569" /> CSV Export ({filteredSchools.length})
           </button>
 
-          {/* Refresh Button */}
           <button
             type="button"
             onClick={onRefresh}
@@ -577,7 +471,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Aktualisieren
           </button>
 
-          {/* Primary CTA: + Schule provisionieren */}
           <button
             type="button"
             onClick={() => setShowProvisionModal(true)}
@@ -592,9 +485,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '7px',
-              boxShadow: 'none',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+              gap: '7px'
             }}
             className="hover-scale-mini"
           >
@@ -603,18 +494,14 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 2. APPLE HIG METRIC SCORECARDS                                          */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 2. UNIFIED METRIC SCORECARDS & SMART ALERTS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-        
-        {/* MRR Card */}
         <div style={{
           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
           borderRadius: '20px',
           padding: '20px 22px',
           color: '#ffffff',
-          boxShadow: 'none',
+          border: 'none',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -634,36 +521,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </div>
         </div>
 
-        {/* Registrierte Schulen Card */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '20px',
-          padding: '20px 22px',
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.025)',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
-        }}>
-          <div>
-            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Registrierte Schulen
-            </span>
-            <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '5px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-              {sanitizedSchools.length}
-            </h3>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '8px', color: '#059669' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> {activeCount} Aktiv
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '2px 8px', borderRadius: '8px', color: '#64748b' }}>
-              <Clock size={11} /> {trialCount} Test
-            </span>
-          </div>
-        </div>
-
-        {/* Schüler-Aktivierungen Card */}
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
@@ -692,7 +549,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </div>
         </div>
 
-        {/* DSGVO & Compliance Card */}
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
@@ -708,183 +564,151 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               DSGVO-AVV Compliance
             </span>
             <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '5px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
-              {totalSignedAvvCount} <span style={{ fontSize: '1.1rem', color: '#94a3b8', fontWeight: 600 }}>/ {sanitizedSchools.length}</span>
+              {totalSignedAvvCount} <span style={{ fontSize: '1.1rem', color: '#94a3b8', fontWeight: 600 }}>/ {nonArchivedSchools.length}</span>
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
-            <span style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '4px', 
-              background: totalSignedAvvCount === sanitizedSchools.length ? '#ecfdf5' : '#fffbeb', 
-              color: totalSignedAvvCount === sanitizedSchools.length ? '#059669' : '#d97706',
-              padding: '2px 8px', 
-              borderRadius: '8px' 
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: missingAvvSchools.length === 0 ? '#ecfdf5' : '#fffbeb',
+              color: missingAvvSchools.length === 0 ? '#059669' : '#d97706',
+              padding: '2px 8px',
+              borderRadius: '8px'
             }}>
-              <ShieldCheck size={12} /> {sanitizedSchools.length - totalSignedAvvCount} AVVs offen
+              <ShieldCheck size={12} /> {missingAvvSchools.length} AVVs offen
             </span>
           </div>
         </div>
-      </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 3. ⚡ OPERATOR ACTION CENTER (APPLE HIG SMART ALERTS)                   */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div style={{
-        background: 'rgba(248, 250, 252, 0.90)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderRadius: '20px',
-        padding: '16px 20px',
-        border: '1px solid rgba(226, 232, 240, 0.9)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '10px',
-            background: '#ffffff',
-            color: '#0f172a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-            border: '1px solid #e2e8f0'
-          }}>
-            <Zap size={16} />
+        {/* Merged Operator Action Center Card */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '20px',
+          padding: '20px 22px',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          boxShadow: '0 4px 18px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <Zap size={12} color="#0f172a" /> Action Center Filter
+            </span>
+            {actionFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setActionFilter('all')}
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#475569',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Reset
+              </button>
+            )}
           </div>
-          <div>
-            <strong style={{ fontSize: '0.86rem', color: '#0f172a', fontWeight: 800 }}>
-              Operator Action Center
-            </strong>
-            <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b' }}>
-              Tages-Fokus &amp; Handlungsbedarfe. Klick auf einen Alert filtert sofort die Tabelle.
-            </p>
-          </div>
-        </div>
 
-        {/* Smart Alert Pills */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {expiringTrialSchools.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setActionFilter(actionFilter === 'expiring_trial' ? 'all' : 'expiring_trial')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '100px',
-                border: actionFilter === 'expiring_trial' ? '1.5px solid #d97706' : '1px solid #fde68a',
-                background: actionFilter === 'expiring_trial' ? '#fef3c7' : '#ffffff',
-                color: '#b45309',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer',
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginTop: '8px' }}>
+            {expiringTrialSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'expiring_trial' ? 'all' : 'expiring_trial')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'expiring_trial' ? 'none' : '1px solid #fde68a',
+                  background: actionFilter === 'expiring_trial' ? '#fef3c7' : '#ffffff',
+                  color: '#b45309',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Clock size={11} />
+                <span>{expiringTrialSchools.length} Test &lt;7d</span>
+              </button>
+            )}
+
+            {missingAvvSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'missing_avv' ? 'all' : 'missing_avv')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'missing_avv' ? 'none' : '1px solid #ffedd5',
+                  background: actionFilter === 'missing_avv' ? '#ffedd5' : '#ffffff',
+                  color: '#c2410c',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <ShieldAlert size={11} />
+                <span>{missingAvvSchools.length} AVV offen</span>
+              </button>
+            )}
+
+            {inactiveSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'inactive' ? 'all' : 'inactive')}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'inactive' ? 'none' : '1px solid #fee2e2',
+                  background: actionFilter === 'inactive' ? '#fee2e2' : '#ffffff',
+                  color: '#b91c1c',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <AlertCircle size={11} />
+                <span>{inactiveSchools.length} Inaktiv (&gt;14d)</span>
+              </button>
+            )}
+
+            {expiringTrialSchools.length === 0 && missingAvvSchools.length === 0 && inactiveSchools.length === 0 && (
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                boxShadow: 'none'
-              }}
-            >
-              <Clock size={12} />
-              <span>{expiringTrialSchools.length} Testphasen enden in &lt; 7 Tagen</span>
-            </button>
-          )}
-
-          {missingAvvSchools.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setActionFilter(actionFilter === 'missing_avv' ? 'all' : 'missing_avv')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '100px',
-                border: actionFilter === 'missing_avv' ? '1.5px solid #ea580c' : '1px solid #ffedd5',
-                background: actionFilter === 'missing_avv' ? '#ffedd5' : '#ffffff',
-                color: '#c2410c',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: 'none'
-              }}
-            >
-              <ShieldAlert size={12} />
-              <span>{missingAvvSchools.length} AVVs offen</span>
-            </button>
-          )}
-
-          {inactiveSchools.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setActionFilter(actionFilter === 'inactive' ? 'all' : 'inactive')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '100px',
-                border: actionFilter === 'inactive' ? '1.5px solid #dc2626' : '1px solid #fee2e2',
-                background: actionFilter === 'inactive' ? '#fee2e2' : '#ffffff',
-                color: '#b91c1c',
-                fontSize: '0.76rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: 'none'
-              }}
-            >
-              <AlertCircle size={12} />
-              <span>{inactiveSchools.length} Schulen inaktiv (&gt;14d)</span>
-            </button>
-          )}
-
-          {expiringTrialSchools.length === 0 && missingAvvSchools.length === 0 && inactiveSchools.length === 0 && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '100px',
-              background: '#ecfdf5',
-              border: '1px solid #a7f3d0',
-              color: '#059669',
-              fontSize: '0.76rem',
-              fontWeight: 800
-            }}>
-              <CheckCircle2 size={13} />
-              <span>Alles im grünen Bereich – 0 offene Betreiber-Aufgaben</span>
-            </div>
-          )}
-
-          {actionFilter !== 'all' && (
-            <button
-              type="button"
-              onClick={() => setActionFilter('all')}
-              style={{
+                gap: '6px',
                 padding: '5px 10px',
                 borderRadius: '100px',
-                background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
-                color: '#475569',
+                background: '#ecfdf5',
+                border: 'none',
+                color: '#059669',
                 fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Filter zurücksetzen ×
-            </button>
-          )}
+                fontWeight: 800
+              }}>
+                <CheckCircle2 size={12} />
+                <span>0 offene Aufgaben</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 4. APPLE HIG CONTROL BAR (SEGMENTED TABS, SEARCH, VIEW-SWITCH)         */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 3. CONTROL BAR (SEGMENTED TABS, SEARCH, SORT) */}
       <div style={{
         background: '#ffffff',
         borderRadius: '20px',
@@ -895,15 +719,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         gap: '14px',
         boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)'
       }}>
-        {/* Top Control Track: Status Tabs & View Switcher */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          flexWrap: 'wrap', 
-          gap: '12px' 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
         }}>
-          {/* Apple Segmented Control: Status Tabs */}
           <div style={{
             display: 'inline-flex',
             background: '#f1f5f9',
@@ -913,7 +735,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             border: '1px solid #e2e8f0'
           }}>
             {[
-              { id: 'all', label: `Alle (${sanitizedSchools.length})` },
+              { id: 'all', label: `Alle (${nonArchivedSchools.length})` },
               { id: 'active', label: `Aktiv (${activeCount})` },
               { id: 'trial', label: `Testphase (${trialCount})` },
               { id: 'pending', label: `Freigabe (${pendingCount})` },
@@ -924,7 +746,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setStatusTab(tab.id as any)}
+                  onClick={() => setStatusTab(tab.id as typeof statusTab)}
                   style={{
                     padding: '7px 14px',
                     borderRadius: '11px',
@@ -945,64 +767,39 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             })}
           </div>
 
-          {/* Right: View Switcher (Tabelle vs. Karten) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              display: 'inline-flex',
-              background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0'
-            }}>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '9px',
-                  border: viewMode === 'table' ? '1px solid rgba(0,0,0,0.06)' : 'none',
-                  background: viewMode === 'table' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'table' ? '#0f172a' : '#64748b',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: viewMode === 'table' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
-                }}
-              >
-                <LayoutList size={13} /> Tabelle
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '9px',
-                  border: viewMode === 'cards' ? '1px solid rgba(0,0,0,0.06)' : 'none',
-                  background: viewMode === 'cards' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'cards' ? '#0f172a' : '#64748b',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: viewMode === 'cards' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
-                }}
-              >
-                <LayoutGrid size={13} /> Karten
-              </button>
-            </div>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'all', label: 'Alle Module' },
+              { id: 'kombi', label: 'Kombi' },
+              { id: 'campus', label: 'Campus' },
+              { id: 'groovelab', label: 'GrooveLab' }
+            ].map(mod => {
+              const isSel = moduleFilter === mod.id;
+              return (
+                <button
+                  key={mod.id}
+                  type="button"
+                  onClick={() => setModuleFilter(mod.id as typeof moduleFilter)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '100px',
+                    border: isSel ? 'none' : '1px solid #e2e8f0',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    background: isSel ? '#ecfdf5' : '#f8fafc',
+                    color: isSel ? '#047857' : '#64748b',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {mod.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Second Track: Search, Sort & Module Pills */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          
-          {/* Search Box */}
           <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
             <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
@@ -1026,6 +823,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             {searchQuery && (
               <button
                 type="button"
+                aria-label="Suchtext löschen"
                 onClick={() => setSearchQuery('')}
                 style={{
                   position: 'absolute',
@@ -1043,42 +841,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             )}
           </div>
 
-          {/* Module Filter Pills */}
-          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-            {[
-              { id: 'all', label: 'Alle Module' },
-              { id: 'kombi', label: 'Kombi' },
-              { id: 'campus', label: 'Campus' },
-              { id: 'groovelab', label: 'GrooveLab' }
-            ].map(mod => {
-              const isSel = moduleFilter === mod.id;
-              return (
-                <button
-                  key={mod.id}
-                  type="button"
-                  onClick={() => setModuleFilter(mod.id as any)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '100px',
-                    border: isSel ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    background: isSel ? '#ecfdf5' : '#f8fafc',
-                    color: isSel ? '#047857' : '#64748b',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {mod.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Sort Dropdown */}
           <select
             value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as any)}
+            onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
             style={{
               padding: '9px 14px',
               borderRadius: '12px',
@@ -1100,9 +865,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 5. MAIN CONTENT: APPLE ENTERPRISE DATA-GRID OR VISUAL CARDS            */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 4. ENTERPRISE DATA-GRID */}
       {filteredSchools.length === 0 ? (
         <div style={{
           padding: '60px 24px',
@@ -1121,11 +884,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           <strong style={{ color: '#475569', fontSize: '1.05rem' }}>Keine Mandanten gefunden</strong>
           <span>Passen Sie Ihre Filter oder Suchbegriffe an.</span>
         </div>
-      ) : viewMode === 'table' ? (
-        
-        /* ─────────────────────────────────────────────────────────────────────── */
-        /* MODE A: APPLE ENTERPRISE DATA-GRID (macOS Numbers / Finder Style)       */
-        /* ─────────────────────────────────────────────────────────────────────── */
+      ) : (
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -1164,67 +923,43 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               <tbody>
                 {filteredSchools.map((school, idx) => {
                   const stats = schoolStats[school.id] || {};
-                  const teachers = stats.teachers !== undefined ? stats.teachers : 0;
-                  const totalStudents = stats.students || 0;
-                  const campusActive = stats.studentsCampus || 0;
-                  const groovelabActive = stats.studentsGroovelab || 0;
+                  const metrics = schoolMetricsMap.get(school.id) || computeSchoolBillingMetrics(school, stats, masterPricing);
+                  const teachers = metrics.teachersCount;
+                  const campusActive = metrics.activeCampusStudentsCount;
+                  const groovelabActive = metrics.activeGroovelabStudentsCount;
                   const activeStudents = Math.max(campusActive, groovelabActive);
-                  const passiveStudents = Math.max(0, totalStudents - activeStudents);
+                  const passiveStudents = metrics.passiveStudentsCount;
 
                   const isPending = school.is_approved === false || school.status === 'pending';
-                  const isPaused = school.is_paused || school.status === 'suspended';
+                  const isPaused = school.is_paused || school.status === 'suspended' || school.status === 'archived';
                   const isTrial = isSchoolTrialActive(school) && !isPending;
                   const trialDaysLeft = getDaysUntilTrialExpires(school);
                   const act = getSchoolActivityStatus(school);
 
-                  // MRR Calculation
-                  const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(school) : {
-                    priceCampus: school.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
-                    priceGroovelab: school.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
-                    priceKombi: school.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
-                    priceTeacher: school.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
-                    priceStudent: school.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
-                    pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
-                  };
-
-                  const storageAddonGbVal = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive') ? 0 : Number(school.storage_addon_gb || 0);
-                  const storageAddonFeeVal = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || storageAddonGbVal === 0)
-                    ? 0
-                    : resolveStorageAddonFee(storageAddonGbVal, school.storage_addon_monthly_fee);
-                  const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
-                  const hasCamp = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_campus_subscription;
-                  const hasGroove = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_groovelab_subscription;
-
-                  const billingCalc = calculateCampusGroovelabBilling({
-                    hasCampusModule: hasCamp,
-                    hasGroovelabModule: hasGroove,
-                    activeTeacherCount: teachers,
-                    activeStudentCount: activeStudents,
-                    campusStudentCount: campusActive,
-                    groovelabStudentCount: groovelabActive,
-                    passiveStudentCount: passiveStudents,
-                    storageAddonMonthlyFee: storageAddonFeeVal,
-                    rates
-                  });
-
-                  const mrr = (isTrial || isSchoolBypassActive(school) || isPaused) ? 0 : billingCalc.totalMonthlySchoolInvoice;
+                  const mrr = metrics.totalMonthlyNet;
                   const isEditingNote = editingNoteSchoolId === school.id;
 
                   return (
-                    <tr 
+                    <tr
                       key={school.id}
                       style={{
                         borderBottom: '1px solid #f1f5f9',
                         background: isPending ? '#fffdf7' : isPaused ? '#fcfcfc' : idx % 2 === 1 ? '#fafafa' : '#ffffff',
                         transition: 'background 0.15s ease'
                       }}
-                      onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                      onMouseOut={(e) => e.currentTarget.style.background = isPending ? '#fffdf7' : isPaused ? '#fcfcfc' : idx % 2 === 1 ? '#fafafa' : '#ffffff'}
                     >
                       {/* Mandant & Ort */}
                       <td style={{ padding: '9px 12px', verticalAlign: 'middle' }}>
-                        <div 
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => onSelectSchool(school)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSelectSchool(school);
+                            }
+                          }}
                           style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
                         >
                           <strong style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 750 }}>
@@ -1232,13 +967,12 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                           </strong>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.70rem', color: '#64748b' }}>
                             <span>{school.zip_code || ''} {school.city || 'Standort hinterlegt'}</span>
-                            {/* Module Badges */}
-                            {school.has_campus_subscription && (
+                            {metrics.hasCampus && (
                               <span style={{ fontSize: '0.60rem', background: '#ecfdf5', color: '#059669', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
                                 Campus
                               </span>
                             )}
-                            {school.has_groovelab_subscription && (
+                            {metrics.hasGroovelab && (
                               <span style={{ fontSize: '0.60rem', background: '#fefce8', color: '#ca8a04', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
                                 GrooveLab
                               </span>
@@ -1254,8 +988,8 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             {school.billing_contact_person || 'Schulleitung'}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#64748b' }}>
-                            {school.phone_number ? (
-                              <a 
+                            {school.phone_number && !['test', '000', '123', 'keine', 'null', '-'].includes(school.phone_number.trim().toLowerCase()) ? (
+                              <a
                                 href={`tel:${school.phone_number}`}
                                 style={{ color: '#0369a1', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}
                               >
@@ -1270,28 +1004,31 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                         </div>
                       </td>
 
-                      {/* Vertrag & Aktivität (Semantisch sauber getrennt) */}
+                      {/* Vertrag & Aktivität */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          {/* Vertrags-Status */}
-                          {isPending ? (
+                          {school.status === 'archived' ? (
+                            <span style={{ fontSize: '0.64rem', background: '#f1f5f9', color: '#475569', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
+                              Archiviert (GoBD)
+                            </span>
+                          ) : isPending ? (
                             <span style={{ fontSize: '0.64rem', background: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
                               Freigabe offen
                             </span>
                           ) : isPaused ? (
-                            <span style={{ fontSize: '0.64rem', background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
+                            <span style={{ fontSize: '0.64rem', background: '#fee2e2', color: '#dc2626', border: 'none', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
                               Pausiert
                             </span>
                           ) : isTrial ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'nowrap' }}>
-                              <span style={{ 
-                                fontSize: '0.64rem', 
-                                background: trialDaysLeft !== null && trialDaysLeft <= 7 ? '#fef3c7' : '#f1f5f9', 
-                                color: trialDaysLeft !== null && trialDaysLeft <= 7 ? '#b45309' : '#475569', 
-                                border: '1px solid #e2e8f0',
-                                padding: '1px 5px', 
-                                borderRadius: '5px', 
-                                fontWeight: 800, 
+                              <span style={{
+                                fontSize: '0.64rem',
+                                background: trialDaysLeft !== null && trialDaysLeft <= 7 ? '#fef3c7' : '#f1f5f9',
+                                color: trialDaysLeft !== null && trialDaysLeft <= 7 ? '#b45309' : '#475569',
+                                border: 'none',
+                                padding: '1px 5px',
+                                borderRadius: '5px',
+                                fontWeight: 800,
                                 width: 'fit-content',
                                 whiteSpace: 'nowrap'
                               }}>
@@ -1305,7 +1042,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                                   padding: '1px 5px',
                                   borderRadius: '5px',
                                   background: '#fffbeb',
-                                  border: '1px solid #fde68a',
+                                  border: 'none',
                                   color: '#b45309',
                                   fontSize: '0.60rem',
                                   fontWeight: 800,
@@ -1315,19 +1052,17 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                                   lineHeight: 1.2,
                                   whiteSpace: 'nowrap'
                                 }}
-                                className="hover-scale-mini"
                                 title="Testphase um +14 Tage Kulanz verlängern"
                               >
                                 {extendingTrialId === school.id ? '...' : '+14d'}
                               </button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: '0.64rem', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
+                            <span style={{ fontSize: '0.64rem', background: '#ecfdf5', color: '#059669', border: 'none', padding: '1px 5px', borderRadius: '5px', fontWeight: 800, width: 'fit-content' }}>
                               Abo Aktiv
                             </span>
                           )}
 
-                          {/* Nutzungs-Aktivität mit Ampel */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: act.color, fontWeight: 750, whiteSpace: 'nowrap' }}>
                             <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: act.color, flexShrink: 0 }} />
                             <span>{act.label}</span>
@@ -1335,10 +1070,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                         </div>
                       </td>
 
-                      {/* Compact DSGVO-AVV Badge */}
+                      {/* DSGVO-AVV Badge */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
                         {school.avv_signed_at ? (
-                          <div 
+                          <div
                             title={`DSGVO-AVV gezeichnet am ${new Date(school.avv_signed_at).toLocaleDateString('de-DE')}${school.avv_signee_name ? ` durch ${school.avv_signee_name}` : ''}`}
                             style={{
                               display: 'inline-flex',
@@ -1346,7 +1081,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               gap: '3px',
                               background: '#ecfdf5',
                               color: '#059669',
-                              border: '1px solid #a7f3d0',
+                              border: 'none',
                               padding: '2px 6px',
                               borderRadius: '5px',
                               fontSize: '0.66rem',
@@ -1359,15 +1094,15 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             <span>Gezeichnet</span>
                           </div>
                         ) : (
-                          <div 
-                            title="Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO noch nicht unterzeichnet"
+                          <div
+                            title="Auftragsverarbeitungsvertrag (AVV) noch nicht unterzeichnet"
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px',
                               background: '#fffbeb',
                               color: '#b45309',
-                              border: '1px solid #fde68a',
+                              border: 'none',
                               padding: '2px 6px',
                               borderRadius: '5px',
                               fontSize: '0.66rem',
@@ -1385,7 +1120,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                       {/* Nutzer Quoten */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
                         <div style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                          {teachers} Lehrer{stats.totalTeachers && stats.totalTeachers > teachers ? ` (${stats.totalTeachers} inkl.)` : ''} · {activeStudents} Schüler aktiv
+                          {teachers} Lehrer · {activeStudents} Schüler aktiv
                         </div>
                         <div style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
                           <span style={{ color: '#059669', fontWeight: 700 }}>{campusActive} Campus</span>
@@ -1398,7 +1133,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
                       {/* MRR Rate */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                        <div 
+                        <div
                           style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', gap: '2px' }}
                           onMouseEnter={() => setActiveMrrTooltipSchoolId(school.id)}
                           onMouseLeave={() => setActiveMrrTooltipSchoolId(null)}
@@ -1411,7 +1146,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               color: isTrial ? '#64748b' : (mrr > 0 ? '#0f172a' : '#94a3b8'),
                               whiteSpace: 'nowrap'
                             }}>
-                              {isTrial ? '0,00 €' : `${mrr.toFixed(2).replace('.', ',')} €`}
+                              {isTrial ? `0,00 ${metrics.currencySymbol}` : `${mrr.toFixed(2).replace('.', ',')} ${metrics.currencySymbol}`}
                             </span>
                             <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 650 }}>
                               / Mo.
@@ -1423,7 +1158,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               <span style={{ fontSize: '0.60rem', background: '#f1f5f9', color: '#64748b', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                                 Testphase
                               </span>
-                            ) : school.subscription_bypass ? (
+                            ) : isSchoolBypassActive(school) ? (
                               <span style={{ fontSize: '0.60rem', background: '#fef3c7', color: '#b45309', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                                 Kulanz
                               </span>
@@ -1434,7 +1169,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             )}
                           </div>
 
-                          {/* MRR Breakdown Tooltip */}
                           {activeMrrTooltipSchoolId === school.id && (
                             <div style={{
                               position: 'absolute',
@@ -1454,21 +1188,20 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               <div style={{ fontWeight: 800, borderBottom: '1px solid #f1f5f9', paddingBottom: '4px', marginBottom: '5px' }}>
                                 Kanonische B2B-Kalkulation
                               </div>
-                              <div style={{ color: '#16a34a' }}>1. Campus-Groovelab Software: 0,00 €</div>
-                              {school.has_campus_subscription && <div>Cloud Campus: {rates.priceCampus.toFixed(2).replace('.', ',')} €</div>}
-                              {school.has_groovelab_subscription && <div>Cloud GrooveLab: {rates.priceGroovelab.toFixed(2).replace('.', ',')} €</div>}
-                              <div>Service ({teachers} Lehrer): {(teachers * rates.priceTeacher).toFixed(2).replace('.', ',')} €</div>
-                              <div>Basis ({passiveStudents} Schüler): {(passiveStudents * rates.pricePassiveStudent).toFixed(2).replace('.', ',')} €</div>
-                              {storageAddonFeeVal > 0 && <div>Audio-Tresor Addon: {storageAddonFeeVal.toFixed(2).replace('.', ',')} €</div>}
+                              <div style={{ color: '#16a34a' }}>1. Software-Bereitstellung: 0,00 {metrics.currencySymbol}</div>
+                              <div>Hosting Netto: {metrics.baseHostingNet.toFixed(2).replace('.', ',')} {metrics.currencySymbol}</div>
+                              <div>Service ({teachers} Lehrer): {metrics.step5TeacherServiceFee.toFixed(2).replace('.', ',')} {metrics.currencySymbol}</div>
+                              <div>Basis ({passiveStudents} Schüler): {metrics.step6PassiveStudentBaseFee.toFixed(2).replace('.', ',')} {metrics.currencySymbol}</div>
+                              {metrics.step7StorageAddonFee > 0 && <div>Audio-Tresor Addon: {metrics.step7StorageAddonFee.toFixed(2).replace('.', ',')} {metrics.currencySymbol}</div>}
                               <div style={{ fontWeight: 900, borderTop: '1px solid #f1f5f9', paddingTop: '4px', marginTop: '4px', color: '#059669' }}>
-                                Summe: {mrr.toFixed(2).replace('.', ',')} € / Mo. {isTrial ? '(In Testphase 0,00 €)' : ''}
+                                Summe: {mrr.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.
                               </div>
                             </div>
                           )}
                         </div>
                       </td>
 
-                      {/* Betreiber-Notiz (Inline Editable) */}
+                      {/* Betreiber-Notiz */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle', maxWidth: '100px' }}>
                         {isEditingNote ? (
                           <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
@@ -1493,6 +1226,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             />
                             <button
                               type="button"
+                              aria-label="Notiz speichern"
                               onClick={() => handleSaveNote(school.id)}
                               disabled={savingNote}
                               style={{
@@ -1509,24 +1243,33 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             </button>
                           </div>
                         ) : (
-                          <div 
+                          <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => {
                               setEditingNoteSchoolId(school.id);
                               setNoteDraft(school.operator_notes || '');
                             }}
-                            style={{ 
-                              cursor: 'pointer', 
-                              display: 'flex', 
-                              alignItems: 'center', 
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setEditingNoteSchoolId(school.id);
+                                setNoteDraft(school.operator_notes || '');
+                              }
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
                               gap: '4px',
                               color: school.operator_notes ? '#334155' : '#94a3b8',
                               fontSize: '0.70rem'
                             }}
                             title="Klick zum Bearbeiten der internen Notiz"
                           >
-                            <span style={{ 
-                              overflow: 'hidden', 
-                              textOverflow: 'ellipsis', 
+                            <span style={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               maxWidth: '85px'
                             }}>
@@ -1537,11 +1280,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                         )}
                       </td>
 
-                      {/* Schnellaktionen Toolbar (Fixed Slot Architecture - Fits 100% in Viewport) */}
+                      {/* Schnellaktionen Toolbar */}
                       <td style={{ padding: '9px 12px', verticalAlign: 'middle', textAlign: 'left' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-start', flexWrap: 'nowrap' }}>
-                          
-                          {/* Slot 1: Ghost Support Button (ALWAYS FIRST, FIXED POSITION) */}
                           <button
                             type="button"
                             onClick={() => onStartGhostMode(school)}
@@ -1557,24 +1298,22 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '3px',
-                              boxShadow: 'none',
                               flexShrink: 0
                             }}
-                            className="hover-scale-mini"
                             title="Ghost-Support im neuen Tab autorisieren & starten"
                           >
                             <Eye size={11} /> Ghost
                           </button>
 
-                          {/* Slot 2: 1-Click Magic Invite Copy */}
                           <button
                             type="button"
+                            aria-label="Magic-Invite erneuern und Briefing kopieren"
                             onClick={() => handleRegenerateAndCopyInvite(school)}
                             style={{
                               padding: '5px 7px',
                               borderRadius: '7px',
                               background: copiedInviteId === school.id ? '#ecfdf5' : '#f8fafc',
-                              border: copiedInviteId === school.id ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                              border: copiedInviteId === school.id ? 'none' : '1px solid #e2e8f0',
                               color: copiedInviteId === school.id ? '#059669' : '#475569',
                               fontSize: '0.70rem',
                               fontWeight: 800,
@@ -1584,18 +1323,19 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               justifyContent: 'center',
                               flexShrink: 0
                             }}
-                            className="hover-scale-mini"
                             title="Magic-Invite erneuern & Schulleiter-Briefing kopieren"
                           >
                             {copiedInviteId === school.id ? <Check size={11} /> : <Copy size={11} />}
                           </button>
 
-                          {/* Slot 3: Status Toggle Switch (Triggers Safety Modal on Suspend) */}
                           {(() => {
                             const isSuspended = school.status === 'suspended' || school.is_paused === true;
                             return (
                               <button
                                 type="button"
+                                role="switch"
+                                aria-checked={!isSuspended}
+                                aria-label={!isSuspended ? `Schule ${school.name} pausieren` : `Schule ${school.name} reaktivieren`}
                                 onClick={() => {
                                   if (!isSuspended) {
                                     setSuspendTargetSchool(school);
@@ -1633,13 +1373,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             );
                           })()}
 
-                          {/* Slot 4: Delete / Archive */}
                           <button
                             type="button"
+                            aria-label={`Schule ${school.name} archivieren oder löschen`}
                             onClick={() => onDeleteSchool(school)}
                             style={{
                               background: '#fef2f2',
-                              border: '1px solid #fee2e2',
+                              border: 'none',
                               borderRadius: '7px',
                               color: '#dc2626',
                               cursor: 'pointer',
@@ -1649,12 +1389,10 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               justifyContent: 'center',
                               flexShrink: 0
                             }}
-                            className="hover-scale-mini"
                             title="Schule archivieren / löschen"
                           >
                             <Trash2 size={11} />
                           </button>
-
                         </div>
                       </td>
                     </tr>
@@ -1664,347 +1402,9 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             </table>
           </div>
         </div>
-      ) : (
-
-        /* ─────────────────────────────────────────────────────────────────────── */
-        /* MODE B: APPLE HIG VISUAL CARDS GRID                                     */
-        /* ─────────────────────────────────────────────────────────────────────── */
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-          gap: '16px'
-        }}>
-          {filteredSchools.map((school) => {
-            const stats = schoolStats[school.id] || {};
-            const teachers = stats.teachers || 0;
-            const totalStudents = stats.students || 0;
-            const campusActive = stats.studentsCampus || 0;
-            const groovelabActive = stats.studentsGroovelab || 0;
-            const activeStudents = Math.max(campusActive, groovelabActive);
-            const passiveStudents = Math.max(0, totalStudents - activeStudents);
-
-            const isPending = school.is_approved === false || school.status === 'pending';
-            const isPaused = school.is_paused || school.status === 'suspended';
-            const isTrial = isSchoolTrialActive(school) && !isPending;
-            const trialDaysLeft = getDaysUntilTrialExpires(school);
-            const act = getSchoolActivityStatus(school);
-
-            const rates = masterPricing?.getSchoolRates ? masterPricing.getSchoolRates(school) : {
-              priceCampus: school.custom_price_campus ?? masterPricing?.priceCampus ?? 14.90,
-              priceGroovelab: school.custom_price_groovelab ?? masterPricing?.priceGroovelab ?? 9.90,
-              priceKombi: school.custom_price_kombi ?? masterPricing?.priceKombi ?? 19.90,
-              priceTeacher: school.custom_price_teacher ?? masterPricing?.priceTeacher ?? 0.49,
-              priceStudent: school.custom_price_student ?? masterPricing?.priceStudent ?? 0.49,
-              pricePassiveStudent: masterPricing?.pricePassiveStudent ?? 0.09
-            };
-
-            const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
-            const hasCamp = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_campus_subscription;
-            const hasGroove = (isBooked && !school.has_campus_subscription && !school.has_groovelab_subscription) ? true : !!school.has_groovelab_subscription;
-
-            const billingCalc = calculateCampusGroovelabBilling({
-              hasCampusModule: hasCamp,
-              hasGroovelabModule: hasGroove,
-              activeTeacherCount: teachers,
-              activeStudentCount: activeStudents,
-              campusStudentCount: campusActive,
-              groovelabStudentCount: groovelabActive,
-              passiveStudentCount: passiveStudents,
-              storageAddonMonthlyFee: Number(school.storage_addon_monthly_fee || 0),
-              rates
-            });
-
-            const mrr = (isTrial || isSchoolBypassActive(school) || isPaused) ? 0 : billingCalc.totalMonthlySchoolInvoice;
-            const isEditingNote = editingNoteSchoolId === school.id;
-
-            return (
-              <div
-                key={school.id}
-                style={{
-                  background: isPending ? '#fffdf7' : isPaused ? '#fcfcfc' : '#ffffff',
-                  border: isPending ? '1.5px solid #fde68a' : '1px solid #e2e8f0',
-                  borderRadius: '20px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '14px',
-                  boxShadow: '0 4px 18px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-                className="hover-scale-mini"
-              >
-                {/* Card Top: Title & Status */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div 
-                      onClick={() => onSelectSchool(school)}
-                      style={{ cursor: 'pointer', flex: 1 }}
-                    >
-                      <strong style={{ fontSize: '1.05rem', color: '#0f172a', letterSpacing: '-0.02em', display: 'block' }}>
-                        {school.name}
-                      </strong>
-                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                        {school.zip_code || ''} {school.city || 'Standort hinterlegt'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                      <span style={{
-                        fontSize: '0.82rem',
-                        fontWeight: 800,
-                        color: mrr > 0 ? '#059669' : '#64748b',
-                        background: mrr > 0 ? '#ecfdf5' : '#f1f5f9',
-                        padding: '2px 8px',
-                        borderRadius: '8px',
-                        border: mrr > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
-                      }}>
-                        {mrr.toFixed(2)} € / Mo.
-                      </span>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: act.color, fontWeight: 700 }}>
-                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: act.color }} />
-                        <span>{act.label}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contact & AVV Status Row */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    marginTop: '10px', 
-                    padding: '8px 10px', 
-                    borderRadius: '12px', 
-                    background: '#f8fafc',
-                    fontSize: '0.74rem'
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#1e293b' }}>
-                        {school.billing_contact_person || 'Schulleitung'}
-                      </div>
-                      <div style={{ color: '#64748b', fontSize: '0.70rem' }}>
-                        {school.phone_number || school.billing_email || school.email || 'Keine Kontaktdaten'}
-                      </div>
-                    </div>
-
-                    {school.avv_signed_at ? (
-                      <span style={{ fontSize: '0.68rem', background: '#ecfdf5', color: '#059669', padding: '2px 7px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                        <ShieldCheck size={11} /> AVV Gezeichnet
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: '0.68rem', background: '#fffbeb', color: '#b45309', padding: '2px 7px', borderRadius: '6px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                        <ShieldAlert size={11} /> AVV Offen
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Quotas & Modules */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', fontSize: '0.74rem', color: '#475569' }}>
-                    <span>{teachers} Lehrer • {activeStudents} Aktiv ({passiveStudents} Passiv)</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {school.has_campus_subscription && (
-                        <span style={{ fontSize: '0.62rem', background: '#ecfdf5', color: '#059669', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
-                          Campus
-                        </span>
-                      )}
-                      {school.has_groovelab_subscription && (
-                        <span style={{ fontSize: '0.62rem', background: '#fefce8', color: '#ca8a04', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
-                          GrooveLab
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Inline Note */}
-                  <div style={{ marginTop: '10px' }}>
-                    {isEditingNote ? (
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          value={noteDraft}
-                          onChange={(e) => setNoteDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveNote(school.id);
-                            if (e.key === 'Escape') setEditingNoteSchoolId(null);
-                          }}
-                          placeholder="Notiz eingeben..."
-                          autoFocus
-                          style={{
-                            width: '100%',
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            border: '1px solid #059669',
-                            fontSize: '0.74rem',
-                            outline: 'none'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveNote(school.id)}
-                          disabled={savingNote}
-                          style={{
-                            padding: '6px 8px',
-                            borderRadius: '8px',
-                            background: '#059669',
-                            color: '#ffffff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '0.70rem'
-                          }}
-                        >
-                          <Check size={12} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div 
-                        onClick={() => {
-                          setEditingNoteSchoolId(school.id);
-                          setNoteDraft(school.operator_notes || '');
-                        }}
-                        style={{ 
-                          cursor: 'pointer', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px',
-                          color: school.operator_notes ? '#334155' : '#94a3b8',
-                          fontSize: '0.74rem',
-                          background: '#fafafa',
-                          padding: '6px 10px',
-                          borderRadius: '8px',
-                          border: '1px solid #f1f5f9'
-                        }}
-                        title="Klick zum Bearbeiten der internen Notiz"
-                      >
-                        <Edit3 size={11} color="#94a3b8" />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {school.operator_notes || 'Interne Notiz hinzufügen...'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Bottom Toolbar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => onStartGhostMode(school)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <Eye size={12} /> Ghost
-                  </button>
-
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {isTrial && (
-                      <button
-                        type="button"
-                        onClick={() => handleQuickExtendTrial(school, 14)}
-                        disabled={extendingTrialId === school.id}
-                        style={{
-                          padding: '6px 8px',
-                          borderRadius: '8px',
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          color: '#334155',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          cursor: 'pointer'
-                        }}
-                        title="Kulanz +14 Tage"
-                      >
-                        +14d
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleRegenerateAndCopyInvite(school)}
-                      style={{
-                        padding: '6px 8px',
-                        borderRadius: '8px',
-                        background: copiedInviteId === school.id ? '#ecfdf5' : '#f8fafc',
-                        border: copiedInviteId === school.id ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
-                        color: copiedInviteId === school.id ? '#059669' : '#475569',
-                        cursor: 'pointer'
-                      }}
-                      title="Magic-Invite kopieren"
-                    >
-                      {copiedInviteId === school.id ? <Check size={12} /> : <Copy size={12} />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (school.status === 'active') {
-                          setSuspendTargetSchool(school);
-                          setSuspendReason('');
-                        } else {
-                          onToggleSchoolStatus(school, 'active');
-                        }
-                      }}
-                      style={{
-                        position: 'relative',
-                        width: '34px',
-                        height: '18px',
-                        borderRadius: '9px',
-                        background: school.status === 'active' ? '#10b981' : '#cbd5e1',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title={school.status === 'active' ? 'Pausieren' : 'Aktivieren'}
-                    >
-                      <div style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        background: '#ffffff',
-                        transform: school.status === 'active' ? 'translateX(18px)' : 'translateX(3px)',
-                        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                      }} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onDeleteSchool(school)}
-                      style={{
-                        background: '#fef2f2',
-                        border: '1px solid #fee2e2',
-                        borderRadius: '8px',
-                        color: '#dc2626',
-                        cursor: 'pointer',
-                        padding: '5px 7px'
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 6. SLIDE-OVER MODAL: PROVISION NEW SCHOOL (Autarkic Satellit)          */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* 5. AUTARKIC MODALS */}
       <ProvisionSchoolModal
         isOpen={showProvisionModal}
         onClose={() => setShowProvisionModal(false)}
@@ -2012,262 +1412,19 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
         onProvisionSuccess={(inviteData) => setMagicInviteData(inviteData)}
       />
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 7. POPUP: NO-EMAIL BEREITSTELLUNGS-KIT                                  */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {magicInviteData && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.50)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #e2e8f0',
-            maxWidth: '560px',
-            width: '100%',
-            padding: '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle size={26} />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 800, color: '#0f172a' }}>
-                  Schule erfolgreich angelegt!
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
-                  Bereitstellungs-Kit für „{magicInviteData.schoolName}“ generiert.
-                </p>
-              </div>
-            </div>
+      <MagicInviteKitModal
+        data={magicInviteData}
+        onClose={() => setMagicInviteData(null)}
+      />
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                Persönlicher Einladungs-Link (14 Tage gültig)
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={magicInviteData.loginUrl}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.78rem',
-                    fontFamily: 'monospace',
-                    color: '#0f172a'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(magicInviteData.loginUrl);
-                    setInviteCopied(true);
-                    setTimeout(() => setInviteCopied(false), 2500);
-                  }}
-                  style={{
-                    padding: '10px 16px',
-                    borderRadius: '12px',
-                    background: '#059669',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: '0.82rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {inviteCopied ? 'Kopiert!' : 'Kopieren'}
-                </button>
-              </div>
-            </div>
-
-            {/* Ready Briefing Copy for Mail / Messenger */}
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
-                Vorformulierter Übergabe-Text für die Schulleitung
-              </span>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
-                {`Guten Tag ${magicInviteData.contactPerson},\n\nhier ist Ihr persönlicher Einrichtungs- und Aktivierungszugang für Campus-Groovelab an der Musikschule ${magicInviteData.schoolName}:\n👉 ${magicInviteData.loginUrl}\n\nDieser gesicherte Einladungslink ist für 14 Tage gültig. Der 3-Schritte-Assistent führt Sie direkt durch das Setup und die DSGVO-AVV-Gegenzeichnung.`}
-              </p>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const briefingText = `Guten Tag ${magicInviteData.contactPerson},\n\nhier ist Ihr persönlicher Einrichtungs- und Aktivierungszugang für Campus-Groovelab an der Musikschule ${magicInviteData.schoolName}:\n👉 ${magicInviteData.loginUrl}\n\nDieser gesicherte Einladungslink ist für 14 Tage gültig. Der 3-Schritte-Assistent führt Sie direkt durch das Setup und die DSGVO-AVV-Gegenzeichnung.\n\nBei Fragen unterstützen wir Sie jederzeit gerne!\n\nHerzliche Grüße,\nPatrick Huber | Campus-Groovelab Leitstand`;
-                  navigator.clipboard.writeText(briefingText);
-                  setBriefingCopied(true);
-                  setTimeout(() => setBriefingCopied(false), 2500);
-                }}
-                style={{
-                  marginTop: '12px',
-                  padding: '9px 14px',
-                  borderRadius: '10px',
-                  background: briefingCopied ? '#059669' : '#ffffff',
-                  color: briefingCopied ? '#ffffff' : '#1e293b',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                {briefingCopied ? <Check size={13} /> : <Copy size={13} />}
-                <span>{briefingCopied ? 'Briefing-Text kopiert!' : 'Fertigen Briefing-Text kopieren'}</span>
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-              <button
-                type="button"
-                onClick={() => setMagicInviteData(null)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '12px',
-                  background: '#f1f5f9',
-                  color: '#334155',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.84rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                Fertig
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 8. SICHERHEITS-MODAL: MANDANTEN PAUSIEREN / SPERREN                     */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {suspendTargetSchool && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.55)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.25)',
-            border: '1px solid #fee2e2',
-            maxWidth: '520px',
-            width: '100%',
-            padding: '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldAlert size={26} />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.20rem', fontWeight: 800, color: '#991b1b' }}>
-                  Mandanten pausieren &amp; sperren?
-                </h3>
-                <p style={{ margin: '2px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
-                  Sperrung für „{suspendTargetSchool.name}“.
-                </p>
-              </div>
-            </div>
-
-            <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
-              Achtung: Durch die Pausierung werden <strong>alle aktiven Sitzungen</strong> von Lehrkräften und Schülern dieser Schule sofort beendet. Der Zugang wird gesperrt.
-            </p>
-
-            <form onSubmit={handleConfirmSuspend} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Pflichtangabe: Grund für die Sperrung *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={suspendReason}
-                  onChange={(e) => setSuspendReason(e.target.value)}
-                  placeholder="z. B. Zahlungsverzug nach 2. Mahnung / Sommerpause auf Kundenwunsch"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSuspendTargetSchool(null)}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '12px',
-                    background: '#f1f5f9',
-                    color: '#334155',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.84rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Abbrechen
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={suspending}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '12px',
-                    background: '#dc2626',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: '0.84rem',
-                    fontWeight: 850,
-                    cursor: 'pointer',
-                    boxShadow: 'none'
-                  }}
-                >
-                  {suspending ? 'Wird gesperrt...' : 'Mandanten kostenpflichtig sperren'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      <SuspendSchoolModal
+        school={suspendTargetSchool}
+        reason={suspendReason}
+        onChangeReason={setSuspendReason}
+        suspending={suspending}
+        onClose={() => setSuspendTargetSchool(null)}
+        onSubmit={handleConfirmSuspend}
+      />
     </div>
   );
 };

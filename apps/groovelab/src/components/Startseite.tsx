@@ -134,7 +134,8 @@ export const Startseite: React.FC<StartseiteProps> = ({
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setAllSchools(parsed);
+          const cleanCached = parsed.filter((s: any) => !s.is_demo_tenant && s.status !== 'archived' && s.id !== '11111111-1111-1111-1111-111111111111');
+          setAllSchools(cleanCached);
         }
       }
     } catch (e) {}
@@ -166,7 +167,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
         }
 
         if (cleanData.length > 0) {
-          const filtered = cleanData.filter((s: any) => !s.is_demo_tenant && s.status !== 'archived');
+          const filtered = cleanData.filter((s: any) => !s.is_demo_tenant && s.status !== 'archived' && s.id !== '11111111-1111-1111-1111-111111111111');
           if (isMounted) {
             setAllSchools(filtered);
           }

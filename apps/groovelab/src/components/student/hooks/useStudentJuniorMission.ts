@@ -88,13 +88,13 @@ export function useStudentJuniorMission({
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
 
   // ⏱️ Kumulierte Gesamt-Übezeit (Summe aller historischen fokus_logs + laufende Session-Minuten)
+  const liveSessionMinutes = Math.floor(practice.secondsElapsed / 60);
   const totalPracticeMinutes = useMemo(() => {
     const historicalMinutes = (practice.fokusLogs || []).reduce((sum: number, log: any) => {
       return sum + (log.duration_minutes || Math.floor((log.duration_seconds || 0) / 60));
     }, 0);
-    const liveSessionMinutes = Math.floor(practice.secondsElapsed / 60);
     return historicalMinutes + liveSessionMinutes;
-  }, [practice.fokusLogs, practice.secondsElapsed]);
+  }, [practice.fokusLogs, liveSessionMinutes]);
 
   // 🏆 Autoritatives Unified Stickers Map (100% harmonisiert mit Übezeit, XP, Streak, Schuljahr)
   const unifiedStickersMap = useMemo(() => {

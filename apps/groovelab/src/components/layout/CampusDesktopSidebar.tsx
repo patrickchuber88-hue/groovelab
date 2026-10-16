@@ -176,9 +176,9 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: isCollapsed ? '12px' : '8px',
-                border: activePlatform === 'campus' ? '1.5px solid rgba(52, 168, 83, 0.35)' : '1px solid #e2e8f0',
-                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.08)' : '#f8fafc',
-                color: activePlatform === 'campus' ? '#34a853' : '#64748b',
+                border: '1.5px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#64748b',
                 cursor: 'pointer',
                 padding: 0,
                 flexShrink: 0,
@@ -186,7 +186,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               }}
               className="hover-scale"
             >
-              {isCollapsed ? <PanelLeftOpen size={18} color={activePlatform === 'campus' ? '#34a853' : 'currentColor'} /> : <PanelLeftClose size={15} color={activePlatform === 'campus' ? '#34a853' : 'currentColor'} />}
+              {isCollapsed ? <PanelLeftOpen size={18} color="#64748b" /> : <PanelLeftClose size={15} color="#64748b" />}
             </button>
           )}
         </div>
@@ -382,12 +382,13 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 <div style={{ 
                   width: '42px', 
                   height: '42px', 
-                  background: 'rgba(52, 168, 83, 0.08)', 
+                  background: '#f8fafc', 
+                  border: '1.5px solid #e2e8f0',
                   borderRadius: '12px', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: 'none'
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
                 }}>
                   <GraduationCap size={24} color="#34a853" />
                 </div>

@@ -99,12 +99,12 @@ if [[ -s "$USER_AUTH_KEYS" ]]; then
 # Standard: BSI IT-Grundschutz / OWASP ASVS Level 3
 # ==============================================================================
 Port $SSH_PORT
-PermitRootLogin no
+PermitRootLogin prohibit-password
 PasswordAuthentication no
 PubkeyAuthentication yes
 KbdInteractiveAuthentication no
 ChallengeResponseAuthentication no
-MaxAuthTries 3
+MaxAuthTries 5
 ClientAliveInterval 300
 ClientAliveCountMax 2
 X11Forwarding no
@@ -119,7 +119,8 @@ EOF
     if sshd -t; then
         log_info "SSH-Konfiguration syntaktisch valide (sshd -t = 0)."
         systemctl daemon-reload 2>/dev/null || true
-        systemctl reload-or-restart ssh 2>/dev/null || systemctl reload-or-restart sshd 2>/dev/null || systemctl reload ssh 2>/dev/null || true
+        systemctl restart ssh.socket 2>/dev/null || true
+        systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
         log_info "SSH-Dienst erfolgreich neu geladen."
     else
         log_error "Fehler in der SSH-Konfiguration! Entferne Konfiguration zur Vermeidung eines Lockouts."
@@ -218,9 +219,10 @@ cat << EOF > "$FAIL2BAN_JAIL"
 # Campus-Groovelab Fail2ban Production Jail Configuration
 # ==============================================================================
 [DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 93.232.17.119
 bantime  = 3600
 findtime = 600
-maxretry = 3
+maxretry = 5
 banaction = ufw
 banaction_allports = ufw
 backend = systemd
@@ -228,8 +230,8 @@ backend = systemd
 [sshd]
 enabled = true
 port    = $SSH_PORT
-mode    = aggressive
-maxretry = 3
+mode    = normal
+maxretry = 5
 bantime = 7200
 EOF
 

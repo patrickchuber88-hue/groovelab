@@ -258,11 +258,7 @@ export function useTeacherBookings({
 
       if (spuriousBookingIds.length > 0) {
         const uniqueSpuriousIds = Array.from(new Set(spuriousBookingIds));
-        supabase.from('room_bookings').delete().in('id', uniqueSpuriousIds).then(({ error }) => {
-          if (!error) {
-            window.dispatchEvent(new CustomEvent('refresh-bookings'));
-          }
-        });
+        supabase.from('room_bookings').delete().in('id', uniqueSpuriousIds).then(() => {});
         try {
           const cleaned = allBookings.filter((b: any) => !uniqueSpuriousIds.includes(b.id));
           if (sId) {

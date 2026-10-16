@@ -1151,10 +1151,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     }
   }, [resolvedUrl]);
 
-  // 🌊 Background Retrofit: Berechnet Wellenform für Bestandsaufnahmen automatisch
+  // 🌊 Background Retrofit: Berechnet Wellenform für Bestandsaufnahmen automatisch (staggered)
   useEffect(() => {
     if (!peaks || peaks.length === 0) {
-      loadAudioBuffer().catch(() => {});
+      const t = setTimeout(() => { loadAudioBuffer().catch(() => {}); }, 250);
+      return () => clearTimeout(t);
     }
   }, [url, resolvedUrl]);
 
@@ -3232,16 +3233,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                     if (raw) {
                       const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/wav' });
                       const newBlobUrl = URL.createObjectURL(finalBlob);
-                      setResolvedUrl(newBlobUrl);
+                      setResolvedUrl(prev => { if (prev && prev.startsWith('blob:')) { try { URL.revokeObjectURL(prev); } catch {} } return newBlobUrl; });
                       getOrCreateAudioContext().then(ctx => {
                         const getAb = raw instanceof Blob ? raw.arrayBuffer() : Promise.resolve(raw as ArrayBuffer);
                         getAb.then(ab => {
                           safeDecodeAudioData(ctx, ab).then(decoded => {
                             const centered = ensureCenteredStereoAudioBuffer(ctx, decoded);
                             audioBufferRef.current = centered;
-                            if (centered.duration && isFinite(centered.duration)) {
-                              setDuration(Number(centered.duration.toFixed(2)));
-                            }
+                            if (centered.duration && isFinite(centered.duration)) setDuration(Number(centered.duration.toFixed(2)));
                           }).catch(() => {});
                         });
                       });

@@ -313,8 +313,8 @@ export function CampusSetupScreen({
             title: 'Stundenplan & Sync',
             subtitle: icalActive ? 'iCal Kalender aktiv' : 'Manuelle Termine',
             badge: icalActive ? 'Live-Sync' : 'Lokal',
-            gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            shadowColor: 'rgba(16, 185, 129, 0.40)',
+            gradient: 'linear-gradient(135deg, #34a853 0%, #2e9648 100%)',
+            shadowColor: 'rgba(52, 168, 83, 0.40)',
             icon: Clock
           },
           {
@@ -340,7 +340,7 @@ export function CampusSetupScreen({
             title: 'Datenschutz & AVV',
             subtitle: '21/21 DSGVO Standards',
             badge: 'DSGVO-Audit',
-            gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+            gradient: 'linear-gradient(135deg, #34a853 0%, #2e9648 100%)',
             shadowColor: 'rgba(52, 168, 83, 0.40)',
             icon: ShieldCheck
           },
@@ -412,14 +412,25 @@ export function CampusSetupScreen({
               <span style={{
                 fontSize: '0.68rem',
                 fontWeight: 800,
-                padding: '3px 9px',
+                padding: '3px 10px',
                 borderRadius: '100px',
-                background: '#e6f4ea',
-                color: '#15803d',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
                 marginBottom: '10px',
                 letterSpacing: '0.02em',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
               }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#34a853',
+                  boxShadow: '0 0 6px rgba(52, 168, 83, 0.45)'
+                }} />
                 {module.badge}
               </span>
 
@@ -497,10 +508,11 @@ export function CampusSetupScreen({
 
       {/* QUICK LINK: HANDBUCH & AKADEMIE */}
       <div style={{ 
-        background: '#f0fdf4', 
+        background: '#ffffff', 
         borderRadius: '20px', 
         padding: '18px 24px', 
-        border: '1.5px solid #bbf7d0',
+        border: '1.5px solid #e2e8f0',
+        boxShadow: '0 2px 10px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -508,14 +520,14 @@ export function CampusSetupScreen({
         gap: '12px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: brandColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={20} />
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: brandColor, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(52, 168, 83, 0.28)' }}>
+            <BookOpen size={20} color="#ffffff" />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#14532d' }}>
+            <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 900, color: '#0f172a' }}>
               Leitfäden &amp; Akademie (Offizielles Handbuch)
             </h4>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#166534' }}>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
               Schritt-für-Schritt-Anleitungen für Schulleitung, Kollegium und Eltern sowie FAQ und DSGVO-Standards.
             </p>
           </div>

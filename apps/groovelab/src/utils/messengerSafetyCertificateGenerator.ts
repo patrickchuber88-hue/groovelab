@@ -87,11 +87,11 @@ export async function generateMessengerSafetyCertificatePDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(17);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('Sicherheitsattest: Schul-Messenger & Kinderschutz', margin, 24);
+    doc.text('Technisches Sicherheits-Merkblatt: Schul-Messenger & Kinderschutz', margin, 24);
 
     doc.setFontSize(9);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('RECHTSVERBINDLICHE EXKULPATIONS-BESTÄTIGUNG NACH §§ 832, 831 BGB, § 8a SGB VIII & JUSCHG', margin, 29);
+    doc.text('TECHNISCHE ARCHITEKTUR-DOKUMENTATION (UNVERBINDLICHE FACHINFORMATION GEM. § 3 RDG)', margin, 29);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
@@ -106,16 +106,15 @@ export async function generateMessengerSafetyCertificatePDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('PRÄAMBEL & SCHUTZZWECK FÜR DIE MUSIKSCHULLEITUNG:', margin + 4, 43);
+    doc.text('PRÄAMBEL & TECHNISCHER SCHUTZZWECK FÜR DIE MUSIKSCHULLEITUNG:', margin + 4, 43);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     const preambelText =
-      'Dieses Dokument dient der Musikschulleitung, dem Schulträger und Rechtsvertretern als amtlicher Nachweis ' +
-      'gegenüber Aufsichtsbehörden und Erziehungsberechtigten, dass die in der Plattform Campus-Groovelab eingesetzte ' +
-      'Kommunikationsinfrastruktur alle technisch-organisatorischen Vorkehrungen (TOMs) erfüllt, um Cybermobbing, ' +
-      'Ehrverletzungen und Pflichtverletzungen nach §§ 832, 823 BGB systemisch auszuschließen.';
+      'Dieses technische Merkblatt dokumentiert für die Musikschulleitung, den Schulträger und Erziehungsberechtigte ' +
+      'die in der Plattform Campus-Groovelab implementierten technisch-organisatorischen Maßnahmen (TOMs) zum Schutz ' +
+      'Minderjähriger im Schul-Messenger (unverbindliche Fachinformation gem. § 3 RDG; keine Rechtsberatung).';
     const splitPreambel = doc.splitTextToSize(cleanPdfText(preambelText), contentWidth - 8);
     doc.text(splitPreambel, margin + 4, 48);
 
@@ -126,15 +125,15 @@ export async function generateMessengerSafetyCertificatePDF(
     const pillars = [
       {
         num: '1',
-        title: 'Ausschluss von Schüler-zu-Schüler-Chats (Kein Peer-to-Peer Cybermobbing)',
-        legal: 'Rechtsnorm: § 832 BGB (Aufsichtspflicht), § 823 BGB (Recht am eingerichteten Gewerbebetrieb)',
-        desc: 'Die Plattform unterbindet systemisch jegliche private 1:1-Kommunikation zwischen Minderjährigen. Schüler können ausschließlich ihrer fest zugeteilten Lehrkraft oder autorisierten Ensemble-Räumen organisatorische Mitteilungen senden. Klassisches Peer-to-Peer Cybermobbing oder verdeckte Schikane ist technisch ausgeschlossen.'
+        title: 'Datenbankseitiger Ausschluss von 1:1-Schüler-Direktnachrichten',
+        legal: 'Schutzzweck: § 832 BGB (Aufsichtspflicht), § 8a SGB VIII (Kinderschutz)',
+        desc: 'Private 1:1-Direktnachrichten zwischen Schülerinnen und Schülern sind sowohl in der Benutzeroberfläche als auch auf Datenbankebene durch einen zwingenden PostgreSQL-Trigger (enforce_campus_chat_governance) gesperrt. Schüler kommunizieren 1:1 ausschließlich mit ihrer zugeteilten Lehrkraft; Gruppenkanäle (Ensembles/Bands) stehen unter Lehrkraft-Moderation und Wortfilterung.'
       },
       {
         num: '2',
         title: 'Proaktives No-Bullying Respect-Gate (Strafrechts- & Jugendschutz-Pre-Flight)',
         legal: 'Rechtsnorm: §§ 185 ff., 86a, 130, 241 StGB, JuSchG, § 8a SGB VIII',
-        desc: 'Jede Nachricht wird vor der Übertragung einer clientseitigen Integritätsprüfung unterzogen. Verfassungsfeindliche Parolen, rassistische Hassrede, schwere personale Ehrverletzungen, sexuelle Belästigung und Gewaltdrohungen werden vor dem Senden blockiert. Eine geschützte Musik-Whitelist schützt Fachbegriffe vor False Positives.'
+        desc: 'Jede Nachricht wird vor der Übertragung einer clientseitigen und serverseitigen Integritätsprüfung unterzogen. Verfassungsfeindliche Parolen, rassistische Hassrede, schwere personale Ehrverletzungen, sexuelle Belästigung und Gewaltdrohungen werden vor dem Senden blockiert. Eine geschützte Musik-Whitelist schützt Fachbegriffe vor False Positives.'
       },
       {
         num: '3',
@@ -195,16 +194,16 @@ export async function generateMessengerSafetyCertificatePDF(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text('RECHTLICHE WIRKUNG & HAFTUNGSAUSSCHLUSS:', margin + 4, yPos + 6);
+    doc.text('TECHNISCHE SCHUTZWIRKUNG & HINWEIS GEM. § 3 RDG:', margin + 4, yPos + 6);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
     const legalNotice =
-      'Die Musikschule setzt mit Campus-Groovelab eine nach dem Grundsatz „Safety by Design“ zertifizierte ' +
-      'Fachsoftware ein. Durch den systemischen Ausschluss offener Chaträume sowie die Vorab-Filterung beleidigender ' +
-      'Inhalte hat die Leitung alle organisatorisch und technisch zumutbaren Sorgfaltspflichten erfüllt (§ 832 BGB). ' +
-      'Die Haftung als Störer oder mittelbarer Täter entfällt; für die Plattform greift das Host-Provider-Privileg gem. Art. 6 DSA.';
+      'Die Musikschule setzt mit Campus-Groovelab eine nach dem Grundsatz „Safety by Design“ konzipierte ' +
+      'Fachsoftware ein. Durch die datenbankseitige Sperre privater 1:1-Schüler-Direktchats sowie die Vorab-Filterung beleidigender ' +
+      'Inhalte unterstützt die Plattform die technischen Schutzpflichten der Schule (§ 832 BGB, § 8a SGB VIII). ' +
+      'Hinweis gem. § 3 RDG: Dieses Dokument dokumentiert die technische Architektur und ersetzt keine Rechtsberatung im Einzelfall.';
     const splitLegal = doc.splitTextToSize(cleanPdfText(legalNotice), contentWidth - 8);
     doc.text(splitLegal, margin + 4, yPos + 11);
 

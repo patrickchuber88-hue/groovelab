@@ -7,6 +7,7 @@ import {
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 import { isUUID } from '../../utils/uuidValidator';
+import { TeacherPreLessonDeltaBadge } from './TeacherPreLessonDeltaBadge';
 
 export interface TeacherTourDemoScheduleProps {
   isFreeDay?: boolean;
@@ -24,18 +25,9 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
   toggleRealNames,
 }) => (
     <div id="tour-teacher-schedule" className="google-card animation-slide-up" style={{ 
-      flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
-      minWidth: '300px', 
-      padding: '20px 24px', 
-      borderRadius: '20px', 
-      border: '1px solid #f1f5f9', 
-      boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
-      background: 'white', 
-      boxSizing: 'border-box',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      maxHeight: windowWidth >= 768 ? '700px' : undefined
+      flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', minWidth: '300px', padding: '20px 24px', borderRadius: '20px', 
+      border: '1px solid #cbd5e1', boxShadow: 'none', background: 'white', boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', height: '100%', maxHeight: windowWidth >= 768 ? '700px' : undefined
     }}>
       {/* 1:1 Live Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -46,36 +38,19 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
           </strong>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            padding: '4px 12px',
-            borderRadius: '100px',
-            background: '#e8f0fe',
-            color: '#0b57d0',
-            fontFamily: 'Inter'
-          }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px', background: '#e8f0fe', color: '#0b57d0', fontFamily: 'Inter' }}>
             LIVE
           </span>
           <button
             type="button"
             onClick={() => toggleRealNames?.()}
+            aria-label={showRealNames ? "Datenschutz-Modus umschalten: Klarnamen verbergen" : "Datenschutz-Modus umschalten: Klarnamen anzeigen"}
             title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
             style={{
-              border: 'none',
-              background: showRealNames ? '#e6f4ea' : '#f1f5f9',
-              color: showRealNames ? '#34a853' : '#64748b',
-              width: (windowWidth < 768) ? '36px' : '28px',
-              height: (windowWidth < 768) ? '36px' : '28px',
-              minWidth: (windowWidth < 768) ? '36px' : '28px',
-              minHeight: (windowWidth < 768) ? '36px' : '28px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              touchAction: 'manipulation'
+              border: 'none', background: showRealNames ? '#e6f4ea' : '#f1f5f9', color: showRealNames ? '#34a853' : '#64748b',
+              width: (windowWidth < 768) ? '44px' : '28px', height: (windowWidth < 768) ? '44px' : '28px',
+              minWidth: (windowWidth < 768) ? '44px' : '28px', minHeight: (windowWidth < 768) ? '44px' : '28px',
+              borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation'
             }}
           >
             {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -804,18 +779,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
           gap: '12px'
         }}>
           <div id="tour-teacher-schedule" className="google-card" style={{ 
-            width: '100%', 
-            padding: (windowWidth < 768 || isMobileDevice) ? '18px 16px' : '22px 26px', 
-            borderRadius: '24px', 
-            border: isWeekend ? '1px solid #e2e8f0' : isFreeDay ? '1px solid #e2e8f0' : '1px solid #f1f5f9', 
-            boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
-            background: '#ffffff', 
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: windowWidth >= 768 ? '700px' : undefined,
-            position: 'relative',
-            overflow: 'hidden'
+            width: '100%', padding: (windowWidth < 768 || isMobileDevice) ? '18px 16px' : '22px 26px', borderRadius: '24px', 
+            border: isWeekend ? '1px solid #e2e8f0' : isFreeDay ? '1px solid #e2e8f0' : '1px solid #cbd5e1', 
+            boxShadow: 'none', background: '#ffffff', boxSizing: 'border-box',
+            display: 'flex', flexDirection: 'column', maxHeight: windowWidth >= 768 ? '700px' : undefined, position: 'relative', overflow: 'hidden'
           }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', position: 'relative', zIndex: 3 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
@@ -830,18 +797,11 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                padding: '4px 12px',
-                borderRadius: '100px',
+                fontSize: '0.72rem', fontWeight: 800, padding: '4px 12px', borderRadius: '100px',
                 background: isWeekend ? '#ede9fe' : isFreeDay ? '#ecfdf5' : '#e8f0fe',
                 color: isWeekend ? '#6d28d9' : isFreeDay ? '#059669' : '#0b57d0',
                 border: isWeekend ? '1px solid #ddd6fe' : isFreeDay ? '1px solid #10b981' : '1px solid rgba(11, 87, 208, 0.15)',
-                fontFamily: 'Inter',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: isWeekend ? '0 1px 4px rgba(109, 40, 217, 0.08)' : 'none'
+                fontFamily: 'Inter', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: 'none'
               }}>
                 {isWeekend && <Sparkles size={11} color="#6d28d9" />}
                 {isFreeDay && <Sparkles size={11} color="#15803d" />}
@@ -851,22 +811,13 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
+                  aria-label={showRealNames ? "Datenschutz-Modus umschalten: Klarnamen verbergen" : "Datenschutz-Modus umschalten: Klarnamen anzeigen"}
                   title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
                   style={{
-                    border: 'none',
-                    background: showRealNames ? '#e6f4ea' : '#f1f5f9',
-                    color: showRealNames ? '#34a853' : '#64748b',
-                    width: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                    height: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                    minWidth: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                    minHeight: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    touchAction: 'manipulation'
+                    border: 'none', background: showRealNames ? '#e6f4ea' : '#f1f5f9', color: showRealNames ? '#34a853' : '#64748b',
+                    width: (isMobileDevice || windowWidth < 768) ? '44px' : '28px', height: (isMobileDevice || windowWidth < 768) ? '44px' : '28px',
+                    minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '28px', minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '28px',
+                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', touchAction: 'manipulation'
                   }}
                 >
                   {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -1454,7 +1405,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                   </span>
                                 )}
 
-                                {/* Question Badge */}
+                                {/* Pre-Lesson Practice Delta Satellite (CAM-153) & Question Badge */}
+                                {!slot.isGroup && slot.student && !isCanceled && !isRescheduledAway && (
+                                  <TeacherPreLessonDeltaBadge student={slot.student} allStudents={allStudents} />
+                                )}
                                 {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
                                   const targetStudentId = slot.isGroup ? slot.students?.[0]?.id : slot.student?.id;
                                   const hasQuestion = targetStudentId ? checkHasStudentQuestion(targetStudentId) : false;
@@ -1463,19 +1417,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                     <span
                                       title="Schüler hat eine Frage für den Unterricht notiert"
                                       style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '3px',
-                                        padding: '2px 7px',
-                                        borderRadius: '100px',
-                                        background: '#fef3c7',
-                                        border: '1px solid #fde68a',
-                                        color: '#b45309',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 850,
-                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                        flexShrink: 0,
-                                        marginLeft: '4px'
+                                        display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 7px', borderRadius: '100px',
+                                        background: '#fef3c7', border: 'none', color: '#b45309', fontSize: '0.68rem', fontWeight: 850,
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0, marginLeft: '4px'
                                       }}
                                     >
                                       <HelpCircle size={10} strokeWidth={2.8} />

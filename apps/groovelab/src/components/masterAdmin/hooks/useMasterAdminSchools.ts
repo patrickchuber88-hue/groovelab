@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { logApplicationAudit } from '../../../services/auditLogService';
+import { aggregateSchoolMetrics } from '../../../domain/schoolMetricsAggregator';
+import { ensureMasterAdminSessionLease } from '../../../utils/sessionLeaseManager';
 import type { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 
 interface UseMasterAdminSchoolsOptions {
@@ -60,29 +62,65 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         onRefreshMetrics();
       }
 
-      // 1. Fetch from schools table (PostgREST)
-      let tableSchools: School[] = [];
-      try {
-        const { data: schoolData, error: schoolErr } = await supabase
-          .from('schools')
-          .select('*')
-          .order('name');
-        if (!schoolErr && Array.isArray(schoolData)) {
-          tableSchools = schoolData;
-        }
-      } catch (err) {
-        console.warn('Direct schools table query notice:', err);
-      }
+      // 1 & 2 & 4. Fetch schools table, authoritative master overview RPC, users, pending students, and school stats concurrently in 1 single roundtrip
+      let [
+        schoolTableRes,
+        overviewRpcRes,
+        rpcStatsRes,
+        statsTableRes,
+        usersRes,
+        pendingStudentsRes
+      ] = await Promise.all([
+        Promise.resolve(supabase.from('schools').select('*').order('name')).catch((err) => {
+          console.warn('Direct schools table query notice:', err);
+          return { data: null, error: err };
+        }),
+        Promise.resolve(supabase.rpc('get_master_schools_overview')).catch((e) => {
+          console.warn('get_master_schools_overview RPC notice:', e);
+          return { data: null, error: e };
+        }),
+        Promise.resolve(supabase.rpc('get_master_school_stats')).catch(() => ({ data: null })),
+        Promise.resolve(supabase.from('school_user_statistics').select('*')).catch(() => ({ data: null })),
+        Promise.resolve(
+          supabase
+            .from('users')
+            .select('id, school_id, role, roles, first_name, last_name, email, is_active, is_campus_active, is_groovelab_active, is_trial, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing')
+        ).catch(() => ({ data: null })),
+        Promise.resolve(supabase.from('pending_students_decrypted').select('id, school_id, first_name, last_name')).catch(() => ({ data: null }))
+      ]);
 
-      // 2. Fetch authoritative master overview RPC (Security Definer - Bypasses table RLS)
-      let rpcRows: any[] = [];
-      try {
-        const { data, error: rpcErr } = await supabase.rpc('get_master_schools_overview');
-        if (!rpcErr && Array.isArray(data) && data.length > 0) {
-          rpcRows = data;
+      let tableSchools: School[] = (!schoolTableRes.error && Array.isArray(schoolTableRes.data)) ? schoolTableRes.data : [];
+      let rpcRows: any[] = (!overviewRpcRes.error && Array.isArray(overviewRpcRes.data) && overviewRpcRes.data.length > 0) ? overviewRpcRes.data : [];
+
+      // 🛡️ Self-Healing Master Admin Session Lease Bootstrap
+      // If table query and RPC both returned 0 rows, ensure an authoritative lease token exists and retry once
+      if (tableSchools.length === 0 && rpcRows.length === 0) {
+        console.log('[useMasterAdminSchools] 0 schools returned. Initiating ensureMasterAdminSessionLease bootstrap...');
+        const healedToken = await ensureMasterAdminSessionLease();
+        if (healedToken) {
+          const [retryTable, retryRpc] = await Promise.all([
+            Promise.resolve(supabase.from('schools').select('*').order('name')).catch(() => ({ data: null, error: true })),
+            Promise.resolve(supabase.rpc('get_master_schools_overview')).catch(() => ({ data: null, error: true }))
+          ]);
+          if (!retryTable.error && Array.isArray(retryTable.data) && retryTable.data.length > 0) {
+            tableSchools = retryTable.data;
+          }
+          if (!retryRpc.error && Array.isArray(retryRpc.data) && retryRpc.data.length > 0) {
+            rpcRows = retryRpc.data;
+          }
         }
-      } catch (e) {
-        console.warn('get_master_schools_overview RPC notice:', e);
+
+        // Resilient Fallback 3: search_public_schools RPC
+        if (tableSchools.length === 0 && rpcRows.length === 0) {
+          try {
+            const { data: publicSchools } = await supabase.rpc('search_public_schools', { p_query: '' });
+            if (Array.isArray(publicSchools) && publicSchools.length > 0) {
+              tableSchools = publicSchools as any[];
+            }
+          } catch (pubErr) {
+            console.warn('[useMasterAdminSchools] search_public_schools fallback notice:', pubErr);
+          }
+        }
       }
 
       // 3. Union Map: Unify all schools across both sources so zero schools are dropped
@@ -167,43 +205,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         }
       }
 
-      let mergedSchools = Array.from(schoolMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-
-      // Hybrid Multi-Source Telemetry: Ensure active dev schools reflect live activity
-      try {
-        const currentActiveSchoolId = typeof window !== 'undefined' ? (
-          sessionStorage.getItem('groovelab_ghost_school_id') || 
-          localStorage.getItem('campus_active_school_id') || 
-          localStorage.getItem('groovelab_user_school_id')
-        ) : null;
-
-        mergedSchools = mergedSchools.map(s => {
-          const isDevActiveSchool = Boolean(
-            (currentActiveSchoolId && currentActiveSchoolId === s.id) ||
-            (s.name && s.name.toLowerCase().includes('bad säckingen')) ||
-            (s.billing_email && s.billing_email.toLowerCase().includes('musaek'))
-          );
-
-          if (isDevActiveSchool) {
-            return {
-              ...s,
-              last_session_at: new Date().toISOString()
-            };
-          }
-          return s;
-        });
-      } catch (e) {}
-
-      // Auto-heal database & in-memory models if school has 25GB with legacy 3.50 fee
-      mergedSchools.forEach(s => {
-        const addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
-        const addonFee = Number(s.storage_addon_monthly_fee || 0);
-        if (addonGb === 25 && (addonFee === 3.5 || addonFee === 3.50)) {
-          s.storage_addon_monthly_fee = 3.99;
-          Promise.resolve(supabase.from('schools').update({ storage_addon_monthly_fee: 3.99 }).eq('id', s.id))
-            .catch(() => {});
-        }
-      });
+      const mergedSchools = Array.from(schoolMap.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
       setSchools(mergedSchools);
       setSelectedSchool((prev: any) => {
@@ -212,44 +214,76 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         return fresh ? { ...prev, ...fresh } : prev;
       });
 
-      // Fetch School Stats
-      const [
-        { data: rpcStats },
-        { data: statsData }
-      ] = await Promise.all([
-        supabase.rpc('get_master_schools_stats'),
-        supabase.from('school_user_statistics').select('*')
-      ]);
+      const rpcStats = Array.isArray(rpcStatsRes?.data) ? rpcStatsRes.data : [];
+      const statsData = Array.isArray(statsTableRes?.data) ? statsTableRes.data : [];
+      const allUsers = Array.isArray(usersRes?.data) ? usersRes.data : [];
+      const pendingStudents = Array.isArray(pendingStudentsRes?.data) ? pendingStudentsRes.data : [];
+
+      const rpcBySchool = new Map<string, any>();
+      rpcStats.forEach((row: any) => {
+        if (row?.school_id) rpcBySchool.set(row.school_id, row);
+      });
+      const statTableBySchool = new Map<string, any>();
+      statsData.forEach((row: any) => {
+        if (row?.school_id) statTableBySchool.set(row.school_id, row);
+      });
+      const usersBySchool = new Map<string, any[]>();
+      allUsers.forEach((u: any) => {
+        if (!u?.school_id) return;
+        const arr = usersBySchool.get(u.school_id);
+        if (arr) arr.push(u); else usersBySchool.set(u.school_id, [u]);
+      });
+      const pendingBySchool = new Map<string, any[]>();
+      pendingStudents.forEach((p: any) => {
+        if (!p?.school_id) return;
+        const arr = pendingBySchool.get(p.school_id);
+        if (arr) arr.push(p); else pendingBySchool.set(p.school_id, [p]);
+      });
 
       const statsMap: Record<string, SchoolStat> = {};
 
-      if (Array.isArray(rpcStats) && rpcStats.length > 0) {
-        rpcStats.forEach((row: any) => {
-          statsMap[row.school_id] = {
-            totalStudents: Number(row.total_students || 0),
-            activeStudents: Number(row.active_students || 0),
-            totalTeachers: Number(row.total_teachers || 0),
-            totalSongs: Number(row.total_songs || 0),
-            hasGroovelab: Boolean(row.has_groovelab),
-            hasCampus: Boolean(row.has_campus)
-          };
-        });
-      }
+      mergedSchools.forEach(s => {
+        const agg = aggregateSchoolMetrics(
+          s,
+          usersBySchool.get(s.id) || [],
+          pendingBySchool.get(s.id) || []
+        );
+        const rpcRow = rpcBySchool.get(s.id);
+        const statRow = statTableBySchool.get(s.id);
 
-      if (statsData) {
-        statsData.forEach((row: any) => {
-          if (!statsMap[row.school_id]) {
-            statsMap[row.school_id] = {
-              totalStudents: Number(row.student_count || 0),
-              activeStudents: Number(row.active_student_count || row.student_count || 0),
-              totalTeachers: Number(row.teacher_count || 0),
-              totalSongs: 0,
-              hasGroovelab: true,
-              hasCampus: true
-            };
-          }
-        });
-      }
+        const hasLiveUserRows = (usersBySchool.get(s.id)?.length || 0) > 0 || (pendingBySchool.get(s.id)?.length || 0) > 0;
+        const teachersCount = hasLiveUserRows
+          ? agg.activeTeachers
+          : Number(rpcRow?.total_teachers ?? statRow?.teacher_count ?? s.teachers_count ?? 0);
+        const totalTeachersCount = hasLiveUserRows
+          ? agg.totalTeachers
+          : teachersCount;
+        const totalStudentsCount = hasLiveUserRows
+          ? agg.totalStudents
+          : Number(rpcRow?.total_students ?? statRow?.student_count ?? s.active_students_count ?? 0);
+        const campusCount = hasLiveUserRows
+          ? agg.campusStudents
+          : Number(rpcRow?.active_students ?? statRow?.active_student_count ?? s.active_students_count ?? 0);
+        const groovelabCount = hasLiveUserRows ? agg.groovelabStudents : 0;
+        const activeCount = Math.max(campusCount, groovelabCount);
+        const passiveCount = Math.max(0, totalStudentsCount - activeCount);
+
+        statsMap[s.id] = {
+          totalStudents: totalStudentsCount,
+          activeStudents: activeCount,
+          totalTeachers: totalTeachersCount,
+          totalSongs: Number(rpcRow?.total_songs || 0),
+          hasGroovelab: Boolean(s.has_groovelab_subscription ?? rpcRow?.has_groovelab),
+          hasCampus: Boolean(s.has_campus_subscription ?? rpcRow?.has_campus),
+          teachers: teachersCount,
+          students: totalStudentsCount,
+          studentsCampus: campusCount,
+          studentsGroovelab: groovelabCount,
+          passiveStudents: passiveCount,
+          exemptActiveStudents: agg.exemptActiveStudents || 0,
+          parentPaidStudents: agg.parentPaidStudents || 0
+        };
+      });
 
       setSchoolStats(statsMap);
     } catch (err: any) {
@@ -310,19 +344,28 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     }
   }, [schools, fetchSchoolsAndStats, notify]);
 
-  const handleProvisionSchool = useCallback(async (data: any) => {
-    if (!data?.name?.trim() || !data?.street?.trim() || !data?.house_number?.trim() || !data?.zip_code?.trim() || !data?.city?.trim() || (!data?.billing_email?.trim() && !data?.email?.trim())) {
+  const handleProvisionSchool = useCallback(async (data: Record<string, unknown>) => {
+    const nameStr = String(data?.name || '').trim();
+    const streetStr = String(data?.street || '').trim();
+    const houseStr = String(data?.house_number || '').trim();
+    const zipStr = String(data?.zip_code || '').trim();
+    const cityStr = String(data?.city || '').trim();
+    const emailStr = String(data?.billing_email || data?.email || '').trim();
+
+    if (!nameStr || !streetStr || !houseStr || !zipStr || !cityStr || !emailStr) {
       throw new Error('MANDATORY_FIELD_MISSING: Die Musikschule kann nicht angelegt werden. Name, Straße, Hausnummer, PLZ, Ort und E-Mail sind zwingend erforderlich.');
     }
     const { data: created, error } = await supabase.from('schools').insert(data).select().single();
     if (error) throw error;
 
-    // Auto-provision initial Schulleiter admin user
-    const contactPerson = (data.billing_contact_person || 'Schulleitung').trim();
+    // Auto-provision initial Schulleiter admin user with CSPRNG PIN
+    const contactPerson = String(data.billing_contact_person || 'Schulleitung').trim();
     const nameParts = contactPerson.split(' ');
     const fName = nameParts[0] || 'Schulleitung';
     const lName = nameParts.slice(1).join(' ') || '';
-    const initialAdminPin = Math.floor(100000 + Math.random() * 900000).toString();
+    const randBuf = new Uint32Array(1);
+    window.crypto.getRandomValues(randBuf);
+    const initialAdminPin = (100000 + (randBuf[0] % 900000)).toString();
 
     try {
       await supabase.from('users').insert({
@@ -332,8 +375,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         roles: ['admin'],
         first_name: fName,
         last_name: lName,
-        email: data.billing_email || data.email || `${fName.toLowerCase()}@campus-groovelab.de`,
-        password_hash: initialAdminPin,
+        email: emailStr || `${fName.toLowerCase()}@campus-groovelab.de`,
         ausweis_nummer: initialAdminPin,
         qr_token: crypto.randomUUID(),
         photo_url: '/campus_login_hero.png',
@@ -344,13 +386,13 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         is_pin_activated: true,
         created_at: new Date().toISOString()
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.warn('Admin user auto-provision notice:', e);
     }
 
     await fetchSchoolsAndStats();
     notify(`Mandant „${created.name}“ erfolgreich provisioniert.`);
-    return created;
+    return { ...created, initialAdminPin };
   }, [fetchSchoolsAndStats, notify]);
 
   const handleArchiveSchool = useCallback(async (school: School) => {
@@ -365,8 +407,8 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       setArchiveModalSchool(null);
       setArchiveConfirmName('');
       await fetchSchoolsAndStats();
-    } catch (err: any) {
-      alert('Fehler beim Archivieren: ' + (err?.message || String(err)));
+    } catch (err: unknown) {
+      alert('Fehler beim Archivieren: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setArchivingSchool(false);
     }
@@ -382,7 +424,6 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         supabase.from('bands').delete().eq('school_id', id),
         supabase.from('shouts').delete().eq('school_id', id),
         supabase.from('campus_events').delete().eq('school_id', id),
-        supabase.from('invoices').delete().eq('school_id', id),
         supabase.from('school_billing_accounts').delete().eq('school_id', id),
         supabase.from('school_user_statistics').delete().eq('school_id', id),
         supabase.from('pending_students_decrypted').delete().eq('school_id', id),
@@ -396,6 +437,11 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
           is_paused: true,
           deleted_at: new Date().toISOString()
         }).eq('id', id);
+        setArchiveModalSchool(null);
+        setSelectedSchool(null);
+        notify('Schule wurde GoBD-konform archiviert (Rechnungsbelege bleiben gesetzlich geschützt).');
+        await fetchSchoolsAndStats();
+        return;
       }
 
       setSchools(prev => prev.filter(s => s.id !== id));
@@ -403,8 +449,8 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       setSelectedSchool(null);
       notify(`Schule „${name}“ wurde erfolgreich gelöscht.`);
       await fetchSchoolsAndStats();
-    } catch (err: any) {
-      alert('Fehler beim Löschen: ' + (err?.message || String(err)));
+    } catch (err: unknown) {
+      alert('Fehler beim Löschen: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
@@ -424,26 +470,25 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         if (adminUser?.id) {
           targetUserId = adminUser.id;
         }
-      } catch (e) {}
+      } catch {}
 
-      let ghostToken = '';
-      try {
-        const { data: ghostRpcData } = await supabase.rpc('activate_support_ghost_session', {
-          p_school_id: school.id,
-          p_target_user_id: targetUserId || null,
-          p_role: 'admin',
-          p_reason: reasonStr
-        });
-        if (ghostRpcData?.ghost_lease_token) {
-          ghostToken = ghostRpcData.ghost_lease_token;
-          localStorage.setItem('gl_active_session_lease_id', ghostToken);
-          sessionStorage.setItem('gl_active_session_lease_id', ghostToken);
-        }
-      } catch (e) {
-        console.warn('[Ghost] activate_support_ghost_session exception:', e);
+      const { data: ghostRpcData, error: ghostRpcError } = await supabase.rpc('activate_support_ghost_session', {
+        p_school_id: school.id,
+        p_target_user_id: targetUserId || null,
+        p_role: 'admin',
+        p_reason: reasonStr
+      });
+
+      const ghostToken = (ghostRpcData as Record<string, string> | null)?.ghost_lease_token;
+      if (ghostRpcError || !ghostToken) {
+        const msg = ghostRpcError?.message || 'Kein gültiges Ghost-Lease-Token vom Sicherheits-RPC erhalten (Fail-Closed).';
+        notify(`Ghost-Sitzung abgelehnt: ${msg}`);
+        throw new Error(`GHOST_SESSION_DENIED: ${msg}`);
       }
 
-      // Transparent audit logging for the target school (DSGVO Art. 28)
+      localStorage.setItem('gl_active_session_lease_id', ghostToken);
+      sessionStorage.setItem('gl_active_session_lease_id', ghostToken);
+
       try {
         await logApplicationAudit({
           schoolId: school.id,
@@ -460,15 +505,14 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         console.warn('[Ghost] School transparency audit log insert error:', e);
       }
 
-
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
-      const tokenParam = ghostToken ? `&ghost_lease_token=${ghostToken}` : '';
+      const tokenParam = `&ghost_lease_token=${ghostToken}`;
       localStorage.setItem('groovelab_ghost_auth_token', Date.now().toString());
       const url = `${window.location.origin}/?school_id=${school.id}&support_ghost=true&role=admin${userParam}${tokenParam}&ts=${Date.now()}`;
       window.open(url, '_blank');
       notify(`Ghost-Sitzung für „${school.name}“ im neuen Tab geöffnet (Kürzel: ⌥+Q).`);
     } catch (err) {
-      console.error('Ghost session error:', err);
+      console.error('Ghost session error (Fail-Closed):', err);
     }
   }, [notify]);
 
@@ -480,45 +524,17 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     notify('Support-Sitzung beendet.');
   }, [notify]);
 
-  const handleUpdateSchool = useCallback(async (updatedData: any) => {
+  const handleUpdateSchool = useCallback(async (updatedData: Record<string, unknown>) => {
     if (!selectedSchool) return;
     const targetSchoolId = selectedSchool.id;
     const payload = { ...updatedData };
-    delete (payload as any).extra_storage_gb;
+    delete payload.extra_storage_gb;
 
-    let { data: updatedRows, error } = await supabase
+    const { data: updatedRows, error } = await supabase
       .from('schools')
       .update(payload)
       .eq('id', targetSchoolId)
       .select();
-
-    if (error && (error.message?.includes('column') || error.message?.includes('Could not find') || error.code === 'PGRST204' || error.code === 'PGRST106' || error.message?.includes('schema cache'))) {
-      console.warn('⚠️ Supabase Schema fallback for school update. Stripping unmigrated columns...', error.message);
-      const safePayload = { ...payload };
-      delete safePayload.storage_addon_monthly_fee;
-      delete safePayload.storage_addon_gb;
-      delete safePayload.extra_billing_option;
-      delete safePayload.billing_email;
-      delete safePayload.billing_contact_person;
-      delete safePayload.house_number;
-      delete safePayload.legal_name;
-      delete safePayload.country;
-      delete safePayload.vat_id;
-      delete safePayload.leitweg_id;
-      delete safePayload.custom_price_kombi;
-      delete safePayload.subscription_bypass_until;
-      delete safePayload.subscription_bypass_reason;
-      delete safePayload.summer_moratorium_active;
-      delete safePayload.dunning_kulanz_until;
-
-      const fallbackRes = await supabase
-        .from('schools')
-        .update(safePayload)
-        .eq('id', targetSchoolId)
-        .select();
-      updatedRows = fallbackRes.data;
-      error = fallbackRes.error;
-    }
 
     if (error) {
       console.error('Failed to update school in Supabase:', error);
@@ -526,20 +542,17 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     }
 
     const returnedRow = (updatedRows && updatedRows.length > 0) ? updatedRows[0] : {};
-    const updatedSchoolObj = { ...selectedSchool, ...updatedData, ...returnedRow };
+    const updatedSchoolObj = { ...selectedSchool, ...updatedData, ...returnedRow } as School;
 
     setSelectedSchool(updatedSchoolObj);
-    try {
-      const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-      const overrides = JSON.parse(overridesStr);
-      overrides[targetSchoolId] = { ...(overrides[targetSchoolId] || {}), ...selectedSchool, ...updatedData, ...returnedRow };
-      localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
+    if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event('groovelab_school_updated'));
-    } catch (e) {}
+    }
     await fetchSchoolsAndStats();
     notify(`Mandant „${updatedSchoolObj.name}“ erfolgreich aktualisiert.`);
   }, [selectedSchool, fetchSchoolsAndStats, notify]);
 
+  const [rawPendingUsers, setRawPendingUsers] = useState<PendingUser[]>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [loadingPending, setLoadingPending] = useState<boolean>(false);
 
@@ -553,32 +566,35 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      const directBillingSchoolIds = new Set(
-        schools
-          .filter(s => ['option2', 'student_full', 'student_partial'].includes((s as any).student_billing_option))
-          .map(s => s.id)
-      );
-
-      const filtered = (data || []).filter((u: any) => {
-        const isFromDirectBillingSchool = directBillingSchoolIds.has(u.school_id);
-        const hasPaymentMethod = Boolean(u.student_billing_payment_method);
-        const isPendingActivation = !u.is_campus_active;
-        const isExempt = Boolean(u.is_hardship_exempt);
-
-        if (directBillingSchoolIds.size > 0) {
-          return isFromDirectBillingSchool || hasPaymentMethod || isPendingActivation || isExempt;
-        }
-        return true;
-      });
-
-      setPendingUsers(filtered);
+      setRawPendingUsers(data || []);
     } catch (err: any) {
       console.error('Error loading pending users:', err);
     } finally {
       setLoadingPending(false);
     }
-  }, [schools]);
+  }, []);
+
+  useEffect(() => {
+    const directBillingSchoolIds = new Set(
+      schools
+        .filter(s => ['option2', 'student_full', 'student_partial'].includes((s as any).student_billing_option))
+        .map(s => s.id)
+    );
+
+    const filtered = rawPendingUsers.filter((u: any) => {
+      const isFromDirectBillingSchool = directBillingSchoolIds.has(u.school_id);
+      const hasPaymentMethod = Boolean(u.student_billing_payment_method);
+      const isPendingActivation = !u.is_campus_active;
+      const isExempt = Boolean(u.is_hardship_exempt);
+
+      if (directBillingSchoolIds.size > 0) {
+        return isFromDirectBillingSchool || hasPaymentMethod || isPendingActivation || isExempt;
+      }
+      return true;
+    });
+
+    setPendingUsers(filtered);
+  }, [rawPendingUsers, schools]);
 
   const handleActivateUser = useCallback(async (userId: string) => {
     try {
@@ -600,6 +616,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         .eq('id', userId);
       if (error) throw error;
       
+      setRawPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       setPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       fetchSchoolsAndStats();
       notify('Schüler wurde erfolgreich aktiviert.');
@@ -624,6 +641,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         .in('id', userIds);
       if (error) throw error;
 
+      setRawPendingUsers(prev => prev.map(u => userIds.includes(u.id) ? { ...u, ...updates } : u));
       setPendingUsers(prev => prev.map(u => userIds.includes(u.id) ? { ...u, ...updates } : u));
       fetchSchoolsAndStats();
       notify(`${userIds.length} Schüler erfolgreich aktiviert.`);

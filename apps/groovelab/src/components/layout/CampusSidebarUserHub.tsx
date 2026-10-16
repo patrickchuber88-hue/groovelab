@@ -60,9 +60,9 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
 
   const isGreenTheme = activePlatform === 'campus';
   const cardBorder = isGreenTheme ? '1px solid rgba(52, 168, 83, 0.2)' : '1px solid rgba(234, 179, 8, 0.25)';
-  const accentColor = isGreenTheme ? '#16a34a' : '#ca8a04';
-  const badgeBg = isGreenTheme ? '#dcfce7' : '#fef9c3';
-  const badgeColor = isGreenTheme ? '#15803d' : '#854d0e';
+  const accentColor = isGreenTheme ? '#34a853' : '#ca8a04';
+  const badgeBg = isGreenTheme ? '#34a853' : '#fef9c3';
+  const badgeColor = isGreenTheme ? '#ffffff' : '#854d0e';
 
   // ── Collapsed Rail Mode (68px) ──
   if (isCollapsed) {
@@ -95,7 +95,7 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
               justifyContent: 'center',
               cursor: 'pointer',
               padding: 0,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              boxShadow: isGreenTheme ? '0 2px 8px rgba(52, 168, 83, 0.32)' : '0 2px 6px rgba(0,0,0,0.03)',
               transition: 'all 0.18s ease'
             }}
             className="hover-scale sidebar-bottom-btn"
@@ -113,38 +113,47 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
           style={{
             width: '42px',
             height: '42px',
-            borderRadius: '12px',
-            border: activeStudentTab === 'profile' ? `2px solid ${accentColor}` : '1px solid #e2e8f0',
+            borderRadius: '50%',
+            border: 'none',
             background: '#f8fafc',
             padding: 0,
             cursor: 'pointer',
             position: 'relative',
             overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            transition: 'all 0.18s ease'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            transition: 'all 0.18s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            outline: 'none'
           }}
-          className="hover-scale sidebar-profile-card"
+          className="hover-scale sidebar-bottom-btn sidebar-collapsed-avatar-btn"
         >
-          <StudioAvatar 
-            src={user?.avatar_url || user?.photo_url} 
-            user={{
-              ...user,
-              role: (activeWorkspace === 'teacher' || user?.role === 'teacher') ? 'teacher' : user?.role,
-              isTeacherContext: (activeWorkspace === 'teacher' || user?.role === 'teacher'),
-              resolved_instrument: user?.resolved_instrument || user?.instrument || (teachers.find(t => t.id === user?.teacher_id)?.instrument) || 'Gitarre'
-            }} 
-            activePlatform={activePlatform} 
-          />
+          <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', borderRadius: '50%' }}>
+            <StudioAvatar 
+              src={user?.avatar_url || user?.photo_url} 
+              user={{
+                ...user,
+                role: (activeWorkspace === 'teacher' || user?.role === 'teacher') ? 'teacher' : user?.role,
+                isTeacherContext: (activeWorkspace === 'teacher' || user?.role === 'teacher'),
+                resolved_instrument: user?.resolved_instrument || user?.instrument || (teachers.find(t => t.id === user?.teacher_id)?.instrument) || 'Gitarre'
+              }} 
+              activePlatform={activePlatform} 
+              onClick={() => setActiveStudentTab('profile')}
+            />
+          </div>
           {session && (
             <div style={{
               position: 'absolute',
-              bottom: 2,
-              right: 2,
-              width: '8px',
-              height: '8px',
+              bottom: 1,
+              right: 1,
+              width: '9px',
+              height: '9px',
               background: accentColor,
               borderRadius: '50%',
-              border: '1.5px solid white'
+              border: '2px solid white',
+              zIndex: 3,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
             }} />
           )}
         </button>
@@ -341,7 +350,7 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
           <div style={{
             width: '34px',
             height: '34px',
-            borderRadius: '10px',
+            borderRadius: '50%',
             overflow: 'hidden',
             boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
           }}>

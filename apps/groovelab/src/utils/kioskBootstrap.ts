@@ -1,4 +1,5 @@
 import { safeReplaceState } from './historyUtils';
+import { sanitizeClientTenantStorage } from './tenantSanitizer';
 
 /**
  * 🔒 Kiosk Token & URL Parameter Bootstrap
@@ -7,6 +8,9 @@ import { safeReplaceState } from './historyUtils';
  */
 export function initKioskUrlBootstrap(): void {
   if (typeof window === 'undefined') return;
+
+  // 🛡️ Desinfiziere verwaiste Dummy-Schulen aus dem Speicher vor jedem Render
+  sanitizeClientTenantStorage();
 
   // Purge legacy shared credentials from localStorage to enforce per-tab isolation
   try {

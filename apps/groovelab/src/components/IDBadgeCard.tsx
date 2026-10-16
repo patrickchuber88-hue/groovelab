@@ -148,7 +148,8 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
     spectrumGradient = '#eab308'; // Gelber Balken
   }
 
-  const tokenToUse = user?.qr_token || user?.teacher_qr_token || user?.ausweis_nummer || '';
+  const canonicalId = resolveUserCampusId(user);
+  const tokenToUse = user?.qr_token || user?.teacher_qr_token || user?.ausweis_nummer || canonicalId || '';
   const effectiveQrValue = qrValue || getCanonicalQrLandingUrl(tokenToUse) || 'https://campus-groovelab.de';
   
   const isTeacherRole = user?.role === 'teacher' || userRolesList.includes('teacher') || user?.role === 'admin' || userRolesList.includes('admin') || user?.role === 'secretary' || userRolesList.includes('secretary');

@@ -1007,6 +1007,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             roomIssues={roomIssues || []}
             setRoomIssues={setRoomIssues as any}
             rooms={rooms || []}
+            buildings={buildings || []}
             students={students || []}
             campusTeachers={campusTeachers || []}
             bypassTeachers={bypassTeachers || []}

@@ -742,7 +742,8 @@ div:hover > .photo-overlay {
   justify-content: center !important;
 }
 
-.sidebar-nav.is-collapsed .sidebar-profile-card > div:last-child,
+.sidebar-nav.is-collapsed .sidebar-profile-card > div.sidebar-profile-info,
+.sidebar-nav.is-collapsed .sidebar-profile-card:not(.sidebar-collapsed-avatar-btn) > div:nth-child(2),
 .sidebar-nav.is-collapsed div[style*="marginTop: auto"] > button:first-child > div:last-child {
   display: none !important;
 }
@@ -752,6 +753,27 @@ div:hover > .photo-overlay {
   width: 38px !important;
   height: 38px !important;
   border-radius: 10px !important;
+}
+
+.sidebar-nav.is-collapsed .sidebar-collapsed-avatar-btn,
+.sidebar-nav.is-collapsed .sidebar-profile-card.sidebar-collapsed-avatar-btn {
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  border-radius: 50% !important;
+  border: none !important;
+}
+
+.sidebar-nav.is-collapsed .studio-avatar-wrapper,
+.sidebar-nav.is-collapsed .sidebar-collapsed-avatar-btn .studio-avatar-wrapper {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
 }
 
 .sidebar-nav.is-collapsed .sidebar-bottom-btn {

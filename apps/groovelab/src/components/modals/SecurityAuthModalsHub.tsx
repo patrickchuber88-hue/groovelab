@@ -74,6 +74,8 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
   const effectiveSchoolId = school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
   const effectiveSchool = school || (Array.isArray(user?.schools) ? user?.schools[0] : user?.schools);
 
+  const isGroovelabPlatform = activePlatform === 'groovelab';
+
   return (
     <>
       {/* 1. Admin Forensik & Security Suite Modal */}
@@ -109,7 +111,16 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
                 zIndex: 999999,
                 backdropFilter: 'blur(28px)',
                 WebkitBackdropFilter: 'blur(28px)',
-                backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                background: isGroovelabPlatform
+                  ? '#ca8a04'
+                  : activeWorkspace === 'admin'
+                  ? '#0f172a'
+                  : '#0a361c',
+                backgroundImage: isGroovelabPlatform
+                  ? 'radial-gradient(circle at 50% 50%, #fef08a 0%, #ca8a04 100%)'
+                  : activeWorkspace === 'admin'
+                  ? 'radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%)'
+                  : 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'

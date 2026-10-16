@@ -33,16 +33,16 @@ export function detectDeviceLatencyInfo(audioCtx?: AudioContext | null): DeviceL
 
   if (isMac) {
     platform = 'macos';
-    baseMs = 70; // CoreAudio Buffer + Keyboard/Trackpad Polling
+    baseMs = 70; // CoreAudio Output (~22ms) + Input (~23ms) + WebRTC MediaStream FIFO (~25ms)
   } else if (isIOS) {
     platform = 'ios';
-    baseMs = 60; // iOS Low-Latency Audio Stack + Touchscreen
+    baseMs = 60; // iOS Low-Latency CoreAudio Stack + WebRTC Input
   } else if (isAndroid) {
     platform = 'android';
-    baseMs = 105; // Android Audio HAL + Touch Digitizer
+    baseMs = 105; // Android AAudio / Oboe HAL + WebRTC Input
   } else if (isWindows) {
     platform = 'windows';
-    baseMs = 95; // WASAPI Shared Buffer + USB Input
+    baseMs = 95; // WASAPI Shared Buffer + WebRTC Input
   }
 
   // 🎧 Bluetooth & External DAC Latenz-Detektor via Web Audio API
@@ -55,7 +55,7 @@ export function detectDeviceLatencyInfo(audioCtx?: AudioContext | null): DeviceL
       // Wenn der Output-Puffer > 75ms ist, handelt es sich mit hoher Wahrscheinlichkeit um Bluetooth (z. B. AirPods)
       if (outputLat > 0.075 || baseLat > 0.04) {
         isBluetooth = true;
-        baseMs += 110; // Typischer Bluetooth A2DP / AAC Hardware-Puffer
+        baseMs = 210; // Typischer Bluetooth A2DP / AAC Hardware-Puffer
       }
     } catch (_) {}
   }
@@ -63,9 +63,9 @@ export function detectDeviceLatencyInfo(audioCtx?: AudioContext | null): DeviceL
   return {
     detectedPlatform: platform,
     isBluetoothSuspected: isBluetooth,
-    baselineLatencyMs: Math.max(30, Math.min(260, baseMs)),
+    baselineLatencyMs: Math.max(15, Math.min(260, baseMs)),
     description: isBluetooth 
-      ? `${platform.toUpperCase()} + Bluetooth Audio (+110ms)` 
+      ? `${platform.toUpperCase()} + Bluetooth Audio (210ms)` 
       : `${platform.toUpperCase()} Lautsprecher (${baseMs}ms)`
   };
 }

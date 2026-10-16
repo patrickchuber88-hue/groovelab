@@ -7323,14 +7323,15 @@ export function CampusEventsBoard({
                       display: 'flex',
                       flexDirection: 'column',
                       padding: windowWidth < 768 ? '14px 14px' : '16px 20px',
-                      borderRadius: windowWidth < 768 ? '16px' : '24px',
+                      borderRadius: windowWidth < 768 ? '16px' : '20px',
                       cursor: isStatutory ? 'pointer' : ((role === 'admin' || role === 'secretary') ? 'grab' : 'pointer'),
                       background: '#ffffff',
                       border: '1px solid #e2e8f0',
-                      borderLeft: `5px solid ${catColor}`,
+                      borderLeft: `4px solid ${catColor}`,
                       boxShadow: `0 4px 16px rgba(0, 0, 0, 0.02), -2px 0 10px ${catColor}25`,
                       position: 'relative',
                       overflow: 'hidden',
+                      minHeight: windowWidth < 768 ? 'auto' : '88px',
                       flexShrink: 0,
                       boxSizing: 'border-box'
                     }}
@@ -7338,7 +7339,7 @@ export function CampusEventsBoard({
                   >
 
                     {/* Row 1: Category Badge on Left & Duration/Time on Right */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', minHeight: '20px', flexWrap: 'wrap', gap: '6px' }}>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{
                           fontSize: '0.75rem',
@@ -7411,7 +7412,7 @@ export function CampusEventsBoard({
                     </div>
 
                     {/* Row 2: Event Title on Left & Clean Date Span on Right */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                         <h4 style={{
                           margin: 0,

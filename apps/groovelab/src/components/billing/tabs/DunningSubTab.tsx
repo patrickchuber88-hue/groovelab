@@ -2,8 +2,19 @@ import React from 'react';
 import { AlertTriangle, AlertCircle, Mail } from 'lucide-react';
 import { Invoice, getSchoolNumericId } from '../types';
 
+interface DbInvoiceRecord {
+  id?: string;
+  invoice_number?: string;
+  school_id?: string;
+  due_date?: string;
+  billing_date?: string;
+  created_at?: string;
+  status?: string;
+}
+
 interface DunningSubTabProps {
   invoices: Invoice[];
+  dbInvoices?: DbInvoiceRecord[];
   totalUnpaid: number;
   getPaidInvoices: (schoolId: string) => string[];
   onSendDunningEmail: (invoice: { id: string; amount: number }, inv: Invoice, level: 1 | 2 | 3) => void;
@@ -11,6 +22,7 @@ interface DunningSubTabProps {
 
 export const DunningSubTab: React.FC<DunningSubTabProps> = ({
   invoices,
+  dbInvoices = [],
   totalUnpaid,
   getPaidInvoices,
   onSendDunningEmail
@@ -77,15 +89,28 @@ export const DunningSubTab: React.FC<DunningSubTabProps> = ({
 
                 if (isPaid) return null;
 
+                const matchingDbInv = dbInvoices.find(
+                  d => d.school_id === inv.schoolId && (d.id === invId || d.invoice_number === invId || d.status !== 'paid')
+                );
+                const rawRefDate = matchingDbInv?.due_date || matchingDbInv?.billing_date || matchingDbInv?.created_at || inv.contractStartDate || inv.createdAt;
+                const refTime = rawRefDate ? new Date(rawRefDate).getTime() : now.getTime();
+                const dueTime = matchingDbInv?.due_date ? refTime : refTime + 30 * 24 * 60 * 60 * 1000;
+                const diffDays = Math.round((now.getTime() - dueTime) / (1000 * 60 * 60 * 24));
+                const dueLabel = diffDays > 0
+                  ? `Seit ${diffDays} Tag${diffDays === 1 ? '' : 'en'} überfällig`
+                  : diffDays === 0
+                    ? 'Heute fällig'
+                    : `Fällig in ${Math.abs(diffDays)} Tag${Math.abs(diffDays) === 1 ? '' : 'en'}`;
+
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 14px', fontWeight: 800, color: '#0f172a' }}>{inv.schoolName}</td>
                     <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 700 }}>{invId}</td>
-                    <td style={{ padding: '12px 14px', color: '#dc2626', fontWeight: 700 }}>Seit 30 Tagen überfällig</td>
+                    <td style={{ padding: '12px 14px', color: diffDays > 0 ? '#dc2626' : '#d97706', fontWeight: 700 }}>{dueLabel}</td>
                     <td style={{ padding: '12px 14px', fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>{inv.total.toFixed(2).replace('.', ',')} €</td>
                     <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: '0.70rem', padding: '3px 8px', borderRadius: '6px', background: '#fee2e2', color: '#b91c1c', fontWeight: 800 }}>
-                        Stufe 1 (Zahlungserinnerung)
+                      <span style={{ fontSize: '0.70rem', padding: '3px 8px', borderRadius: '6px', background: diffDays > 0 ? '#fee2e2' : '#fef3c7', color: diffDays > 0 ? '#b91c1c' : '#b45309', fontWeight: 800 }}>
+                        {diffDays > 14 ? 'Stufe 2 (1. Mahnung)' : diffDays > 0 ? 'Stufe 1 (Zahlungserinnerung)' : 'Offen (innerhalb Frist)'}
                       </span>
                     </td>
                     <td style={{ padding: '12px 14px', textAlign: 'right' }}>

@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, Check, RefreshCw, Eye, HardDrive, Building, 
-  Sliders, ShieldCheck, Trash2, ArrowLeft, Disc3, Mic, Music, Sparkles, ShieldAlert, BookOpen, Clock, Volume2, Radio, Headphones, FileText, Download
+import {
+  X, Check, RefreshCw, Eye, HardDrive, Building,
+  Sliders, ShieldCheck, Trash2, ArrowLeft, Sparkles, ShieldAlert, Clock, Volume2, FileText, Sun, Award
 } from 'lucide-react';
 import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
-import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../../../domain/pricingEngine';
+import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../../domain/pricingEngine';
 import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 import { generateB2BSchoolInvoicePDF } from '../../../utils/pdfGenerator';
+import { computeSchoolBillingMetrics, resolveCanonicalStorageFee, CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
+import type { School, SchoolStat } from '../MasterAdminTypes';
 
 interface SchoolDetailDrawerProps {
-  school: any;
-  schoolStats: any;
-  masterPricing: any;
+  school: School | null;
+  schoolStats: Partial<SchoolStat>;
+  masterPricing: CanonicalBillingRates & { storageTiers?: StorageTier[] };
   operatorCompany?: string;
   onClose: () => void;
-  onUpdateSchool: (updatedData: any) => Promise<void>;
-  onStartGhostMode: (school: any) => void;
-  onDeleteSchool: (school: any) => void;
-  onTogglePause?: (school: any) => void;
+  onUpdateSchool: (updatedData: Record<string, unknown>) => Promise<void>;
+  onStartGhostMode: (school: School) => void;
+  onDeleteSchool: (school: School) => void;
+  onTogglePause?: (school: School) => void;
 }
 
 export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
@@ -29,8 +31,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   onClose,
   onUpdateSchool,
   onStartGhostMode,
-  onDeleteSchool,
-  onTogglePause
+  onDeleteSchool
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'licenses' | 'quotas' | 'avv'>('overview');
   const [saving, setSaving] = useState(false);
@@ -38,35 +39,22 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [showDpoPortal, setShowDpoPortal] = useState(false);
   const [revokingSessions, setRevokingSessions] = useState(false);
 
-  const handleRevokeAllSessions = async () => {
-    if (!window.confirm(`Möchtest du wirklich alle aktiven Anmeldungen (Lehrkräfte, Schüler, Kioske) für "${school?.name || 'diese Schule'}" mit sofortiger Wirkung beenden?`)) {
-      return;
-    }
-    try {
-      setRevokingSessions(true);
-      const { data, error } = await supabase.rpc('revoke_school_sessions', { p_school_id: school.id });
-      if (error) throw error;
-      alert(`Erfolg: ${data || 0} aktive Benutzer-Sitzungen der Schule "${school?.name || ''}" wurden mit sofortiger Wirkung beendet.`);
-    } catch (err: any) {
-      alert('Fehler beim Widerrufen der Sitzungen: ' + (err?.message || String(err)));
-    } finally {
-      setRevokingSessions(false);
-    }
-  };
-
   // Form states
   const [name, setName] = useState(school?.name || '');
+  const [legalName, setLegalName] = useState(school?.legal_name || '');
   const [zipCode, setZipCode] = useState(school?.zip_code || '');
   const [city, setCity] = useState(school?.city || '');
   const [street, setStreet] = useState(school?.street || '');
   const [houseNumber, setHouseNumber] = useState(school?.house_number || '');
+  const [phoneNumber, setPhoneNumber] = useState(school?.phone_number || '');
+  const [leitwegId, setLeitwegId] = useState(school?.leitweg_id || '');
   const [billingEmail, setBillingEmail] = useState(school?.billing_email || '');
   const [billingContact, setBillingContact] = useState(school?.billing_contact_person || '');
-  const [status, setStatus] = useState(school?.status || 'active');
-  const [isTrial, setIsTrial] = useState<boolean>(() => isSchoolTrialActive(school));
+  const [status, setStatus] = useState<string>(school?.status || 'active');
+  const [isTrial, setIsTrial] = useState<boolean>(() => school ? isSchoolTrialActive(school) : false);
   const [trialEndsAt, setTrialEndsAt] = useState<string>(
-    school?.trial_ends_at 
-      ? new Date(school.trial_ends_at).toISOString().split('T')[0] 
+    school?.trial_ends_at
+      ? new Date(school.trial_ends_at).toISOString().split('T')[0]
       : (school?.created_at ? new Date(new Date(school.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : '')
   );
   const [hasCampus, setHasCampus] = useState<boolean>(Boolean(school?.has_campus_subscription));
@@ -76,34 +64,46 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [dunningKulanzUntil, setDunningKulanzUntil] = useState<string>(school?.dunning_kulanz_until || '');
   const [mfaEnforcedForAdmins, setMfaEnforcedForAdmins] = useState<boolean>(Boolean(school?.mfa_enforced_for_admins));
 
-  // Audio-Tresor Storage State (Synchronized with Financial Control & SecretaryDashboard)
   const [extraStorageGb, setExtraStorageGb] = useState<number>(() => {
     if (school?.storage_addon_gb !== undefined && school?.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
     if (school?.extra_storage_gb !== undefined && school?.extra_storage_gb !== null && Number(school.extra_storage_gb) > 0) return Number(school.extra_storage_gb);
     if (school?.extra_billing_option === 'option1') return 20;
-    try {
-      const overridesStr = localStorage.getItem('groovelab_school_overrides');
-      if (overridesStr) {
-        const overrides = JSON.parse(overridesStr);
-        if (overrides[school?.id]?.storage_addon_gb) return Number(overrides[school?.id]?.storage_addon_gb);
-      }
-    } catch (e) {}
     return 0;
   });
 
-  // Keep state in sync with selected school
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDpoPortal) {
+          setShowDpoPortal(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, showDpoPortal]);
+
   useEffect(() => {
     if (school) {
       setName(school.name || '');
+      setLegalName(school.legal_name || '');
       setZipCode(school.zip_code || '');
       setCity(school.city || '');
       setStreet(school.street || '');
       setHouseNumber(school.house_number || '');
+      setPhoneNumber(school.phone_number || '');
+      setLeitwegId(school.leitweg_id || '');
       setBillingEmail(school.billing_email || '');
       setBillingContact(school.billing_contact_person || '');
       setStatus(school.status || 'active');
       setIsTrial(isSchoolTrialActive(school));
-      setTrialEndsAt(school.trial_ends_at ? new Date(school.trial_ends_at).toISOString().split('T')[0] : (school.created_at ? new Date(new Date(school.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : ''));
+      setTrialEndsAt(
+        school.trial_ends_at
+          ? new Date(school.trial_ends_at).toISOString().split('T')[0]
+          : (school.created_at ? new Date(new Date(school.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : '')
+      );
       setHasCampus(Boolean(school.has_campus_subscription));
       setHasGroovelab(Boolean(school.has_groovelab_subscription));
       setSubscriptionBypass(school.subscription_bypass ?? false);
@@ -114,19 +114,15 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         if (school.storage_addon_gb !== undefined && school.storage_addon_gb !== null && Number(school.storage_addon_gb) > 0) return Number(school.storage_addon_gb);
         if (school.extra_storage_gb !== undefined && school.extra_storage_gb !== null && Number(school.extra_storage_gb) > 0) return Number(school.extra_storage_gb);
         if (school.extra_billing_option === 'option1') return 20;
-        try {
-          const overridesStr = localStorage.getItem('groovelab_school_overrides');
-          if (overridesStr) {
-            const overrides = JSON.parse(overridesStr);
-            if (overrides[school?.id]?.storage_addon_gb) return Number(overrides[school?.id]?.storage_addon_gb);
-          }
-        } catch (e) {}
         return 0;
       });
     }
   }, [
     school?.id,
     school?.name,
+    school?.legal_name,
+    school?.phone_number,
+    school?.leitweg_id,
     school?.status,
     school?.is_trial,
     school?.trial_ends_at,
@@ -148,33 +144,45 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
   if (!school) return null;
 
-  const teachers = schoolStats?.teachers || 0;
-  const totalStudents = schoolStats?.students || 0;
-  const campusActive = schoolStats?.studentsCampus || 0;
-  const groovelabActive = schoolStats?.studentsGroovelab || 0;
-  const activeStudents = Math.max(campusActive, groovelabActive);
-  const passiveStudents = Math.max(0, totalStudents - activeStudents);
+  const handleRevokeAllSessions = async () => {
+    if (!window.confirm(`Möchtest du wirklich alle aktiven Anmeldungen (Lehrkräfte, Schüler, Kioske) für "${school.name || 'diese Schule'}" mit sofortiger Wirkung beenden?`)) {
+      return;
+    }
+    try {
+      setRevokingSessions(true);
+      const { data, error } = await supabase.rpc('revoke_school_sessions', { p_school_id: school.id });
+      if (error) throw error;
+      alert(`Erfolg: ${data || 0} aktive Benutzer-Sitzungen der Schule "${school.name || ''}" wurden mit sofortiger Wirkung beendet.`);
+    } catch (err: unknown) {
+      alert('Fehler beim Widerrufen der Sitzungen: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setRevokingSessions(false);
+    }
+  };
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 🎙️ CANONICAL AUDIO-TRESOR QUOTA CALCULATION
-  // ═══════════════════════════════════════════════════════════════════════════
-  const STORAGE_PACKAGES = masterPricing?.storageTiers || DEFAULT_STORAGE_TIERS;
+  const metrics = computeSchoolBillingMetrics(
+    {
+      ...school,
+      has_campus_subscription: hasCampus,
+      has_groovelab_subscription: hasGroovelab,
+      storage_addon_gb: extraStorageGb,
+      is_trial: isTrial,
+      subscription_bypass: subscriptionBypass
+    },
+    schoolStats,
+    masterPricing
+  );
 
-  const baseStorageGb = 1.0;
+  const teachers = metrics.teachersCount;
+  const totalStudents = metrics.totalStudentsCount;
+  const activeStudents = Math.max(metrics.activeCampusStudentsCount, metrics.activeGroovelabStudentsCount);
+  const passiveStudents = metrics.passiveStudentsCount;
+
+  // Canonical 10 GB Base Storage + Booked Add-on
+  const STORAGE_PACKAGES: StorageTier[] = masterPricing?.storageTiers || DEFAULT_STORAGE_TIERS;
+  const baseStorageGb = 10;
   const totalStorageGb = baseStorageGb + extraStorageGb;
-  let rawStorageUsed = Number(school?.storage_used_bytes || 0);
-  try {
-    const schId = String(school?.id || '');
-    const overrides = JSON.parse(localStorage.getItem('groovelab_school_overrides') || '{}');
-    if (overrides[schId]?.storage_used_bytes) {
-      rawStorageUsed = Math.max(rawStorageUsed, Number(overrides[schId].storage_used_bytes));
-    }
-    const directKey = localStorage.getItem(`groovelab_storage_used_bytes_${schId}`);
-    if (directKey) {
-      rawStorageUsed = Math.max(rawStorageUsed, Number(directKey));
-    }
-  } catch {}
-  const storageUsedBytes = rawStorageUsed;
+  const storageUsedBytes = Math.max(0, Number(school.storage_used_bytes || 0));
   const usedStorageGb = storageUsedBytes / (1024 * 1024 * 1024);
   const usedStorageMb = storageUsedBytes / (1024 * 1024);
   const freeStorageGb = Math.max(0, totalStorageGb - usedStorageGb);
@@ -187,14 +195,11 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
   const formattedStoragePct = storageUsedBytes > 0 && storagePercentage < 1 ? '< 1%' : `${storagePercentage}%`;
 
-  const currentAddonPackage = STORAGE_PACKAGES.find((p: StorageTier) => p.gb === extraStorageGb) || {
-    gb: extraStorageGb,
-    price: extraStorageGb === 20 ? 5.49 : extraStorageGb === 10 ? 2.99 : extraStorageGb === 5 ? 1.49 : Number((extraStorageGb * 0.25).toFixed(2)),
-    label: `+${extraStorageGb} GB`,
-    desc: `${(extraStorageGb === 20 ? 5.49 : extraStorageGb === 10 ? 2.99 : extraStorageGb === 5 ? 1.49 : extraStorageGb * 0.25).toFixed(2).replace('.', ',')} € / Mo.`
-  };
+  const resolvedStorage = resolveCanonicalStorageFee(
+    { ...school, storage_addon_gb: extraStorageGb, storage_addon_status: extraStorageGb > 0 ? 'active' : 'none' },
+    metrics.currency
+  );
 
-  // Quick Extend Trial
   const handleExtendTrial = (days: number) => {
     const currentEnd = trialEndsAt ? new Date(trialEndsAt).getTime() : Date.now();
     const newEnd = new Date(Math.max(Date.now(), currentEnd) + days * 24 * 60 * 60 * 1000);
@@ -202,19 +207,21 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     setIsTrial(true);
   };
 
-  // Submit Save
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      const addonFee = currentAddonPackage.price;
+      const addonFee = resolvedStorage.fee;
       const finalStatus = isTrial ? 'trial' : status === 'trial' ? 'active' : status;
       await onUpdateSchool({
         name,
+        legal_name: legalName.trim() || null,
         zip_code: zipCode,
         city,
         street,
         house_number: houseNumber,
+        phone_number: phoneNumber.trim() || null,
+        leitweg_id: leitwegId.trim() || null,
         billing_email: billingEmail,
         billing_contact_person: billingContact,
         status: finalStatus,
@@ -232,49 +239,34 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving school details:', err);
-      alert('Fehler beim Speichern der Änderungen: ' + (err?.message || err));
+      alert('Fehler beim Speichern der Änderungen: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
   };
 
-  // Open Ghost Session in New Tab
-  const handleTriggerGhostTab = async () => {
-    if (onStartGhostMode) {
-      onStartGhostMode(school);
-    } else {
-      let targetUserId = '';
-      try {
-        const { data: adminUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('school_id', school.id)
-          .eq('role', 'admin')
-          .limit(1)
-          .maybeSingle();
-        if (adminUser?.id) {
-          targetUserId = adminUser.id;
-        }
-      } catch (e) {}
-
-      const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
-      window.open(`${window.location.origin}/?support_ghost=true&school_id=${school.id}&role=admin${userParam}`, '_blank');
-    }
+  const handleTriggerGhostTab = () => {
+    onStartGhostMode(school);
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 99999,
-      background: '#f8fafc',
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: '"Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-      animation: 'appleFullscreenZoomIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-    }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Mandanten-Details: ${school.name}`}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        background: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: '"Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+        animation: 'appleFullscreenZoomIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+      }}
+    >
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes appleFullscreenZoomIn {
           from { opacity: 0; transform: scale(0.985); }
@@ -282,9 +274,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         }
       `}} />
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 🍎 APPLE macOS / iPadOS PRO HEADER TOOLBAR                             */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* HEADER TOOLBAR */}
       <header style={{
         height: '72px',
         background: 'rgba(255, 255, 255, 0.90)',
@@ -298,7 +288,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         flexShrink: 0,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
       }}>
-        {/* Left: Back Action & School Identity */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
           <button
             type="button"
@@ -325,7 +314,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
           <div style={{ width: '1px', height: '24px', background: '#e2e8f0' }} />
 
-          {/* School Avatar & Name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '42px',
@@ -338,7 +326,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               justifyContent: 'center',
               fontWeight: 900,
               fontSize: '1.2rem',
-              boxShadow: 'none'
+              border: 'none'
             }}>
               {school.name ? school.name.charAt(0).toUpperCase() : 'M'}
             </div>
@@ -355,9 +343,13 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   borderRadius: '100px',
                   background: isTrial ? '#fef3c7' : status === 'active' ? '#ecfdf5' : '#f1f5f9',
                   color: isTrial ? '#d97706' : status === 'active' ? '#059669' : '#64748b',
-                  border: `1px solid ${isTrial ? '#fde68a' : status === 'active' ? '#a7f3d0' : '#cbd5e1'}`
+                  border: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}>
-                  {isTrial ? 'Testphase' : status === 'active' ? '● Aktiv' : 'Pausiert'}
+                  {status === 'active' && !isTrial && <Check size={11} />}
+                  <span>{isTrial ? 'Testphase' : status === 'active' ? 'Aktiv' : 'Pausiert'}</span>
                 </span>
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -373,7 +365,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           </div>
         </div>
 
-        {/* Center: Apple HIG Segmented Track (4 Tabs) */}
+        {/* Center: 4 Tabs */}
         <div style={{
           display: 'inline-flex',
           background: '#f8fafc',
@@ -394,7 +386,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'licenses' | 'quotas' | 'avv')}
                 style={{
                   padding: '7px 16px',
                   borderRadius: '10px',
@@ -436,7 +428,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
@@ -461,7 +452,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
@@ -474,6 +464,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Schließen"
             style={{
               width: '36px',
               height: '36px',
@@ -495,9 +486,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         </div>
       </header>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 🌟 FULLSCREEN CANVAS WORKSPACE BODY                                    */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* WORKSPACE BODY */}
       <main style={{
         flex: 1,
         overflowY: 'auto',
@@ -508,10 +497,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         boxSizing: 'border-box'
       }}>
 
-        {/* 🏢 TAB 1: STAMMDATEN & ANSCHRIFT */}
+        {/* TAB 1: STAMMDATEN & ANSCHRIFT */}
         {activeTab === 'overview' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '28px' }} className="animate-fade-in">
-            {/* Left Card: School Address Form */}
             <div style={{
               background: '#ffffff',
               borderRadius: '24px',
@@ -520,7 +508,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '20px'
+              gap: '18px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
                 <Building size={20} color="#0f172a" />
@@ -529,69 +517,55 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </h3>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                  Name der Musikschule *
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '12px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    background: '#f8fafc',
-                    fontSize: '0.90rem',
-                    fontWeight: 700,
-                    color: '#0f172a'
-                  }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Name der Musikschule *
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Rechtsträger / Offizieller Schulname
+                  </label>
+                  <input
+                    type="text"
+                    value={legalName}
+                    onChange={(e) => setLegalName(e.target.value)}
+                    placeholder="z. B. Stadtverwaltung / Trägerverein e.V."
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Straße
+                    Straße *
                   </label>
                   <input
                     type="text"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    placeholder="Friedrichstraße"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    placeholder="Straßenname"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Hausnummer
+                    Hausnummer *
                   </label>
                   <input
                     type="text"
                     value={houseNumber}
                     onChange={(e) => setHouseNumber(e.target.value)}
-                    placeholder="33"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    placeholder="1"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
                   />
                 </div>
               </div>
@@ -599,44 +573,26 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    PLZ
+                    PLZ *
                   </label>
                   <input
                     type="text"
                     value={zipCode}
                     onChange={(e) => setZipCode(e.target.value)}
-                    placeholder="79713"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    placeholder="PLZ"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Ort
+                    Ort *
                   </label>
                   <input
                     type="text"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    placeholder="Bad Säckingen"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    placeholder="Stadt / Gemeinde"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
                   />
                 </div>
               </div>
@@ -651,43 +607,52 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     value={billingContact}
                     onChange={(e) => setBillingContact(e.target.value)}
                     placeholder="Vorname Nachname"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Rechnungs- / Kontakt-E-Mail
+                    Rechnungs- / Kontakt-E-Mail *
                   </label>
                   <input
                     type="email"
                     value={billingEmail}
                     onChange={(e) => setBillingEmail(e.target.value)}
                     placeholder="leitung@musikschule.de"
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '11px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #cbd5e1',
-                      background: '#f8fafc',
-                      fontSize: '0.86rem',
-                      color: '#0f172a'
-                    }}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Telefonnummer
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="+49 / +41 ..."
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', color: '#0f172a' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Leitweg-ID (XRechnung / B2G)
+                  </label>
+                  <input
+                    type="text"
+                    value={leitwegId}
+                    onChange={(e) => setLeitwegId(e.target.value)}
+                    placeholder="z. B. 08-123456-78"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.86rem', fontFamily: 'monospace', color: '#0f172a' }}
                   />
                 </div>
               </div>
             </div>
 
-            {/* Right Card: Quick Tenant Metrics & Access Cards */}
+            {/* Right Card: Quick Tenant Metrics */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{
                 background: '#ffffff',
@@ -714,7 +679,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#ecfdf5', borderRadius: '16px', border: '1px solid #a7f3d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#ecfdf5', borderRadius: '16px', border: 'none' }}>
                   <div>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>Aktivierte Profile</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#065f46' }}>
@@ -723,7 +688,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 700 }}>Passiv im Register</div>
-                    <div style={{ fontSize: '0.90rem', fontWeight: 800, color: '#065f46' }}>{passiveStudents} Schüler (0,00 €)</div>
+                    <div style={{ fontSize: '0.90rem', fontWeight: 800, color: '#065f46' }}>
+                      {passiveStudents} Schüler ({metrics.step6PassiveStudentBaseFee.toFixed(2).replace('.', ',')} {metrics.currencySymbol})
+                    </div>
                   </div>
                 </div>
               </div>
@@ -731,7 +698,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           </div>
         )}
 
-        {/* 📜 TAB 2: MODULE & TARIFE */}
+        {/* TAB 2: MODULE & TARIFE */}
         {activeTab === 'licenses' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '28px' }} className="animate-fade-in">
             <div style={{
@@ -753,7 +720,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </p>
               </div>
 
-              {/* Module Switches */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <label style={{
                   display: 'flex',
@@ -761,13 +727,13 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   justifyContent: 'space-between',
                   padding: '16px 20px',
                   borderRadius: '16px',
-                  border: hasCampus ? '2px solid #059669' : '1px solid #cbd5e1',
+                  border: hasCampus ? 'none' : '1px solid #cbd5e1',
                   background: hasCampus ? '#ecfdf5' : '#f8fafc',
                   cursor: 'pointer'
                 }}>
                   <div>
                     <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>
-                      Modul Campus ({(masterPricing?.priceCampus ?? 14.90).toFixed(2).replace('.', ',')} € / Mo.)
+                      Modul Campus ({metrics.unitCampusHosting.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.)
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
                       Stundenplan-Designer, Raumplaner, Schüler-Protokoll, Übe-Timer &amp; Loopstation.
@@ -787,13 +753,13 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   justifyContent: 'space-between',
                   padding: '16px 20px',
                   borderRadius: '16px',
-                  border: hasGroovelab ? '2px solid #eab308' : '1px solid #cbd5e1',
+                  border: hasGroovelab ? 'none' : '1px solid #cbd5e1',
                   background: hasGroovelab ? '#fefce8' : '#f8fafc',
                   cursor: 'pointer'
                 }}>
                   <div>
                     <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>
-                      Modul GrooveLab ({(masterPricing?.priceGroovelab ?? 9.90).toFixed(2).replace('.', ',')} € / Mo.)
+                      Modul GrooveLab ({metrics.unitGroovelabHosting.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.)
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
                       Band-Verwaltung, Song-Bibliotheken, Repertoire-Planer &amp; Musiker-Avatare.
@@ -808,21 +774,22 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </label>
               </div>
 
-              {/* Kombi-Vorteil Badge */}
               {hasCampus && hasGroovelab && (
                 <div style={{
                   padding: '12px 18px',
                   borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #ecfdf5 0%, #fefce8 100%)',
-                  border: '1px solid #10b981',
+                  background: '#ecfdf5',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'
                 }}>
                   <div style={{ fontSize: '0.80rem', fontWeight: 800, color: '#065f46' }}>
-                    Kombi-Vorteilsrabatt aktiv (Infrastruktur-Bündel: 19,90 € statt 24,80 €)
+                    Kombi-Vorteilsrabatt aktiv (Infrastruktur-Bündel: {metrics.unitKombiHosting.toFixed(2).replace('.', ',')} {metrics.currencySymbol})
                   </div>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#059669' }}>-4,90 € / Mo.</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#059669' }}>
+                    -{metrics.step4KombiDiscount.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.
+                  </span>
                 </div>
               )}
             </div>
@@ -856,7 +823,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </label>
 
                 {isTrial && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', background: '#fffbeb', borderRadius: '14px', border: '1px solid #fde68a' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px', background: '#fffbeb', borderRadius: '14px', border: 'none' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.70rem', color: '#92400e', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
                         Testphase läuft bis
@@ -915,7 +882,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </label>
               </div>
 
-              {/* ☀️ Sommerferien-Moratorium & 🃏 Kulanzjoker (ASVS L3 / FinOps) */}
+              {/* Sommerferien-Moratorium & Kulanzjoker */}
               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
                   <input
@@ -925,8 +892,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     style={{ accentColor: '#f59e0b', width: '18px', height: '18px', marginTop: '2px' }}
                   />
                   <div>
-                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>
-                      ☀️ Sommerferien-Moratorium (42 Tage Standard)
+                    <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Sun size={15} color="#475569" />
+                      <span>Sommerferien-Moratorium (42 Tage Standard)</span>
                     </span>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
                       Verlängert die Kulanzphase auf 42 Tage (6 Wochen), um Ferien-Schließzeiten von Musikschul-Kassenämtern zu berücksichtigen.
@@ -934,12 +902,11 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   </div>
                 </label>
 
-                {/* 🃏 Kulanzjoker */}
                 <div style={{
                   padding: '14px 16px',
                   borderRadius: '14px',
                   background: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? '#ecfdf5' : '#f8fafc',
-                  border: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                  border: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? 'none' : '1px solid #e2e8f0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -947,7 +914,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.05rem' }}>🃏</span>
+                      <Award size={16} color="#0f172a" />
                       <span style={{ fontWeight: 850, fontSize: '0.86rem', color: '#0f172a' }}>
                         Kulanzjoker (+30 Tage Stundung &amp; Erlass Verzugspauschale)
                       </span>
@@ -963,17 +930,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     <button
                       type="button"
                       onClick={() => setDunningKulanzUntil('')}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        background: '#ffffff',
-                        border: '1px solid #fca5a5',
-                        color: '#dc2626',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
+                      style={{ padding: '6px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid #fca5a5', color: '#dc2626', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
                     >
                       Widerrufen
                     </button>
@@ -984,19 +941,10 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                         const until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
                         setDunningKulanzUntil(until);
                       }}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '10px',
-                        background: '#0f172a',
-                        border: 'none',
-                        color: '#ffffff',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                      }}
+                      style={{ padding: '6px 14px', borderRadius: '10px', background: '#0f172a', border: 'none', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                     >
-                      🃏 Joker ziehen (+30 T)
+                      <Sparkles size={13} />
+                      <span>Joker ziehen (+30 T)</span>
                     </button>
                   )}
                 </div>
@@ -1005,10 +953,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           </div>
         )}
 
-        {/* 🎙️ TAB 3: QUOTAS & AUDIO-TRESOR (Synchronized with Financial Control) */}
+        {/* TAB 3: QUOTAS & AUDIO-TRESOR */}
         {activeTab === 'quotas' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: '28px' }} className="animate-fade-in">
-            {/* Left Card: Storage Cockpit & Addon Selector */}
             <div style={{
               background: '#ffffff',
               borderRadius: '24px',
@@ -1038,7 +985,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                       Audio-Tresor &amp; Cloud-Speicher Kontingent
                     </h3>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                      1 GB Basis-Inklusivvolumen {extraStorageGb > 0 ? `+ ${extraStorageGb} GB gebuchtes Zusatz-Volumen` : ''}
+                      10 GB Basis inklusive {extraStorageGb > 0 ? `+ ${extraStorageGb} GB gebuchtes Add-on` : ''}
                     </p>
                   </div>
                 </div>
@@ -1053,7 +1000,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Dynamic Storage Meter */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.76rem', fontWeight: 700 }}>
                   <span style={{ color: '#64748b' }}>Aktuelle Auslastung</span>
@@ -1070,15 +1016,14 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 </div>
               </div>
 
-              {/* Storage Tier Packages Selector */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <label style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
-                    Zusatz-Speicherpaket wählen (Hetzner Dedicated Storage)
+                    Zusatz-Speicherpaket wählen (Dedizierter Audio-Tresor)
                   </label>
                   {extraStorageGb > 0 && (
                     <span style={{ fontSize: '0.72rem', background: '#ecfdf5', color: '#059669', padding: '2px 8px', borderRadius: '100px', fontWeight: 800 }}>
-                      + {extraStorageGb} GB aktiv ({currentAddonPackage.desc})
+                      + {extraStorageGb} GB aktiv ({resolvedStorage.fee.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.)
                     </span>
                   )}
                 </div>
@@ -1094,7 +1039,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                         style={{
                           padding: '12px 10px',
                           borderRadius: '14px',
-                          border: isSel ? '2px solid #059669' : '1px solid #e2e8f0',
+                          border: isSel ? 'none' : '1px solid #e2e8f0',
                           background: isSel ? '#ecfdf5' : '#f8fafc',
                           cursor: 'pointer',
                           textAlign: 'center',
@@ -1119,7 +1064,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               </div>
             </div>
 
-            {/* Right Card: Storage Breakdown & Retention Policies */}
+            {/* Right Card: Honest Total Quota Summary */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{
                 background: '#ffffff',
@@ -1133,115 +1078,43 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                    Audio-Tresor Speicherverteilung (Campus-Modul)
+                    Gesamt-Kontingent Übersicht
                   </h4>
                   <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#dcfce7', color: '#166534' }}>
                     100% Campus-Exklusiv
                   </span>
                 </div>
 
-                {/* Apple-Style Stacked Segmented Bar */}
-                {storageUsedBytes <= 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ height: '8px', borderRadius: '4px', background: '#f1f5f9', width: '100%' }} />
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center' }}>
-                      Noch keine Audioaufnahmen erstellt · 0,0 MB von {totalStorageGb} GB belegt (0%)
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', height: '8px', borderRadius: '4px', overflow: 'hidden', gap: '2px', background: '#f1f5f9' }}>
-                    <div style={{ width: '48%', background: '#10b981', transition: 'width 0.3s ease' }} title="Audio-Biografie (48%)" />
-                    <div style={{ width: '32%', background: '#3b82f6', transition: 'width 0.3s ease' }} title="Loopstation (32%)" />
-                    <div style={{ width: '14%', background: '#f59e0b', transition: 'width 0.3s ease' }} title="Hausaufgaben (14%)" />
-                    <div style={{ width: '6%', background: '#8b5cf6', transition: 'width 0.3s ease' }} title="Meisterwerke (6%)" />
-                  </div>
-                )}
-
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {/* 1. Platz: Audio-Biografie & Schüler-Protokoll (48%) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#10b981' : '#cbd5e1' }} />
-                      <BookOpen size={16} color={storageUsedBytes > 0 ? '#059669' : '#64748b'} />
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Audio-Biografie &amp; Schüler-Protokoll</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Wöchentliches Unterrichts- &amp; Meilenstein-Archiv</div>
-                      </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Basis-Kontingent (Inklusive)</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Standardmäßig im Campus-Modul enthalten</div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {storageUsedBytes <= 0 
-                        ? '0,0 MB (0 %)'
-                        : usedStorageGb < 1.0 
-                          ? `${(usedStorageGb * 1024 * 0.48).toFixed(1).replace('.', ',')} MB (48 %)` 
-                          : `${(usedStorageGb * 0.48).toFixed(2).replace('.', ',')} GB (48 %)`}
-                    </span>
+                    <strong style={{ fontSize: '0.86rem', color: '#059669' }}>10 GB (0,00 {metrics.currencySymbol})</strong>
                   </div>
 
-                  {/* 2. Platz: Loopstation & Übe-Studio (32%) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#3b82f6' : '#cbd5e1' }} />
-                      <Disc3 size={16} color={storageUsedBytes > 0 ? '#2563eb' : '#64748b'} />
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Loopstation &amp; Übe-Studio Aufnahmen</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Mehrspurige Loops &amp; selbstständige Übe-Sessions</div>
-                      </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Gebuchtes Zusatz-Kontingent (Add-on)</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>Monatlich flexibel anpassbares Zusatzvolumen</div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {storageUsedBytes <= 0 
-                        ? '0,0 MB (0 %)'
-                        : usedStorageGb < 1.0 
-                          ? `${(usedStorageGb * 1024 * 0.32).toFixed(1).replace('.', ',')} MB (32 %)` 
-                          : `${(usedStorageGb * 0.32).toFixed(2).replace('.', ',')} GB (32 %)`}
-                    </span>
+                    <strong style={{ fontSize: '0.86rem', color: '#0f172a' }}>
+                      +{extraStorageGb} GB ({resolvedStorage.fee.toFixed(2).replace('.', ',')} {metrics.currencySymbol} / Mo.)
+                    </strong>
                   </div>
 
-                  {/* 3. Platz: Hausaufgaben- & Unterrichtsaufnahmen (14%) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#f59e0b' : '#cbd5e1' }} />
-                      <Mic size={16} color={storageUsedBytes > 0 ? '#d97706' : '#64748b'} />
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Hausaufgaben- &amp; Unterrichtsaufnahmen</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Sprachmemos der Lehrkräfte &amp; Übe-Vorgaben</div>
-                      </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#ecfdf5', borderRadius: '12px', border: 'none' }}>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#065f46' }}>Verfügbares Gesamtvolumen</div>
+                      <div style={{ fontSize: '0.68rem', color: '#047857' }}>Belegt: {formattedUsedStorage} ({formattedStoragePct})</div>
                     </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {storageUsedBytes <= 0 
-                        ? '0,0 MB (0 %)'
-                        : usedStorageGb < 1.0 
-                          ? `${(usedStorageGb * 1024 * 0.14).toFixed(1).replace('.', ',')} MB (14 %)` 
-                          : `${(usedStorageGb * 0.14).toFixed(2).replace('.', ',')} GB (14 %)`}
-                    </span>
-                  </div>
-
-                  {/* 4. Platz: Meisterwerk-Dokumentation (6%) */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: storageUsedBytes > 0 ? '#8b5cf6' : '#cbd5e1' }} />
-                      <Sparkles size={16} color={storageUsedBytes > 0 ? '#7c3aed' : '#64748b'} />
-                      <div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e293b' }}>Meisterwerk-Dokumentation (Master-Audios)</div>
-                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>Kuratiertes Jahresvorspiel-Portfolio &amp; Master-Tracks</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
-                      {storageUsedBytes <= 0 
-                        ? '0,0 MB (0 %)'
-                        : usedStorageGb < 1.0 
-                          ? `${(usedStorageGb * 1024 * 0.06).toFixed(1).replace('.', ',')} MB (6 %)` 
-                          : `${(usedStorageGb * 0.06).toFixed(2).replace('.', ',')} GB (6 %)`}
-                    </span>
+                    <strong style={{ fontSize: '0.95rem', fontWeight: 900, color: '#065f46' }}>{totalStorageGb} GB Gesamt</strong>
                   </div>
                 </div>
 
-                {/* Audio-Tresor Storage & Capacity Info Box */}
                 {(() => {
-                  const usedFormatted = usedStorageGb < 1.0 
-                    ? `${(usedStorageGb * 1024).toFixed(1).replace('.', ',')} MB` 
-                    : `${usedStorageGb.toFixed(2).replace('.', ',')} GB`;
                   const approxRemainingHours = Math.max(1, Math.round((freeStorageGb * 1024 * 1024) / (500 * 60)));
-
                   return (
                     <div style={{
                       marginTop: '4px',
@@ -1258,22 +1131,14 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     }}>
                       <Volume2 size={16} color="#475569" style={{ flexShrink: 0 }} />
                       <div>
-                        {storageUsedBytes <= 0 ? (
-                          <>
-                            <strong style={{ color: '#0f172a' }}>Audio-Tresor Status:</strong> Noch keine Audio-Aufnahmen archiviert · Volle <strong style={{ color: '#047857' }}>{totalStorageGb} GB Speicher</strong> bieten Puffer für über <strong style={{ color: '#047857' }}>{approxRemainingHours} Stunden</strong> Musikaufnahmen.
-                          </>
-                        ) : (
-                          <>
-                            <strong style={{ color: '#0f172a' }}>Audio-Tresor Status:</strong> <strong style={{ color: '#0f172a' }}>{usedFormatted}</strong> echte Audio-Aufnahmen archiviert · <strong style={{ color: '#047857' }}>{freeStorageGb.toFixed(2).replace('.', ',')} GB</strong> freier Speicher bieten Puffer für über <strong style={{ color: '#047857' }}>{approxRemainingHours} Stunden</strong> Musikaufnahmen.
-                          </>
-                        )}
+                        <strong style={{ color: '#0f172a' }}>Audio-Tresor Status:</strong> Aktuell sind <strong style={{ color: '#0f172a' }}>{formattedUsedStorage}</strong> belegt · <strong style={{ color: '#047857' }}>{freeStorageGb.toFixed(2).replace('.', ',')} GB</strong> freier Speicher bieten Puffer für über <strong style={{ color: '#047857' }}>{approxRemainingHours} Stunden</strong> Musikaufnahmen.
                       </div>
                     </div>
                   );
                 })()}
 
-                <div style={{ marginTop: '4px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: '1px solid #a7f3d0', fontSize: '0.74rem', color: '#065f46', lineHeight: '1.5' }}>
-                  <strong>DSGVO Art. 17 Physische Löschung:</strong> Alle gelöschten Audio-Einträge werden sofort physisch aus dem Hetzner-Tresor entfernt. Inaktive Demo-Files unterliegen einer 90-Tage-Retention.
+                <div style={{ marginTop: '4px', padding: '12px 14px', borderRadius: '12px', background: '#ecfdf5', border: 'none', fontSize: '0.74rem', color: '#065f46', lineHeight: '1.5' }}>
+                  <strong>DSGVO Art. 17 Physische Löschung:</strong> Alle gelöschten Audio-Einträge werden sofort physisch aus dem europäischen Rechenzentrums-Tresor entfernt. Inaktive Demo-Files unterliegen einer 90-Tage-Retention.
                 </div>
               </div>
             </div>
@@ -1305,9 +1170,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <div style={{
                 padding: '6px 14px',
                 borderRadius: '100px',
-                background: school?.avv_signed_at ? '#ecfdf5' : '#fffbeb',
-                border: `1px solid ${school?.avv_signed_at ? '#a7f3d0' : '#fde68a'}`,
-                color: school?.avv_signed_at ? '#059669' : '#b45309',
+                background: school.avv_signed_at ? '#ecfdf5' : '#fffbeb',
+                border: 'none',
+                color: school.avv_signed_at ? '#059669' : '#b45309',
                 fontSize: '0.76rem',
                 fontWeight: 900,
                 display: 'flex',
@@ -1315,7 +1180,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                 gap: '6px'
               }}>
                 <ShieldCheck size={14} />
-                <span>{school?.avv_signed_at ? 'Rechtsgültig digital gezeichnet' : 'Ausstehend'}</span>
+                <span>{school.avv_signed_at ? 'Rechtsgültig digital gezeichnet' : 'Ausstehend'}</span>
               </div>
             </div>
 
@@ -1323,7 +1188,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <div><strong>Vertragspartner:</strong> {school.name}, {street || school.street} {houseNumber || school.house_number}, {zipCode || school.zip_code} {city || school.city}</div>
               <div><strong>Auftragnehmer:</strong> {operatorCompany || 'Campus-Groovelab (Einzelunternehmen Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden)'}</div>
               <div><strong>Geltungsbereich:</strong> Hosting, Bereitstellung von Schüler-Protokollen, Terminen, Loopstation &amp; Band-Portalen nach EU-DSGVO.</div>
-              {school?.avv_signed_at && (
+              {school.avv_signed_at && (
                 <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #cbd5e1', color: '#0f172a' }}>
                   <strong>Digital gezeichnet am:</strong> {new Date(school.avv_signed_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })} MESZ<br />
                   <strong>Unterzeichner:</strong> {school.avv_signee_name || 'Schulleitung / Vertretungsberechtigt'}
@@ -1331,7 +1196,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               )}
             </div>
 
-            {/* 🛡️ HISCOX CYBERSAFE 05/2026: MFA ENFORCEMENT POLICY FOR SCHOOL ADMINS */}
             <div style={{
               background: '#ffffff',
               border: mfaEnforcedForAdmins ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
@@ -1357,8 +1221,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                       HISCOX CYBERSAFE 05/2026 • FERNZUGRIFFE &amp; MFA
                     </span>
                     {mfaEnforcedForAdmins && (
-                      <span style={{ background: '#ecfdf5', color: '#059669', padding: '3px 10px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 900, border: '1px solid #a7f3d0' }}>
-                        ✓ 2FA Verpflichtend Aktiv
+                      <span style={{ background: '#ecfdf5', color: '#059669', padding: '3px 10px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 900, border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Check size={11} />
+                        <span>2FA Verpflichtend Aktiv</span>
                       </span>
                     )}
                   </div>
@@ -1389,7 +1254,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               </div>
             </div>
 
-            {/* DSB & Audit Portal Launcher Button */}
             <div style={{
               background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
               border: '1.5px solid #e2e8f0',
@@ -1430,16 +1294,8 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   boxShadow: '0 4px 14px rgba(15, 23, 42, 0.18)',
                   transition: 'all 0.2s ease'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(15, 23, 42, 0.28)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.18)';
-                }}
               >
-                <ShieldCheck size={18} color="#475569" />
+                <ShieldCheck size={18} color="#10b981" />
                 <span>DSB- &amp; Audit-Portal für diese Schule öffnen</span>
               </button>
             </div>
@@ -1448,9 +1304,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
       </main>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 🍎 APPLE FOOTER BAR                                                    */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* FOOTER BAR */}
       <footer style={{
         height: '68px',
         background: 'rgba(255, 255, 255, 0.92)',
@@ -1464,7 +1318,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         flexShrink: 0,
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.02)'
       }}>
-        {/* Left: Destructive / Security Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
@@ -1474,7 +1327,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               padding: '8px 14px',
               borderRadius: '10px',
               background: '#fef2f2',
-              border: '1px solid #fee2e2',
+              border: 'none',
               color: '#dc2626',
               fontSize: '0.80rem',
               fontWeight: 800,
@@ -1498,7 +1351,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               padding: '8px 16px',
               borderRadius: '10px',
               background: '#fff1f2',
-              border: '1px solid #fecdd3',
+              border: 'none',
               color: '#e11d48',
               fontSize: '0.80rem',
               fontWeight: 800,
@@ -1515,7 +1368,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           </button>
         </div>
 
-        {/* Right: Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             type="button"
@@ -1552,7 +1404,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
@@ -1563,7 +1414,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         </div>
       </footer>
 
-      {/* 🛡️ FULLSCREEN OVERLAY: DSB- & AUDIT-PORTAL FÜR DEN BETREIBER */}
       {showDpoPortal && (
         <div style={{
           position: 'fixed',
@@ -1577,9 +1427,9 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         }}>
           <DpoAuditPortal
             onClose={() => setShowDpoPortal(false)}
-            schoolName={name || school?.name || 'Stadtmusikschule'}
-            schoolAddress={`${street || school?.street || ''} ${houseNumber || school?.house_number || ''}, ${zipCode || school?.zip_code || ''} ${city || school?.city || ''}`.trim()}
-            schoolSigneeName={school?.avv_signee_name}
+            schoolName={name || school.name || 'Stadtmusikschule'}
+            schoolAddress={`${street || school.street || ''} ${houseNumber || school.house_number || ''}, ${zipCode || school.zip_code || ''} ${city || school.city || ''}`.trim()}
+            schoolSigneeName={school.avv_signee_name || undefined}
             school={school}
           />
         </div>

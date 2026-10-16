@@ -1390,7 +1390,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                 Ruhezeit-Schutz aktivieren
                               </div>
                               <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '2px' }}>
-                                {isEnabled ? 'Schutz aktiv – Schüler sehen außerhalb deiner Dienstzeiten den Abwesenheitshinweis' : 'Deaktiviert – Nachrichten werden ohne Ruhezeit-Banner empfangen'}
+                                {isEnabled ? 'Schutz aktiv – Schüler & Eltern sehen außerhalb deiner Dienstzeiten den dezenten Feierabendhinweis (Ruhezeit)' : 'Deaktiviert – Du bestimmst deine Erreichbarkeit autonom; es wird kein Feierabend-Banner angezeigt'}
                               </div>
                             </div>
                           </div>

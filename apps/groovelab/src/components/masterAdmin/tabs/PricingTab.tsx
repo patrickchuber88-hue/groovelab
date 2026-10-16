@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
 import { 
-  Tag, Percent, Plus, Copy, Check, Trash2, Edit2, RotateCcw, 
-  ArrowRight, ShieldCheck, Building2, Rocket, Calendar, GraduationCap, Download, FileText,
-  HardDrive, Users, DollarSign, Sparkles, AlertCircle, Clock
+  Tag, Plus, Check, Trash2, Edit2, 
+  ShieldCheck, Building2, Users, Globe, History
 } from 'lucide-react';
 import { CampaignEditModal } from './pricing/CampaignEditModal';
 import { SchoolRedemptionDetailModal } from './pricing/SchoolRedemptionDetailModal';
 import { PricingImpactSimulationModal } from './pricing/PricingImpactSimulationModal';
 import type { School, SchoolStat, SpecialOffer, PricingAuditLog } from '../MasterAdminTypes';
 import type { StorageTier } from '../hooks/useMasterAdminPricing';
+
+interface PricingImpactSummary {
+  currentMrr: number;
+  projectedMrr: number;
+  deltaMrr: number;
+  affectedSchoolsCount: number;
+  affectedSchools: { name: string; oldCost: number; newCost: number }[];
+}
+
+interface PricingSaveRatesPayload {
+  campus: number;
+  groovelab: number;
+  kombi: number;
+  teacher: number;
+  student: number;
+  passiveStudent: number;
+  storageAddon: number;
+  trialDays: number;
+  scope: 'all' | 'new_only';
+  currency: 'EUR' | 'CHF';
+  effectiveDate: string;
+  reason: string;
+}
 
 interface PricingTabProps {
   activeCurrency?: 'EUR' | 'CHF';
@@ -21,19 +43,19 @@ interface PricingTabProps {
     totalPassiveStudents: number;
   };
   priceCampus: number | string;
-  setPriceCampus: (val: any) => void;
+  setPriceCampus: (val: number | string) => void;
   priceGroovelab: number | string;
-  setPriceGroovelab: (val: any) => void;
+  setPriceGroovelab: (val: number | string) => void;
   priceKombi: number | string;
-  setPriceKombi: (val: any) => void;
+  setPriceKombi: (val: number | string) => void;
   priceTeacher: number | string;
-  setPriceTeacher: (val: any) => void;
+  setPriceTeacher: (val: number | string) => void;
   priceStudent: number | string;
-  setPriceStudent: (val: any) => void;
+  setPriceStudent: (val: number | string) => void;
   pricePassiveStudent: number | string;
-  setPricePassiveStudent: (val: any) => void;
+  setPricePassiveStudent: (val: number | string) => void;
   priceStorageAddon: number | string;
-  setPriceStorageAddon: (val: any) => void;
+  setPriceStorageAddon: (val: number | string) => void;
   defaultTrialDays: number;
   setDefaultTrialDays: (val: number) => void;
   priceChangeScope: 'all' | 'new_only';
@@ -45,13 +67,13 @@ interface PricingTabProps {
   storageTiersList: StorageTier[];
   setStorageTiersList: (tiers: StorageTier[]) => void;
   specialOffers: SpecialOffer[];
-  setSpecialOffers: (offers: any) => void;
+  setSpecialOffers: (offers: SpecialOffer[]) => void;
   pricingAuditLogs: PricingAuditLog[];
   pricingSaving: boolean;
-  onSavePricing: (newRates: any) => Promise<void>;
+  onSavePricing: (newRates: PricingSaveRatesPayload) => Promise<void>;
   onSaveCampaigns: (campaigns: SpecialOffer[]) => Promise<void>;
-  onRollbackPricing?: (logEntry: any) => Promise<void>;
-  onOpenLegalNoticeModal: () => void;
+  onRollbackPricing?: (logEntry: PricingAuditLog) => Promise<void>;
+  onOpenLegalNoticeModal?: () => void;
   schools: School[];
   schoolStats: Record<string, SchoolStat>;
 }
@@ -73,25 +95,23 @@ export const PricingTab: React.FC<PricingTabProps> = ({
   pricePassiveStudent,
   setPricePassiveStudent,
   priceStorageAddon,
-  setPriceStorageAddon,
+  setPriceStorageAddon: _setPriceStorageAddon,
   defaultTrialDays,
   setDefaultTrialDays,
   priceChangeScope,
-  setPriceChangeScope,
+  setPriceChangeScope: _setPriceChangeScope,
   priceEffectiveDate,
-  setPriceEffectiveDate,
+  setPriceEffectiveDate: _setPriceEffectiveDate,
   priceChangeReason,
-  setPriceChangeReason,
+  setPriceChangeReason: _setPriceChangeReason,
   storageTiersList,
   setStorageTiersList,
   specialOffers,
-  setSpecialOffers,
+  setSpecialOffers: _setSpecialOffers,
   pricingAuditLogs,
   pricingSaving,
   onSavePricing,
   onSaveCampaigns,
-  onRollbackPricing,
-  onOpenLegalNoticeModal,
   schools,
   schoolStats
 }) => {
@@ -118,10 +138,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({
   const [campaignFilter, setCampaignFilter] = useState<'all' | 'active' | 'archived'>('all');
 
   // Sub-modal states
-  const [editingOffer, setEditingOffer] = useState<any | null>(null);
-  const [selectedOfferForSchools, setSelectedOfferForSchools] = useState<any | null>(null);
+  const [editingOffer, setEditingOffer] = useState<SpecialOffer | null>(null);
+  const [selectedOfferForSchools, setSelectedOfferForSchools] = useState<SpecialOffer | null>(null);
   const [showPricingImpactModal, setShowPricingImpactModal] = useState(false);
-  const [pricingImpactData, setPricingImpactData] = useState<any>(null);
+  const [pricingImpactData, setPricingImpactData] = useState<PricingImpactSummary | null>(null);
 
   const handlePreSavePricingCheck = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,9 +162,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       const curCampus = school.grandfathered_campus_price ?? (Number(priceCampus) || (isChf ? 25.90 : 19.90));
       const curGroove = school.grandfathered_groovelab_price ?? (Number(priceGroovelab) || (isChf ? 16.80 : 12.90));
       const curKombi = school.grandfathered_kombi_price ?? (Number(priceKombi) || (isChf ? 32.50 : 24.90));
-      const curTeacher = school.grandfathered_teacher_price ?? (Number(priceTeacher) || (isChf ? 0.65 : 0.49));
-      const curStudent = school.grandfathered_student_price ?? (Number(priceStudent) || (isChf ? 0.65 : 0.49));
-      const curPassive = isChf ? 0.15 : 0.09;
+      const curTeacher = school.grandfathered_teacher_price ?? (Number(priceTeacher) || (isChf ? 1.00 : 0.49));
+      const curStudent = school.grandfathered_student_price ?? (Number(priceStudent) || (isChf ? 1.00 : 0.49));
+      const curPassive = isChf ? 0.20 : 0.09;
       const curStorage = Number(school.storage_addon_monthly_fee || 0);
 
       let curBase = 0;
@@ -160,9 +180,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         const newCamp = Number(priceCampus) || (isChf ? 25.90 : 19.90);
         const newGroove = Number(priceGroovelab) || (isChf ? 16.80 : 12.90);
         const newKombi = Number(priceKombi) || (isChf ? 32.50 : 24.90);
-        const newTeach = Number(priceTeacher) || (isChf ? 0.65 : 0.49);
-        const newStud = Number(priceStudent) || (isChf ? 0.65 : 0.49);
-        const newPass = Number(pricePassiveStudent) || (isChf ? 0.15 : 0.09);
+        const newTeach = Number(priceTeacher) || (isChf ? 1.00 : 0.49);
+        const newStud = Number(priceStudent) || (isChf ? 1.00 : 0.49);
+        const newPass = Number(pricePassiveStudent) || (isChf ? 0.20 : 0.09);
 
         if (school.has_campus_subscription && school.has_groovelab_subscription) projBase = newKombi;
         else if (school.has_campus_subscription) projBase = newCamp;
@@ -180,12 +200,11 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       }
     });
 
-    const delta = priceChangeScope === 'new_only' ? 0 : Math.round((projectedTotalMrr - currentTotalMrr) * 100) / 100;
     setPricingImpactData({
       currentMrr: Math.round(currentTotalMrr * 100) / 100,
-      projectedMrr: priceChangeScope === 'new_only' ? Math.round(currentTotalMrr * 100) / 100 : Math.round(projectedTotalMrr * 100) / 100,
-      deltaMrr: delta,
-      affectedSchoolsCount: priceChangeScope === 'new_only' ? 0 : affectedList.length,
+      projectedMrr: Math.round(currentTotalMrr * 100) / 100,
+      deltaMrr: 0,
+      affectedSchoolsCount: 0,
       affectedSchools: affectedList
     });
 
@@ -203,7 +222,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
       passiveStudent: Number(pricePassiveStudent),
       storageAddon: Number(priceStorageAddon),
       trialDays: defaultTrialDays,
-      scope: priceChangeScope,
+      scope: 'new_only',
       currency: currentCurrency,
       effectiveDate: priceEffectiveDate,
       reason: priceChangeReason
@@ -235,12 +254,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({
     setNewOfferName('');
     setNewOfferDiscount(10);
     setNewOfferCode('');
+    setNewOfferDuration(0);
     setNewOfferMaxRedemptions('');
-  };
-
-  const handleToggleOfferActive = async (id: string, current: boolean) => {
-    const updated = specialOffers.map(o => o.id === id ? { ...o, is_active: !current } : o);
-    await onSaveCampaigns(updated);
   };
 
   const handleDeleteOffer = async (id: string) => {
@@ -249,29 +264,29 @@ export const PricingTab: React.FC<PricingTabProps> = ({
     await onSaveCampaigns(updated);
   };
 
-  const handleSaveEditedOffer = async (updatedOffer: any) => {
+  const handleSaveEditedOffer = async (updatedOffer: SpecialOffer) => {
     const updated = specialOffers.map(o => o.id === updatedOffer.id ? updatedOffer : o);
     await onSaveCampaigns(updated);
     setEditingOffer(null);
   };
 
   const handleAssignSchoolToOffer = async (offerId: string, schoolId: string) => {
-    const target = specialOffers.find(o => o.id === offerId) as any;
+    const target = specialOffers.find(o => o.id === offerId);
     if (!target) return;
     const redeemed = target.redeemed_school_ids || [];
     if (redeemed.includes(schoolId)) return;
     const updated = specialOffers.map(o => o.id === offerId ? { ...o, redeemed_school_ids: [...redeemed, schoolId] } : o);
     await onSaveCampaigns(updated);
-    setSelectedOfferForSchools(updated.find(o => o.id === offerId));
+    setSelectedOfferForSchools(updated.find(o => o.id === offerId) || null);
   };
 
   const handleRemoveSchoolFromOffer = async (offerId: string, schoolId: string) => {
-    const target = specialOffers.find(o => o.id === offerId) as any;
+    const target = specialOffers.find(o => o.id === offerId);
     if (!target) return;
     const redeemed = (target.redeemed_school_ids || []).filter((id: string) => id !== schoolId);
     const updated = specialOffers.map(o => o.id === offerId ? { ...o, redeemed_school_ids: redeemed } : o);
     await onSaveCampaigns(updated);
-    setSelectedOfferForSchools(updated.find(o => o.id === offerId));
+    setSelectedOfferForSchools(updated.find(o => o.id === offerId) || null);
   };
 
   const handleStorageTierPriceChange = (gb: number, newPrice: number) => {
@@ -311,7 +326,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               height: '38px',
               borderRadius: '12px',
               background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -323,7 +338,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </h2>
           </div>
           <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', fontWeight: 500 }}>
-            Katalogpreise für Neuanmeldungen, BGB- &amp; nDSG-konforme Preispolitik und 100% Lifetime-Bestandsschutz.
+            Katalogpreise für Neuanmeldungen, transparente Tarif-Governance und 100% Lifetime-Bestandsschutz.
           </p>
         </div>
 
@@ -337,7 +352,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               background: '#f1f5f9',
               padding: '4px',
               borderRadius: '14px',
-              border: '1px solid #e2e8f0',
+              border: 'none',
               gap: '4px'
             }}
           >
@@ -362,7 +377,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 transition: 'all 0.15s ease'
               }}
             >
-              <span>🇪🇺</span> EUR (€)
+              <Globe size={14} color={currentCurrency === 'EUR' ? '#0f172a' : '#64748b'} /> EUR (€)
             </button>
             <button
               type="button"
@@ -385,30 +400,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 transition: 'all 0.15s ease'
               }}
             >
-              <span>🇨🇭</span> CHF (Schweiz)
+              <Globe size={14} color={currentCurrency === 'CHF' ? '#991b1b' : '#64748b'} /> CHF (Schweiz)
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onOpenLegalNoticeModal}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '9px 15px',
-              borderRadius: '12px',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#0f172a',
-              fontSize: '0.82rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-            }}
-          >
-            <FileText size={15} color="#475569" /> Vorlage Sonderkündigung (AGB Ziffer 4)
-          </button>
 
           <div style={{
             display: 'flex',
@@ -417,7 +411,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             padding: '7px 14px',
             borderRadius: '100px',
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             color: '#15803d',
             fontSize: '0.80rem',
             fontWeight: 800
@@ -451,6 +445,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             borderRadius: '12px',
             background: '#eff6ff',
             color: '#2563eb',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -486,6 +481,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             borderRadius: '12px',
             background: '#fef2f2',
             color: '#dc2626',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -521,6 +517,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             borderRadius: '12px',
             background: '#f0fdf4',
             color: '#16a34a',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -554,6 +551,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             borderRadius: '12px',
             background: '#faf5ff',
             color: '#9333ea',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -588,12 +586,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.1rem' }}>{isChf ? '🇨🇭' : '🇪🇺'}</span>
+              <Globe size={18} color="#0f172a" />
               <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>
                 Katalogpreise für {isChf ? 'Schweizer Franken (CHF)' : 'Euro-Zone (EUR)'}
               </h3>
             </div>
-            <span style={{ fontSize: '0.74rem', background: isChf ? '#fee2e2' : '#eff6ff', color: isChf ? '#991b1b' : '#1d4ed8', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
+            <span style={{ fontSize: '0.74rem', background: isChf ? '#fee2e2' : '#eff6ff', color: isChf ? '#991b1b' : '#1d4ed8', border: 'none', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
               Gilt für Neuanmeldungen
             </span>
           </div>
@@ -639,12 +637,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                   </div>
                 </div>
 
-                <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '14px', border: '1.5px solid #16a34a' }}>
+                <div style={{ background: '#f0fdf4', padding: '12px', borderRadius: '14px', border: 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <label style={{ display: 'block', fontSize: '0.70rem', color: '#15803d', fontWeight: 900, textTransform: 'uppercase' }}>
                       Kombi-Bundle
                     </label>
-                    <span style={{ fontSize: '0.62rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                    <span style={{ fontSize: '0.62rem', background: '#dcfce7', color: '#15803d', border: 'none', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
                       Vorteil
                     </span>
                   </div>
@@ -731,9 +729,9 @@ export const PricingTab: React.FC<PricingTabProps> = ({
             </div>
 
             {/* 3. Scope & Lifetime Protection Guarantee */}
-            <div style={{ background: '#ecfdf5', padding: '16px', borderRadius: '16px', border: '1.5px solid #10b981' }}>
+            <div style={{ background: '#ecfdf5', padding: '16px', borderRadius: '16px', border: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <ShieldCheck size={18} color="#10b981" />
+                <ShieldCheck size={18} color="#065f46" />
                 <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#065f46', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                   3. Geltungsbereich &amp; 100% Lifetime-Bestandsschutz
                 </span>
@@ -741,50 +739,20 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               <p style={{ margin: '0 0 12px 0', fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
                 <strong>Bestandskunden-Garantie:</strong> Bestehende Sammelzahler-Schulen behalten ihren gebuchten Grundtarif sowie aktive Profile dauerhaft (0,00 {currencySymbol} Mehrkosten). Tarifanpassungen gelten ausschließlich für künftige Neuregistrierungen sowie für Schüler-Neuanmeldungen im neuen Schuljahr. Bei Eltern-Direktabrechnung greift der Treuetarif bei Verlängerung bis 31. Oktober.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: priceChangeScope === 'new_only' ? '#ffffff' : 'transparent',
-                  border: `1.5px solid ${priceChangeScope === 'new_only' ? '#10b981' : '#cbd5e1'}`,
-                  cursor: 'pointer',
-                  fontSize: '0.80rem',
-                  fontWeight: 800,
-                  color: '#0f172a'
-                }}>
-                  <input
-                    type="radio"
-                    name="price_scope"
-                    checked={priceChangeScope === 'new_only'}
-                    onChange={() => setPriceChangeScope('new_only')}
-                  />
-                  <span>🛡️ Nur Neuregistrierungen (Garantie)</span>
-                </label>
-
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  background: priceChangeScope === 'all' ? '#ffffff' : 'transparent',
-                  border: `1.5px solid ${priceChangeScope === 'all' ? '#d97706' : '#cbd5e1'}`,
-                  cursor: 'pointer',
-                  fontSize: '0.80rem',
-                  fontWeight: 800,
-                  color: '#0f172a'
-                }}>
-                  <input
-                    type="radio"
-                    name="price_scope"
-                    checked={priceChangeScope === 'all'}
-                    onChange={() => setPriceChangeScope('all')}
-                  />
-                  <span>⚠️ Alle Mandanten (60-Tage Frist)</span>
-                </label>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                background: '#ffffff',
+                border: 'none',
+                fontSize: '0.80rem',
+                fontWeight: 800,
+                color: '#065f46'
+              }}>
+                <ShieldCheck size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                <span>100 % Lifetime-Bestandsschutz für Bestandsschulen aktiv (Tarifänderungen gelten ausschließlich für Neumandanten)</span>
               </div>
             </div>
 
@@ -863,10 +831,10 @@ export const PricingTab: React.FC<PricingTabProps> = ({
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, fontFamily: '"Outfit", sans-serif' }}>
-              📜 Tarifänderungs-Logbuch
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
+              <History size={18} color="#0f172a" /> Tarifänderungs-Logbuch
             </h3>
-            <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
+            <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', border: 'none', padding: '4px 10px', borderRadius: '8px', fontWeight: 800 }}>
               {pricingAuditLogs.length} Einträge
             </span>
           </div>
@@ -877,23 +845,25 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 Bisher keine Tarifänderungen protokolliert.
               </div>
             ) : (
-              pricingAuditLogs.map((log: any, idx) => {
+              pricingAuditLogs.map((log, idx) => {
                 const logCurrency = log.currency || (log.new_rates?.currency || 'EUR');
                 const logSym = logCurrency === 'CHF' ? 'CHF' : '€';
                 return (
                   <div key={log.id || idx} style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.78rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span style={{ color: '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{logCurrency === 'CHF' ? '🇨🇭' : '🇪🇺'}</span>
-                        {log.changed_by_name || log.changed_by || 'Master Admin'}
+                        <Globe size={13} color="#475569" />
+                        <span>[{logCurrency}]</span>
+                        {log.changed_by || 'Master Admin'}
                       </span>
                       <span style={{ color: '#64748b' }}>{new Date(log.created_at).toLocaleDateString('de-DE')}</span>
                     </div>
                     <div style={{ color: '#475569', margin: '4px 0' }}>
-                      Campus: {Number(log.new_rates?.campus || log.new_price_campus || 0).toFixed(2)} {logSym} • GrooveLab: {Number(log.new_rates?.groovelab || log.new_price_groovelab || 0).toFixed(2)} {logSym} • Kombi: {Number(log.new_rates?.kombi || log.new_price_kombi || 0).toFixed(2)} {logSym}
+                      Campus: {Number(log.new_rates?.campus || 0).toFixed(2)} {logSym} • GrooveLab: {Number(log.new_rates?.groovelab || 0).toFixed(2)} {logSym} • Kombi: {Number(log.new_rates?.kombi || 0).toFixed(2)} {logSym}
                     </div>
-                    <div style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 700 }}>
-                      🛡️ {log.scope || 'new_only (Lifetime-Bestandsschutz)'}
+                    <div style={{ fontSize: '0.70rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <ShieldCheck size={12} color="#16a34a" />
+                      <span>{log.scope || 'new_only (Lifetime-Bestandsschutz)'}</span>
                     </div>
                   </div>
                 );
@@ -918,8 +888,8 @@ export const PricingTab: React.FC<PricingTabProps> = ({
           border: '1px solid #e2e8f0',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-            🏷️ Kampagne anlegen
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
+            <Tag size={18} color="#0f172a" /> Kampagne anlegen
           </h3>
 
           <form onSubmit={handleAddSpecialOffer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -966,12 +936,12 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Währung</label>
                 <select
                   value={newOfferCurrency}
-                  onChange={(e) => setNewOfferCurrency(e.target.value as any)}
+                  onChange={(e) => setNewOfferCurrency(e.target.value as 'ALL' | 'EUR' | 'CHF')}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
                 >
-                  <option value="ALL">🌐 Alle Währungen</option>
-                  <option value="EUR">🇪🇺 Nur Euro (EUR)</option>
-                  <option value="CHF">🇨🇭 Nur Franken (CHF)</option>
+                  <option value="ALL">Alle Währungen (EUR &amp; CHF)</option>
+                  <option value="EUR">Nur Euro (EUR)</option>
+                  <option value="CHF">Nur Franken (CHF)</option>
                 </select>
               </div>
 
@@ -979,27 +949,42 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Geltungsbereich</label>
                 <select
                   value={newOfferScope}
-                  onChange={(e) => setNewOfferScope(e.target.value as any)}
+                  onChange={(e) => setNewOfferScope(e.target.value as 'hosting_only' | 'total_invoice')}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
                 >
-                  <option value="hosting_only">🏢 Nur Server-Hosting Flatrates</option>
-                  <option value="total_invoice">🌐 Gesamtrechnung (inkl. Schüler)</option>
+                  <option value="hosting_only">Nur Server-Hosting Flatrates</option>
+                  <option value="total_invoice">Gesamtrechnung (inkl. Schüler)</option>
                 </select>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Kampagnentyp</label>
                 <select
                   value={newOfferType}
-                  onChange={(e) => setNewOfferType(e.target.value as any)}
+                  onChange={(e) => setNewOfferType(e.target.value as 'promocode' | 'founder' | 'annual' | 'free_quota')}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
                 >
                   <option value="promocode">Gutschein-Code (Standard)</option>
                   <option value="founder">Gründer-Aktion (Dauerhaft)</option>
                   <option value="annual">Jahreszahler-Aktion</option>
                   <option value="free_quota">Freiplatz-Staffel</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '4px', textTransform: 'uppercase' }}>Laufzeit (Monate)</label>
+                <select
+                  value={newOfferDuration}
+                  onChange={(e) => setNewOfferDuration(Number(e.target.value))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700 }}
+                >
+                  <option value={0}>Dauerhaft (Permanent)</option>
+                  <option value={3}>3 Monate</option>
+                  <option value={6}>6 Monate</option>
+                  <option value={12}>12 Monate (1 Jahr)</option>
+                  <option value={24}>24 Monate (2 Jahre)</option>
                 </select>
               </div>
 
@@ -1081,7 +1066,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                 Keine Kampagnen gefunden.
               </div>
             ) : (
-              filteredOffers.map((offer: any) => (
+              filteredOffers.map((offer) => (
                 <div
                   key={offer.id}
                   style={{
@@ -1098,7 +1083,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
                     <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {offer.name} <span style={{ color: '#16a34a' }}>-{offer.discount_percent}%</span>
                       {offer.currency && offer.currency !== 'ALL' && (
-                        <span style={{ fontSize: '0.66rem', background: offer.currency === 'CHF' ? '#fee2e2' : '#eff6ff', color: offer.currency === 'CHF' ? '#991b1b' : '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                        <span style={{ fontSize: '0.66rem', background: offer.currency === 'CHF' ? '#fee2e2' : '#eff6ff', color: offer.currency === 'CHF' ? '#991b1b' : '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 800, border: 'none' }}>
                           {offer.currency}
                         </span>
                       )}

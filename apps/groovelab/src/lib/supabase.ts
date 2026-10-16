@@ -63,8 +63,9 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   
   // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
   // 🛡️ Strict Tab Session Isolation with Persistent Multi-Tab / Safari Coldstart Fallback
+  // Only valid session lease tokens (gl_active_session_lease_id) may authenticate; device keys are hardware fingerprints only
   const sessionToken = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
-    || (typeof localStorage !== 'undefined' ? (localStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key')) : null);
+    || (typeof localStorage !== 'undefined' ? localStorage.getItem('gl_active_session_lease_id') : null);
   if (sessionToken) {
     clientInfo += `;session_token=${sessionToken}`;
   }
@@ -376,11 +377,11 @@ function extractStorageFilePath(url: string, bucket: string): string | null {
 
 /**
  * Helper to physically and fully delete all storage assets associated with users (e.g. custom avatars and homework audio files)
- * from Supabase Storage buckets to ensure absolute GDPR/COPPA compliance when deleting a user/student.
+ * from Supabase Storage buckets to ensure absolute DSGVO Art. 17 & Art. 8 compliance when deleting a user/student.
  */
 export const deleteUserStorageAssets = async (userIds: string[]) => {
   if (!userIds || userIds.length === 0) return;
-  console.log('[GDPR/COPPA Cleanup] Starting physical storage cleanup for user IDs:', userIds);
+  console.log('[DSGVO Art. 17 Cleanup] Starting physical storage cleanup for user IDs:', userIds);
 
   const purgeViaBffOrFallback = async (bucket: string, filePaths: string[]) => {
     if (filePaths.length === 0) return;
@@ -393,12 +394,12 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
         body: JSON.stringify({ bucket, filePaths })
       });
       if (res.ok) {
-        console.log(`[GDPR/COPPA Cleanup] Successfully purged ${filePaths.length} assets from ${bucket} via BFF.`);
+        console.log(`[DSGVO Art. 17 Cleanup] Successfully purged ${filePaths.length} assets from ${bucket} via BFF.`);
         return;
       }
     } catch {}
     const { error: delErr } = await supabase.storage.from(bucket).remove(filePaths);
-    if (delErr) console.error(`[GDPR/COPPA Cleanup] Fallback delete error on ${bucket}:`, delErr);
+    if (delErr) console.error(`[DSGVO Art. 17 Cleanup] Fallback delete error on ${bucket}:`, delErr);
   };
 
   try {
@@ -424,11 +425,11 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
       });
 
       if (groovelabFiles.length > 0) {
-        console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from groovelab-assets:', groovelabFiles);
+        console.log('[DSGVO Art. 17 Cleanup] Deleting custom avatars from groovelab-assets:', groovelabFiles);
         await purgeViaBffOrFallback('groovelab-assets', groovelabFiles);
       }
       if (campusFiles.length > 0) {
-        console.log('[GDPR/COPPA Cleanup] Deleting custom avatars from campus-assets:', campusFiles);
+        console.log('[DSGVO Art. 17 Cleanup] Deleting custom avatars from campus-assets:', campusFiles);
         await purgeViaBffOrFallback('campus-assets', campusFiles);
       }
     }
@@ -460,18 +461,18 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
               });
             }
           } catch (e) {
-            console.error('[GDPR/COPPA Cleanup] Error parsing homework_notes for audio deletion:', e);
+            console.error('[DSGVO Art. 17 Cleanup] Error parsing homework_notes for audio deletion:', e);
           }
         }
       });
 
       if (audioFilesToDelete.length > 0) {
-        console.log('[GDPR/COPPA Cleanup] Physically deleting audio recordings from campus-assets:', audioFilesToDelete);
+        console.log('[DSGVO Art. 17 Cleanup] Physically deleting audio recordings from campus-assets:', audioFilesToDelete);
         await purgeViaBffOrFallback('campus-assets', audioFilesToDelete);
       }
     }
   } catch (err) {
-    console.error('[GDPR/COPPA Cleanup] Unexpected error during asset deletion:', err);
+    console.error('[DSGVO Art. 17 Cleanup] Unexpected error during asset deletion:', err);
   }
 };
 

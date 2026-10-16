@@ -34,6 +34,12 @@ import {
 import { supabase } from '../../lib/supabase';
 import { getBlob } from '../../utils/blobStorage';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
+import {
+  verifySharedBiographyPin,
+  recordSharedBiographyReaction,
+  type ReactionKey
+} from './audioBiography/services/sharedBiographyRpcService';
+import { LegalTextModal, type LegalTabType } from '../LegalTextModal';
 
 interface PlaylistTrackItem {
   id: string;
@@ -126,24 +132,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const initialThemeParam = searchParams.get('theme') === 'light' ? 'light' : 'dark';
   const [visualMode, setVisualMode] = useState<'dark' | 'light'>(initialThemeParam);
   const isLight = visualMode === 'light';
-  const urlPin = searchParams.get('pin')?.trim() || '';
   const isAnonymized = searchParams.get('anon') === 'true' || searchParams.get('anon') === '1';
   const targetPlaylistId = searchParams.get('pl') || null;
   const allowApplause = searchParams.get('appl') !== '0' && searchParams.get('appl') !== 'false';
-  // Deterministic PIN hash helper for cross-device family verification
-  const computePinHash = (pin: string): string => {
-    if (!pin) return '';
-    const clean = pin.trim();
-    let h = 0x811c9dc5;
-    const str = `campus_groovelab_salt_${clean}`;
-    for (let i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 0x01000193);
-    }
-    return (h >>> 0).toString(36);
-  };
-
-  const urlPinHash = searchParams.get('pinh')?.trim() || '';
 
   // 🚨 Enterprise Trust & Safety: Check if this Link / Student was taken down (Notice-and-Takedown)
   const targetKey = studentId || token || 'demo_student';
@@ -176,58 +167,51 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     return { isBlocked: false };
   });
 
-  // 🚨 Authoritative Server-Side Check (Art. 6 & 16 DSA / § 10 DDG / UrhDaG)
+  // 🚨 Authoritative Fail-Closed Server-Side Check (Art. 6 & 16 DSA / § 10 DDG / UrhDaG)
   useEffect(() => {
     let isMounted = true;
     const verifyServerTakedown = async () => {
       try {
         const { data, error } = await supabase.rpc('check_content_takedown', {
-          p_target_id: String(targetKey),
-          p_playlist_id: String(plKey)
+          p_content_type: 'audio_biography',
+          p_content_id: String(targetKey)
         });
-        if (!error && data && data.is_blocked) {
-          if (isMounted) {
-            setTakedownInfo({
-              isBlocked: true,
-              reason: data.reason || 'Urheberrechtliche Prüfung gem. Art. 16 DSA',
-              timestamp: data.timestamp
-            });
-          }
+        if (!isMounted) return;
+        if (error) {
+          setTakedownInfo({
+            isBlocked: true,
+            reason: 'Sicherheitsprüfung nicht erreichbar (Fail-Closed Schutz aktiv)',
+            timestamp: new Date().toISOString()
+          });
+          return;
         }
-      } catch (e) {
-        // Fallback to local state if offline or RPC unavailable
+        if (data && (data.is_blocked || data.is_takedown)) {
+          setTakedownInfo({
+            isBlocked: true,
+            reason: data.reason || data.reason_category || 'Urheberrechtliche Prüfung gem. Art. 16 DSA',
+            timestamp: data.timestamp || new Date().toISOString()
+          });
+        }
+      } catch {
+        if (isMounted) {
+          setTakedownInfo({
+            isBlocked: true,
+            reason: 'Sicherheitsprüfung fehlgeschlagen (Fail-Closed Schutz aktiv)',
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     };
     verifyServerTakedown();
     return () => { isMounted = false; };
   }, [targetKey, plKey]);
 
-  const [rememberDevice, setRememberDevice] = useState<boolean>(true);
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
-    try {
-      const targetKey = studentId || token || 'demo_student';
-      const plKey = targetPlaylistId || 'all';
-
-      // 1. Check persistent device token (365 days / 1 school year) only if explicit PIN was entered on device
-      const persistentKey = `campus_bio_unlocked_${targetKey}_${plKey}`;
-      const expiryKey = `campus_bio_expiry_${targetKey}_${plKey}`;
-
-      const isPersistent = localStorage.getItem(persistentKey) === 'true';
-      const expiry = parseInt(localStorage.getItem(expiryKey) || '0', 10);
-
-      if (isPersistent && expiry > Date.now()) {
-        return true;
-      }
-
-      // 2. Check active session storage
-      const sessionKey = `campus_bio_session_${targetKey}_${plKey}`;
-      return sessionStorage.getItem(sessionKey) === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [digits, setDigits] = useState<string[]>(['', '', '', '']);
+  const [activeLegalTab, setActiveLegalTab] = useState<LegalTabType | null>(null);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const verifiedPinRef = useRef<string>('');
+  const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [pinError, setPinError] = useState<boolean>(false);
+  const [pinLockoutMsg, setPinLockoutMsg] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [shakeKey, setShakeKey] = useState<number>(0);
   const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -254,13 +238,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const targetId = studentId || token || 'demo_student';
-  const [schoolName, setSchoolName] = useState<string>(() => {
-    const cached = localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name') || '';
-    return cached || 'Musikschule';
-  });
-  const [studentDisplayName, setStudentDisplayName] = useState<string>('Amelia • Gitarre');
-  const [studentInstrument, setStudentInstrument] = useState<string>('Gitarre');
-  const [schoolId, setSchoolId] = useState<string | number>(1);
+  const [schoolName, setSchoolName] = useState<string>('Musikschule');
+  const [studentDisplayName, setStudentDisplayName] = useState<string>('Geschütztes Musiktalent');
+  const [studentInstrument, setStudentInstrument] = useState<string>('Instrumental- / Vokalunterricht');
 
   const currentTheme = useMemo(() => {
     const themeKey = activePlaylistMeta?.vibeTheme || 'sunset_gold';
@@ -277,7 +257,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     let animId: number;
     const updateWave = () => {
       const time = audioRef.current ? audioRef.current.currentTime : (Date.now() / 1000);
-      // Dynamically modulated 5-band harmonic spectrum synced to audio playback tempo
       const b1 = 0.30 + 0.65 * Math.abs(Math.sin(time * 7.5));
       const b2 = 0.25 + 0.70 * Math.abs(Math.sin(time * 11.2 + 0.9));
       const b3 = 0.40 + 0.58 * Math.abs(Math.cos(time * 14.8 + 1.7));
@@ -291,196 +270,58 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     return () => cancelAnimationFrame(animId);
   }, [activePlayingId]);
 
+  // 🔒 ZERO-METADATA & ZERO-AUDIO LEAKAGE PROTECTION (§ 15 Abs. 3 UrhG / Art. 8 DSGVO)
+  // No database queries and no audio blob hydration occur before server-side PIN verification succeeds.
   useEffect(() => {
     let isCancelled = false;
 
-    const loadData = async () => {
+    const hydrateUnlockedTracks = async () => {
+      if (!isUnlocked) {
+        if (!isCancelled) setTracks([]);
+        return;
+      }
+
       try {
-        let resolvedSchoolName = localStorage.getItem('campus_school_name') || localStorage.getItem('groovelab_school_name') || '';
-        let resolvedInstrument = 'Gitarre';
-        let resolvedFirstName = '';
-
-        // 1. Check local student cache first
-        try {
-          const cachedStudentMetaStr = localStorage.getItem(`campus_student_meta_${targetId}`);
-          if (cachedStudentMetaStr) {
-            const parsed = JSON.parse(cachedStudentMetaStr);
-            if (parsed.first_name) resolvedFirstName = parsed.first_name;
-            if (parsed.instrument && parsed.instrument !== 'Musiker') {
-              resolvedInstrument = parsed.instrument;
-              setStudentInstrument(parsed.instrument);
-            }
-            if (parsed.school_name) {
-              resolvedSchoolName = parsed.school_name;
-            }
-          }
-        } catch {}
-
-        // 2. Query Supabase users table (where real student profiles live)
-        if (targetId && targetId !== 'demo_student' && targetId !== 'anonymous_student') {
-          try {
-            let targetSchoolId = '';
-
-            const { data: userRecord } = await supabase
-              .from('users')
-              .select('id, first_name, last_name, instrument, school_id')
-              .eq('id', targetId)
-              .maybeSingle();
-
-            if (userRecord && !isCancelled) {
-              if (userRecord.first_name) resolvedFirstName = userRecord.first_name;
-              if (userRecord.instrument && userRecord.instrument !== 'Musiker') {
-                resolvedInstrument = userRecord.instrument;
-                setStudentInstrument(userRecord.instrument);
-              }
-              if (userRecord.school_id) {
-                targetSchoolId = userRecord.school_id;
-                setSchoolId(userRecord.school_id);
-              }
-            }
-
-            // Fallback to students table if users table had no school_id
-            if (!targetSchoolId) {
-              const { data: studentRecord } = await supabase
-                .from('students')
-                .select('id, school_id')
-                .eq('id', targetId)
-                .maybeSingle();
-              if (studentRecord?.school_id) {
-                targetSchoolId = studentRecord.school_id;
-                setSchoolId(studentRecord.school_id);
-              }
-            }
-
-            if (targetSchoolId) {
-              const { data: schoolRecord } = await supabase
-                .from('schools')
-                .select('id, name, city')
-                .eq('id', targetSchoolId)
-                .maybeSingle();
-
-              if (schoolRecord?.name) {
-                resolvedSchoolName = schoolRecord.name;
-              }
-            }
-          } catch (err) {
-            console.warn('User/Student profile fetch note:', err);
-          }
-        }
-
-        // 3. If no school resolved from student profile, query the real active music school (excluding demo schools)
-        if (!resolvedSchoolName) {
-          try {
-            const { data: realSchools } = await supabase
-              .from('schools')
-              .select('id, name, city')
-              .eq('is_demo_tenant', false)
-              .order('created_at', { ascending: false })
-              .limit(5);
-
-            if (realSchools && realSchools.length > 0) {
-              const matchedSchool = realSchools.find(s => s.name);
-              if (matchedSchool?.name) {
-                resolvedSchoolName = matchedSchool.name;
-              }
-            }
-          } catch (err) {
-            console.warn('Default school query note:', err);
-          }
-        }
-
-        // 4. Default fallback: 'Musikschule'
-        if (!resolvedSchoolName) {
-          resolvedSchoolName = 'Musikschule';
-        }
-
-        if (resolvedSchoolName && !isCancelled) {
-          setSchoolName(resolvedSchoolName);
-        }
-
-        // Formulate Artist Name according to Decision #1
-        if (!isCancelled) {
-          if (isAnonymized) {
-            const artPrefix = resolvedInstrument.toLowerCase().includes('gitarre') ? 'an der Gitarre'
-              : resolvedInstrument.toLowerCase().includes('klavier') ? 'am Klavier'
-              : resolvedInstrument.toLowerCase().includes('schlagzeug') ? 'am Schlagzeug'
-              : resolvedInstrument.toLowerCase().includes('geige') || resolvedInstrument.toLowerCase().includes('violine') ? 'an der Geige'
-              : resolvedInstrument.toLowerCase().includes('gesang') ? 'im Gesang'
-              : `am Instrument ${resolvedInstrument}`;
-            setStudentDisplayName(`Nachwuchstalent ${artPrefix}`);
-          } else {
-            const name = resolvedFirstName || 'Amelia';
-            setStudentDisplayName(`${name} • ${resolvedInstrument}`);
-          }
-        }
-
         const PLAYLISTS_KEY = `campus_custom_playlists_${targetId}`;
         const STORAGE_KEY = `campus_audio_biography_${targetId}`;
+        let rawTracks: PlaylistTrackItem[] = tracks;
+        let plMeta: SharedPlaylistMeta | null = activePlaylistMeta;
 
-        let rawTracks: PlaylistTrackItem[] = [];
-        let plMeta: SharedPlaylistMeta | null = null;
-
-        let parsedPlaylists: any[] = [];
-        const savedPlaylistsStr = localStorage.getItem(PLAYLISTS_KEY);
-        if (savedPlaylistsStr) {
-          try {
-            parsedPlaylists = JSON.parse(savedPlaylistsStr);
-          } catch (e) {
-            console.warn('Custom playlists parse note:', e);
-          }
-        }
-
-        // ☁️ Cross-Device Fallback: If family opens link on their own phone, load playlist definition from Supabase
-        if ((!parsedPlaylists || parsedPlaylists.length === 0) && targetId) {
-          try {
-            const { data: remotePlRow } = await supabase
-              .from('progress_matrix')
-              .select('homework_notes')
-              .eq('student_id', targetId)
-              .eq('topic_name', 'CAMPUS_CUSTOM_PLAYLISTS')
-              .order('created_at', { ascending: false })
-              .limit(1);
-
-            if (remotePlRow && remotePlRow.length > 0 && remotePlRow[0].homework_notes) {
-              const remoteParsed = JSON.parse(remotePlRow[0].homework_notes);
-              if (Array.isArray(remoteParsed) && remoteParsed.length > 0) {
-                parsedPlaylists = remoteParsed;
+        if (rawTracks.length === 0) {
+          const savedPlaylistsStr = localStorage.getItem(PLAYLISTS_KEY);
+          if (savedPlaylistsStr) {
+            try {
+              const parsedPlaylists = JSON.parse(savedPlaylistsStr);
+              if (Array.isArray(parsedPlaylists) && parsedPlaylists.length > 0) {
+                const matchedPl = targetPlaylistId
+                  ? parsedPlaylists.find((p: any) => p.id === targetPlaylistId)
+                  : parsedPlaylists[0];
+                if (matchedPl) {
+                  plMeta = {
+                    id: matchedPl.id,
+                    title: matchedPl.title,
+                    description: matchedPl.description || 'Persönliche Meisterstücke & Song-Sammlung',
+                    vibeTheme: matchedPl.vibeTheme || 'sunset_gold',
+                    iconName: matchedPl.iconName || 'music',
+                    createdAt: matchedPl.createdAt || 'Aktuelles Schuljahr',
+                    tracks: matchedPl.tracks || []
+                  };
+                  rawTracks = (matchedPl.tracks || []).map((t: any, idx: number) => ({
+                    id: t.id || `pl_track_${idx}`,
+                    title: t.title || `Song ${idx + 1}`,
+                    subtitle: t.subtitle,
+                    audioUrl: t.audioUrl,
+                    masteredAudioUrl: t.masteredAudioUrl,
+                    duration: t.duration || 45,
+                    recordedAt: t.recordedAt || 'Aufgenommen',
+                    personalNote: t.personalNote,
+                    preferredVersion: t.preferredVersion || 'master',
+                    stepNumber: idx + 1,
+                    iconName: 'music'
+                  }));
+                }
               }
-            }
-          } catch (cloudErr) {
-            console.warn('Remote playlists fallback notice:', cloudErr);
-          }
-        }
-
-        if (Array.isArray(parsedPlaylists) && parsedPlaylists.length > 0) {
-          const matchedPl = targetPlaylistId 
-            ? parsedPlaylists.find((p: any) => p.id === targetPlaylistId) 
-            : parsedPlaylists[0];
-
-          if (matchedPl) {
-            plMeta = {
-              id: matchedPl.id,
-              title: matchedPl.title,
-              description: matchedPl.description || 'Persönliche Meisterstücke & Song-Sammlung',
-              vibeTheme: matchedPl.vibeTheme || 'sunset_gold',
-              iconName: matchedPl.iconName || 'music',
-              createdAt: matchedPl.createdAt || 'Aktuelles Schuljahr',
-              tracks: matchedPl.tracks || []
-            };
-
-            rawTracks = (matchedPl.tracks || []).map((t: any, idx: number) => ({
-              id: t.id || `pl_track_${idx}`,
-              title: t.title || `Song ${idx + 1}`,
-              subtitle: t.subtitle,
-              audioUrl: t.audioUrl,
-              masteredAudioUrl: t.masteredAudioUrl,
-              duration: t.duration || 45,
-              recordedAt: t.recordedAt || 'Aufgenommen',
-              personalNote: t.personalNote,
-              preferredVersion: t.preferredVersion || 'master',
-              stepNumber: idx + 1,
-              iconName: 'music'
-            }));
+            } catch {}
           }
         }
 
@@ -504,44 +345,25 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                   stepNumber: m.stepNumber || idx + 1,
                   iconName: m.iconName || 'sparkles'
                 }));
-
-                plMeta = {
-                  id: 'pl_milestones_album',
-                  title: 'Musikalische Meisterreise',
-                  description: 'Eine persönliche Zeitkapsel der akustischen Entwicklung – von den ersten Tönen bis zu den großen Stücken.',
-                  vibeTheme: 'sunset_gold',
-                  iconName: 'sparkles',
-                  createdAt: 'Schuljahr 2026/2027',
-                  tracks: rawTracks
-                };
               }
-            } catch (e) {
-              console.warn('Milestones parse note:', e);
-            }
+            } catch {}
           }
         }
 
-        if (rawTracks.length === 0 && !plMeta) {
+        if (!plMeta) {
           plMeta = {
-            id: targetPlaylistId || 'pl_empty',
-            title: 'Audio-Biografie',
+            id: targetPlaylistId || 'pl_milestones_album',
+            title: 'Musikalische Meisterreise',
             description: 'Persönliche Meisterstücke & Song-Sammlung',
             vibeTheme: 'sunset_gold',
-            iconName: 'music',
+            iconName: 'sparkles',
             createdAt: 'Aktuelles Schuljahr',
-            tracks: []
+            tracks: rawTracks
           };
         }
 
         if (!isCancelled) {
           setActivePlaylistMeta(plMeta);
-        }
-
-        // 🔒 ZERO-AUDIO LEAKAGE PROTECTION (§ 15 Abs. 3 UrhG)
-        // No audio blob hydration, no preloading until PIN verification succeeds!
-        if (!isUnlocked) {
-          if (!isCancelled) setTracks([]);
-          return;
         }
 
         const hydratedTracks: PlaylistTrackItem[] = await Promise.all(
@@ -575,7 +397,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       }
     };
 
-    loadData();
+    hydrateUnlockedTracks();
 
     return () => {
       isCancelled = true;
@@ -584,7 +406,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
         audioRef.current = null;
       }
     };
-  }, [targetId, targetPlaylistId, isAnonymized, isUnlocked]);
+  }, [targetId, targetPlaylistId, isUnlocked]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -608,49 +430,20 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       window.dispatchEvent(new CustomEvent('campus_family_listen_received', { detail: { targetId, playlistId: playlistKey, reaction: type } }));
     } catch {}
 
-    // 🌟 PERSIST TO SUPABASE FOR CROSS-DEVICE STUDENT SYNC (§ 53 UrhG / Tier-1 SaaS Enterprise+)
-    if (targetId) {
-      try {
-        const topicIdentifier = `FAMILY_REACTION:${playlistKey}`;
-        const { data: existingMatrix } = await supabase
-          .from('progress_matrix')
-          .select('id, homework_notes')
-          .eq('student_id', targetId)
-          .eq('topic_name', topicIdentifier)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        let reactionTally = { bravo: 0, love: 0, fire: 0, star: 0 };
-        if (existingMatrix && existingMatrix.length > 0 && existingMatrix[0].homework_notes) {
-          try {
-            reactionTally = JSON.parse(existingMatrix[0].homework_notes);
-          } catch {}
-        }
-        reactionTally[type] = (Number(reactionTally[type]) || 0) + 1;
-
-        if (existingMatrix && existingMatrix.length > 0) {
-          await supabase
-            .from('progress_matrix')
-            .update({
-              homework_notes: JSON.stringify(reactionTally),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingMatrix[0].id);
-        } else {
-          await supabase
-            .from('progress_matrix')
-            .insert({
-              student_id: targetId,
-              school_id: schoolId || 1,
-              topic_name: topicIdentifier,
-              homework_notes: JSON.stringify(reactionTally),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-        }
-      } catch (cloudErr) {
-        console.warn('Cross-device reaction sync notice:', cloudErr);
-      }
+    // 🌟 PERSIST VIA AUTHORITATIVE SERVER RPC (Zero Direct Table Mutation)
+    if (targetId && verifiedPinRef.current) {
+      const reactionKeyMap: Record<'bravo' | 'love' | 'fire' | 'star', ReactionKey> = {
+        bravo: 'clap',
+        love: 'heart',
+        fire: 'fire',
+        star: 'star'
+      };
+      await recordSharedBiographyReaction(
+        targetId,
+        verifiedPinRef.current,
+        playlistKey,
+        reactionKeyMap[type]
+      );
     }
 
     const messages = {
@@ -678,7 +471,6 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setCurrentTimeSec(0);
     setTotalDurationSec(track.duration || 45);
 
-    // 🌟 DSGVO-konforme Registrierung des ersten Hörerlebnisses für den Meilenstein
     try {
       localStorage.setItem(`campus_family_listen_${targetId}`, new Date().toISOString());
       localStorage.setItem(`campus_family_shared_${targetId}`, 'true');
@@ -776,13 +568,13 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
 
   const activeTrackObj = tracks.find(t => t.id === activePlayingId) || tracks[currentTrackIndex];
 
+  // 🔒 Strict 2-Channel Separation: Share link NEVER includes the plaintext Familien-PIN
   const handleShareToApp = (platform?: 'share' | 'copy') => {
-    const url = window.location.href;
-    const pin = getExpectedPin();
-    const fullText = `🎵 Höre dir meine neuesten Songs aus der Musikschule an!\n\n1. Link öffnen: ${url}\n2. Familien-PIN eingeben: ${pin}\n\n🔒 WICHTIGER HINWEIS:\nDieser Link & PIN sind ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media, Instagram, TikTok oder Websites) ist unzulässig.`;
+    const cleanUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
+    const fullText = `🎵 Höre dir meine neuesten Aufnahmen aus der Musikschule an!\n\n1. Link öffnen: ${cleanUrl}\n2. Familien-PIN eingeben (wird aus Sicherheitsgründen separat auf einem zweiten Kanal mitgeteilt)\n\n🔒 WICHTIGER HINWEIS:\nDieser Link ist ausschließlich für den privaten Familienkreis bestimmt. Ein öffentliches Teilen (z. B. auf Social Media oder Websites) ist unzulässig.`;
 
     if (platform === 'share' && navigator.share) {
-      navigator.share({ title: 'Musikschule Playlist', text: fullText, url }).catch(() => {});
+      navigator.share({ title: 'Musikschule Audio-Biografie', text: fullText, url: cleanUrl }).catch(() => {});
       return;
     }
 
@@ -790,70 +582,95 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       navigator.clipboard.writeText(fullText);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2500);
-      showToast('📋 Vollständige Einladung mit PIN in Zwischenablage kopiert!');
+      showToast('📋 Geschützter Freigabelink (ohne PIN) kopiert! Bitte teile die Familien-PIN separat mit.');
     }
   };
 
-  const getExpectedPin = () => {
-    try {
-      if (targetPlaylistId) {
-        const pPin = localStorage.getItem(`campus_share_pin_${targetId}_${targetPlaylistId}`);
-        if (pPin && /^\d{4}$/.test(pPin)) return pPin;
-      }
-      const sPin = localStorage.getItem(`campus_share_pin_${targetId}`);
-      if (sPin && /^\d{4}$/.test(sPin)) return sPin;
-
-      const currPin = localStorage.getItem('campus_share_pin_current') || localStorage.getItem('campus_share_pin_global');
-      if (currPin && /^\d{4}$/.test(currPin)) return currPin;
-
-      // 🛡️ Hardened SEC-05: Zero predictable ID derivation.
-      // Enforces explicit cryptographic verification via urlPinHash or stored device PIN.
-      return null;
-    } catch {}
-    return null;
-  };
-
-  const handleVerifyPin = (pinToTest?: string) => {
-    const fullPin = pinToTest || digits.join('');
-    if (fullPin.length !== 4) return;
+  // 🛡️ Authoritative Server-Side Bcrypt Verification via RPC verify_shared_biography_pin
+  const handleVerifyPin = async (pinToTest?: string) => {
+    const fullPin = (pinToTest || digits.join('')).trim();
+    if (fullPin.length < 4 || fullPin.length > 6) return;
 
     setIsVerifying(true);
-    const expected = getExpectedPin();
+    setPinLockoutMsg(null);
 
-    setTimeout(() => {
-      setIsVerifying(false);
-      const isHashMatch = Boolean(urlPinHash && computePinHash(fullPin) === urlPinHash);
-      const isExpectedMatch = Boolean(expected && fullPin === expected);
+    try {
+      const rpcResult = await verifySharedBiographyPin(targetId, fullPin);
 
-      if (isHashMatch || isExpectedMatch) {
-        try {
-          const plKey = targetPlaylistId || 'all';
-          const sessionKey = `campus_bio_session_${targetId}_${plKey}`;
-          sessionStorage.setItem(sessionKey, 'true');
+      if (rpcResult.isTakedown) {
+        setIsVerifying(false);
+        setTakedownInfo({
+          isBlocked: true,
+          reason: rpcResult.reasonCategory || 'Urheberrechtliche Prüfung gem. Art. 16 DSA',
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
 
-          if (rememberDevice) {
-            const ONE_SCHOOL_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-            localStorage.setItem(`campus_bio_unlocked_${targetId}_${plKey}`, 'true');
-            localStorage.setItem(`campus_bio_expiry_${targetId}_${plKey}`, (Date.now() + ONE_SCHOOL_YEAR_MS).toString());
-          }
-        } catch {}
+      if (rpcResult.success) {
+        verifiedPinRef.current = fullPin;
+        const resolvedInstrument = rpcResult.studentInstrument || 'Instrumental- / Vokalunterricht';
+        const resolvedSchool = rpcResult.schoolName || 'Musikschule';
+        const resolvedName = rpcResult.studentName || 'Musiktalent';
+
+        setStudentInstrument(resolvedInstrument);
+        setSchoolName(resolvedSchool);
+        setStudentDisplayName(
+          isAnonymized
+            ? `Nachwuchstalent (${resolvedInstrument})`
+            : `${resolvedName} • ${resolvedInstrument}`
+        );
+
+        if (rpcResult.playlist && rpcResult.playlist.length > 0) {
+          const serverTracks: PlaylistTrackItem[] = rpcResult.playlist.map((item, idx) => ({
+            id: item.id || `srv_track_${idx}`,
+            title: item.title || `Aufnahme ${idx + 1}`,
+            subtitle: item.instrument || resolvedInstrument,
+            audioUrl: item.audioUrl,
+            masteredAudioUrl: item.audioUrl,
+            duration: item.durationSec || 45,
+            recordedAt: item.date ? new Date(item.date).toLocaleDateString('de-DE') : 'Aufgenommen',
+            personalNote: item.description,
+            preferredVersion: 'master',
+            stepNumber: idx + 1,
+            iconName: item.category === 'milestone' ? 'sparkles' : 'music'
+          }));
+          setTracks(serverTracks);
+          setActivePlaylistMeta({
+            id: targetPlaylistId || 'pl_milestones_album',
+            title: 'Musikalische Meisterreise',
+            description: 'Persönliche Meisterstücke & Song-Sammlung',
+            vibeTheme: 'sunset_gold',
+            iconName: 'sparkles',
+            createdAt: 'Aktuelles Schuljahr',
+            tracks: serverTracks
+          });
+        }
+
+        setIsVerifying(false);
         setIsUnlocked(true);
         setPinError(false);
-      } else {
-        setPinError(true);
-        setShakeKey(prev => prev + 1);
-        setDigits(['', '', '', '']);
-        digitInputRefs.current[0]?.focus();
+        return;
       }
-    }, 180);
-  };
 
-  // Auto-verify if valid 4-digit urlPin is provided in search params
-  useEffect(() => {
-    if (!isUnlocked && urlPin && /^\d{4}$/.test(urlPin)) {
-      handleVerifyPin(urlPin);
+      setIsVerifying(false);
+      setPinError(true);
+      if (rpcResult.error === 'LOCKED_TOO_MANY_ATTEMPTS') {
+        setPinLockoutMsg('Zu viele Fehlversuche. Der Zugang ist zum Schutz für 15 Minuten gesperrt.');
+      } else if (typeof rpcResult.remainingAttempts === 'number') {
+        setPinLockoutMsg(`Falsche Familien-PIN. Noch ${rpcResult.remainingAttempts} Versuche bis zur 15-Minuten-Sperre.`);
+      }
+      setShakeKey(prev => prev + 1);
+      setDigits(['', '', '', '', '', '']);
+      digitInputRefs.current[0]?.focus();
+    } catch {
+      setIsVerifying(false);
+      setPinError(true);
+      setShakeKey(prev => prev + 1);
+      setDigits(['', '', '', '', '', '']);
+      digitInputRefs.current[0]?.focus();
     }
-  }, [isUnlocked, urlPin]);
+  };
 
   const handleDigitChange = (index: number, val: string) => {
     const char = val.replace(/\D/g, '').slice(-1);
@@ -862,13 +679,13 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
     setDigits(newDigits);
     setPinError(false);
 
-    if (char && index < 3) {
+    if (char && index < 5) {
       digitInputRefs.current[index + 1]?.focus();
     }
 
-    if (index === 3 && char) {
+    if (index === 5 && char) {
       const enteredPin = newDigits.join('');
-      if (enteredPin.length === 4) {
+      if (enteredPin.length === 6) {
         handleVerifyPin(enteredPin);
       }
     }
@@ -879,14 +696,20 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
       if (!digits[index] && index > 0) {
         digitInputRefs.current[index - 1]?.focus();
       }
+    } else if (e.key === 'Enter') {
+      const enteredPin = digits.join('');
+      if (enteredPin.length >= 4 && enteredPin.length <= 6) {
+        handleVerifyPin(enteredPin);
+      }
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-    if (pasted.length === 4) {
-      const newDigits = pasted.split('');
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length >= 4 && pasted.length <= 6) {
+      const newDigits = ['', '', '', '', '', ''];
+      pasted.split('').forEach((c, idx) => { newDigits[idx] = c; });
       setDigits(newDigits);
       handleVerifyPin(pasted);
     }
@@ -902,7 +725,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
   const handleNumpadBackspace = () => {
     const lastFilledIdx = [...digits].reverse().findIndex(d => d !== '');
     if (lastFilledIdx !== -1) {
-      const realIdx = 3 - lastFilledIdx;
+      const realIdx = 5 - lastFilledIdx;
       const newDigits = [...digits];
       newDigits[realIdx] = '';
       setDigits(newDigits);
@@ -1008,14 +831,18 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             </span>
             <span style={{ fontSize: '0.68rem', color: '#94a3b8', lineHeight: 1.4 }}>
               Gegenvorstellung & Rechtsbehelf nach Art. 20 DSA:{' '}
-              <a 
-                href="mailto:dsa-appeal@campus-groovelab.de?subject=DSA-Gegenvorstellung%20Takedown" 
-                style={{ color: '#38bdf8', textDecoration: 'underline' }}
-              >
+              <a href="mailto:dsa-appeal@campus-groovelab.de?subject=DSA-Gegenvorstellung%20Takedown" style={{ color: '#38bdf8', textDecoration: 'underline' }}>
                 dsa-appeal@campus-groovelab.de
               </a>
             </span>
           </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '0.70rem' }}>
+            <button type="button" onClick={() => setActiveLegalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+            <button type="button" onClick={() => setActiveLegalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+            <button type="button" onClick={() => setActiveLegalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+          </div>
+          <LegalTextModal isOpen={activeLegalTab !== null} onClose={() => setActiveLegalTab(null)} initialTab={activeLegalTab || 'impressum'} />
         </div>
       </div>
     );
@@ -1113,30 +940,30 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               {activePlaylistMeta?.title || 'Audio-Biografie & Aufnahmen'}
             </h2>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.80rem', color: '#94a3b8', lineHeight: 1.45 }}>
-              Bitte gib die 4-stellige Familien-PIN ein, um die Audioaufnahmen freizuschalten.
+              Bitte gib die 4- bis 6-stellige Familien-PIN ein, um die Audioaufnahmen freizuschalten.
             </p>
           </div>
 
-          {/* 4 Glowing PIN Dots / Pills */}
+          {/* 4-6 Glowing PIN Dots / Pills */}
           <div 
             key={shakeKey}
             style={{
               display: 'flex',
-              gap: '12px',
+              gap: '8px',
               justifyContent: 'center',
               animation: pinError ? 'pinShake 0.4s ease-in-out' : 'none',
               margin: '4px 0'
             }}
           >
-            {[0, 1, 2, 3].map((idx) => {
+            {[0, 1, 2, 3, 4, 5].map((idx) => {
               const isFilled = Boolean(digits[idx]);
               return (
                 <div
                   key={idx}
                   onClick={() => digitInputRefs.current[idx]?.focus()}
                   style={{
-                    width: '46px',
-                    height: '54px',
+                    width: '42px',
+                    height: '52px',
                     borderRadius: '14px',
                     border: pinError
                       ? '2px solid #ef4444'
@@ -1205,46 +1032,9 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               fontWeight: 700,
               lineHeight: 1.35
             }}>
-              Falsche PIN. Bitte frage das Musiktalent nach dem 4-stelligen Familien-Code.
+              {pinLockoutMsg || 'Falsche PIN. Bitte frage das Musiktalent nach dem 4- bis 6-stelligen Familien-Code.'}
             </div>
           )}
-
-          {/* Remember Device Checkbox */}
-          <div 
-            onClick={() => setRememberDevice(!rememberDevice)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              userSelect: 'none',
-              padding: '6px 14px',
-              borderRadius: '100px',
-              background: rememberDevice ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.04)',
-              border: `1px solid ${rememberDevice ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <div style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '5px',
-              background: rememberDevice ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
-              border: rememberDevice ? 'none' : '1px solid rgba(255, 255, 255, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              fontSize: '10px',
-              fontWeight: 900
-            }}>
-              {rememberDevice && '✓'}
-            </div>
-            <span style={{ fontSize: '0.74rem', color: rememberDevice ? '#a7f3d0' : '#94a3b8', fontWeight: 700 }}>
-              Auf diesem Gerät merken (365 Tage)
-            </span>
-          </div>
 
           {/* Apple-Style Studio Keypad */}
           <div style={{
@@ -1326,20 +1116,20 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             <button
               type="button"
               onClick={() => handleVerifyPin()}
-              disabled={digits.join('').length !== 4 || isVerifying}
+              disabled={digits.join('').length < 4 || digits.join('').length > 6 || isVerifying}
               style={{
                 height: '52px',
                 borderRadius: '16px',
                 border: 'none',
-                background: digits.join('').length === 4 ? currentTheme.gradient : 'rgba(255, 255, 255, 0.08)',
+                background: (digits.join('').length >= 4 && digits.join('').length <= 6) ? currentTheme.gradient : 'rgba(255, 255, 255, 0.08)',
                 color: '#ffffff',
                 fontSize: '0.92rem',
                 fontWeight: 900,
-                cursor: digits.join('').length === 4 ? 'pointer' : 'not-allowed',
+                cursor: (digits.join('').length >= 4 && digits.join('').length <= 6) ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: digits.join('').length === 4 ? `0 4px 16px ${currentTheme.glow}` : 'none',
+                boxShadow: (digits.join('').length >= 4 && digits.join('').length <= 6) ? `0 4px 16px ${currentTheme.glow}` : 'none',
                 userSelect: 'none'
               }}
               className="hover-scale"
@@ -1364,6 +1154,14 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               <strong style={{ color: '#ffffff' }}>Geschützter Familien-Zugang:</strong> Diese Audioaufnahmen dienen ausschließlich der internen pädagogischen Dokumentation im persönlichen Familien- und Freundeskreis. Eine öffentliche Wiedergabe oder Verbreitung im Internet ist unzulässig.
             </span>
           </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '0.70rem' }}>
+            <button type="button" onClick={() => setActiveLegalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+            <button type="button" onClick={() => setActiveLegalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+            <button type="button" onClick={() => setActiveLegalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+            <a href="mailto:copyright@campus-groovelab.de?subject=DSA-Meldung%20Audio-Biografie" style={{ color: '#94a3b8', textDecoration: 'underline' }}>Inhalt melden (DSA)</a>
+          </div>
+          <LegalTextModal isOpen={activeLegalTab !== null} onClose={() => setActiveLegalTab(null)} initialTab={activeLegalTab || 'impressum'} />
         </div>
       </div>
     );
@@ -2170,11 +1968,18 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             <span>Pädagogische Unterrichtsergebnisse • <strong>{schoolName}</strong></span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Shield size={12} color="#10b981" />
-            <span>Geschützte Unterrichtsaufnahmen für den privaten Familienkreis</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Shield size={12} color="#10b981" />
+              <span>Geschützte Unterrichtsaufnahmen für den privaten Familienkreis</span>
+            </div>
+            <button type="button" onClick={() => setActiveLegalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+            <button type="button" onClick={() => setActiveLegalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+            <button type="button" onClick={() => setActiveLegalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+            <a href="mailto:copyright@campus-groovelab.de?subject=DSA-Meldung%20Audio-Biografie" style={{ color: 'inherit', fontSize: '0.72rem', textDecoration: 'underline' }}>Inhalt melden (DSA)</a>
           </div>
         </div>
+        <LegalTextModal isOpen={activeLegalTab !== null} onClose={() => setActiveLegalTab(null)} initialTab={activeLegalTab || 'impressum'} />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { ParentInfoSheetModal } from './modals/ParentInfoSheetModal';
@@ -104,6 +104,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
     handleExportLedgerCsv
   } = useTariffLedger(showActionToast);
 
+  useEffect(() => {
+    if (invoices && invoices.length > 0 && allTariffBookings.length === 0) {
+      fetchAllTariffBookings(invoices);
+    }
+  }, [invoices]);
+
   // 4. DATEV Export Hook
   const {
     selectedChartOfAccounts,
@@ -112,7 +118,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
     setDatevPeriodMonth,
     datevPeriodYear,
     handleDatevExport
-  } = useDatevExport(showActionToast);
+  } = useDatevExport(showActionToast, taxMode);
 
   // 5. Banking & CAMT.053 Hook
   const {
@@ -204,7 +210,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
       const today = new Date().toISOString().split('T')[0];
       const due = new Date();
-      due.setDate(due.getDate() + 14);
+      due.setDate(due.getDate() + 30);
       const dueDate = due.toISOString().split('T')[0];
 
       // GoBD Prüfsiegel gem. §§ 146, 147 AO
@@ -298,7 +304,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
       {/* Dynamic styles injector */}
       <style>{`
         .billing-card {
@@ -406,7 +412,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         flexWrap: 'wrap'
       }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: '"Outfit", sans-serif' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', display: 'flex', alignItems: 'center', gap: '10px', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
             <Landmark style={{ color: '#ea4335' }} size={28} /> Finance &amp; Accounting Suite
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 550 }}>
@@ -418,6 +424,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* DATEV Export Button */}
           <button
+            type="button"
             onClick={() => handleDatevExport(selectedChartOfAccounts, invoices, getSchoolInvoices, operatorCompany)}
             style={{
               display: 'flex',
@@ -442,6 +449,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
           {/* CAMT.053 Bankabgleich Button */}
           <button
+            type="button"
             onClick={() => setCamtUploadModalOpen(true)}
             style={{
               display: 'flex',
@@ -466,6 +474,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
           {/* SEPA Lastschriften XML */}
           <button
+            type="button"
             onClick={() => setSepaExportModalOpen(true)}
             style={{
               display: 'flex',
@@ -490,6 +499,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
 
           {/* Refresh Button */}
           <button
+            type="button"
             onClick={() => {
               fetchBillingData();
               fetchAllTariffBookings();
@@ -541,6 +551,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           const IconComp = tab.icon;
           return (
             <button
+              type="button"
               key={tab.id}
               onClick={() => setActiveFinanceSubTab(tab.id as any)}
               style={{
@@ -632,7 +643,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         />
       )}
 
-      {/* 📊 SUB-TAB 2: DATEV & ERLÖSKONTEN */}
+      {/* SUB-TAB 2: DATEV & ERLÖSKONTEN */}
       {activeFinanceSubTab === 'datev' && (
         <DatevSubTab
           selectedChartOfAccounts={selectedChartOfAccounts}
@@ -641,11 +652,12 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           setDatevPeriodMonth={setDatevPeriodMonth}
           datevPeriodYear={datevPeriodYear}
           invoices={invoices}
+          taxMode={taxMode}
           onDatevExport={(chart) => handleDatevExport(chart, invoices, getSchoolInvoices, operatorCompany)}
         />
       )}
 
-      {/* 📜 SUB-TAB 6: BUCHUNGSJOURNAL & TARIFE */}
+      {/* SUB-TAB 6: BUCHUNGSJOURNAL & TARIFE */}
       {activeFinanceSubTab === 'ledger' && (
         <LedgerSubTab
           allTariffBookings={allTariffBookings}
@@ -667,7 +679,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         />
       )}
 
-      {/* 🏦 SUB-TAB 3: BANKING & SEPA */}
+      {/* SUB-TAB 3: BANKING & SEPA */}
       {activeFinanceSubTab === 'banking' && (
         <BankingSubTab
           bankFileInputRef={bankFileInputRef}
@@ -693,15 +705,16 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
         />
       )}
 
-      {/* 📈 SUB-TAB 4: PRAP & PERIODENABGRENZUNG */}
+      {/* SUB-TAB 4: PRAP & PERIODENABGRENZUNG */}
       {activeFinanceSubTab === 'prap' && (
-        <PrapSubTab totalMonthlyRevenue={summary.totalMonthlyRevenue} />
+        <PrapSubTab totalMonthlyRevenue={summary.totalMonthlyRevenue} dbInvoices={dbInvoices} />
       )}
 
-      {/* ⚠️ SUB-TAB 5: OPOS & MAHNWESEN */}
+      {/* SUB-TAB 5: OPOS & MAHNWESEN */}
       {activeFinanceSubTab === 'dunning' && (
         <DunningSubTab
           invoices={invoices}
+          dbInvoices={dbInvoices}
           totalUnpaid={summary.totalUnpaid}
           getPaidInvoices={getPaidInvoices}
           onSendDunningEmail={(invoice, inv, level) => handleSendDunningEmail(invoice, inv, level, { operatorCompany, operatorIban, operatorBic })}

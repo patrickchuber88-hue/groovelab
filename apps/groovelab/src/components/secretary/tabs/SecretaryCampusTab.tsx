@@ -15,8 +15,8 @@ import {
   BarChart2, LayoutGrid, Info, Activity, Lightbulb, GripVertical
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
-import { SecretaryStudentsView } from '../SecretaryStudentsView';
-import { SecretarySubjectsView } from '../SecretarySubjectsView';
+const SecretaryStudentsView = React.lazy(() => import('../SecretaryStudentsView').then(m => ({ default: m.SecretaryStudentsView })));
+const SecretarySubjectsView = React.lazy(() => import('../SecretarySubjectsView').then(m => ({ default: m.SecretarySubjectsView })));
 import { AppleStyleTokenField } from '../../common/AppleStyleTokenField';
 const CampusEventsBoard = React.lazy(() => import('../../CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 const AdminDashboard = React.lazy(() => import('../../AdminDashboard').then(m => ({ default: m.AdminDashboard })));
@@ -520,6 +520,11 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
   handleToggleSetting,
 }) => {
   const { toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+  const teacherStudentCountsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    (students || []).forEach((s: any) => { if (s?.teacher_id) map[s.teacher_id] = (map[s.teacher_id] || 0) + 1; });
+    return map;
+  }, [students]);
   return (
           <div className="campus-grid" style={(campusSubTab === 'briefing' || campusSubTab === 'events' || campusSubTab === 'rooms') ? { gridTemplateColumns: '1fr', gap: 0 } : {}}>
             
@@ -1391,25 +1396,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               {/* Pupil Count */}
                               <div style={{ flex: '1', minWidth: '100px', display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: '#3a3a3c' }}>
                                 <Users size={16} style={{ color: '#86868b' }} />
-                                <span>{(students.filter((s: any) => s.teacher_id === t.id).length) || t.studentCount || 0} Schüler</span>
+                                <span>{teacherStudentCountsMap[t.id] || t.studentCount || 0} Schüler</span>
                               </div>
 
                               {/* Action Buttons */}
                               <div style={{ flex: '1.2', minWidth: '120px', display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setManageTeacher(t);
-                                  }}
-                                  style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#1a73e8',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    fontFamily: 'Urbanist'
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setManageTeacher(t); }}
+                                  style={{ background: 'transparent', border: 'none', color: '#1a73e8', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Urbanist' }}
                                 >
                                   Pass teilen
                                 </button>

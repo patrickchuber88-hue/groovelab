@@ -8,20 +8,18 @@ import { checkIsAudioTresorActive } from '../../../domain/stickersAndTresor';
 import { queryCache } from '../../../lib/supabase';
 import { TourStartButton } from '../../PremiumOnboardingTour';
 
-// Modals
-import { TeacherInviteStudentModal } from '../TeacherInviteStudentModal';
-import { TeacherUrgentCancellationsModal } from '../TeacherUrgentCancellationsModal';
-import { TeacherMakeupTokenModal } from '../TeacherMakeupTokenModal';
-import { TeacherEditStudentModal } from '../TeacherEditStudentModal';
-import { TeacherAbsenceModal } from '../TeacherAbsenceModal';
-import { TeacherAbsenceNotifModal } from '../TeacherAbsenceNotifModal';
-import { TeacherAbsenceEndedModal } from '../TeacherAbsenceEndedModal';
-import { TeacherAbsenceOverviewModal } from '../TeacherAbsenceOverviewModal';
-import { CampusAppointmentShoutboxModal } from '../../CampusAppointmentShoutboxModal';
-import { GlobalNotesDrawer } from '../../notes/GlobalNotesDrawer';
-import { TeacherAnnouncementReaderModal } from '../TeacherAnnouncementReaderModal';
-
 // Lazy loaded modals
+const TeacherInviteStudentModal = lazy(() => import('../TeacherInviteStudentModal').then(m => ({ default: m.TeacherInviteStudentModal })));
+const TeacherUrgentCancellationsModal = lazy(() => import('../TeacherUrgentCancellationsModal').then(m => ({ default: m.TeacherUrgentCancellationsModal })));
+const TeacherMakeupTokenModal = lazy(() => import('../TeacherMakeupTokenModal').then(m => ({ default: m.TeacherMakeupTokenModal })));
+const TeacherEditStudentModal = lazy(() => import('../TeacherEditStudentModal').then(m => ({ default: m.TeacherEditStudentModal })));
+const TeacherAbsenceModal = lazy(() => import('../TeacherAbsenceModal').then(m => ({ default: m.TeacherAbsenceModal })));
+const TeacherAbsenceNotifModal = lazy(() => import('../TeacherAbsenceNotifModal').then(m => ({ default: m.TeacherAbsenceNotifModal })));
+const TeacherAbsenceEndedModal = lazy(() => import('../TeacherAbsenceEndedModal').then(m => ({ default: m.TeacherAbsenceEndedModal })));
+const TeacherAbsenceOverviewModal = lazy(() => import('../TeacherAbsenceOverviewModal').then(m => ({ default: m.TeacherAbsenceOverviewModal })));
+const CampusAppointmentShoutboxModal = lazy(() => import('../../CampusAppointmentShoutboxModal').then(m => ({ default: m.CampusAppointmentShoutboxModal })));
+const GlobalNotesDrawer = lazy(() => import('../../notes/GlobalNotesDrawer').then(m => ({ default: m.GlobalNotesDrawer })));
+const TeacherAnnouncementReaderModal = lazy(() => import('../TeacherAnnouncementReaderModal').then(m => ({ default: m.TeacherAnnouncementReaderModal })));
 const LiveStageToolboxModal = lazy(() => import('../../LiveStageToolboxModal').then(m => ({ default: m.LiveStageToolboxModal })));
 const TeacherDetailModal = lazy(() => import('../../TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
 const StudentDetailModal = lazy(() => import('../../StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
@@ -296,7 +294,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
   TourComponent
 }) => {
   return (
-    <>
+    <Suspense fallback={null}>
       {showStageToolbox && (
         <Suspense fallback={null}>
           <LiveStageToolboxModal 
@@ -808,6 +806,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
       )}
 
       {/* Global Notes Quick-Drawer */}
+      {showNotesDrawer && (
       <GlobalNotesDrawer
         isOpen={showNotesDrawer}
         onClose={() => setShowNotesDrawer(false)}
@@ -837,8 +836,10 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
           });
         }}
       />
+      )}
 
       {/* Announcement Reader Modal */}
+      {openAnnouncementDetailModal && (
       <TeacherAnnouncementReaderModal
         openAnnouncementDetailModal={openAnnouncementDetailModal}
         setOpenAnnouncementDetailModal={setOpenAnnouncementDetailModal}
@@ -849,6 +850,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
         handleSubmitFeedbackResponse={handleSubmitFeedbackResponse}
         handleMarkRequestAsDone={handleMarkRequestAsDone}
       />
-    </>
+      )}
+    </Suspense>
   );
 };

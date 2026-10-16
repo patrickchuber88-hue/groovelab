@@ -15,12 +15,14 @@ import {
   ShieldCheck,
   Lock,
   User,
-  Fingerprint
+  Fingerprint,
+  Moon
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { isWebAuthnSupported, getSanitizedRpId } from '../utils/webauthn';
+import { isQuietHoursActive } from '../utils/chatRespectGuard';
 import { CampusDynamicAvatar } from './CampusDirectMessages';
 import { CampusUnifiedChatMessage, isChatMessageSystem } from './messages/CampusUnifiedChatMessage';
 
@@ -177,7 +179,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     if (currentUserRole === 'student' && !teacherObj && teacherId) {
       supabase
         .from('users')
-        .select('id, first_name, last_name, role, avatar_url, photo_url')
+        .select('id, first_name, last_name, role, avatar_url, photo_url, quiet_hours')
         .eq('id', teacherId)
         .maybeSingle()
         .then(({ data }) => {
@@ -185,6 +187,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         });
     }
   }, [currentUserRole, teacherObj, teacherId]);
+
+  const isTeacherInQuietHours = useMemo(() => {
+    if (currentUserRole !== 'student') return false;
+    const tObj = teacherObj || fetchedTeacher;
+    if (!tObj) return false;
+    return isQuietHoursActive(tObj.quiet_hours);
+  }, [currentUserRole, teacherObj, fetchedTeacher]);
 
   const isGroupOcc = Boolean(
     occurrence.isGroup ||
@@ -1574,6 +1583,27 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       <span>Als Elternteil antworten (PIN)</span>
                     </button>
                   )}
+                </div>
+              )}
+
+              {/* 🌙 Ambient Quiet Hours Status Pill (0.1% Goldstandard) */}
+              {isTeacherInQuietHours && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  borderRadius: '100px',
+                  padding: '4px 12px',
+                  marginBottom: '8px',
+                  fontSize: '0.74rem',
+                  color: '#92400e',
+                  fontWeight: 650,
+                  alignSelf: 'flex-start'
+                }}>
+                  <Moon size={13} color="#d97706" style={{ flexShrink: 0 }} />
+                  <span>{teacherDisplayName} hat Feierabend (Ruhezeit) • Nachricht wird zugestellt und am nächsten Schultag beantwortet</span>
                 </div>
               )}
 

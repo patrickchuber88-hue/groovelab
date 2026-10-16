@@ -41,8 +41,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const handleShareFamily = async () => {
     const shareUrl = buildShareUrl();
-    const title = `Musikalisches Album von ${student?.first_name || 'Schüler'}`;
-    const text = `Hör dir meine neuesten Musik-Aufnahmen an! Mein Familien-PIN lautet: ${sharePin}`;
+    const title = `Musikalisches Album von ${student?.first_name || 'Musiktalent'}`;
+    const text = `Hör dir meine neuesten Musik-Aufnahmen an! (Die 4-stellige Familien-PIN erhältst du separat auf einem zweiten Kanal.)`;
 
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
@@ -225,7 +225,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 DEIN FAMILIEN-PIN
               </div>
               <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.18em' }}>
-                {sharePin || '4829'}
+                {sharePin || '••••'}
               </div>
             </div>
           </div>

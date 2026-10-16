@@ -1,4 +1,5 @@
 import React from 'react';
+import { FileText, Globe, ShieldCheck, Copy, X } from 'lucide-react';
 
 interface PricingLegalNoticeModalProps {
   isOpen: boolean;
@@ -26,7 +27,6 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
   if (!isOpen) return null;
 
   const isChf = currency === 'CHF';
-  const sym = isChf ? 'CHF' : '€';
   const fmt = (n: number | string) => isChf ? `CHF ${Number(n).toFixed(2)}` : `${Number(n).toFixed(2).replace('.', ',')} €`;
 
   const effectiveDateFormatted = new Date(priceEffectiveDate || Date.now() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString('de-DE');
@@ -42,7 +42,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
       `- Kombi-Vorteil Bundle: ${fmt(priceKombi)} / Mo.\n` +
       `- Pädagogen- & Administrationspauschale: ${fmt(priceTeacher)} / Mo.\n` +
       `- Schüleraktivierung: ${fmt(priceStudent)} / Mo.\n\n` +
-      `Gesetzliche Belehrung zum Sonderkündigungsrecht (AGB Ziffer 4 & BGB 315):\n` +
+      `Vertragliche Hinweise zum Sonderkündigungsrecht (AGB Ziffer 4):\n` +
       `Gemäß unserer vertraglichen Preisanpassungsklausel kündigen wir diese Änderung mit einer Frist von mindestens zwei (2) Monaten in Textform an. Sie haben das Recht, dieser Vertragsanpassung vor dem Wirksamkeitszeitpunkt in Textform zu widersprechen. Im Falle eines form- und fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens (${effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen.`
     );
     alert('Rechtssicherer Mitteilungstext erfolgreich in die Zwischenablage kopiert!');
@@ -96,9 +96,10 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               gap: '8px',
             }}
           >
-            📄 Rechtssichere Mitteilungsvorlage (B2B SaaS / AGB Ziffer 4)
+            <FileText size={20} color="#0f172a" /> Rechtssichere Mitteilungsvorlage (B2B SaaS / AGB Ziffer 4)
           </h3>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Schließen"
             style={{
@@ -110,9 +111,12 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               cursor: 'pointer',
               fontWeight: 900,
               color: '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -131,12 +135,16 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
             <span style={{
               background: isChf ? '#fee2e2' : '#dbeafe',
               color: isChf ? '#991b1b' : '#1e40af',
-              padding: '2px 8px',
+              border: 'none',
+              padding: '4px 10px',
               borderRadius: '6px',
               fontWeight: 800,
-              fontSize: '0.72rem'
+              fontSize: '0.72rem',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
             }}>
-              {isChf ? '🇨🇭 Währung: Schweizer Franken (CHF)' : '🇪🇺 Währung: Euro (EUR)'}
+              <Globe size={13} /> {isChf ? 'Währung: Schweizer Franken (CHF)' : 'Währung: Euro (EUR)'}
             </span>
           </div>
 
@@ -166,13 +174,13 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               <li>Campus-Modul: {fmt(priceCampus)} / Mo.</li>
               <li>GrooveLab-Modul: {fmt(priceGroovelab)} / Mo.</li>
               <li>Kombi-Vorteil Bundle: {fmt(priceKombi)} / Mo.</li>
-              <li>Pädagogen- & Verwaltungslizenz: {fmt(priceTeacher)} / Mo.</li>
+              <li>Pädagogen- &amp; Verwaltungslizenz: {fmt(priceTeacher)} / Mo.</li>
               <li>Schüleraktivierung: {fmt(priceStudent)} / Mo.</li>
             </ul>
           </div>
 
-          <p style={{ margin: '0 0 12px 0', fontWeight: 700, color: '#0f172a' }}>
-            ⚖️ Gesetzliche Belehrung zum Sonderkündigungsrecht (AGB Ziffer 4):
+          <p style={{ margin: '0 0 12px 0', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={16} color="#0f172a" /> Vertragliche Hinweise zum Sonderkündigungsrecht (AGB Ziffer 4):
           </p>
           <p style={{ margin: '0 0 12px 0', fontSize: '0.80rem', color: '#334155' }}>
             Gemäß unserer AGB kündigen wir diese Preisanpassung mit einer Frist von mindestens zwei (2) Monaten vor dem neuen Schuljahr in Textform an. Sie haben das Recht, dieser Vertragsanpassung vor dem Stichtag in Textform zu widersprechen. Im Falle eines fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag ({effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen.
@@ -181,6 +189,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <button
+            type="button"
             onClick={handleCopyNotice}
             style={{
               padding: '10px 18px',
@@ -191,11 +200,15 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
               fontSize: '0.82rem',
               border: 'none',
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            📋 Text kopieren
+            <Copy size={14} /> Text kopieren
           </button>
           <button
+            type="button"
             onClick={onClose}
             style={{
               padding: '10px 20px',

@@ -600,23 +600,29 @@ class MockSupabaseClient {
 // Instantiate database
 const mockDb = new MockDatabase();
 
-async function seedRealDatabase(serviceClient: any) {
+async function seedRealDatabase(serviceClient: any): Promise<string | null> {
   console.log('Seeding remote Supabase database with test users and lessons...');
 
-  // 1. School
-  const { error: schoolError } = await serviceClient.from('schools').upsert([
-    { id: '11111111-1111-1111-1111-111111111111', name: 'Groove Academy' }
-  ]);
-  if (schoolError) {
-    console.error('Failed to seed schools:', schoolError);
-    throw schoolError;
+  // 1. School (Zero-Dummy: keine automatischen Test-Schulen in Real-DB)
+  // Dynamically resolve existing demo/test tenant
+  const { data: demoSchool } = await serviceClient
+    .from('schools')
+    .select('id')
+    .eq('is_demo_tenant', true)
+    .limit(1)
+    .maybeSingle();
+
+  const targetSchoolId = demoSchool?.id;
+  if (!targetSchoolId) {
+    console.log('Zero-Dummy Doktrin: Kein aktiver Demo-Mandant in Real-DB gefunden. Seeding übersprungen zum Schutz von Produktivdaten.');
+    return null;
   }
 
   // 2. Users
   const usersToSeed = [
     {
       id: '22222222-2222-2222-2222-222222222221',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'teacher',
       first_name: 'John',
       last_name: 'Doe',
@@ -628,7 +634,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '22222222-2222-2222-2222-222222222222',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'teacher',
       first_name: 'Alice',
       last_name: 'Smith',
@@ -640,7 +646,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '33333333-3333-3333-3333-333333333331',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'student',
       first_name: 'Jane',
       last_name: 'Smith',
@@ -652,7 +658,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '33333333-3333-3333-3333-333333333332',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'student',
       first_name: 'Bob',
       last_name: 'Jones',
@@ -664,7 +670,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '44444444-4444-4444-4444-444444444441',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'admin',
       first_name: 'Admin',
       last_name: 'User',
@@ -676,7 +682,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '44444444-4444-4444-4444-444444444442',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'secretary',
       first_name: 'Sec',
       last_name: 'Retary',
@@ -688,7 +694,7 @@ async function seedRealDatabase(serviceClient: any) {
     },
     {
       id: '99999999-9999-9999-9999-999999999999',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       role: 'admin',
       first_name: 'Master',
       last_name: 'Admin',
@@ -712,7 +718,7 @@ async function seedRealDatabase(serviceClient: any) {
       id: '66666666-6666-6666-6666-666666666661',
       teacher_id: '22222222-2222-2222-2222-222222222221',
       student_id: '33333333-3333-3333-3333-333333333331',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       date: '2026-06-17',
       start_time: '10:00',
       duration: 45,
@@ -722,7 +728,7 @@ async function seedRealDatabase(serviceClient: any) {
       id: '66666666-6666-6666-6666-666666666662',
       teacher_id: '22222222-2222-2222-2222-222222222221',
       student_id: '33333333-3333-3333-3333-333333333332',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       date: '2026-06-18',
       start_time: '11:00',
       duration: 45,
@@ -732,7 +738,7 @@ async function seedRealDatabase(serviceClient: any) {
       id: '66666666-6666-6666-6666-666666666663',
       teacher_id: '22222222-2222-2222-2222-222222222222',
       student_id: '33333333-3333-3333-3333-333333333331',
-      school_id: '11111111-1111-1111-1111-111111111111',
+      school_id: targetSchoolId,
       date: '2026-06-17',
       start_time: '14:00',
       duration: 60,
@@ -747,6 +753,7 @@ async function seedRealDatabase(serviceClient: any) {
   }
 
   console.log('Successfully completed real database seeding.');
+  return targetSchoolId;
 }
 
 // Main Execution
@@ -777,10 +784,11 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
     const serviceClient = createClient(supabaseUrl, serviceKey || "");
-    await seedRealDatabase(serviceClient);
+    const seededSchoolId = await seedRealDatabase(serviceClient);
+    const effectiveTestSchoolId = seededSchoolId || '00000000-0000-0000-0000-000000000001';
 
     const idMap: Record<string, string> = {
-      'school-1': '11111111-1111-1111-1111-111111111111',
+      'school-1': effectiveTestSchoolId,
       'teacher-1': '22222222-2222-2222-2222-222222222221',
       'teacher-2': '22222222-2222-2222-2222-222222222222',
       'student-1': '33333333-3333-3333-3333-333333333331',
@@ -903,7 +911,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
       try {
         sessionStorage.setItem('groovelab_user_id', 'admin-1');
         // Delete only test events to prevent wiping out user's real events
-        const delRes = await client.from('campus_events').delete().in('school_id', ['school-1', '11111111-1111-1111-1111-111111111111']);
+        const delRes = await client.from('campus_events').delete().in('school_id', ['school-1']);
         if (delRes.error) {
           console.warn(`[Cleanup] Delete events failed:`, delRes.error);
         }

@@ -30,6 +30,8 @@ export {
   isInstrumentAvatar
 };
 
+const resolvedInstrumentCache = new Map<string, Promise<string>>();
+
 export const resolveStudentInstrumentAsync = async (user: any): Promise<string> => {
   if (!user) return '';
   if (user.resolved_instrument && !isGenericInstrument(user.resolved_instrument)) {
@@ -39,42 +41,54 @@ export const resolveStudentInstrumentAsync = async (user: any): Promise<string> 
     return String(user.instrument).split(',')[0].trim();
   }
 
-  // 1. Direct teacher_id check in users table
-  if (user.teacher_id) {
-    try {
-      const { data: teacherData } = await supabase
-        .from('users')
-        .select('instrument, subject')
-        .eq('id', user.teacher_id)
-        .maybeSingle();
-      if (teacherData?.instrument && !isGenericInstrument(teacherData.instrument)) {
-        return String(teacherData.instrument).split(',')[0].trim();
-      }
-      if (teacherData?.subject && !isGenericInstrument(teacherData.subject)) {
-        return String(teacherData.subject).split(',')[0].trim();
-      }
-    } catch (e) {}
+  const cacheKey = `${user.id || ''}_${user.teacher_id || ''}`;
+  if (cacheKey !== '_' && resolvedInstrumentCache.has(cacheKey)) {
+    return resolvedInstrumentCache.get(cacheKey)!;
   }
 
-  // 2. Relational student_teachers junction lookup
-  if (user.id) {
-    try {
-      const { data: stData } = await supabase
-        .from('student_teachers')
-        .select('teacher_id, teacher:users!student_teachers_teacher_id_fkey(instrument, subject)')
-        .eq('student_id', user.id)
-        .maybeSingle();
-      const teacherObj: any = Array.isArray(stData?.teacher) ? stData?.teacher[0] : stData?.teacher;
-      if (teacherObj?.instrument && !isGenericInstrument(teacherObj.instrument)) {
-        return String(teacherObj.instrument).split(',')[0].trim();
-      }
-      if (teacherObj?.subject && !isGenericInstrument(teacherObj.subject)) {
-        return String(teacherObj.subject).split(',')[0].trim();
-      }
-    } catch (e) {}
-  }
+  const lookupPromise = (async (): Promise<string> => {
+    // 1. Direct teacher_id check in users table
+    if (user.teacher_id) {
+      try {
+        const { data: teacherData } = await supabase
+          .from('users')
+          .select('instrument, subject')
+          .eq('id', user.teacher_id)
+          .maybeSingle();
+        if (teacherData?.instrument && !isGenericInstrument(teacherData.instrument)) {
+          return String(teacherData.instrument).split(',')[0].trim();
+        }
+        if (teacherData?.subject && !isGenericInstrument(teacherData.subject)) {
+          return String(teacherData.subject).split(',')[0].trim();
+        }
+      } catch (e) {}
+    }
 
-  return '';
+    // 2. Relational student_teachers junction lookup
+    if (user.id) {
+      try {
+        const { data: stData } = await supabase
+          .from('student_teachers')
+          .select('teacher_id, teacher:users!student_teachers_teacher_id_fkey(instrument, subject)')
+          .eq('student_id', user.id)
+          .maybeSingle();
+        const teacherObj: any = Array.isArray(stData?.teacher) ? stData?.teacher[0] : stData?.teacher;
+        if (teacherObj?.instrument && !isGenericInstrument(teacherObj.instrument)) {
+          return String(teacherObj.instrument).split(',')[0].trim();
+        }
+        if (teacherObj?.subject && !isGenericInstrument(teacherObj.subject)) {
+          return String(teacherObj.subject).split(',')[0].trim();
+        }
+      } catch (e) {}
+    }
+
+    return '';
+  })();
+
+  if (cacheKey !== '_') {
+    resolvedInstrumentCache.set(cacheKey, lookupPromise);
+  }
+  return lookupPromise;
 };
 
 // ─── Dynamic Level Border & Halo Frame System ─────────────────────────────────

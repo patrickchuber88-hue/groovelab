@@ -25,6 +25,7 @@ import {
 export type LegalTab = 
   | 'impressum' 
   | 'privacy' 
+  | 'junior_privacy'
   | 'terms' 
   | 'avv' 
   | 'sla' 
@@ -33,10 +34,13 @@ export type LegalTab =
   | 'cancellation' 
   | 'accessibility';
 
+export type LegalTabType = LegalTab;
+
 interface LegalTextModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: LegalTab;
+  schoolData?: Record<string, unknown> | null;
 }
 
 /**
@@ -319,18 +323,76 @@ const DocumentStage: React.FC<{ doc: LegalDocumentDefinition; extraBadge?: strin
   );
 };
 
+const getResolvedImpressumDoc = (schoolData?: Record<string, unknown> | null): LegalDocumentDefinition => {
+  const baseDoc = LEGAL_DOCUMENTS.impressum;
+  const rawName = (typeof schoolData?.name === 'string' ? schoolData.name : '') || (typeof schoolData?.school_name === 'string' ? schoolData.school_name : '');
+  if (!schoolData || !rawName.trim()) {
+    return baseDoc;
+  }
+
+  const schoolName = rawName.trim();
+  const principal = (typeof schoolData.principal_name === 'string' && schoolData.principal_name.trim())
+    || (typeof schoolData.leader_name === 'string' && schoolData.leader_name.trim())
+    || (typeof schoolData.billing_contact_person === 'string' && schoolData.billing_contact_person.trim())
+    || '';
+  const streetPart = typeof schoolData.street === 'string' && schoolData.street
+    ? `${schoolData.street} ${typeof schoolData.house_number === 'string' ? schoolData.house_number : ''}`.trim()
+    : (typeof schoolData.school_street === 'string' ? schoolData.school_street : '');
+  const cityPart = typeof schoolData.zip_code === 'string' && typeof schoolData.city === 'string' && schoolData.zip_code && schoolData.city
+    ? `${schoolData.zip_code} ${schoolData.city}`.trim()
+    : (typeof schoolData.city === 'string' ? schoolData.city : '');
+  const addressLine = [streetPart, cityPart].filter(Boolean).join(', ');
+  const email = (typeof schoolData.email === 'string' && schoolData.email.trim())
+    || (typeof schoolData.school_email === 'string' && schoolData.school_email.trim())
+    || '';
+  const phone = (typeof schoolData.phone === 'string' && schoolData.phone.trim())
+    || (typeof schoolData.school_phone === 'string' && schoolData.school_phone.trim())
+    || '';
+  const legalForm = (typeof schoolData.legal_form === 'string' && schoolData.legal_form.trim()) || '';
+  const authority = (typeof schoolData.supervisory_authority === 'string' && schoolData.supervisory_authority.trim()) || '';
+
+  const tenantLines = [
+    `### 🏛️ Ebene 1: Herausgeber & inhaltlich verantwortliche Bildungsstätte (§ 5 Abs. 1 DDG / § 18 MStV)`,
+    `**${schoolName}**  `,
+    legalForm ? `Rechtsform: ${legalForm}  ` : '',
+    principal ? `Vertreten durch die Schulleitung: ${principal}  ` : '',
+    addressLine ? `Anschrift: ${addressLine}  ` : '',
+    phone ? `Telefon: ${phone}  ` : '',
+    email ? `E-Mail: ${email}  ` : '',
+    authority ? `Zuständige Aufsichtsbehörde: ${authority}  ` : '',
+    '',
+    '---',
+    '',
+    '### 🛡️ Ebene 2: Technische Plattformbereitstellung, Cloud-Hosting & Pflichtangaben (§ 5 Abs. 1 DDG)'
+  ].filter((line, idx, arr) => line !== '' || (idx > 0 && arr[idx - 1] === '---') || (idx < arr.length - 1 && arr[idx + 1] === '---'));
+
+  const tenantHeaderMarkdown = tenantLines.join('\n').trim();
+
+  return {
+    ...baseDoc,
+    subtitle: `Schul-Primat für ${schoolName} gem. § 5 DDG & § 18 MStV`,
+    fullTextMarkdown: `${tenantHeaderMarkdown}\n\n${baseDoc.fullTextMarkdown}`
+  };
+};
+
 export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   isOpen,
   onClose,
-  initialTab = 'impressum'
+  initialTab = 'impressum',
+  schoolData
 }) => {
   const [activeTab, setActiveTab] = useState<LegalTab>(initialTab);
+  const isB2bInitial = ['avv', 'sla', 'school_parent_info'].includes(initialTab);
+  const [showB2bTabs, setShowB2bTabs] = useState<boolean>(isB2bInitial);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
+      if (['avv', 'sla', 'school_parent_info'].includes(initialTab)) {
+        setShowB2bTabs(true);
+      }
       if (contentRef.current) {
         contentRef.current.scrollTop = 0;
       }
@@ -364,6 +426,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     let docTitle = 'Rechtliche Dokumente – Campus-Groovelab';
     if (activeTab === 'impressum') docTitle = 'Campus-Groovelab – Impressum & Anbieterkennzeichnung';
     else if (activeTab === 'privacy') docTitle = 'Campus-Groovelab – Datenschutzerklärung (DSGVO)';
+    else if (activeTab === 'junior_privacy') docTitle = 'Campus-Groovelab – Datenschutz für Kinder & Jugendliche (Art. 12 DSGVO)';
     else if (activeTab === 'terms') docTitle = 'Campus-Groovelab – Allgemeine Geschäftsbedingungen (AGB)';
     else if (activeTab === 'avv') docTitle = 'Campus-Groovelab – Auftragsverarbeitungsvertrag (AVV / Art. 28 DSGVO)';
     else if (activeTab === 'sla') docTitle = 'Campus-Groovelab – Service Level Agreement (SLA)';
@@ -530,9 +593,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 <Scale size={20} />
               </div>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                    Rechtliche Hinweise &amp; Governance
+                    Rechtliche Hinweise &amp; Richtlinien
                   </h3>
                   <span style={{
                     background: '#e2e8f0',
@@ -543,11 +606,11 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                     fontWeight: 750,
                     letterSpacing: '0.02em'
                   }}>
-                    DACH • B2B &amp; B2C
+                    Deutschland • Österreich • Schweiz
                   </span>
                 </div>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#475569', fontWeight: 500 }}>
-                  Offizielle Dokumente, Datenschutz &amp; Compliance für Musikschulen, Eltern und Lehrkräfte
+                  Offizielle Dokumente, Datenschutz und Schutzstandards für Musikschulen, Eltern und Lehrkräfte
                 </p>
               </div>
             </div>
@@ -600,20 +663,31 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 scrollbarWidth: 'none'
               }}
             >
-              {[
-                { id: 'impressum' as const, label: 'Impressum', icon: Building },
-                { id: 'privacy' as const, label: 'Datenschutz', icon: ShieldCheck },
-                { id: 'terms' as const, label: 'AGB (A & B)', icon: FileText },
-                { id: 'avv' as const, label: 'AVV', icon: FileCheck },
-                { id: 'sla' as const, label: 'SLA', icon: Server },
-                { id: 'school_parent_info' as const, label: 'Eltern-Info', icon: Shield },
-                { id: 'child_protection' as const, label: 'Kinderschutz', icon: HeartHandshake },
-                { id: 'cancellation' as const, label: 'Widerruf', icon: Undo2 },
-                { id: 'accessibility' as const, label: 'Barrierefreiheit', icon: Accessibility }
-              ].map((tab, tabIdx, tabArr) => {
-                const isActive = activeTab === tab.id;
-                const Icon = tab.icon;
-                return (
+              {(() => {
+                const tabs: Array<{ id: LegalTab; label: string; icon: React.ElementType }> = [
+                  { id: 'impressum', label: 'Impressum', icon: Building },
+                  { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
+                  { id: 'terms', label: showB2bTabs ? 'B2B-AGB & SaaS' : 'AGB & Nutzung', icon: FileText },
+                  { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 },
+                  { id: 'child_protection', label: 'Verhaltensregeln', icon: HeartHandshake },
+                  { id: 'accessibility', label: 'Barrierefreiheit', icon: Accessibility }
+                ];
+
+                if (showB2bTabs) {
+                  tabs.push(
+                    { id: 'avv', label: 'AVV (Art. 28)', icon: FileCheck },
+                    { id: 'sla', label: 'SLA (99,5%)', icon: Server }
+                  );
+                }
+
+                if (activeTab === 'school_parent_info' || showB2bTabs) {
+                  tabs.push({ id: 'school_parent_info', label: 'Eltern-Info', icon: Shield });
+                }
+
+                return tabs.map((tab, tabIdx, tabArr) => {
+                  const isActive = activeTab === tab.id || (tab.id === 'privacy' && activeTab === 'junior_privacy');
+                  const Icon = tab.icon;
+                  return (
                   <button
                     key={tab.id}
                     ref={(el) => { tabRefs.current[tab.id] = el; }}
@@ -673,7 +747,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                     <span>{tab.label}</span>
                   </button>
                 );
-              })}
+              });
+            })()}
             </div>
           </div>
 
@@ -696,13 +771,49 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
           >
             {activeTab === 'impressum' && (
               <div role="tabpanel" id="legal-tabpanel-impressum" aria-labelledby="legal-tab-impressum" tabIndex={0} style={{ outline: 'none' }}>
-                <DocumentStage doc={LEGAL_DOCUMENTS.impressum} />
+                <DocumentStage doc={getResolvedImpressumDoc(schoolData)} />
               </div>
             )}
 
             {activeTab === 'privacy' && (
               <div role="tabpanel" id="legal-tabpanel-privacy" aria-labelledby="legal-tab-privacy" tabIndex={0} style={{ outline: 'none' }}>
+                {/* 1-Click Audience Switcher for Junior-Privacy */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 650, color: '#334155' }}>
+                    Datenschutz-Version wählen:
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleTabChange('junior_privacy')}
+                      style={{ fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
+                    >
+                      🧒 Für Schüler (Leichte Sprache)
+                    </button>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#166534' }}>
+                      👔 Vollständige Rechtsfassung
+                    </span>
+                  </div>
+                </div>
                 <DocumentStage doc={LEGAL_DOCUMENTS.platform_privacy} />
+              </div>
+            )}
+
+            {activeTab === 'junior_privacy' && (
+              <div role="tabpanel" id="legal-tabpanel-junior_privacy" aria-labelledby="legal-tab-junior_privacy" tabIndex={0} style={{ outline: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', padding: '10px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534' }}>
+                    🧒 Datenschutz für Kinder &amp; Jugendliche (Leichte Sprache gem. Art. 12 Abs. 1 DSGVO)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange('privacy')}
+                    style={{ fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
+                  >
+                    👔 Zur Vollständigen Fassung
+                  </button>
+                </div>
+                <DocumentStage doc={LEGAL_DOCUMENTS.junior_privacy} extraBadge="Leichte Sprache (Art. 12 DSGVO)" />
               </div>
             )}
 
@@ -785,7 +896,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
             background: '#f8fafc',
             flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
                 Version: <strong style={{ color: '#0f172a' }}>{ACTIVE_LEGAL_VERSION}</strong>
               </span>
@@ -793,6 +904,23 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                 Rechtssicher zertifiziert für DE, AT &amp; CH
               </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <button
+                type="button"
+                onClick={() => setShowB2bTabs(prev => !prev)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: showB2bTabs ? '#15803d' : '#64748b',
+                  fontSize: '0.74rem',
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: 0
+                }}
+              >
+                {showB2bTabs ? 'B2B-Unterlagen verbergen' : 'Schulleitung / Träger? B2B-Vertragsunterlagen (AVV/SLA/AGB) einblenden'}
+              </button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

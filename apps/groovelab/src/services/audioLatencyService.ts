@@ -116,21 +116,21 @@ class AudioLatencyService {
       }
     }
 
-    // Curated Baseline Matrix (Goldstandard Values in ms)
-    let baselineLatencyMs = 45;
+    // Curated Baseline Matrix (Hetzner 2db785fa Proven Roundtrip Values in ms)
+    let baselineLatencyMs = 70;
     if (routeType === 'bluetooth') {
       baselineLatencyMs = 210; // A2DP Bluetooth Audio Buffer typical offset
     } else if (routeType === 'usb') {
-      baselineLatencyMs = 15; // Low-latency ASIO/CoreAudio interface
+      baselineLatencyMs = 35; // Low-latency ASIO/CoreAudio interface + WebRTC bridge
     } else if (routeType === 'headphones') {
-      baselineLatencyMs = 22;
+      baselineLatencyMs = 55;
     } else {
       switch (platform) {
-        case 'ios': baselineLatencyMs = 48; break;
-        case 'mac': baselineLatencyMs = 38; break;
-        case 'windows': baselineLatencyMs = 65; break;
-        case 'android': baselineLatencyMs = 85; break;
-        default: baselineLatencyMs = 45; break;
+        case 'ios': baselineLatencyMs = 60; break;
+        case 'mac': baselineLatencyMs = 70; break;
+        case 'windows': baselineLatencyMs = 95; break;
+        case 'android': baselineLatencyMs = 105; break;
+        default: baselineLatencyMs = 80; break;
       }
     }
 
@@ -140,6 +140,20 @@ class AudioLatencyService {
 
     if (typeof window !== 'undefined') {
       try {
+        // 🛡️ One-time self-healing migration (v3): Clear stale 42ms/45ms or uncompensated ScriptProcessor(4096) offsets
+        const migKey = 'campus_latency_cal_v3';
+        if (localStorage.getItem(migKey) !== '1') {
+          const rawRouteVal = localStorage.getItem(storageKey);
+          const rawMasterVal = localStorage.getItem('campus_master_latency_ms');
+          const parsedRoute = rawRouteVal ? parseInt(rawRouteVal, 10) : NaN;
+          const parsedMaster = rawMasterVal ? parseInt(rawMasterVal, 10) : NaN;
+          if (!isBluetooth && ((parsedRoute > 110 && parsedRoute < 180) || parsedRoute === 42 || (parsedMaster > 110 && parsedMaster < 180) || parsedMaster === 42)) {
+            localStorage.removeItem(storageKey);
+            UniversalLatencyEngine.saveLatencyMs(baselineLatencyMs);
+          }
+          localStorage.setItem(migKey, '1');
+        }
+
         const stored = localStorage.getItem(storageKey);
         if (stored) {
           const parsed = parseInt(stored, 10);
@@ -152,7 +166,10 @@ class AudioLatencyService {
           if (masterVal !== null) {
             const parsed = parseInt(masterVal, 10);
             if (!isNaN(parsed) && parsed >= 0 && parsed <= 600) {
-              calibratedLatencyMs = parsed;
+              // Only adopt masterVal if it matches current route class (avoid applying BT latency to speaker or vice versa)
+              if (isBluetooth ? parsed >= 120 : parsed <= 115) {
+                calibratedLatencyMs = parsed;
+              }
             }
           }
         }
@@ -193,7 +210,7 @@ class AudioLatencyService {
       return this.cachedRoute.effectiveLatencyMs;
     }
     const platform = this.detectPlatform();
-    return platform === 'ios' ? 48 : platform === 'mac' ? 38 : 50;
+    return platform === 'ios' ? 60 : platform === 'mac' ? 70 : 80;
   }
 
   /**
@@ -307,15 +324,21 @@ class AudioLatencyService {
       }
 
       // Record audio for ~1.85 seconds across all 3 pulses
+      const scriptBufferSize = 4096;
+      const scriptBufferSec = scriptBufferSize / sampleRate;
       const micSource = audioCtx.createMediaStreamSource(stream);
-      const scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+      const scriptNode = audioCtx.createScriptProcessor(scriptBufferSize, 1, 1);
       
       const recordedChunks: Float32Array[] = [];
       let recording = true;
+      let firstBlockAudioTime: number | null = null;
 
       scriptNode.onaudioprocess = (e) => {
         if (!recording) return;
         const inputData = e.inputBuffer.getChannelData(0);
+        if (firstBlockAudioTime === null) {
+          firstBlockAudioTime = audioCtx.currentTime - (inputData.length / sampleRate);
+        }
         recordedChunks.push(new Float32Array(inputData));
 
         // 🛡️ Zero out output buffer to prevent mic-to-speaker feedback howling
@@ -327,7 +350,8 @@ class AudioLatencyService {
       scriptNode.connect(audioCtx.destination);
 
       // 🎯 0.1% Goldstandard: 3 Synchronized Test-Signal Pings (Cadence 500ms)
-      const baseTime = audioCtx.currentTime + 0.20;
+      const connectAudioTime = audioCtx.currentTime;
+      const baseTime = connectAudioTime + 0.20;
       const pingOffsetsSec = [0.0, 0.50, 1.00]; // 3 discrete pulses
 
       for (let k = 0; k < 3; k++) {
@@ -365,9 +389,11 @@ class AudioLatencyService {
       // Normalized Cross-Correlation (NCC) peak search for each of the 3 chirps
       const measuredDelaysMs: number[] = [];
       let maxOverallNcc = 0;
+      const recordOriginTime = firstBlockAudioTime !== null ? firstBlockAudioTime : connectAudioTime;
 
       for (let k = 0; k < 3; k++) {
-        const expectedStartSample = Math.floor(sampleRate * (0.20 + pingOffsetsSec[k]));
+        const pingEmitTime = baseTime + pingOffsetsSec[k];
+        const expectedStartSample = Math.max(0, Math.floor((pingEmitTime - recordOriginTime) * sampleRate));
         // Search window: expected start + 5ms up to expected start + 500ms
         const windowStart = expectedStartSample + Math.floor(sampleRate * 0.005);
         const windowEnd = Math.min(fullRecord.length - numSamples, expectedStartSample + Math.floor(sampleRate * 0.500));
@@ -386,7 +412,7 @@ class AudioLatencyService {
             recEnergy += r * r;
           }
           if (recEnergy > 1e-6) {
-            const ncc = crossCorr / Math.sqrt(chirpEnergy * recEnergy);
+            const ncc = crossCorr / Math.sqrt((chirpEnergy * 0.25) * recEnergy);
             if (ncc > maxNcc) {
               maxNcc = ncc;
               peakIdx = i;
@@ -394,13 +420,15 @@ class AudioLatencyService {
           }
         }
 
-        // Fine scan: single sample refinement in +/- 4 samples around peak
+        // Fine scan: full-sample resolution in +/- 4 samples around coarse peak
         const fineStart = Math.max(windowStart, peakIdx - 4);
         const fineEnd = Math.min(windowEnd, peakIdx + 4);
+        const fineNccMap = new Map<number, number>();
+        maxNcc = -1;
         for (let i = fineStart; i <= fineEnd; i++) {
           let crossCorr = 0;
           let recEnergy = 0;
-          for (let j = 0; j < numSamples; j += 2) {
+          for (let j = 0; j < numSamples; j++) {
             const r = fullRecord[i + j];
             const c = chirpData[j];
             crossCorr += r * c;
@@ -408,6 +436,7 @@ class AudioLatencyService {
           }
           if (recEnergy > 1e-6) {
             const ncc = crossCorr / Math.sqrt(chirpEnergy * recEnergy);
+            fineNccMap.set(i, ncc);
             if (ncc > maxNcc) {
               maxNcc = ncc;
               peakIdx = i;
@@ -415,10 +444,27 @@ class AudioLatencyService {
           }
         }
 
+        // Parabolic 3-point sub-sample interpolation around peakIdx
+        let exactPeakIdx = peakIdx;
+        const yPrev = fineNccMap.get(peakIdx - 1);
+        const yPeak = fineNccMap.get(peakIdx);
+        const yNext = fineNccMap.get(peakIdx + 1);
+        if (yPrev !== undefined && yPeak !== undefined && yNext !== undefined) {
+          const denom = yPrev - 2 * yPeak + yNext;
+          if (Math.abs(denom) > 1e-9) {
+            const delta = Math.max(-0.5, Math.min(0.5, (0.5 * (yPrev - yNext)) / denom));
+            exactPeakIdx = peakIdx + delta;
+          }
+        }
+
         if (maxNcc > maxOverallNcc) maxOverallNcc = maxNcc;
 
-        const measuredSec = (peakIdx - expectedStartSample) / sampleRate;
-        const measuredMs = Math.round(measuredSec * 1000);
+        // Subtract intrinsic 4096-sample ScriptProcessorNode buffer delay (~85-93ms) so only true acoustic hardware RTL remains
+        const rawDelaySec = (exactPeakIdx - expectedStartSample) / sampleRate;
+        const trueHardwareDelaySec = rawDelaySec > (scriptBufferSec + 0.008)
+          ? (rawDelaySec - scriptBufferSec)
+          : rawDelaySec;
+        const measuredMs = Math.round(trueHardwareDelaySec * 1000);
 
         // Require valid window and minimal acoustic correlation threshold
         if (measuredMs >= 8 && measuredMs <= 550 && maxNcc > 0.12) {
@@ -437,7 +483,7 @@ class AudioLatencyService {
         finalMeasuredMs = measuredDelaysMs[0];
       } else {
         // Fallback to baseline if measurement was too quiet or obstructed
-        finalMeasuredMs = this.cachedRoute?.baselineLatencyMs || 45;
+        finalMeasuredMs = this.cachedRoute?.baselineLatencyMs || 42;
       }
 
       const confidence = Math.min(1, Math.max(0.4, maxOverallNcc * 1.5));

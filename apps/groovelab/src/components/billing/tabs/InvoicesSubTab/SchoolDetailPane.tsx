@@ -58,7 +58,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
           borderRadius: '20px',
           background: inv.status === 'trial' ? '#fef3c7' : inv.status === 'bypass' ? '#f3e8ff' : inv.status === 'suspended' ? '#fee2e2' : '#e6f4ea',
           color: inv.status === 'trial' ? '#b45309' : inv.status === 'bypass' ? '#7e22ce' : inv.status === 'suspended' ? '#dc2626' : '#137333',
-          border: `1px solid ${inv.status === 'trial' ? '#fde68a' : inv.status === 'bypass' ? '#e9d5ff' : inv.status === 'suspended' ? '#fca5a5' : '#ceead6'}`,
+          border: 'none',
           letterSpacing: '0.04em'
         }}>
           Abonnement: {inv.status === 'trial' ? 'Probezeit' : inv.status === 'bypass' ? 'Gebühren-Bypass' : inv.status === 'suspended' ? 'Gesperrt' : 'Aktiv'}
@@ -272,9 +272,16 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', fontSize: '0.76rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Modul-Bereitstellung: Campus</span>
-                    <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.activeCampusCount || 0} Schüler × {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €</span>
+                    <span style={{ color: '#64748b', fontSize: '0.65rem' }}>
+                      {inv.activeCampusCount || 0} Schüler × {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €
+                      {((inv.parentPaidStudentsCount || 0) + (inv.exemptStudentsCount || 0)) > 0 && (
+                        <> ({Math.max(0, (inv.activeCampusCount || 0) - (inv.parentPaidStudentsCount || 0) - (inv.exemptStudentsCount || 0))} abgerechnet)</>
+                      )}
+                    </span>
                   </div>
-                  <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{((inv.activeCampusCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</span>
+                  <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>
+                    {(inv.campusStudentActivationFeeTotal ?? ((inv.activeCampusCount || 0) * masterPricing.priceStudent)).toFixed(2).replace('.', ',')} € / Mo.
+                  </span>
                 </div>
               )}
 
@@ -285,7 +292,9 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
                     <span style={{ color: '#0f172a', fontWeight: 600 }}>Cloud- &amp; Modul-Bereitstellung: GrooveLab</span>
                     <span style={{ color: '#64748b', fontSize: '0.65rem' }}>{inv.activeGroovelabCount || 0} Schüler × {masterPricing.priceStudent.toFixed(2).replace('.', ',')} €</span>
                   </div>
-                  <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>{((inv.activeGroovelabCount || 0) * masterPricing.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</span>
+                  <span style={{ fontWeight: 650, color: '#0f172a', paddingTop: '2px' }}>
+                    {(inv.groovelabStudentActivationFeeTotal ?? ((inv.activeGroovelabCount || 0) * masterPricing.priceStudent)).toFixed(2).replace('.', ',')} € / Mo.
+                  </span>
                 </div>
               )}
 
@@ -332,7 +341,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
             </div>
           </div>
           
-          {/* Apple HIG Endsummen- & GoBD-Steuerkachel gem. § 14 UStG */}
+          {/* Apple HIG Endsummen- & GoBD-Steuerkachel */}
           <div style={{
             marginTop: '14px',
             background: '#ffffff',
@@ -400,7 +409,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
       {/* Audio-Tresor Storage Addon & Quota Card */}
       {(() => {
         const storageGb = Number(inv.storageAddonGb || 0);
-        const baseGb = 1.0;
+        const baseGb = 10.0;
         const totalGb = baseGb + storageGb;
         const totalBytes = totalGb * 1024 * 1024 * 1024;
 
@@ -455,7 +464,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
                 <div>
                   <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>Audio-Tresor &amp; Cloud-Speicher Kontingent</h4>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 550 }}>
-                    1 GB Basis-Inklusivvolumen {storageGb > 0 ? `+ ${storageGb} GB gebuchtes Zusatz-Volumen` : ''}
+                    10 GB Basis-Inklusivvolumen {storageGb > 0 ? `+ ${storageGb} GB gebuchtes Zusatz-Volumen` : ''}
                   </span>
                 </div>
               </div>

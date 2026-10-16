@@ -81,10 +81,10 @@ export const CampusSidebarRailItem: React.FC<CampusSidebarRailItemProps> = ({
       case 'campus':
       default:
         return {
-          activeBg: 'rgba(52, 168, 83, 0.12)',
-          activeColor: '#15803d',
-          activeBorder: 'rgba(52, 168, 83, 0.28)',
-          activeIconColor: '#15803d',
+          activeBg: '#f1f5f9',
+          activeColor: '#0f172a',
+          activeBorder: '#cbd5e1',
+          activeIconColor: '#0f172a',
           iconCircleBg: '#34a853',
           iconCircleColor: '#ffffff'
         };

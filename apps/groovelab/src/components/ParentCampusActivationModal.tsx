@@ -156,13 +156,12 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const effectiveIban = masterBillingIban;
   const effectiveBic = masterBillingBic;
 
-  // EPC GiroCode payload
+  // EPC GiroCode payload (EPC069-12 mandates EUR currency; CHF uses EUR SEPA equivalent)
   const epcPayload = generateEpcGiroCodePayload({
-    iban: effectiveIban,
-    bic: effectiveBic,
-    recipientName: recipientName,
-    amount: effectiveAnnualFee,
-    referenceCode: referenceCode
+    iban: effectiveIban, bic: effectiveBic, recipientName: recipientName,
+    amount: isChf ? +(schoolYearCalc.remainingPaidMonths * 0.49).toFixed(2) : effectiveAnnualFee,
+    referenceCode: referenceCode,
+    unstructuredRemittance: isChf ? `Campus-Aktivierung ${studentDisplayName} (CHF ${totalAmountStr})` : undefined
   });
 
   const handleCopy = (text: string, fieldName: string) => {
@@ -190,8 +189,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     setParentPinError(null);
     try {
       const { data: parentOk, error } = await supabase.rpc('verify_parent_pin', {
-        p_parent_pin: parentPinInput.trim(),
-        p_student_id: student.id
+        student_id: student.id,
+        input_pin: parentPinInput.trim()
       });
       if (error) {
         setParentPinError('Authentifizierung fehlgeschlagen: ' + error.message);
@@ -239,14 +238,12 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     }
   };
 
-  // Finalize activation: update DB, save parent permissions & UI level, log audit consent, download PDF
+  // Finalize activation: authoritative server RPCs, save parent permissions & UI level, log audit consent, download PDF
   const handleFinalizeActivation = async () => {
     try {
       setIsSubmitting(true);
-      const isFamilyBonus = linkedSiblings.length >= 2;
-      const initialPaymentStatus = isFamilyBonus ? 'paid' : 'transfer_pending';
-      const isCashPaid = isFamilyBonus ? true : false;
-      const nowIso = new Date().toISOString();
+      setSiblingError(null);
+      const isFamilyBonus = isThirdOrMoreChild;
 
       const parentPermissionsObj = {
         allow_student_audio: allowStudentAudio,
@@ -256,76 +253,76 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         campus_ui_level: selectedUiLevel
       };
 
-      const updatePayload: Record<string, any> = {
-        student_billing_payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
-        payment_status: initialPaymentStatus,
-        student_billing_cash_paid: isCashPaid,
-        is_campus_active: true,
-        campus_ui_level: selectedUiLevel,
-        parent_allow_audio: allowStudentAudio,
-        parent_permissions: parentPermissionsObj,
-        exempt_from_direct_billing: isFamilyBonus ? true : false,
-        activated_at: nowIso,
-        updated_at: nowIso
-      };
+      const { data: actData, error: actErr } = await supabase.rpc('activate_student_b2c_campus_module', {
+        p_student_id: student.id,
+        p_plan_type: isFamilyBonus ? 'family_bonus' : 'b2c_school_year',
+        p_final_price_cents: isFamilyBonus ? 0 : Math.round(effectiveAnnualFee * 100),
+        p_legal_version: ACTIVE_LEGAL_VERSION
+      });
+      if (actErr || (actData && typeof actData === 'object' && (actData as Record<string, unknown>).success === false)) {
+        throw new Error(actErr?.message || 'B2C-Modulaktivierung durch Server abgelehnt.');
+      }
 
-      const { error } = await supabase
-        .from('students')
-        .update(updatePayload)
-        .eq('id', student.id);
-
-      if (error) {
-        // Fallback: also try updating users table if students table is a view
-        await supabase
-          .from('users')
-          .update(updatePayload)
-          .eq('id', student.id);
+      const { data: ctrlData, error: ctrlErr } = await supabase.rpc('save_parent_controls', {
+        p_target_user_id: student.id,
+        p_controls: {
+          campus_ui_level: selectedUiLevel,
+          parent_allow_audio: allowStudentAudio,
+          parent_allow_chat: allowStudentChat,
+          parent_allow_absences: allowStudentAbsences,
+          allow_student_Cancel: allowStudentAbsences,
+          allow_student_Reschedule: allowStudentAbsences,
+          parent_disable_loops: !allowStudentAudio,
+          parent_disable_chat: !allowStudentChat,
+          ...(parentPinInput.trim().length >= 4 ? { parent_pin: parentPinInput.trim() } : {})
+        }
+      });
+      if (ctrlErr || (ctrlData && typeof ctrlData === 'object' && (ctrlData as Record<string, unknown>).success === false)) {
+        throw new Error(ctrlErr?.message || 'Eltern-Steuerung konnte nicht revisionssicher gespeichert werden.');
       }
 
       if (!isFamilyBonus) {
-        try {
-          await supabase.rpc('request_student_bank_transfer_order', {
-            p_student_id: student.id
-          });
-        } catch (e) {
-          console.warn('[ParentCampusActivationModal] request_student_bank_transfer_order error:', e);
+        const { error: orderErr } = await supabase.rpc('request_student_bank_transfer_order', {
+          p_student_id: student.id
+        });
+        if (orderErr) {
+          throw new Error(orderErr.message);
         }
       }
 
       // 🛡️ Revisionssicheres Logging der elterlichen Einwilligung & B2C-Consent-Enforcement (§ 371a ZPO / OWASP ASVS L3)
       const b2cTermsMarkdown = LEGAL_DOCUMENTS.terms_student_platform?.fullTextMarkdown || 'TERMS_STUDENT_PLATFORM';
+      const b2cTermsHash = await computeSha256(b2cTermsMarkdown);
       const consentPayload = b2cTermsMarkdown + String(student.id) + ACTIVE_LEGAL_VERSION + (agreeWithdrawalWaiver ? '1' : '0');
       const auditConsentChecksum = await computeSha256(consentPayload);
+      const consentTypes = ['terms_student_platform', 'consumer_cancellation_policy', ...(allowStudentAudio ? ['consent_media_audio'] : [])];
+      const docHashes: Record<string, string> = {
+        terms_student_platform: b2cTermsHash,
+        consumer_cancellation_policy: await computeSha256(LEGAL_DOCUMENTS.consumer_cancellation_policy?.fullTextMarkdown || ''),
+        ...(allowStudentAudio ? { consent_media_audio: await computeSha256(LEGAL_DOCUMENTS.consent_media_audio?.fullTextMarkdown || '') } : {})
+      };
 
-      // Autoritativer Supabase-RPC-Aufruf in public.legal_consents
-      try {
-        const { error: rpcConsentErr } = await supabase.rpc('record_user_legal_consent', {
-          p_user_id: student.id,
-          p_school_id: student.school_id || null,
-          p_role: 'student',
-          p_consent_types: ['terms_student_platform', 'consumer_cancellation_policy'],
-          p_version: ACTIVE_LEGAL_VERSION,
-          p_document_hashes: {
-            terms_student_platform: auditConsentChecksum,
-            consumer_cancellation_policy: await computeSha256(LEGAL_DOCUMENTS.consumer_cancellation_policy?.fullTextMarkdown || '')
-          },
-          p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Parent Portal B2C Checkout',
-          p_ip_hash: null,
-          p_metadata: {
-            parent_checkout: true,
-            period: periodDescription,
-            effective_fee: effectiveAnnualFee,
-            agreed_withdrawal_waiver: agreeWithdrawalWaiver,
-            payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
-            checksum: auditConsentChecksum
-          }
-        });
-
-        if (rpcConsentErr) {
-          console.error('[ParentCampusActivationModal] Fail-Closed Consent RPC Error:', rpcConsentErr);
+      const { error: rpcConsentErr } = await supabase.rpc('record_user_legal_consent', {
+        p_user_id: student.id,
+        p_school_id: student.school_id || null,
+        p_role: 'student',
+        p_consent_types: consentTypes,
+        p_version: ACTIVE_LEGAL_VERSION,
+        p_document_hashes: docHashes,
+        p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Parent Portal B2C Checkout',
+        p_ip_hash: null,
+        p_metadata: {
+          parent_checkout: true,
+          period: periodDescription,
+          effective_fee: effectiveAnnualFee,
+          agreed_withdrawal_waiver: agreeWithdrawalWaiver,
+          payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
+          checksum: auditConsentChecksum
         }
-      } catch (rpcEx) {
-        console.warn('[ParentCampusActivationModal] Consent RPC exception:', rpcEx);
+      });
+
+      if (rpcConsentErr) {
+        throw new Error(rpcConsentErr.message || 'Rechtliche Einwilligung konnte nicht protokolliert werden.');
       }
 
       await logSecurityEvent({
@@ -333,7 +330,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
         schoolId: student.school_id ? String(student.school_id) : undefined,
         targetId: String(student.id),
         metadata: {
-          consent_type: 'b2c_terms_and_withdrawal_waiver',
+          consent_type: 'b2c_terms_and_immediate_execution_request',
           agreed_withdrawal_waiver: agreeWithdrawalWaiver,
           payment_method: isFamilyBonus ? 'family_bonus' : 'bank_transfer',
           period: periodDescription,
@@ -358,9 +355,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
       setWizardStep('success');
     } catch (err) {
-      console.warn('Payment update notice error:', err);
-      setSubmittedSuccess(true);
-      setWizardStep('success');
+      console.error('[ParentCampusActivationModal] Fail-Closed activation error:', err);
+      setSubmittedSuccess(false);
+      setSiblingError('Freischaltung abgebrochen (Fail-Closed Schutz): ' + (err instanceof Error ? err.message : 'Server-Verifikation fehlgeschlagen.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -477,14 +474,10 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       } catch (e) {}
 
       // GoBD Cryptographic Seal (§§ 146, 147 AO)
-      let sha256Seal = '';
+      let sha256Seal = referenceCode;
       try {
-        const rawPayload = `${referenceCode}:${student.id}:${totalAmountStr}:${effectiveIban}:${periodDescription}`;
-        const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawPayload));
-        sha256Seal = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      } catch (e) {
-        sha256Seal = referenceCode;
-      }
+        sha256Seal = await computeSha256(`${referenceCode}:${student.id}:${totalAmountStr}:${effectiveIban}:${periodDescription}`);
+      } catch (e) {}
 
       doc.setFont('courier', 'normal');
       doc.setFontSize(6.8);
@@ -553,7 +546,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.text(`Laufzeit & Entgelt: ${periodDescription} (${remainingMonths} Monate) • Gesamtpreis: ${totalAmountStr} ${currencySuffix} (inkl. 1 Probemonat kostenfrei)`, 25, p2Y + 26);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(22, 101, 52);
-      doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.07.`, 25, p2Y + 30);
+      doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.08.`, 25, p2Y + 30);
 
       p2Y += 38;
 
@@ -988,10 +981,11 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                       if (res.error || !resData?.success) {
                         setSiblingError(resData?.error || res.error?.message || 'Verknüpfung fehlgeschlagen. Bitte Nachnamen und Ausweis prüfen.');
                       } else {
+                        const updatedActiveCount = typeof resData.active_siblings_count === 'number' ? resData.active_siblings_count : activePaidSiblingsCount;
                         const newSibling: LinkedSibling = {
                           name: resData.linked_sibling_name || inputVal,
                           id: undefined,
-                          isCampusActive: true
+                          isCampusActive: updatedActiveCount > activePaidSiblingsCount
                         };
                         setLinkedSiblings(prev => [...prev.filter(s => s.name.toLowerCase() !== newSibling.name.toLowerCase()), newSibling]);
                         setSiblingNameOrPin('');
@@ -1364,21 +1358,15 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             </div>
 
-            {/* Primary confirmation CTA with strict Compliance */}
+            {/* Preliminary wizard progression CTA (final § 312j BGB button is on final step) */}
             <button
               type="button"
               disabled={!agreeWithdrawalWaiver}
               onClick={handleProceedToWizard}
-              aria-label={isThirdOrMoreChild 
-                ? 'Kostenlos freischalten' 
-                : schoolYearCalc.isCurrentTrialPeriod 
-                  ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay})` 
-                  : 'Zahlungspflichtig bestellen'}
+              aria-label="Weiter zur Einrichtung & Freigabe"
               style={{
                 width: '100%',
-                background: !agreeWithdrawalWaiver 
-                  ? '#94a3b8' 
-                  : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: !agreeWithdrawalWaiver ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '14px',
@@ -1396,11 +1384,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               onMouseOver={(e) => { if (agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
             >
-              {isThirdOrMoreChild 
-                ? 'Kostenlos freischalten ➔' 
-                : schoolYearCalc.isCurrentTrialPeriod
-                  ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay}) ➔`
-                  : 'Zahlungspflichtig bestellen ➔'}
+              Weiter zur Einrichtung &amp; Freigabe
             </button>
 
             {/* 2-Column secondary tools */}
@@ -2081,7 +2065,18 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             })}
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', marginTop: '6px' }}>
+          {/* Gesetzliche Pflichtangaben gem. § 312j Abs. 2 BGB unmittelbar vor dem Bestell-Button */}
+          <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '10px 14px', fontSize: '0.74rem', lineHeight: 1.45, color: '#334155' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, color: '#0f172a', marginBottom: '2px' }}>
+              <span>📋 Vertragszusammenfassung (§ 312j Abs. 2 BGB): Campus-Groovelab (Modul Campus)</span>
+              <span style={{ color: '#059669' }}>{isThirdOrMoreChild ? '0,00 € (3. Kind Befreiung)' : `${isChf ? `CHF ${totalAmountStr} Endpreis (Art. 8 MWSTG)` : `${totalAmountStr} € ${OPERATOR_BANKING_CONFIG.isVatStandardTaxed ? 'Endpreis inkl. 19% MwSt.' : 'Endpreis (§ 19 UStG)'}`}`}</span>
+            </div>
+            <div style={{ color: '#64748b' }}>
+              Laufzeit: Bis Schuljahresende (31.08. • endet automatisch, kein Abo) • 1. Monat kostenfreie Schnupperphase (0,00 € Wertersatz bei Widerruf binnen 14 Tagen)
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between', marginTop: '4px' }}>
             <button
               type="button"
               onClick={() => setWizardStep('permissions')}
@@ -2107,6 +2102,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               type="button"
               disabled={isSubmitting}
               onClick={handleFinalizeActivation}
+              aria-label={isThirdOrMoreChild ? 'Kostenlos freischalten' : 'Zahlungspflichtig bestellen'}
               style={{
                 flex: 1,
                 background: isSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -2124,7 +2120,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 boxShadow: 'none'
               }}
             >
-              {isSubmitting ? 'Wird gespeichert...' : '✓ Einrichtung abschließen & App freigeben'}
+              {isSubmitting ? 'Wird gespeichert...' : isThirdOrMoreChild ? 'Kostenlos freischalten' : 'Zahlungspflichtig bestellen'}
             </button>
           </div>
         </div>

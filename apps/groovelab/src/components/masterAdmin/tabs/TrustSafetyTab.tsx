@@ -54,73 +54,50 @@ export function TrustSafetyTab() {
     takedownRecord?: TakedownRecord;
   } | null>(null);
 
-  const [takedownRegistry, setTakedownRegistry] = useState<TakedownRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem('campus_takedowns_registry');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [
-      {
-        id: 'DSA-TAKEDOWN-20260815-4B87',
-        studentId: 'demo_student',
-        studentName: 'Amelia H. (Demo)',
-        schoolName: 'Musäk Bad Säckingen',
-        playlistId: 'pl_sommer_2026',
-        playlistTitle: 'Mein Sommerkonzert 2026',
-        reportedUrl: 'https://campus-groovelab.de/bio/demo_student?pl=pl_sommer_2026&anon=1',
-        reason: 'Unbefugte Verlinkung in Social Media (Instagram Story)',
-        timestamp: '15.08.2026, 14:22:08 MESZ',
-        active: true,
-        sha256Hash: 'a8f5b4923e811c9dc521098ef763190ab420404a011733cfb7b190d62c65bf0b',
-        legalBasis: 'Art. 6 DSA / § 10 DDG / UrhDaG'
-      }
-    ];
-  });
-
+  const [takedownRegistry, setTakedownRegistry] = useState<TakedownRecord[]>([]);
   const [registrySearch, setRegistrySearch] = useState('');
   const [selectedReason, setSelectedReason] = useState('Unbefugte Verlinkung in Social Media / Öffentliche PIN-Weitergabe');
   const [actionSuccessToast, setActionSuccessToast] = useState<string | null>(null);
+  const [actionErrorToast, setActionErrorToast] = useState<string | null>(null);
   const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
 
-  // 🚨 Enterprise Trust & Safety: Fetch authoritative takedown registry from PostgreSQL
+  // Enterprise Trust & Safety: Fetch authoritative takedown registry from PostgreSQL
   useEffect(() => {
     let isMounted = true;
     const fetchServerRecords = async () => {
       try {
         const { data, error } = await supabase.rpc('fetch_active_content_takedowns');
-        if (!error && Array.isArray(data) && data.length > 0 && isMounted) {
-          const mapped: TakedownRecord[] = data.map((d: any) => ({
-            id: d.id,
-            studentId: d.target_id,
-            studentName: d.student_name || 'Unbekannt',
-            schoolName: d.school_name || 'Unbekannt',
-            playlistId: d.playlist_id,
-            playlistTitle: undefined,
-            reportedUrl: d.reported_url || `https://campus-groovelab.de/bio/${d.target_id}`,
-            reason: d.reason,
-            timestamp: new Date(d.blocked_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) + ' MESZ',
-            active: d.is_active,
-            sha256Hash: d.sha256_hash || '',
-            legalBasis: d.legal_basis || 'Art. 6 DSA / § 10 DDG / UrhDaG'
-          }));
-          setTakedownRegistry(prev => {
-            const ids = new Set(mapped.map(m => m.studentId + '_' + (m.playlistId || 'all')));
-            const filteredLocal = prev.filter(p => !ids.has(p.studentId + '_' + (p.playlistId || 'all')));
-            return [...mapped, ...filteredLocal];
+        if (!error && Array.isArray(data) && isMounted) {
+          const mapped: TakedownRecord[] = data.map((rawItem: unknown) => {
+            const d = (rawItem && typeof rawItem === 'object' ? rawItem : {}) as Record<string, unknown>;
+            const targetId = typeof d.target_id === 'string' ? d.target_id : '';
+            const blockedAt = typeof d.blocked_at === 'string' ? d.blocked_at : new Date().toISOString();
+            return {
+              id: typeof d.id === 'string' ? d.id : `TAKEDOWN-${targetId.slice(0, 8)}`,
+              studentId: targetId,
+              studentName: typeof d.student_name === 'string' && d.student_name.trim() ? d.student_name : 'Schülerprofil',
+              schoolName: typeof d.school_name === 'string' && d.school_name.trim() ? d.school_name : 'Musikschule',
+              playlistId: typeof d.playlist_id === 'string' ? d.playlist_id : undefined,
+              playlistTitle: undefined,
+              reportedUrl: typeof d.reported_url === 'string' && d.reported_url ? d.reported_url : `https://campus-groovelab.de/bio/${targetId}`,
+              reason: typeof d.reason === 'string' ? d.reason : 'Plattform-Sperrung',
+              timestamp: new Date(blockedAt).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }),
+              active: Boolean(d.is_active),
+              sha256Hash: typeof d.sha256_hash === 'string' ? d.sha256_hash : '',
+              legalBasis: 'Plattform-Sperrprotokoll (Jugend- & Urheberrechtsschutz)'
+            };
           });
+          setTakedownRegistry(mapped);
         }
       } catch (e) {
-        // Fallback to local
+        console.warn('Could not load takedowns from server:', e);
       }
     };
     fetchServerRecords();
     return () => { isMounted = false; };
   }, []);
 
-  // Helper to format timestamps strictly in German Local Time (Europe/Berlin CEST/MESZ)
+  // Helper to format timestamps in German Local Time (Europe/Berlin)
   const formatGermanTime = (dateObj: Date = new Date()) => {
     return dateObj.toLocaleString('de-DE', {
       timeZone: 'Europe/Berlin',
@@ -130,30 +107,28 @@ export function TrustSafetyTab() {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
-    }) + ' MESZ';
+    });
   };
 
-  // Simple deterministic SHA-256 simulator for cryptographic certificate
-  const computeAuditHash = (dataStr: string): string => {
-    let hash = 0x811c9dc5;
-    for (let i = 0; i < dataStr.length; i++) {
-      hash ^= dataStr.charCodeAt(i);
-      hash = Math.imul(hash, 0x01000193);
-    }
-    const hex = (hash >>> 0).toString(16).padStart(8, '0');
-    return `${hex}e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.slice(0, 64);
+  // Authoritative WebCrypto SHA-256 digest
+  const computeAuditHash = async (payload: string): Promise<string> => {
+    const encoded = new TextEncoder().encode(payload);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoded);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   };
 
   const showToast = (msg: string) => {
+    setActionErrorToast(null);
     setActionSuccessToast(msg);
     setTimeout(() => setActionSuccessToast(null), 3500);
   };
 
-  const saveRegistry = (records: TakedownRecord[]) => {
-    setTakedownRegistry(records);
-    try {
-      localStorage.setItem('campus_takedowns_registry', JSON.stringify(records));
-    } catch {}
+  const showError = (msg: string) => {
+    setActionSuccessToast(null);
+    setActionErrorToast(msg);
+    setTimeout(() => setActionErrorToast(null), 4500);
   };
 
   // Smart Link Resolver: Parses any URL or raw UUID and resolves student & school metadata
@@ -163,7 +138,7 @@ export function TrustSafetyTab() {
     setResolvedResult(null);
 
     try {
-      let cleanInput = rawInput.trim();
+      const cleanInput = rawInput.trim();
       let extractedId = '';
       let extractedPl: string | undefined = undefined;
       let extractedPinHash: string | undefined = undefined;
@@ -179,7 +154,6 @@ export function TrustSafetyTab() {
           extractedPinHash = urlObj.searchParams.get('pinh') || undefined;
           extractedAnon = urlObj.searchParams.get('anon') === '1' || urlObj.searchParams.get('anon') === 'true';
         } catch {
-          // Fallback regex parsing
           const match = cleanInput.match(/\/bio\/([a-zA-Z0-9_-]+)/);
           if (match && match[1]) extractedId = match[1];
         }
@@ -188,60 +162,41 @@ export function TrustSafetyTab() {
       }
 
       if (!extractedId) {
-        extractedId = 'demo_student';
+        showError('Ungültiger Link oder fehlende Profil-ID.');
+        return;
       }
 
-      let resolvedName = 'Unbekannter Schüler';
-      let resolvedInstrument = 'Gitarre';
-      let resolvedSchool = 'Musäk Bad Säckingen';
+      let resolvedName = `Schüler-Profil #${extractedId.slice(0, 8)}`;
+      let resolvedInstrument = 'Instrumental- / Vokalunterricht';
+      let resolvedSchool = 'Musikschule';
       let resolvedSchoolId = '';
-      let playlistTitle = extractedPl ? `Playlist: ${extractedPl}` : 'Komplette Audio-Biografie';
+      const playlistTitle = extractedPl ? `Playlist: ${extractedPl}` : 'Komplette Audio-Biografie';
 
-      // 1. Query Supabase users table (Read-Only)
+      // Query Supabase users table (Read-Only)
       try {
-        if (extractedId !== 'demo_student' && extractedId !== 'talent') {
-          const { data: userRec } = await supabase
-            .from('users')
-            .select('id, first_name, last_name, instrument, school_id')
-            .eq('id', extractedId)
+        const { data: userRec } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, instrument, school_id')
+          .eq('id', extractedId)
+          .maybeSingle();
+
+        if (userRec) {
+          resolvedName = `${userRec.first_name || ''} ${userRec.last_name || ''}`.trim() || resolvedName;
+          if (userRec.instrument) resolvedInstrument = userRec.instrument;
+          if (userRec.school_id) resolvedSchoolId = userRec.school_id;
+        }
+
+        if (resolvedSchoolId) {
+          const { data: schoolRec } = await supabase
+            .from('schools')
+            .select('id, name, city')
+            .eq('id', resolvedSchoolId)
             .maybeSingle();
 
-          if (userRec) {
-            resolvedName = `${userRec.first_name || ''} ${userRec.last_name || ''}`.trim() || 'Schüler ohne Namen';
-            if (userRec.instrument) resolvedInstrument = userRec.instrument;
-            if (userRec.school_id) resolvedSchoolId = userRec.school_id;
-          }
-
-          if (resolvedSchoolId) {
-            const { data: schoolRec } = await supabase
-              .from('schools')
-              .select('id, name, city')
-              .eq('id', resolvedSchoolId)
-              .maybeSingle();
-
-            if (schoolRec?.name) resolvedSchool = schoolRec.name;
-          }
+          if (schoolRec?.name) resolvedSchool = schoolRec.name;
         }
       } catch (err) {
         console.warn('Resolver query note:', err);
-      }
-
-      // Check local cache if not found on backend
-      if (resolvedName === 'Unbekannter Schüler') {
-        try {
-          const cachedMetaStr = localStorage.getItem(`campus_student_meta_${extractedId}`);
-          if (cachedMetaStr) {
-            const parsed = JSON.parse(cachedMetaStr);
-            if (parsed.first_name) resolvedName = `${parsed.first_name} ${parsed.last_name || ''}`.trim();
-            if (parsed.instrument) resolvedInstrument = parsed.instrument;
-            if (parsed.school_name) resolvedSchool = parsed.school_name;
-          }
-        } catch {}
-      }
-
-      // Fallback for demo or test accounts
-      if (resolvedName === 'Unbekannter Schüler') {
-        resolvedName = extractedId === 'demo_student' ? 'Amelia H. (Schülerin)' : `Schüler-Profil #${extractedId.slice(0, 8)}`;
       }
 
       // Check if currently blocked
@@ -270,13 +225,13 @@ export function TrustSafetyTab() {
     }
   };
 
-  // 1-Click Takedown Execution
+  // 1-Click Takedown Execution (Fail-Closed Server Authority)
   const handleExecuteTakedown = async () => {
     if (!resolvedResult) return;
 
     const timestamp = formatGermanTime();
-    const incidentId = `DSA-TAKEDOWN-${Date.now().toString().slice(-6)}-${resolvedResult.studentId.slice(0, 8).toUpperCase()}`;
-    const hash = computeAuditHash(`${incidentId}|${resolvedResult.studentId}|${resolvedResult.playlistId || 'all'}|${timestamp}|${selectedReason}`);
+    const incidentId = `TAKEDOWN-${Date.now().toString().slice(-6)}-${resolvedResult.studentId.slice(0, 8).toUpperCase()}`;
+    const hash = await computeAuditHash(`${incidentId}|${resolvedResult.studentId}|${resolvedResult.playlistId || 'all'}|${timestamp}|${selectedReason}`);
 
     const newRecord: TakedownRecord = {
       id: incidentId,
@@ -290,12 +245,11 @@ export function TrustSafetyTab() {
       timestamp: timestamp,
       active: true,
       sha256Hash: hash,
-      legalBasis: 'Art. 6 DSA / § 10 DDG / UrhDaG'
+      legalBasis: 'Plattform-Sperrprotokoll (Jugend- & Urheberrechtsschutz)'
     };
 
-    // Authoritative Server-Side Persistence (Art. 6 & 16 DSA)
     try {
-      await supabase.rpc('execute_content_takedown', {
+      const { error } = await supabase.rpc('execute_content_takedown', {
         p_student_id: resolvedResult.studentId,
         p_student_name: resolvedResult.studentName,
         p_school_name: resolvedResult.schoolName,
@@ -305,22 +259,19 @@ export function TrustSafetyTab() {
         p_reason: selectedReason,
         p_sha256: hash
       });
-    } catch (err) {
-      console.warn('Backend takedown RPC error (fallback to local):', err);
+
+      if (error) {
+        showError(`Sperrung fehlgeschlagen (Server-RPC): ${error.message}`);
+        return;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verbindungsfehler';
+      showError(`Sperrung abgebrochen (Fail-Closed): ${msg}`);
+      return;
     }
 
-    // Update localStorage specific and registry
-    try {
-      localStorage.setItem(`campus_takedown_${resolvedResult.studentId}`, JSON.stringify({
-        active: true,
-        reason: selectedReason,
-        timestamp: timestamp,
-        playlistId: resolvedResult.playlistId || 'all'
-      }));
-    } catch {}
-
     const updated = [newRecord, ...takedownRegistry.filter(t => t.studentId !== resolvedResult.studentId || t.playlistId !== resolvedResult.playlistId)];
-    saveRegistry(updated);
+    setTakedownRegistry(updated);
 
     setResolvedResult(prev => prev ? {
       ...prev,
@@ -331,20 +282,22 @@ export function TrustSafetyTab() {
     showToast(`Sofort-Takedown ausgeführt: Freigabelink für „${resolvedResult.studentName}“ gesperrt!`);
   };
 
-  // Revert / Restore Link Access
+  // Revert / Restore Link Access (Fail-Closed)
   const handleRestoreAccess = async (studentIdToRestore: string, playlistIdToRestore?: string) => {
     try {
-      await supabase.rpc('restore_content_takedown', {
+      const { error } = await supabase.rpc('restore_content_takedown', {
         p_student_id: studentIdToRestore,
         p_playlist_id: playlistIdToRestore || 'all'
       });
-    } catch (err) {
-      console.warn('Backend restore takedown RPC error:', err);
+      if (error) {
+        showError(`Freigabe fehlgeschlagen (Server-RPC): ${error.message}`);
+        return;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verbindungsfehler';
+      showError(`Freigabe abgebrochen (Fail-Closed): ${msg}`);
+      return;
     }
-
-    try {
-      localStorage.removeItem(`campus_takedown_${studentIdToRestore}`);
-    } catch {}
 
     const updated = takedownRegistry.map(t => {
       if (t.studentId === studentIdToRestore && (!playlistIdToRestore || t.playlistId === playlistIdToRestore)) {
@@ -353,38 +306,51 @@ export function TrustSafetyTab() {
       return t;
     });
 
-    saveRegistry(updated);
+    setTakedownRegistry(updated);
 
     if (resolvedResult && resolvedResult.studentId === studentIdToRestore) {
       setResolvedResult(prev => prev ? { ...prev, isCurrentlyBlocked: false, takedownRecord: undefined } : null);
     }
 
-    showToast(`Freigabelink reaktiviert & Takedown aufgehoben.`);
+    showToast(`Freigabelink reaktiviert & Sperrung aufgehoben.`);
   };
 
-  // Re-Roll PIN (Token Invalidation without full takedown)
-  const handleReRollPin = () => {
+  // Re-Roll PIN (6-digit CSPRNG PIN, Server-Only without localStorage)
+  const handleReRollPin = async () => {
     if (!resolvedResult) return;
-    const newRandomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    const randomBuf = new Uint32Array(1);
+    window.crypto.getRandomValues(randomBuf);
+    const newRandomPin = (100000 + (randomBuf[0] % 900000)).toString();
+
     try {
-      localStorage.setItem(`campus_share_pin_${resolvedResult.studentId}`, newRandomPin);
-      if (resolvedResult.playlistId) {
-        localStorage.setItem(`campus_share_pin_${resolvedResult.studentId}_${resolvedResult.playlistId}`, newRandomPin);
+      const { error } = await supabase.rpc('upsert_shared_biography_link', {
+        p_student_id: resolvedResult.studentId,
+        p_pin: newRandomPin,
+        p_student_display_name: resolvedResult.studentName || null,
+        p_school_display_name: resolvedResult.schoolName || null
+      });
+      if (error) {
+        showError(`PIN-Rotation fehlgeschlagen (Server-RPC): ${error.message}`);
+        return;
       }
-    } catch {}
-    showToast(`PIN neu gewürfelt (${newRandomPin}): Bisheriger Link-Kryptohash ist ab sofort ungültig!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Verbindungsfehler';
+      showError(`PIN-Rotation abgebrochen (Fail-Closed): ${msg}`);
+      return;
+    }
+    showToast(`6-stellige PIN neu vergeben (${newRandomPin}): Bisheriger Hash auf dem Server wurde sofort rotiert!`);
   };
 
-  // Export DSA Compliance Audit Report (JSON / Printable Certificate)
+  // Export Compliance Audit Report (JSON Certificate)
   const handleDownloadDsaCertificate = (rec: TakedownRecord) => {
     const certData = {
-      $schema: "https://campus-groovelab.de/schemas/dsa-takedown-certificate-v1.json",
-      certificateTitle: "RECHTSSICHERES NOTICE-AND-TAKEDOWN PROTOKOLL GEMÄSS ART. 6 DSA / § 10 DDG",
+      $schema: "https://campus-groovelab.de/schemas/takedown-certificate-v1.json",
+      certificateTitle: "PLATTFORM-SPERRPROTOKOLL (JUGEND- & URHEBERRECHTSSCHUTZ)",
       incidentId: rec.id,
       platformOperator: "Campus-Groovelab Platform Systems",
-      legalBasis: rec.legalBasis,
+      protocolStandard: rec.legalBasis,
       takedownExecutionTimestampDE: rec.timestamp,
-      timezone: "Europe/Berlin (MESZ / UTC+2)",
+      timezone: "Europe/Berlin",
       reportedUrl: rec.reportedUrl,
       affectedStudentId: rec.studentId,
       affectedStudentDisplayName: rec.studentName,
@@ -393,18 +359,18 @@ export function TrustSafetyTab() {
       takedownReason: rec.reason,
       complianceStatus: rec.active ? "HTTP_410_RESOURCE_SUSPENDED" : "RESTORED",
       tamperProofSha256Checksum: rec.sha256Hash,
-      legalDisclaimer: "Dieses Dokument dient als amtlicher Nachweis über die unverzügliche Erfüllung der Betreiberpflichten (Expeditious Action) nach Kenntniserlangung. Schadensersatz- und Störerhaftungsansprüche entfallen gem. Art. 6 DSA / § 10 DDG."
+      verificationNotice: "Kryptografisch mit SHA-256 gesiegelter Nachweis über die unverzügliche Sperrung des gemeldeten Freigabelinks."
     };
 
     const blob = new Blob([JSON.stringify(certData, null, 2)], { type: 'application/json;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `DSA_Takedown_Zertifikat_${rec.id}.json`);
+    link.setAttribute('download', `Sperrprotokoll_Zertifikat_${rec.id}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast(`DSA-Beweisprotokoll für Anwalt/GEMA heruntergeladen!`);
+    showToast(`Sperrprotokoll-Beweis heruntergeladen!`);
   };
 
   const filteredRegistry = useMemo(() => {
@@ -429,7 +395,7 @@ export function TrustSafetyTab() {
           color: '#ffffff',
           padding: '14px 20px',
           borderRadius: '16px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          border: 'none',
           boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
           zIndex: 99999,
           display: 'flex',
@@ -438,12 +404,35 @@ export function TrustSafetyTab() {
           fontWeight: 800,
           fontSize: '0.86rem'
         }}>
-          <CheckCircle2 size={18} color="#0f172a" />
+          <CheckCircle2 size={18} color="#10b981" />
           <span>{actionSuccessToast}</span>
         </div>
       )}
 
-      {/* 🌟 BRIGHT APPLE HIG HERO BANNER */}
+      {actionErrorToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          background: '#991b1b',
+          color: '#ffffff',
+          padding: '14px 20px',
+          borderRadius: '16px',
+          border: 'none',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 800,
+          fontSize: '0.86rem'
+        }}>
+          <AlertTriangle size={18} color="#fecaca" />
+          <span>{actionErrorToast}</span>
+        </div>
+      )}
+
+      {/* BRIGHT APPLE HIG HERO BANNER */}
       <div style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',
@@ -461,7 +450,7 @@ export function TrustSafetyTab() {
             <span style={{
               background: '#fef2f2',
               color: '#dc2626',
-              border: '1px solid #fecaca',
+              border: 'none',
               fontSize: '0.72rem',
               fontWeight: 900,
               padding: '3px 10px',
@@ -472,18 +461,18 @@ export function TrustSafetyTab() {
               alignItems: 'center',
               gap: '5px'
             }}>
-              <ShieldCheck size={12} color="#475569" />
+              <ShieldCheck size={12} color="#dc2626" />
               Trust &amp; Safety • Link-Schutz
             </span>
             <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-              1-Klick Sperre &amp; PIN-Schutz
+              1-Klick Sperre &amp; 6-stelliger PIN-Schutz
             </span>
           </div>
-          <h2 style={{ margin: '0 0 8px 0', fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+          <h2 style={{ margin: '0 0 8px 0', fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
             Freigabelinks prüfen &amp; sperren
           </h2>
           <p style={{ margin: 0, fontSize: '0.90rem', color: '#64748b', lineHeight: 1.55 }}>
-            Füge einen Freigabelink ein, um das betroffene Schülerprofil in Sekundenschnelle zu identifizieren und den Link bei Bedarf mit 1 Klick zu deaktivieren oder mit einer neuen PIN zu schützen.
+            Füge einen Freigabelink ein, um das betroffene Schülerprofil in Sekundenschnelle zu identifizieren und den Link bei Bedarf mit 1 Klick zu deaktivieren oder mit einer neuen 6-stelligen PIN zu schützen.
           </p>
         </div>
 
@@ -509,7 +498,7 @@ export function TrustSafetyTab() {
         </div>
       </div>
 
-      {/* 🔍 Section 1: Deep Link Resolver & Takedown Action Cockpit */}
+      {/* Section 1: Deep Link Resolver & Takedown Action Cockpit */}
       <div style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',
@@ -626,7 +615,7 @@ export function TrustSafetyTab() {
                       {resolvedResult.studentName}
                     </h4>
                     {resolvedResult.isAnonymized && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '100px', background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '100px', background: '#f1f5f9', color: '#475569', border: 'none' }}>
                         Anonymisiert im Web
                       </span>
                     )}
@@ -646,7 +635,7 @@ export function TrustSafetyTab() {
                 borderRadius: '100px',
                 background: resolvedResult.isCurrentlyBlocked ? '#fee2e2' : '#ecfdf5',
                 color: resolvedResult.isCurrentlyBlocked ? '#dc2626' : '#059669',
-                border: `1px solid ${resolvedResult.isCurrentlyBlocked ? '#fca5a5' : '#a7f3d0'}`,
+                border: 'none',
                 fontSize: '0.78rem',
                 fontWeight: 900
               }}>
@@ -710,8 +699,8 @@ export function TrustSafetyTab() {
                       <option value="Pädagogische Notfall-Deaktivierung durch Schulleitung">
                         Grund: Anforderung durch Schulleitung
                       </option>
-                      <option value="Datenschutzrechtlicher Widerruf der Erziehungsberechtigten">
-                        Grund: Datenschutz-Widerruf gem. Art. 17 DSGVO
+                      <option value="Widerruf der Freigabe durch Erziehungsberechtigte">
+                        Grund: Widerruf der Freigabe durch Erziehungsberechtigte
                       </option>
                     </select>
                   </div>
@@ -813,7 +802,7 @@ export function TrustSafetyTab() {
                       className="hover-scale-mini"
                     >
                       <Download size={14} />
-                      <span>DSA-Nachweis herunterladen</span>
+                      <span>Sperrprotokoll herunterladen</span>
                     </button>
                   )}
                 </>
@@ -823,7 +812,7 @@ export function TrustSafetyTab() {
         )}
       </div>
 
-      {/* 📜 Section 2: WORM-Compliant Takedown Audit Registry Table */}
+      {/* Section 2: WORM-Compliant Takedown Audit Registry Table */}
       <div style={{
         background: '#ffffff',
         border: '1px solid #e2e8f0',
@@ -837,10 +826,10 @@ export function TrustSafetyTab() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '1.14rem', fontWeight: 900, color: '#0f172a' }}>
-              Rechtsverbindliches Takedown-Protokoll (DSA & UrhDaG Audit Trail)
+              Plattform-Sperrprotokoll (Jugend- &amp; Urheberrechtsschutz)
             </h3>
             <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-              Manipulationssichere Protokollierung mit Zeitstempel (MESZ) und SHA-512 / SHA-256 Prüfsumme
+              Manipulationssichere Protokollierung mit Zeitstempel und kryptografischer SHA-256 Prüfsumme
             </span>
           </div>
 
@@ -870,9 +859,9 @@ export function TrustSafetyTab() {
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <th style={{ padding: '12px 16px' }}>Vorgangs-ID</th>
-                <th style={{ padding: '12px 16px' }}>Zeitstempel (MESZ)</th>
-                <th style={{ padding: '12px 16px' }}>Schüler & Schule</th>
-                <th style={{ padding: '12px 16px' }}>Grund & Rechtsgrundlage</th>
+                <th style={{ padding: '12px 16px' }}>Zeitstempel</th>
+                <th style={{ padding: '12px 16px' }}>Schüler &amp; Schule</th>
+                <th style={{ padding: '12px 16px' }}>Grund &amp; Protokollstandard</th>
                 <th style={{ padding: '12px 16px' }}>Status</th>
                 <th style={{ padding: '12px 16px' }}>Kryptografische Prüfsumme</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Aktionen</th>
@@ -902,7 +891,8 @@ export function TrustSafetyTab() {
                       fontSize: '0.72rem',
                       fontWeight: 900,
                       background: rec.active ? '#fee2e2' : '#dcfce7',
-                      color: rec.active ? '#dc2626' : '#15803d'
+                      color: rec.active ? '#dc2626' : '#15803d',
+                      border: 'none'
                     }}>
                       {rec.active ? 'GESPERRT (410)' : 'REAKTIVIERT'}
                     </span>
@@ -917,7 +907,7 @@ export function TrustSafetyTab() {
                       }}
                       style={{
                         background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
+                        border: 'none',
                         borderRadius: '6px',
                         padding: '3px 8px',
                         fontSize: '0.70rem',
@@ -928,7 +918,7 @@ export function TrustSafetyTab() {
                         alignItems: 'center',
                         gap: '4px'
                       }}
-                      title="Kryptografischen Prüfsummen-Hash kopieren"
+                      title="Kryptografischen SHA-256 Prüfsummen-Hash kopieren"
                     >
                       <span>{rec.sha256Hash.slice(0, 10)}...</span>
                       {copiedHashId === rec.id ? <Check size={11} color="#0f172a" /> : <Copy size={11} />}
@@ -961,7 +951,7 @@ export function TrustSafetyTab() {
                           e.currentTarget.style.borderColor = '#cbd5e1';
                           e.currentTarget.style.transform = 'translateY(0)';
                         }}
-                        title="DSA-Nachweis herunterladen"
+                        title="Sperrprotokoll-Nachweis herunterladen"
                       >
                         <Download size={13} />
                         <span>Beweis</span>
@@ -1001,7 +991,7 @@ export function TrustSafetyTab() {
                           }}
                           style={{
                             background: '#fee2e2',
-                            border: '1px solid #fca5a5',
+                            border: 'none',
                             borderRadius: '8px',
                             padding: '6px 10px',
                             fontSize: '0.74rem',
@@ -1028,8 +1018,16 @@ export function TrustSafetyTab() {
               ))}
               {filteredRegistry.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
-                    Keine Takedown-Einträge gefunden.
+                  <td colSpan={7} style={{ padding: '40px 24px', textAlign: 'center', color: '#475569' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <CheckCircle2 size={28} color="#10b981" />
+                      <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>
+                        0 aktive Takedowns — Alle geteilten Audio-Beiträge sind konform
+                      </span>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                        Es liegen aktuell keine Sperrungen oder Beanstandungen im Plattform-Sperrprotokoll vor.
+                      </span>
+                    </div>
                   </td>
                 </tr>
               )}

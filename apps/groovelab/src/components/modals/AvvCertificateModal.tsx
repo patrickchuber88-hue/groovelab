@@ -327,7 +327,8 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
                 <li><strong>BSI IT-Grundschutz &amp; Resilienz:</strong> <strong>Stündliche automatisierte Backups (Age X25519)</strong> mit Vorab-Speicherplatzprüfung (Storage Box Quota Guardian Port 23) und <strong>DSGVO Art. 17 WORM-Tombstone Reconciliation</strong> (RPO &le; 60m, RTO &le; 45m).</li>
                 <li><strong>Zero-User-Mail &amp; Datenschutz:</strong> Vollständiges Zero-User-Mail-Axiom (0 E-Mail-Adressen von Schülern, Eltern oder Lehrkräften); Zero-Heap-Buffering für Audioaufnahmen; keine Stimmbiometrie.</li>
                 <li><strong>Vorfallsmeldung (24&ndash;48h):</strong> Datenschutzverletzungen werden binnen 24 bis maximal 48 Stunden gemeldet (zur Einhaltung von Art. 33 DSGVO und Art. 24 nDSG an den EDÖB).</li>
-                <li><strong>Herrenberg-Immunität (BSG B 12 R 3/20 R):</strong> Dozentenautonomie gewahrt; kein ERP, kein Arbeitszeiterfassungssystem, keine Leistungs- und Verhaltenskontrolle (&sect; 87 BetrVG).</li>
+                <li><strong>Kinderschutz &amp; Messenger-Governance:</strong> Private 1:1-Direktnachrichten zwischen Schülerinnen und Schülern sind datenbankseitig per Trigger gesperrt; Ensemble-Gruppenkanäle unterliegen der Lehrkraft-Moderation und dem Wortfilter.</li>
+                <li><strong>Technische System-Dokumentation (BSG B 12 R 3/20 R):</strong> Dozentenautonomie technisch gewahrt; kein ERP, kein Arbeitszeiterfassungssystem, keine Leistungs- und Verhaltenskontrolle (unverbindliche technische Fachinformation ohne Rechtsberatung).</li>
               </ul>
             </div>
 

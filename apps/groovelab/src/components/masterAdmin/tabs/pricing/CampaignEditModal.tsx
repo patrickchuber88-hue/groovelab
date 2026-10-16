@@ -1,10 +1,12 @@
 import React from 'react';
+import { Edit2, ShieldCheck, X } from 'lucide-react';
+import type { SpecialOffer } from '../../MasterAdminTypes';
 
 interface CampaignEditModalProps {
-  editingOffer: any;
+  editingOffer: SpecialOffer | null;
   onClose: () => void;
-  onSave: (offer: any) => void;
-  onChange: (offer: any) => void;
+  onSave: (offer: SpecialOffer) => void;
+  onChange: (offer: SpecialOffer | null) => void;
 }
 
 export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
@@ -30,7 +32,7 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
       zIndex: 999999,
       padding: '20px'
     }}>
-      <div role="dialog" aria-modal="true" style={{
+      <div role="dialog" aria-modal="true" aria-label="Kampagne bearbeiten" style={{
         background: '#ffffff',
         borderRadius: '24px',
         width: '100%',
@@ -42,15 +44,16 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
         gap: '16px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-            ✏️ Kampagne bearbeiten
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
+            <Edit2 size={18} color="#0f172a" /> Kampagne bearbeiten
           </h3>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+            aria-label="Schließen"
+            style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -100,12 +103,12 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
               </label>
               <select
                 value={editingOffer.currency || 'ALL'}
-                onChange={(e) => onChange({ ...editingOffer, currency: e.target.value })}
+                onChange={(e) => onChange({ ...editingOffer, currency: e.target.value as 'ALL' | 'EUR' | 'CHF' })}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
               >
-                <option value="ALL">🌐 Alle Währungen</option>
-                <option value="EUR">🇪🇺 Nur Euro (EUR)</option>
-                <option value="CHF">🇨🇭 Nur Franken (CHF)</option>
+                <option value="ALL">Alle Währungen</option>
+                <option value="EUR">Nur Euro (EUR)</option>
+                <option value="CHF">Nur Franken (CHF)</option>
               </select>
             </div>
 
@@ -121,6 +124,7 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
                 <option value={3}>3 Monate</option>
                 <option value={6}>6 Monate</option>
                 <option value={12}>12 Monate</option>
+                <option value={24}>24 Monate</option>
                 <option value={0}>Dauerhaft (Permanent)</option>
               </select>
             </div>
@@ -146,17 +150,20 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
               </label>
               <select
                 value={editingOffer.discount_scope || 'hosting_only'}
-                onChange={(e) => onChange({ ...editingOffer, discount_scope: e.target.value })}
+                onChange={(e) => onChange({ ...editingOffer, discount_scope: e.target.value as 'hosting_only' | 'total_invoice' })}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
               >
-                <option value="hosting_only">🏢 Nur Server-Hosting</option>
-                <option value="total_invoice">🌐 Gesamtrechnung</option>
+                <option value="hosting_only">Nur Server-Hosting</option>
+                <option value="total_invoice">Gesamtrechnung</option>
               </select>
             </div>
           </div>
 
-          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#ecfdf5', border: '1px solid #10b981', fontSize: '0.76rem', color: '#065f46', lineHeight: 1.35 }}>
-            🛡️ <strong>Bestandsschutz:</strong> Änderungen greifen für künftige Neuregistrierungen. Bereits eingelöste Schulen behalten ihre Konditionen.
+          <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#ecfdf5', border: 'none', fontSize: '0.76rem', color: '#065f46', lineHeight: 1.35, display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <ShieldCheck size={16} color="#065f46" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>Bestandsschutz:</strong> Änderungen greifen für künftige Neuregistrierungen. Bereits eingelöste Schulen behalten ihre Konditionen.
+            </div>
           </div>
         </div>
 

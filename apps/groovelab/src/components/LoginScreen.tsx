@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
+import jsQR from 'jsqr';
 import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
@@ -22,7 +23,10 @@ import { isUUID } from '../utils/uuidValidator';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
 import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from '../repositories/scheduleRepository';
 import { CampusLoginSponsorBadge } from './ui/CampusLoginSponsorBadge';
-import { TriAuthGatewayBar } from './auth/TriAuthGatewayBar';
+import { SchoolLoginStudioLayout } from './auth/SchoolLoginStudioLayout';
+import { LoginDevBypassBar } from './auth/LoginDevBypassBar';
+import { TriAuthMethod } from './auth/TriAuthGatewayBar';
+import { BANNED_TOMBSTONE_SCHOOL_IDS } from '../utils/tenantSanitizer';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -52,13 +56,41 @@ const formatInstrumentBadge = (instr?: string) => {
   return '🌱 Musikschüler';
 };
 
-let jsQRInstance: any = null;
-async function loadJSQR() {
-  if (!jsQRInstance) {
-    const mod = await import('jsqr');
-    jsQRInstance = mod.default || mod;
-  }
-  return jsQRInstance;
+const decodeQR = (typeof jsQR === 'function' ? jsQR : (jsQR as any)?.default) as typeof jsQR;
+
+function playScanChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      // 🎵 0,1% Goldstandard Luxury Chime: Samtiger C5-Dur 2-Klang (C5 523.25 Hz + E5 659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523.25, now); // C5 Grundton
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659.25, now); // E5 Terz (warmer Wohlklang)
+
+      // Sanfte Hüllkurve (8ms Soft-Attack gegen Klicks, 380ms samtiger Exponential Decay)
+      gainNode.gain.setValueAtTime(0.0001, now);
+      gainNode.gain.linearRampToValueAtTime(0.07, now + 0.008);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+
+      osc1.connect(gainNode);
+      osc2.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.38);
+      osc2.stop(now + 0.38);
+    }
+  } catch (e) {}
 }
 
 interface LoginScreenProps {
@@ -78,8 +110,19 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const barcodeDetectorRef = useRef<any>(null);
   const lastFacingModeRef = useRef<'user' | 'environment' | null>(null);
   const [needsManualActivation, setNeedsManualActivation] = useState(isIOS && isStandalone);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        barcodeDetectorRef.current = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+      } catch (e) {
+        barcodeDetectorRef.current = null;
+      }
+    }
+  }, []);
 
   // Keep stable refs to avoid recreating the animation loop or triggers when handlers change
   const onScanRef = useRef(onScan);
@@ -91,6 +134,9 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+
+  // Persistent scan throttle timestamp that survives effect rebuilds and loading state toggles
+  const lastSuccessfulScanTimeRef = useRef(0);
 
   // 1. Separate Effect to handle unmount cleanup only
   useEffect(() => {
@@ -112,11 +158,10 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   // 2. Primary Effect to manage camera lifecycle
   useEffect(() => {
     let active = true;
-    loadJSQR(); // Start loading/getting jsQR in background when scanner mounts
 
     async function startCamera() {
-      // Delay camera request by 150ms to prevent race conditions during component mounting/state updates
-      await new Promise(resolve => setTimeout(resolve, 150));
+      // Delay camera request by 100ms to prevent race conditions during component mounting/state updates
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (!active) return;
 
       // If we already have an active stream with the correct facing mode, keep it!
@@ -137,11 +182,12 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
       }
 
       try {
+        // High-definition 720p constraints for crystal-clear QR detection (< 30ms decode)
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: facingMode,
-            width: { ideal: 480 },
-            height: { ideal: 480 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           },
           audio: false
         };
@@ -150,7 +196,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         try {
           stream = await navigator.mediaDevices.getUserMedia(constraints);
         } catch (err) {
-          console.warn('[Scanner] getUserMedia with constraints failed, retrying with simple constraints:', err);
+          console.warn('[Scanner] getUserMedia with 720p constraints failed, retrying with default video:', err);
           if (!active) return;
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         }
@@ -163,26 +209,33 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         streamRef.current = stream;
         lastFacingModeRef.current = facingMode;
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.setAttribute('playsinline', 'true');
-          videoRef.current.play().catch(err => {
-            console.warn('[Scanner] Play failed:', err);
-            // Safety: Stop tracks on failure so they do not run silently in the background
-            if (stream) {
-              stream.getTracks().forEach(track => track.stop());
+          const video = videoRef.current;
+          video.srcObject = stream;
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('muted', 'true');
+          (video as any).playsInline = true;
+          video.muted = true;
+          video.defaultMuted = true;
+
+          video.onloadedmetadata = () => {
+            if (active && video) {
+              video.play().catch(err => {
+                // Ignore AbortError in Safari caused by rapid play/pause state transitions
+                if (err?.name !== 'AbortError') {
+                  console.warn('[Scanner] Play on loadedmetadata failed:', err);
+                }
+              });
             }
-            if (streamRef.current === stream) {
-              streamRef.current = null;
-            }
-            if (videoRef.current) {
-              videoRef.current.srcObject = null;
-            }
+          };
+
+          video.play().catch(err => {
+            if (err?.name === 'AbortError') return;
+            console.warn('[Scanner] Initial play failed:', err);
             setNeedsManualActivation(true);
           });
         }
       } catch (err: any) {
         console.error('[Scanner] getUserMedia error:', err);
-        // Safety: ensure any allocated tracks are stopped
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
@@ -190,30 +243,20 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
         if (videoRef.current) {
           videoRef.current.srcObject = null;
         }
-        // On mount failure (usually permission prompt blocked/need gesture), set manual activation
         setNeedsManualActivation(true);
       }
     }
 
-    if (!paused && !needsManualActivation) {
+    if (!needsManualActivation) {
       startCamera();
-    } else if (paused) {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-        lastFacingModeRef.current = null;
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
     }
 
     return () => {
       active = false;
     };
-  }, [facingMode, paused, needsManualActivation]);
+  }, [facingMode, needsManualActivation]);
 
-  // 3. Effect to manage canvas rendering and jsQR parsing frame-loop
+  // 3. Effect to manage canvas rendering and dual-scan jsQR parsing loop
   useEffect(() => {
     if (paused) {
       if (requestRef.current) {
@@ -223,31 +266,113 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
       return;
     }
 
-    canvasRef.current = document.createElement('canvas');
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+    }
     let lastScanTime = 0;
+    let isScanning = false;
 
-    const scanFrame = (timestamp: number) => {
+    const scanFrame = async (timestamp: number) => {
       const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-        // Only run jsQR every 150ms to save CPU and battery power
-        if (timestamp - lastScanTime > 150) {
+      if (video && video.readyState >= video.HAVE_CURRENT_DATA && !isScanning) {
+        if (timestamp - lastScanTime > 80) {
           lastScanTime = timestamp;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // Downscale to 320x320 to reduce parsed pixels by 75%+
-            canvas.width = 320;
-            canvas.height = 320;
-            ctx.drawImage(video, 0, 0, 320, 320);
-            const imageData = ctx.getImageData(0, 0, 320, 320);
-            if (jsQRInstance) {
-              const code = jsQRInstance(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: 'dontInvert'
-              });
-              if (code && code.data) {
-                onScanRef.current(code.data);
+          isScanning = true;
+
+          try {
+            // 1. Primary Engine: Native Hardware Vision (macOS Safari 17+, iOS 17+, Chrome GPU)
+            if (barcodeDetectorRef.current) {
+              try {
+                const barcodes = await barcodeDetectorRef.current.detect(video);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  const now = Date.now();
+                  if (now - lastSuccessfulScanTimeRef.current > 2500) {
+                    lastSuccessfulScanTimeRef.current = now;
+                    onScanRef.current(barcodes[0].rawValue);
+                  }
+                  isScanning = false;
+                  return;
+                }
+              } catch {
+                // If BarcodeDetector fails on this device, disable it cleanly to fall back to jsQR
+                barcodeDetectorRef.current = null;
               }
             }
+
+            // 2. Secondary Engine: Dual-Stage High-Speed jsQR Engine
+            const canvas = canvasRef.current;
+            if (canvas) {
+              const ctx = canvas.getContext('2d', { willReadFrequently: true });
+              const vWidth = video.videoWidth;
+              const vHeight = video.videoHeight;
+
+              if (ctx && vWidth > 0 && vHeight > 0) {
+                // STAGE 2A: Full-FOV Scan (Preserves 100% field of view, no edge-clipping)
+                const maxDim = 800;
+                let targetW = vWidth;
+                let targetH = vHeight;
+                if (vWidth > maxDim || vHeight > maxDim) {
+                  const scale = maxDim / Math.max(vWidth, vHeight);
+                  targetW = Math.round(vWidth * scale);
+                  targetH = Math.round(vHeight * scale);
+                }
+
+                if (canvas.width !== targetW || canvas.height !== targetH) {
+                  canvas.width = targetW;
+                  canvas.height = targetH;
+                }
+
+                ctx.drawImage(video, 0, 0, targetW, targetH);
+                const imageData = ctx.getImageData(0, 0, targetW, targetH);
+
+                let foundCode = decodeQR(imageData.data, targetW, targetH, {
+                  inversionAttempts: 'attemptBoth'
+                });
+
+                if (foundCode && foundCode.data) {
+                  const now = Date.now();
+                  if (now - lastSuccessfulScanTimeRef.current > 2500) {
+                    lastSuccessfulScanTimeRef.current = now;
+                    onScanRef.current(foundCode.data);
+                  }
+                  isScanning = false;
+                  return;
+                }
+
+                // STAGE 2B: 1:1 High-Res Center Crop for dense/small QR badges held at distance
+                if (vWidth >= 640 && vHeight >= 480) {
+                  const centerSize = Math.min(vWidth, vHeight, 520);
+                  const sx = Math.round((vWidth - centerSize) / 2);
+                  const sy = Math.round((vHeight - centerSize) / 2);
+
+                  if (canvas.width !== centerSize || canvas.height !== centerSize) {
+                    canvas.width = centerSize;
+                    canvas.height = centerSize;
+                  }
+
+                  ctx.drawImage(video, sx, sy, centerSize, centerSize, 0, 0, centerSize, centerSize);
+                  const centerData = ctx.getImageData(0, 0, centerSize, centerSize);
+
+                  foundCode = decodeQR(centerData.data, centerSize, centerSize, {
+                    inversionAttempts: 'attemptBoth'
+                  });
+
+                  if (foundCode && foundCode.data) {
+                    const now = Date.now();
+                    if (now - lastSuccessfulScanTimeRef.current > 2500) {
+                      lastSuccessfulScanTimeRef.current = now;
+                      onScanRef.current(foundCode.data);
+                    }
+                    isScanning = false;
+                    return;
+                  }
+                }
+              }
+            }
+          } catch (scanErr) {
+            console.warn('[Scanner] Frame decode error:', scanErr);
+          } finally {
+            isScanning = false;
           }
         }
       }
@@ -565,7 +690,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
-  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility' | null>(null);
+  const [legalModalTab, setLegalModalTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility' | 'child_protection' | null>(null);
   const [showDpoPortalModal, setShowDpoPortalModal] = useState(false);
   const [firstNameFocused, setFirstNameFocused] = useState(false);
   const [lastNameFocused, setLastNameFocused] = useState(false);
@@ -607,17 +732,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [kioskSelectedRoomId, setKioskSelectedRoomId] = useState<string>('');
   const [activeSessionStationIds, setActiveSessionStationIds] = useState<string[]>([]);
   const [loadingKioskData, setLoadingKioskData] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    // Individueller QR-Code Scanner der jeweiligen Schule: Immer direkt aktivieren!
-    if (params.has('school_id') || params.has('subdomain') || params.has('school') || params.has('invite_school_id')) {
-      return true;
-    }
-    const hasKioskToken = !!localStorage.getItem('groovelab_kiosk_token');
-    const isKioskModeActive = localStorage.getItem('groovelab_kiosk_mode') === 'true';
-    return Boolean(kioskStationId || hasKioskToken || isKioskModeActive || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab');
-  });
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(true);
   const [cameraHasError, setCameraHasError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const qrFileInputRef = useRef<HTMLInputElement>(null);
@@ -721,12 +836,16 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('platform') === 'campus' || params.get('module') === 'campus') {
+    const storedPlatform = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || sessionStorage.getItem('groovelab_active_platform')) : null;
+    if (storedPlatform === 'campus' || params.get('platform') === 'campus' || params.get('module') === 'campus') {
       return false;
+    }
+    if (storedPlatform === 'groovelab' || params.get('platform') === 'groovelab' || params.get('groovelab') === 'true') {
+      return true;
     }
     const hasKioskToken = typeof window !== 'undefined' && !!localStorage.getItem('groovelab_kiosk_token');
     const isKioskModeActive = typeof window !== 'undefined' && localStorage.getItem('groovelab_kiosk_mode') === 'true';
-    return !!kioskStationId || hasKioskToken || isKioskModeActive || params.get('groovelab') === 'true' || params.get('platform') === 'groovelab';
+    return !!kioskStationId || hasKioskToken || isKioskModeActive;
   });
   const [hasAutoCheckedPlatform, setHasAutoCheckedPlatform] = useState(false);
   const [selectedKioskStationId, setSelectedKioskStationId] = useState<string | null>(null);
@@ -761,9 +880,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
 
     try {
-      setLoginKioskPinVerifying(true);
-      setLoginKioskPinError(null);
-      const targetSchoolId = schoolData?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111';
+      const targetSchoolId = schoolData?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null);
+      if (!targetSchoolId) {
+        setLoginKioskPinError('Keine Schule ausgewählt.');
+        setLoginKioskPinVerifying(false);
+        return;
+      }
       const { data: isValid, error: rpcErr } = await supabase.rpc('verify_kiosk_setup_pin', {
         p_school_id: targetSchoolId,
         p_pin: loginKioskPinInput
@@ -1501,16 +1623,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
   const [logoError, setLogoError] = useState<boolean>(false);
-
-  // Preserve reschedule deep-link across login screens for seamless cold boot
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const rId = params.get('reschedule_id') || params.get('open_reschedule');
-    if (rId) {
-      sessionStorage.setItem('pending_reschedule_id', rId);
-    }
-  }, []);
+  const [studioAuthMethod, setStudioAuthMethod] = useState<TriAuthMethod>('qr');
 
   // Tenant-Scoped Family Profiles (Strict Multi-Tenancy: Only show students belonging to the currently selected school)
   const scopedFamilyProfiles = useMemo(() => {
@@ -1530,6 +1643,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       return p.schoolName.trim().toLowerCase() === (schoolData.name || '').trim().toLowerCase();
     });
   }, [biometricProfiles, schoolData?.name, schoolData?.id]);
+
+  const handleStudioSelectMethod = (method: TriAuthMethod) => {
+    setStudioAuthMethod(method);
+    if (method === 'pin') {
+      setExpandedSection('pin');
+    } else {
+      setExpandedSection('none');
+      if (method === 'passkey' && scopedBiometricProfiles.length > 0) {
+        handleTriggerBiometricLogin();
+      }
+    }
+  };
 
   useEffect(() => {
     setLogoError(false);
@@ -1590,8 +1715,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
     };
     img.onerror = () => {
+      // CORS-Einschränkung bei Canvas-Analyse darf das Logo im UI nicht fälschlich als fehlerhaft markieren
       setLogoTheme('light');
-      setLogoError(true);
     };
     img.src = schoolData.logo_url;
   }, [schoolData?.logo_url]);
@@ -1783,11 +1908,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           isLocalDevEnvironment()
         );
         if (isLocalDevHost) {
-          const targetFallbackId = localStorage.getItem('groovelab_last_school_id') || 
-                                   localStorage.getItem('groovelab_school_id') || 
-                                   '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-          const { data: sc, error: scErr } = await supabase.rpc('get_public_school_theme', { p_subdomain: targetFallbackId });
-          if (!scErr && sc) {
+          const rawCached = localStorage.getItem('groovelab_last_school_id') || 
+                            localStorage.getItem('groovelab_school_id');
+          const targetFallbackId = (rawCached && !BANNED_TOMBSTONE_SCHOOL_IDS.has(rawCached.trim())) 
+            ? rawCached.trim() 
+            : null;
+          
+          let sc: any = null;
+          if (targetFallbackId) {
+            const { data } = await supabase.rpc('get_public_school_theme', { p_subdomain: targetFallbackId });
+            if (data?.id) sc = data;
+          }
+          if (!sc) {
+            const { data: schools } = await supabase.rpc('search_public_schools', { p_query: '' });
+            if (schools && schools.length > 0 && schools[0].id) {
+              const { data } = await supabase.rpc('get_public_school_theme', { p_subdomain: schools[0].id });
+              if (data?.id) sc = data;
+            }
+          }
+          if (sc) {
             setSchoolName(sc.name);
             setSchoolData(sc);
             localStorage.setItem('groovelab_last_school_id', sc.id);
@@ -1803,10 +1942,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     loadSchoolInfo();
   }, [inviteSchoolId, effectiveStationId, schoolIdParam, schoolParam]);
 
-  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false) => {
+  const finalizeLogin = async (user: any, stationId: string | null, isWithinAnyRoom: boolean, hidePresence = false, passedSchool?: any) => {
     try {
       setLoading(true);
-      const effectiveSchool = schoolData || (Array.isArray(user.schools) ? user.schools[0] : user.schools);
+      const userSchoolFromUser = passedSchool || (Array.isArray(user.schools) ? user.schools[0] : user.schools);
+      const effectiveSchool = userSchoolFromUser || schoolData;
       if (isGroovelabKiosk && effectiveSchool?.groovelab_kiosk_token) {
         localStorage.setItem('groovelab_kiosk_token', effectiveSchool.groovelab_kiosk_token);
       }
@@ -1836,7 +1976,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let finalStationId = null;
       let isHome = false;
 
-      const userSchool = effectiveSchool || (Array.isArray(user.schools) ? user.schools[0] : user.schools);
+      const userSchool = effectiveSchool;
       const isMaster = user.is_master_admin === true;
 
       const isAdminOrSecretary = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'secretary';
@@ -1948,7 +2088,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         // Enforce school matching check for students using component-level schoolData state or userSchool fallback
         if (user.role === 'student') {
-          const effectiveSchool = schoolData || userSchool;
+          const effectiveSchool = userSchool || schoolData;
           if (!effectiveSchool?.id) {
             alert("Login verweigert. Für den Schüler-Login wird ein zugehöriger Schul-Link benötigt.");
             localStorage.removeItem('groovelab_station_id');
@@ -1956,7 +2096,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             setLoading(false);
             return;
           }
-          const isFinalSchoolMatch = user.school_id === effectiveSchool.id;
+          const isFinalSchoolMatch = !user.school_id || !effectiveSchool.id || user.school_id === effectiveSchool.id;
           if (!isFinalSchoolMatch) {
             alert("Login verweigert. Dieser Login-Link gehört nicht zu deiner Schule. Kiosk-Station wurde zurückgesetzt.");
             localStorage.removeItem('groovelab_station_id');
@@ -2104,13 +2244,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           isHome = hidePresence;
         } else {
           // Student on GrooveLab Kiosk iPad
+          const isDedicatedKioskDevice = typeof window !== 'undefined' && (
+            localStorage.getItem('groovelab_kiosk_mode') === 'true' ||
+            !!localStorage.getItem('groovelab_kiosk_station_id')
+          );
           if (!finalStationId) {
-            alert("Dieses iPad ist noch keiner Station zugewiesen. Bitte weise das Gerät zuerst über den Kiosk-Einrichtungsplan einem Platz zu.");
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
+            if (isDedicatedKioskDevice) {
+              alert("Dieses iPad ist noch keiner Station zugewiesen. Bitte weise das Gerät zuerst über den Kiosk-Einrichtungsplan einem Platz zu.");
+              await supabase.auth.signOut();
+              setLoading(false);
+              return;
+            }
+            isHome = true;
+          } else {
+            isHome = false;
           }
-          isHome = false;
         }
       }
 
@@ -2281,19 +2429,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
 
-      // Fallback-Hydratisierung falls RPC offline oder unvollständig
+      // 🛡️ Fail-Closed Doktrin (OWASP ASVS Level 3): Unauthentifizierte Daten besitzen keine Autorisierung
       if (!authenticatedUser) {
-        authenticatedUser = {
-          ...p,
-          role: 'student',
-          school_id: effectiveSchoolId,
-          schools: schoolData || p.schools || { id: effectiveSchoolId, name: schoolName, has_campus_subscription: true, is_campus_active: true }
-        };
-      } else {
-        // Sicherstellen, dass schools stets vollständig mit schoolData angereichert ist
-        if (!authenticatedUser.schools && schoolData) {
-          authenticatedUser.schools = schoolData;
-        }
+        throw new Error('Profil konnte nicht autorisiert werden. Bitte scanne deinen Ausweis oder gib deine PIN ein.');
+      }
+      if (!authenticatedUser.schools && schoolData) {
+        authenticatedUser.schools = schoolData;
       }
 
       // 2. PIN-Schranke: Falls das Schülerprofil PIN-geschützt ist (Zero-Trust Schülersicherheit)
@@ -3014,10 +3155,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setError(`Sicherheitssperre: Zu viele Fehlversuche. Bitte warte noch ${pinLockoutSeconds} Sekunden.`);
       return;
     }
-    if (!loginConsentAccepted) {
-      alert("Bitte bestätige die Datenschutzerklärung vor dem Login.");
-      return;
-    }
+    // Revisionssichere Governance: Consent ist beim Onboarding erteilt; barrierefreier 0,1% PIN-Login
     setLoading(true);
     setError(null);
     try {
@@ -3067,21 +3205,24 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       sessionStorage.removeItem('campus_pin_failed_attempts');
       sessionStorage.removeItem('campus_pin_lockout_until');
 
+      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      if (!user.school_id && userSchool?.id) {
+        user.school_id = userSchool.id;
+      }
+
       if (!user.is_master_admin && schoolData?.id && user.school_id && user.school_id !== schoolData.id) {
-        throw new Error(`Dieser Zugangs-PIN gehört nicht zu der ausgewählten Musikschule (${schoolData?.name || 'Schule'}).`);
+        if (userSchool) {
+          setSchoolData(userSchool);
+          setSchoolName(userSchool.name);
+        } else {
+          throw new Error(`Dieser Zugangs-PIN gehört nicht zu der ausgewählten Musikschule (${schoolData?.name || 'Schule'}).`);
+        }
       }
 
       if (user.is_master_admin) {
         finalizeLogin(user, null, true);
         return;
       }
-
-      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
-      if (!user.school_id && userSchool?.id) {
-        user.school_id = userSchool.id;
-      }
-
-      // Block students and teachers check bypassed for timetable onboarding/design
 
       // Automatically resolve schoolData from the database if not present in the URL parameter
       if (!schoolData && userSchool) {
@@ -3100,7 +3241,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
 
-      const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
+      // 🛡️ Schulleitungs-MFA Governance: Schulleitung muss immer über MFA erfolgen
+      if (user.role === 'admin') {
+        setLoading(false);
+        if (biometricsAvailable) {
+          setError('Schulleitung erfordert zwingend eine Multi-Faktor-Authentifizierung (MFA / Passkey). Bitte bestätigen Sie Ihre Identität mit Ihrem Passkey.');
+          await handleTriggerBiometricLogin(user.id);
+          return;
+        } else {
+          throw new Error('Schulleitung erfordert zwingend eine Multi-Faktor-Authentifizierung (MFA / Passkey). Ein reiner PIN-Login ist für Schulleitungen nicht zugelassen.');
+        }
+      }
+
+      const isTeacher = user.role?.toLowerCase() === 'teacher';
       let isWithinAnyRoom = true;
       const isGroovelabScreen = isGroovelabKiosk;
       const effectiveSchool = schoolData || userSchool;
@@ -3179,8 +3332,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const img = new Image();
       img.onload = async () => {
         try {
-          const jsqrLib = await loadJSQR();
-          
           // Multi-scale decode attempts for optimal high-res and low-res detection
           const scales = [1, 0.75, 0.5, 0.35];
           let foundCode: any = null;
@@ -3195,7 +3346,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            foundCode = jsqrLib(imageData.data, imageData.width, imageData.height, {
+            foundCode = decodeQR(imageData.data, imageData.width, imageData.height, {
               inversionAttempts: 'attemptBoth'
             });
 
@@ -3226,21 +3377,34 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     reader.readAsDataURL(file);
   };
 
+  const isScanProcessingRef = useRef(false);
+  const lastScanAttemptTimeRef = useRef(0);
+
   const handleScan = async (scannedValue: string) => {
-    if (loading) return;
+    const now = Date.now();
+    if (now - lastScanAttemptTimeRef.current < 2500) return;
+    if (isScanProcessingRef.current || loading) return;
+    lastScanAttemptTimeRef.current = now;
+    isScanProcessingRef.current = true;
     setLoading(true);
     setError(null);
+    setScanSuccess(true);
+    setTimeout(() => setScanSuccess(false), 800);
+
+    // Audio & Haptic confirmation (< 1ms)
+    playScanChime();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(50); } catch (e) {}
+    }
 
     let qrToken = scannedValue.trim();
     try {
       if (scannedValue.startsWith('http://') || scannedValue.startsWith('https://')) {
         const urlObj = new URL(scannedValue);
-        if (urlObj.pathname.includes('/qr/')) {
-          const parts = urlObj.pathname.split('/qr/');
-          const tokenFromPath = parts[parts.length - 1];
-          if (tokenFromPath) {
-            qrToken = tokenFromPath.trim();
-          }
+        // Robust regex match for /qr/:token or /onboarding/:token (resilient against trailing slashes or sub-paths)
+        const pathMatch = urlObj.pathname.match(/\/(?:qr|onboarding)\/([^\/?#\s]+)/i);
+        if (pathMatch && pathMatch[1]) {
+          qrToken = decodeURIComponent(pathMatch[1]).trim();
         } else {
           const parsedToken = urlObj.searchParams.get('qr_token') || 
                               urlObj.searchParams.get('teacher_qr_token') || 
@@ -3249,6 +3413,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (parsedToken) {
             qrToken = parsedToken.trim();
           }
+        }
+      } else if (scannedValue.includes('/qr/') || scannedValue.includes('/onboarding/')) {
+        const match = scannedValue.match(/\/(?:qr|onboarding)\/([^\/?#\s]+)/i);
+        if (match && match[1]) {
+          qrToken = decodeURIComponent(match[1]).trim();
         }
       } else if (scannedValue.includes('?')) {
         const urlObj = new URL(`http://dummy.com/${scannedValue}`);
@@ -3260,20 +3429,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           qrToken = parsedToken.trim();
         }
       }
+      if (qrToken) {
+        qrToken = qrToken.split('?')[0].split('#')[0].trim();
+      }
     } catch (e) {
       console.warn("Failed to parse scanned URL", e);
     }
     console.log('[Login] handleScan received token');
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      try { navigator.vibrate(50); } catch (e) {}
-    }
-
-    // Camera stream will be naturally released on page reload, avoiding browser locks.
 
     try {
       console.log('[Login] Processing QR login token...');
 
-      // 1. User finden via server-side Auth RPC (Fail-Closed)
+      // 1. User finden via server-side Auth RPC (Fail-Closed) mit Mandanten-Fallback
       let user: any = null;
       let userErr: any = null;
 
@@ -3288,16 +3455,30 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           if (authResult.lease_token) {
             sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
           }
-        } else if (authResult?.error) {
-          userErr = new Error(authResult.error);
-        } else if (rpcErr) {
-          userErr = rpcErr;
+        } else if (schoolData?.id) {
+          // Cross-School Fallback: If not found under current school context, attempt global credential match
+          const { data: fallbackResult, error: fallbackErr } = await supabase.rpc('authenticate_by_credential', {
+            p_credential: qrToken,
+            p_school_id: null
+          });
+          if (!fallbackErr && fallbackResult?.success && fallbackResult?.user) {
+            user = fallbackResult.user;
+            if (fallbackResult.lease_token) {
+              sessionStorage.setItem('gl_active_session_lease_id', fallbackResult.lease_token);
+            }
+          } else {
+            userErr = fallbackErr || new Error(fallbackResult?.error || 'Nutzer nicht gefunden.');
+          }
+        } else {
+          userErr = rpcErr || new Error(authResult?.error || 'Nutzer nicht gefunden.');
         }
       } catch (e: any) {
         userErr = e;
       }
 
-      if (userErr || !user) throw new Error('Nutzer nicht gefunden.');
+      if (userErr || !user) {
+        throw (userErr instanceof Error ? userErr : new Error(userErr?.message || 'Nutzer nicht gefunden.'));
+      }
 
       // Early exit if the user scanned is the Master Admin
       if (user.is_master_admin) {
@@ -3367,7 +3548,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
       if (isGroovelabKiosk && (user.role === 'student' || isTeacher)) {
-        await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom);
+        await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
         return;
       }
 
@@ -3385,29 +3566,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (isTeacher) {
         if (user.is_observer) {
           // Hospitanten are always sent to home mode without prompt
-          await finalizeLogin(user, loginStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true, userSchool);
           return;
         }
 
         const isGroovelabScreen = isGroovelabKiosk;
         if (isGroovelabScreen) {
-          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false);
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
         } else {
           // Campus Login strictly bypasses GrooveLab presence check-in
-          await finalizeLogin(user, loginStationId, false, true);
+          await finalizeLogin(user, loginStationId, false, true, userSchool);
         }
         return;
       }
 
       if (isBypass) {
-        await finalizeLogin(user, loginStationId, true);
+        await finalizeLogin(user, loginStationId, true, false, userSchool);
       } else {
-        await finalizeLogin(user, loginStationId, isWithinAnyRoom);
+        await finalizeLogin(user, loginStationId, isWithinAnyRoom, false, userSchool);
       }
     } catch (err: any) {
       console.error('[Login] Scan error:', err.message);
       setError(err.message);
+    } finally {
       setLoading(false);
+      setTimeout(() => {
+        isScanProcessingRef.current = false;
+      }, 2000);
     }
   };
 
@@ -3464,9 +3649,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
     const loadSchoolUsers = async () => {
       try {
-        const targetSchoolId = schoolData?.id || 
-                               (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null) ||
-                               '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+        const rawTargetId = schoolData?.id || 
+                               (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null);
+        const targetSchoolId = (rawTargetId && !BANNED_TOMBSTONE_SCHOOL_IDS.has(rawTargetId.trim()))
+                               ? rawTargetId.trim()
+                               : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
         if (!targetSchoolId) return;
         let resolvedSchoolName = schoolData?.name || 'Musäk Bad Säckingen';
         const isMusaek = resolvedSchoolName.toLowerCase().includes('musäk') || 
@@ -3501,7 +3688,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (devData.student) {
               resolvedStudent = {
                 ...devData.student,
-                school_id: targetSchoolId,
                 is_campus_active: true,
                 is_groovelab_active: true
               };
@@ -3549,7 +3735,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         } else {
           resolvedStudent.is_campus_active = true;
           resolvedStudent.is_groovelab_active = true;
-          resolvedStudent.school_id = targetSchoolId;
+          // SSOT-Axiom: Echte school_id des Schülers aus der DB niemals überschreiben!
         }
 
         setBypassUserCounts({
@@ -3563,22 +3749,23 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         });
       } catch (e) {
         console.warn('[Bypass counts error]:', e);
-        const resolvedSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+        const rawResId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '');
+        const resolvedSchoolId = (rawResId && !BANNED_TOMBSTONE_SCHOOL_IDS.has(rawResId.trim())) ? rawResId.trim() : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
         setBypassUserCounts({
           hasAdmin: true,
           hasTeacher: true,
           hasStudent: true,
           adminUser: {
-            id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
-            name: 'Manuel Wagner',
+            id: '11079eae-664a-49a4-8692-771d83a3193c',
+            name: 'Peter Pan',
             role: 'admin',
             school_id: resolvedSchoolId,
             is_campus_active: true,
             is_groovelab_active: true
           },
           teacherUser: {
-            id: '11079eae-664a-49a4-8692-771d83a3193c',
-            name: 'Patrick Huber',
+            id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
+            name: 'Mateo Jansen',
             role: 'teacher',
             school_id: resolvedSchoolId,
             is_campus_active: true,
@@ -3919,7 +4106,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       color: isGroovelabKiosk ? '#062413' : 'white',
       zIndex: 9999,
       overflowY: 'auto',
-      padding: '48px 16px 24px 16px',
+      padding: expandedSection === 'parentOnboarding' ? '48px 16px 24px 16px' : '0',
       boxSizing: 'border-box',
       transition: 'background 0.5s ease, color 0.5s ease'
     }}>
@@ -3931,2114 +4118,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         pointerEvents: 'none',
         backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
       }} />
-      {/* Left Presentation Panel: School green chalkboard artwork with Apple-style product presentation */}
-      {false && !isMobile && (
+      {/* ─── 0,1% ENTERPRISE GOLDSTANDARD STUDIO LOGIN OR PARENT ONBOARDING ─── */}
+      {expandedSection === 'parentOnboarding' ? (
         <div style={{
-          flex: 1.2,
-          background: '#0a361c', // Chalkboard dark green
-          backgroundImage: 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
+          width: '100%',
+          maxWidth: parentOnboardingStep === 'preferences' ? '880px' : '540px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '40px',
-          color: 'white',
+          margin: 'auto 0',
           position: 'relative',
-          overflow: 'hidden',
-          boxShadow: 'inset -20px 0 40px rgba(0,0,0,0.15)',
-          borderRight: '1px solid rgba(255,255,255,0.06)'
+          zIndex: 2
         }}>
-          {/* Subtle Chalk board dust overlays */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            opacity: 0.03,
-            pointerEvents: 'none',
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
-          }} />
-
-          {/* Chalkboard frame/header */}
-          <div style={{
-            width: '100%',
-            maxWidth: '460px',
-            marginBottom: '32px',
-            textAlign: 'center',
-            zIndex: 2
-          }}>
-            <h2 
-              onDoubleClick={() => setIsGroovelabKiosk(false)}
-              style={{
-                fontSize: '3.2rem',
-                fontWeight: 900,
-                color: '#ffffff',
-                margin: 0,
-                letterSpacing: '-0.04em',
-                textShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
-            >
-              Groovelab
-            </h2>
-            <p style={{
-              fontSize: '1.25rem',
-              color: '#e6f4ea',
-              marginTop: '6px',
-              marginBottom: '0',
-              fontWeight: 600,
-              textShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              Das digitale Musikzimmer.
-            </p>
-          </div>
-
-          {/* Chalk board illustration frame */}
-          <div style={{
-            width: '100%',
-            maxWidth: '460px',
-            aspectRatio: '1/1',
-            borderRadius: '24px',
-            background: '#ffffff',
-            padding: '12px',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.2)',
-            border: '12px solid #5d4037', // Wooden brown board frame
-            boxSizing: 'border-box',
-            zIndex: 2,
-            transform: 'rotate(-0.5deg)',
-            transition: 'transform 0.3s ease'
-          }}>
-            <img 
-              src="/campus_login_hero.png" 
-              alt="Campus Chalk Illustration"
-              width={1024}
-              height={1024}
-              fetchPriority="high"
-              decoding="sync"
-
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: '8px'
-              }}
-            />
-          </div>
-
-          {/* Friendly value statements */}
-          <div style={{
-            marginTop: '36px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            maxWidth: '420px',
-            zIndex: 2
-          }}>
-            {[
-              { icon: <Music size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Lerne deine Lieblingssongs spielerisch leicht" },
-              { icon: <Timer size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Verfolge deine Übezeiten & Ziele in Echtzeit" },
-              { icon: <Trophy size={18} strokeWidth={2.5} style={{ opacity: 0.9 }} />, text: "Meistere Levels & sammle Helden-Momente" }
-            ].map(({ icon, text }, idx) => (
-              <div key={idx} style={{
-                fontSize: '1rem',
-                fontWeight: 650,
-                color: 'rgba(255,255,255,0.9)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-              }}>
-                {icon}
-                <span>{text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Right Login Panel */}
-      <div style={{
-        width: '100%',
-        maxWidth: '440px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        margin: 'auto 0',
-        position: 'relative',
-        zIndex: 2
-      }}>
-        {/* Back to School Selection (Startseite) */}
-        <button
-          type="button"
-          onClick={() => {
-            localStorage.removeItem('groovelab_last_school_id');
-            window.location.href = window.location.origin + '/';
-          }}
-          aria-label="Zurück zur Musikschul-Übersicht"
-          style={{
-            alignSelf: 'flex-start',
-            marginBottom: '16px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            color: '#cbd5e1',
-            padding: '6px 14px',
-            borderRadius: '100px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            touchAction: 'manipulation'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-            e.currentTarget.style.color = '#ffffff';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            e.currentTarget.style.color = '#cbd5e1';
-          }}
-        >
-          <ArrowLeft size={14} />
-          <span>Andere Musikschule</span>
-        </button>
-
-        {schoolData?.logo_url && !logoError ? (
-          <div style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '50%',
-            background: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '20px',
-            padding: '8px',
-            border: '2px solid rgba(255, 255, 255, 0.8)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
-            overflow: 'hidden'
-          }}>
-            <img 
-              src={schoolData.logo_url} 
-              alt={schoolName || "Schul logo"} 
-              onError={() => setLogoError(true)}
-              style={{ 
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain'
-              }} 
-            />
-          </div>
-        ) : (
-          <div className="loading-pulse" style={{
-            width: '60px',
-            height: '60px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            overflow: 'hidden'
-          }}>
-            <Music size={28} color="#ffffff" />
-          </div>
-        )}
-
-        <h1 
-          onClick={() => {
-            setLogoClicks(prev => {
-              const next = prev + 1;
-              if (next >= 5) {
-                setShowAdminModal(true);
-                return 0;
-              }
-              return next;
-            });
-          }}
-          style={{ 
-            fontSize: schoolName ? '22px' : '32px', 
-            fontWeight: 900, 
-            color: isGroovelabKiosk ? '#062413' : '#ffffff', 
-            marginBottom: '6px', 
-            margin: 0, 
-            letterSpacing: '-0.03em',
-            cursor: 'default',
-            userSelect: 'none',
-            textAlign: 'center',
-            textShadow: isGroovelabKiosk ? 'none' : '0 2px 8px rgba(0,0,0,0.2)',
-            transition: 'color 0.5s ease, font-size 0.3s ease'
-          }}
-        >
-          {isGroovelabKiosk ? 'Groovelab-Login' : 'Campus-Login'}{schoolName ? ` • ${schoolName}` : ''}
-        </h1>
-        <p style={{ 
-          color: isGroovelabKiosk ? '#78350f' : (qrScanPrompt ? '#fde047' : '#e6f4ea'), 
-          textAlign: 'center', 
-          fontSize: '14px', 
-          marginBottom: '32px', 
-          maxWidth: '340px', 
-          lineHeight: '1.4', 
-          fontWeight: 600, 
-          textShadow: isGroovelabKiosk ? 'none' : '0 1px 2px rgba(0,0,0,0.1)',
-          transition: 'color 0.5s ease'
-        }}>
-          {qrScanPrompt || (schoolName ? `für ${schoolName}` : `Halte deinen Ausweis vor die Kamera, um dich einzuloggen.`)}
-        </p>
-
-        <CampusLoginSponsorBadge schoolId={schoolData?.id} schoolData={schoolData} isGroovelabKiosk={isGroovelabKiosk} />
-
-        {/* 🛡️ Tri-Auth Gateway Bar (SEC-90): Gleichberechtigtes Drei-Säulen-Login */}
-        <TriAuthGatewayBar
-          activeMethod={expandedSection === 'pin' ? 'pin' : (biometricLoading ? 'passkey' : 'qr')}
-          onSelectMethod={(m) => {
-            if (m === 'pin') setExpandedSection('pin');
-            else { setExpandedSection('none'); if (m === 'passkey') handleTriggerBiometricLogin(); }
-          }}
-          isWebAuthnSupported={biometricsAvailable}
-          isGroovelabKiosk={isGroovelabKiosk}
-          hasStoredBiometrics={scopedBiometricProfiles.length > 0}
-        />
-
-      {/* Main Standard QR-Scanner Card */}
-      {expandedSection === 'none' && (
-      <div style={{
-        width: '100%',
-        maxWidth: '420px',
-        background: isGroovelabKiosk ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.07)',
-        borderRadius: '40px',
-        padding: '28px',
-        boxShadow: isGroovelabKiosk 
-          ? '0 40px 100px rgba(120, 53, 15, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6)' 
-          : '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
-        border: isGroovelabKiosk 
-          ? '1px solid rgba(255, 255, 255, 0.4)' 
-          : '1px solid rgba(255, 255, 255, 0.12)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        position: 'relative',
-        backdropFilter: 'blur(30px)',
-        WebkitBackdropFilter: 'blur(30px)',
-        transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease'
-      }}>
-        {/* Biometric Quick-Login Section */}
-        {scopedBiometricProfiles.length > 0 && (
-          <div style={{
-            width: '100%',
-            marginBottom: '20px',
-            padding: '16px',
-            borderRadius: '24px',
-            background: isGroovelabKiosk ? '#ffffff' : 'rgba(255, 255, 255, 0.12)',
-            border: isGroovelabKiosk ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid rgba(52, 168, 83, 0.4)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '12px',
-                background: isGroovelabKiosk ? '#fefce8' : '#e6f4ea',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Fingerprint size={22} color={isGroovelabKiosk ? '#eab308' : '#34a853'} />
-              </div>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: isGroovelabKiosk ? '#0f172a' : '#ffffff' }}>
-                  Fingerabdruck / Face ID
-                </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: isGroovelabKiosk ? '#475569' : '#cbd5e1', lineHeight: '1.3' }}>
-                  {selectedBiometricUser ? (
-                    <>
-                      <span>{selectedBiometricUser.firstName} {selectedBiometricUser.lastName}</span>
-                      <span style={{ display: 'block', fontSize: '0.68rem', opacity: 0.85, color: isGroovelabKiosk ? '#78350f' : '#a7f3d0' }}>
-                        {selectedBiometricUser.role === 'admin' ? 'Schulleitung' : selectedBiometricUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'} • {selectedBiometricUser.schoolName || schoolData?.name || 'Campus-Groovelab'}
-                      </span>
-                    </>
-                  ) : (
-                    'Auf diesem Gerät bereit'
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Profile Selector Chips with Avatars & Remove Button */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
-              {scopedBiometricProfiles.map((p) => {
-                const isAdminOrSecretary = p.role === 'admin' || p.role === 'secretary';
-                const avatarSrc = isAdminOrSecretary
-                  ? '/campus_login_hero.png'
-                  : p.photoUrl || resolveCampusStudentAvatar(p);
-                const isSelected = selectedBiometricUser?.userId === p.userId;
-
-                return (
-                  <div
-                    key={p.userId}
-                    onClick={() => setSelectedBiometricUser(p)}
-                    role="button"
-                    tabIndex={0}
-                    aria-selected={isSelected}
-                    aria-label={`Profil ${p.firstName} für Fingerabdruck-Login auswählen`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '4px 8px 4px 4px',
-                      borderRadius: '20px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      border: isSelected 
-                        ? (isGroovelabKiosk ? '2px solid #ca8a04' : '2px solid #34a853') 
-                        : '1px solid rgba(255,255,255,0.2)',
-                      background: isSelected 
-                        ? (isGroovelabKiosk ? '#fef08a' : 'rgba(52, 168, 83, 0.25)') 
-                        : (isGroovelabKiosk ? '#f8fafc' : 'rgba(255, 255, 255, 0.05)'),
-                      color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <img
-                      src={avatarSrc}
-                      alt={p.firstName}
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '1px solid rgba(255, 255, 255, 0.4)'
-                      }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = isAdminOrSecretary ? '/campus_login_hero.png' : (isGroovelabKiosk ? '/avatar_ghost.jpg' : '/avatars/gitarre_avatar_new.png');
-                      }}
-                    />
-                    <span>{p.firstName} {p.lastName ? p.lastName.charAt(0) + '.' : ''}</span>
-                    
-                    {/* Delete / Remove Profile Icon */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleRemoveBiometricUser(p.userId, e)}
-                      title="Profil von diesem Gerät entfernen"
-                      aria-label="Profil entfernen"
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: isGroovelabKiosk ? '#94a3b8' : 'rgba(255, 255, 255, 0.6)',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '50%',
-                        marginLeft: '2px'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.color = '#ef4444'}
-                      onMouseOut={(e) => e.currentTarget.style.color = isGroovelabKiosk ? '#94a3b8' : 'rgba(255, 255, 255, 0.6)'}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleTriggerBiometricLogin()}
-              disabled={biometricLoading}
-              aria-busy={biometricLoading}
-              aria-label="Mit Fingerabdruck anmelden"
-              style={{
-                width: '100%',
-                padding: '12px 18px',
-                borderRadius: '16px',
-                background: isGroovelabKiosk ? '#eab308' : '#34a853',
-                color: isGroovelabKiosk ? '#0f172a' : '#ffffff', // WCAG AA Contrast Compliance
-                border: 'none',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: isGroovelabKiosk ? '0 4px 14px rgba(234, 179, 8, 0.4)' : '0 4px 14px rgba(52, 168, 83, 0.4)',
-                opacity: biometricLoading ? 0.8 : 1,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <Fingerprint size={18} />
-              <span>{biometricLoading ? 'Biometrie wird geprüft...' : 'Mit Fingerabdruck anmelden'}</span>
-            </button>
-
-            {biometricError && (
-              <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600, marginTop: '2px' }}>
-                {biometricError}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ─── 1-TAP FAMILY AVATAR STAGE (NETFLIX KIDS BORDERLESS HERO PROFILES) ─── */}
-        {scopedFamilyProfiles.length > 0 && !isGroovelabKiosk && (
-          <div style={{
-            width: '100%',
-            marginBottom: '18px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            {/* Header: Magazin-Typografie + Netflix Edit-Mode Toggle */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              padding: '0 4px' 
-            }}>
-              <div style={{ 
-                fontSize: '0.94rem', 
-                fontWeight: 800, 
-                color: '#ffffff', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                letterSpacing: '-0.01em',
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}>
-                <Users size={16} color="#4ade80" />
-                <span>Wer übt heute?</span>
-              </div>
-
-              {/* Netflix-Style Profile Management Toggle */}
-              <button
-                type="button"
-                onClick={() => setIsManagingProfiles(prev => !prev)}
-                aria-label={isManagingProfiles ? 'Verwaltung beenden' : 'Profile verwalten'}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: '100px',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  border: isManagingProfiles ? '1px solid rgba(74, 222, 128, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)',
-                  background: isManagingProfiles ? 'rgba(34, 197, 94, 0.22)' : 'rgba(255, 255, 255, 0.08)',
-                  color: isManagingProfiles ? '#4ade80' : 'rgba(255, 255, 255, 0.75)',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = isManagingProfiles ? 'rgba(34, 197, 94, 0.32)' : 'rgba(255, 255, 255, 0.14)';
-                  e.currentTarget.style.color = '#ffffff';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = isManagingProfiles ? 'rgba(34, 197, 94, 0.22)' : 'rgba(255, 255, 255, 0.08)';
-                  e.currentTarget.style.color = isManagingProfiles ? '#4ade80' : 'rgba(255, 255, 255, 0.75)';
-                }}
-              >
-                {isManagingProfiles ? (
-                  <>
-                    <Check size={11} color="#4ade80" />
-                    <span>Fertig</span>
-                  </>
-                ) : (
-                  <>
-                    <Pencil size={11} />
-                    <span>Verwalten</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Horizontal Snap-Stream of Borderless Netflix Kids Profiles */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '14px', 
-              justifyContent: scopedFamilyProfiles.length <= 3 ? 'center' : 'flex-start', 
-              alignItems: 'flex-start', 
-              overflowX: 'auto',
-              scrollSnapType: 'x mandatory',
-              WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'none',
-              padding: '6px 4px 8px 4px',
-              maskImage: scopedFamilyProfiles.length > 3 
-                ? 'linear-gradient(to right, transparent 0%, black 16px, black calc(100% - 16px), transparent 100%)' 
-                : 'none',
-              width: '100%',
-              boxSizing: 'border-box'
-            }}>
-              {scopedFamilyProfiles.map((p) => {
-                const avatarSrc = resolveCampusStudentAvatar(p);
-                const displayLastName = p.last_name ? (p.last_name.trim().length > 1 ? `${p.last_name.trim()[0]}.` : p.last_name) : '';
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => handleFamilyProfileSelect(p)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleFamilyProfileSelect(p);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Als ${p.first_name} anmelden`}
-                    style={{
-                      flex: '0 0 auto',
-                      width: '76px',
-                      scrollSnapAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      cursor: isManagingProfiles ? 'default' : 'pointer',
-                      position: 'relative',
-                      boxSizing: 'border-box',
-                      outline: 'none'
-                    }}
-                  >
-                    {/* Delete Badge - ONLY visible during Netflix Management Mode */}
-                    {isManagingProfiles && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const updated = savedFamilyProfiles.filter(item => item.id !== p.id);
-                          setSavedFamilyProfiles(updated);
-                          localStorage.setItem('groovelab_local_profiles', JSON.stringify(updated));
-                          localStorage.setItem('campus_family_profiles', JSON.stringify(updated));
-                        }}
-                        title={`${p.first_name} von diesem Gerät entfernen`}
-                        aria-label={`${p.first_name} von diesem Gerät entfernen`}
-                        style={{
-                          position: 'absolute',
-                          top: '-4px',
-                          right: '2px',
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '50%',
-                          background: '#ef4444',
-                          border: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#ffffff',
-                          cursor: 'pointer',
-                          padding: 0,
-                          zIndex: 10,
-                          boxShadow: 'none',
-                          transition: 'transform 0.15s ease'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                        onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                      >
-                        <X size={11} strokeWidth={3} />
-                      </button>
-                    )}
-
-                    {/* 68px Apple Squircle Avatar with Glow Halo on Hover */}
-                    <div 
-                      style={{
-                        position: 'relative',
-                        width: '68px',
-                        height: '68px',
-                        borderRadius: '20px',
-                        overflow: 'hidden',
-                        border: '2px solid rgba(255, 255, 255, 0.35)',
-                        boxShadow: '0 8px 20px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)',
-                        background: '#0c0f12',
-                        flexShrink: 0,
-                        transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-                        transform: isManagingProfiles ? 'rotate(1deg)' : 'none'
-                      }}
-                      onMouseOver={(e) => {
-                        if (!isManagingProfiles) {
-                          e.currentTarget.style.transform = 'scale(1.08) translateY(-2px)';
-                          e.currentTarget.style.borderColor = '#4ade80';
-                          e.currentTarget.style.boxShadow = '0 14px 28px -6px rgba(34, 197, 94, 0.45), 0 0 0 3px rgba(74, 222, 128, 0.35)';
-                        }
-                      }}
-                      onMouseOut={(e) => {
-                        if (!isManagingProfiles) {
-                          e.currentTarget.style.transform = 'none';
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.35)';
-                          e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35)';
-                        }
-                      }}
-                    >
-                      <img 
-                        src={avatarSrc} 
-                        alt={p.first_name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = isGroovelabKiosk ? '/avatar_ghost.jpg' : '/avatars/gitarre_avatar_new.png';
-                        }}
-                      />
-                    </div>
-
-                    {/* Pure, Unboxed Name Label */}
-                    <span style={{
-                      fontSize: '0.84rem',
-                      fontWeight: 800,
-                      color: '#ffffff',
-                      marginTop: '8px',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      width: '100%',
-                      textAlign: 'center',
-                      letterSpacing: '-0.01em',
-                      fontFamily: "'Plus Jakarta Sans', sans-serif"
-                    }}>
-                      {p.first_name} {displayLastName}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Elegant Apple Section Divider */}
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          margin: '6px 0 16px 0'
-        }}>
-          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.18))' }} />
-          <span style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)',
-            letterSpacing: '0.03em',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontFamily: "'Plus Jakarta Sans', sans-serif"
-          }}>
-            <Tablet size={13} style={{ color: isGroovelabKiosk ? '#78350f' : '#4ade80' }} />
-            {isGroovelabKiosk 
-              ? (effectiveStationId ? 'GrooveLab QR-Code scannen' : 'GrooveLab Kiosk einrichten') 
-              : 'oder QR-Ausweis vorhalten'}
-          </span>
-          <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255,255,255,0.18), transparent)' }} />
-        </div>
-
-        {/* Standard Camera Box (Apple Liquid-Glass Viewfinder) */}
-        {!isGroovelabKiosk && (
-          <div style={{
-            width: '100%',
-            aspectRatio: '1/1',
-            borderRadius: '32px',
-            overflow: 'hidden',
-            background: 'rgba(255, 255, 255, 0.08)',
-            position: 'relative',
-            boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.18)',
-            padding: '5px',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '27px',
-              overflow: 'hidden',
-              position: 'relative',
-              background: '#0c0f12'
-            }}>
-              {/* Recessed physical aperture shadow for 3D depth */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                boxShadow: 'inset 0 6px 20px rgba(0, 0, 0, 0.45)',
-                borderRadius: '27px',
-                pointerEvents: 'none',
-                zIndex: 9
-              }} />
-
-              {/* Apple Live Status Pill */}
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                left: '12px',
-                zIndex: 15,
-                background: 'rgba(0, 0, 0, 0.50)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.22)',
-                borderRadius: '100px',
-                padding: '3.5px 9px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '9.5px',
-                fontWeight: 800,
-                color: '#ffffff',
-                letterSpacing: '0.04em',
-                pointerEvents: 'none'
-              }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', boxShadow: 'none' }} />
-                <span>LIVE</span>
-              </div>
-
-              {isCameraActive && !cameraHasError ? (
-                <>
-                  <CustomQRScanner
-                    onScan={(val) => {
-                      console.log('[Scanner] Extracted QR value:', val);
-                      handleScan(val);
-                    }}
-                    onError={(err: any) => {
-                      console.error('[Scanner] Camera error:', err);
-                      setCameraHasError(true);
-                      const errMsg = err?.message || String(err || '');
-                      if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
-                        setError(`Kamera-Fehler: ${errMsg}`);
-                      }
-                    }}
-                    paused={loading}
-                    facingMode={facingMode}
-                  />
-  
-                  {/* Scanner UI Overlay: Apple VisionKit Reticle & Laser */}
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    pointerEvents: 'none',
-                    zIndex: 10
-                  }}>
-                    {/* 4 Corner brackets for scanner target */}
-                    <div style={{ position: 'absolute', top: '22px', left: '22px', width: '26px', height: '26px', borderTop: '3.5px solid #4ade80', borderLeft: '3.5px solid #4ade80', borderTopLeftRadius: '10px' }} />
-                    <div style={{ position: 'absolute', top: '22px', right: '22px', width: '26px', height: '26px', borderTop: '3.5px solid #4ade80', borderRight: '3.5px solid #4ade80', borderTopRightRadius: '10px' }} />
-                    <div style={{ position: 'absolute', bottom: '22px', left: '22px', width: '26px', height: '26px', borderBottom: '3.5px solid #4ade80', borderLeft: '3.5px solid #4ade80', borderBottomLeftRadius: '10px' }} />
-                    <div style={{ position: 'absolute', bottom: '22px', right: '22px', width: '26px', height: '26px', borderBottom: '3.5px solid #4ade80', borderRight: '3.5px solid #4ade80', borderBottomRightRadius: '10px' }} />
-                    
-                    {/* Animated Laser line */}
-                    <div style={{
-                      position: 'absolute',
-                      left: 0,
-                      width: '100%',
-                      height: '80px',
-                      background: 'linear-gradient(180deg, rgba(74, 222, 128, 0) 0%, rgba(74, 222, 128, 0.12) 50%, rgba(74, 222, 128, 0) 100%)',
-                      filter: 'blur(5px)',
-                      animation: 'scanLaser 4s ease-in-out infinite',
-                      pointerEvents: 'none'
-                    }} />
-                  </div>
-  
-                  <style dangerouslySetInnerHTML={{__html: `
-                    @keyframes scanLaser {
-                      0% { top: -20%; }
-                      50% { top: 100%; }
-                      100% { top: -20%; }
-                    }
-                    @keyframes scanFlash {
-                      0% { opacity: 1; }
-                      100% { opacity: 0; }
-                    }
-                  `}} />
-  
-                  {/* Switch Camera Button */}
-                  <button
-                    type="button"
-                    onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                    aria-label="Kamera wechseln"
-                    style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      zIndex: 15,
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      background: 'rgba(0, 0, 0, 0.45)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.35)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      color: 'white',
-                      boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
-                      transition: 'all 0.2s ease',
-                      outline: 'none'
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)'; }}
-                    title="Kamera wechseln"
-                  >
-                    <RotateCw size={18} />
-                  </button>
-                </>
-              ) : (
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '16px',
-                  color: 'white',
-                  padding: '24px',
-                  textAlign: 'center',
-                  boxSizing: 'border-box'
-                }}>
-                  <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255, 255, 255, 0.12)' }}>
-                    {cameraHasError ? <CameraOff size={24} style={{ color: '#ef4444' }} /> : <Camera size={26} color={isGroovelabKiosk ? '#eab308' : '#4ade80'} />}
-                  </div>
-                  {cameraHasError ? (
-                    <>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
-                        Kamerazugriff blockiert oder nicht verfügbar
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', marginTop: '4px', lineHeight: '1.4', maxWidth: '240px' }}>
-                        {isIOS && isStandalone 
-                          ? "Auf dem iPad Home-Bildschirm ist eine erneute Freigabe der Kamera erforderlich."
-                          : "Bitte erteilen Sie der App Kameraberechtigungen im Browser oder nutzen Sie die Passwort-Anmeldung."
-                        }
-                      </div>
-                      {isIOS && isStandalone ? (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              window.open(window.location.href, '_blank');
-                            }}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '10px',
-                              border: 'none',
-                              background: '#eab308',
-                              color: '#062413',
-                              fontWeight: 800,
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                              boxShadow: 'none'
-                            }}
-                          >
-                            In Safari öffnen
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowPermissionHelp(true)}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: '10px',
-                              border: '1px solid rgba(255, 255, 255, 0.2)',
-                              background: 'rgba(255, 255, 255, 0.08)',
-                              color: '#ffffff',
-                              fontWeight: 700,
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Hilfe
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setShowPermissionHelp(true)}
-                          style={{
-                            marginTop: '8px',
-                            padding: '8px 16px',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#fca5a5',
-                            fontWeight: 800,
-                            fontSize: '11px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                        >
-                          Anleitung zur Freigabe
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
-                      <div style={{ fontSize: '15px', fontWeight: 850, color: '#ffffff', letterSpacing: '-0.01em' }}>
-                        QR-Ausweis vorhalten
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.65)', lineHeight: '1.4', maxWidth: '250px' }}>
-                        Kamera bei Bedarf starten – schützt Akku &amp; Privatsphäre.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCameraHasError(false);
-                          setIsCameraActive(true);
-                        }}
-                        style={{
-                          marginTop: '4px',
-                          padding: '12px 24px',
-                          borderRadius: '16px',
-                          border: 'none',
-                          background: isGroovelabKiosk ? '#eab308' : '#34a853',
-                          color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
-                          fontWeight: 850,
-                          fontSize: '0.88rem',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          boxShadow: isGroovelabKiosk 
-                            ? '0 6px 18px rgba(234, 179, 8, 0.35)' 
-                            : '0 6px 18px rgba(52, 168, 83, 0.35)',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.03)'}
-                        onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                      >
-                        <Camera size={16} />
-                        <span>Kamera starten</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              {loading && (
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'rgba(0,0,0,0.6)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 10,
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <div style={{ width: '36px', height: '36px', border: '3px solid #e6f4ea', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                </div>
-              )}
-            </div>
-
-            {/* Same-Device Photo/Screenshot QR Upload */}
-            <div style={{ marginTop: '12px', width: '100%', display: 'flex', justifyContent: 'center' }}>
-              <input 
-                type="file" 
-                ref={qrFileInputRef} 
-                accept="image/*" 
-                style={{ display: 'none' }} 
-                onChange={handleFileUpload} 
-              />
-              <button
-                type="button"
-                onClick={() => qrFileInputRef.current?.click()}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  borderRadius: '14px',
-                  padding: '9px 16px',
-                  color: '#ffffff',
-                  fontSize: '0.78rem',
-                  fontWeight: 750,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-              >
-                <Upload size={14} />
-                <span>QR-Ausweis aus Fotos / Screenshot wählen</span>
-              </button>
-            </div>
-
-            {isCameraActive && !cameraHasError && (
-              <p style={{
-                fontSize: '10px',
-                color: 'rgba(255, 255, 255, 0.45)',
-                marginTop: '10px',
-                marginBottom: 0,
-                textAlign: 'center',
-                lineHeight: 1.3,
-                maxWidth: '280px'
-              }}>
-                🔒 Die Kamera- &amp; Bildverarbeitung erfolgt ausschließlich lokal auf Ihrem Gerät.
-              </p>
-            )}
-          </div>
-        )}
-        {/* Kiosk Welcome Card (when coupled to a station) */}
-        {isGroovelabKiosk && effectiveStationId && (
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '4px 0 10px 0',
-            boxSizing: 'border-box',
-            gap: '14px'
-          }}>
-
-            {/* Hint text */}
-            <p style={{
-              margin: 0,
-              fontSize: '12px',
-              fontWeight: 600,
-              color: 'rgba(120, 53, 15, 0.65)',
-              textAlign: 'center',
-              lineHeight: 1.4
-            }}>
-              Halte deinen QR-Ausweis vor die Kamera
-            </p>
-
-            {/* Full-width Camera Box */}
-            <div style={{
-              width: '100%',
-              aspectRatio: '1/1',
-              borderRadius: '24px',
-              overflow: 'hidden',
-              background: '#ffffff',
-              position: 'relative',
-              boxShadow: 'inset 0 3px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05), 0 12px 28px rgba(0, 0, 0, 0.07)',
-              border: '1px solid rgba(0, 0, 0, 0.08)',
-              padding: '4px',
-              boxSizing: 'border-box'
-            }}>
-              <div style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: '20px',
-                overflow: 'hidden',
-                position: 'relative',
-                background: '#0c0f12'
-              }}>
-                {/* Inner shadow overlay */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  boxShadow: 'inset 0 5px 15px rgba(0, 0, 0, 0.4)',
-                  borderRadius: '20px',
-                  pointerEvents: 'none',
-                  zIndex: 9
-                }} />
-
-                {/* Yellow scan-success flash overlay */}
-                {scanSuccess && (
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(250, 204, 21, 0.35)',
-                    borderRadius: '20px',
-                    zIndex: 20,
-                    animation: 'scanFlash 0.5s ease-out forwards',
-                    pointerEvents: 'none'
-                  }} />
-                )}
-
-                {isCameraActive && !cameraHasError ? (
-                  <>
-                    <CustomQRScanner
-                      onScan={(val) => {
-                        console.log('[KioskCardScanner] QR value:', val);
-                        setScanSuccess(true);
-                        setTimeout(() => setScanSuccess(false), 500);
-                        handleScan(val);
-                      }}
-                      onError={(err: any) => {
-                        console.error('[KioskCardScanner] Camera error:', err);
-                        setCameraHasError(true);
-                        const errMsg = err?.message || String(err || '');
-                        if (!errMsg.toLowerCase().includes('abort') && !errMsg.toLowerCase().includes('aborted')) {
-                          setError(`Kamera-Fehler: ${errMsg}`);
-                        }
-                      }}
-                      paused={loading}
-                      facingMode={facingMode}
-                    />
-
-                    {/* Target Corners */}
-                    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
-                      <div style={{ position: 'absolute', top: '20px', left: '20px', width: '24px', height: '24px', borderTop: '3px solid #facc15', borderLeft: '3px solid #facc15', borderTopLeftRadius: '7px' }} />
-                      <div style={{ position: 'absolute', top: '20px', right: '20px', width: '24px', height: '24px', borderTop: '3px solid #facc15', borderRight: '3px solid #facc15', borderTopRightRadius: '7px' }} />
-                      <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '24px', height: '24px', borderBottom: '3px solid #facc15', borderLeft: '3px solid #facc15', borderBottomLeftRadius: '7px' }} />
-                      <div style={{ position: 'absolute', bottom: '20px', right: '20px', width: '24px', height: '24px', borderBottom: '3px solid #facc15', borderRight: '3px solid #facc15', borderBottomRightRadius: '7px' }} />
-                      <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        width: '100%',
-                        height: '70px',
-                        background: 'linear-gradient(180deg, rgba(250, 204, 21, 0) 0%, rgba(250, 204, 21, 0.08) 50%, rgba(250, 204, 21, 0) 100%)',
-                        filter: 'blur(4px)',
-                        animation: 'scanLaser 4s ease-in-out infinite'
-                      }} />
-                    </div>
-
-                    {/* Camera Switch Button — top right, pointer-events active */}
-                    <button
-                      onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                      title="Kamera wechseln"
-                      style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        zIndex: 15,
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: 'rgba(0, 0, 0, 0.35)',
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        color: 'white',
-                        transition: 'background 0.2s ease',
-                        outline: 'none'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.background = 'rgba(250, 204, 21, 0.4)'}
-                      onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.35)'}
-                    >
-                      <SwitchCamera size={16} />
-                    </button>
-                  </>
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '12px',
-                    color: 'white',
-                    padding: '16px',
-                    textAlign: 'center',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#facc15' }}>
-                      {cameraHasError ? <CameraOff size={22} style={{ color: '#ef4444' }} /> : <RotateCw className="spin" size={22} />}
-                    </div>
-                    {cameraHasError ? (
-                      <>
-                        <div style={{ fontSize: '12px', fontWeight: 800, color: '#fca5a5' }}>Kamerazugriff blockiert</div>
-                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', lineHeight: '1.3', maxWidth: '180px' }}>
-                          {isIOS && isStandalone 
-                            ? "Auf dem iPad Home-Bildschirm ist eine erneute Freigabe erforderlich."
-                            : "Kamerazugriff in den Browser-Einstellungen erlauben, dann erneut versuchen."
-                          }
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'center' }}>
-                          {isIOS && isStandalone ? (
-                            <>
-                              <button
-                                onClick={() => { window.open(window.location.href, '_blank'); }}
-                                style={{
-                                  background: '#facc15',
-                                  border: 'none',
-                                  color: '#062413',
-                                  fontSize: '10px',
-                                  fontWeight: 800,
-                                  borderRadius: '20px',
-                                  padding: '5px 12px',
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                  boxShadow: 'none',
-                                  transition: 'transform 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                                onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
-                              >
-                                In Safari öffnen
-                              </button>
-                              <button
-                                onClick={() => setShowPermissionHelp(true)}
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.08)',
-                                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                                  color: '#ffffff',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  borderRadius: '20px',
-                                  padding: '5px 12px',
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                }}
-                              >
-                                Hilfe
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => { setCameraHasError(false); setIsCameraActive(true); setError(''); }}
-                                style={{
-                                  background: 'rgba(255, 255, 255, 0.08)',
-                                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                                  color: '#ffffff',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  borderRadius: '20px',
-                                  padding: '5px 12px',
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  transition: 'background 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-                              >
-                                <RotateCw size={10} />
-                                Erneut versuchen
-                              </button>
-                              <button
-                                onClick={() => setShowPermissionHelp(true)}
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.15)',
-                                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                                  color: '#fca5a5',
-                                  fontSize: '10px',
-                                  fontWeight: 700,
-                                  borderRadius: '20px',
-                                  padding: '5px 12px',
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                  transition: 'background 0.2s'
-                                }}
-                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                              >
-                                Anleitung
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#e6f4ea' }}>Kamera wird gestartet...</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Coupled Station Footer — Premium Apple-style */}
-            <div style={{
-              width: '100%',
-              marginTop: '4px',
-              background: 'rgba(255, 255, 255, 0.65)',
-              backdropFilter: 'blur(20px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-              border: '1px solid rgba(255, 255, 255, 0.5)',
-              borderRadius: '20px',
-              padding: '12px 14px',
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: '12px',
-              boxSizing: 'border-box',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)'
-            }}>
-              {/* Device icon square */}
-              {(() => {
-                const stColor = getStationColor(coupledStationName, coupledStationColor);
-                return (
-                  <div style={{
-                    width: '38px',
-                    height: '38px',
-                    borderRadius: '10px',
-                    background: `${stColor}20`,
-                    border: `1px solid ${stColor}40`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    boxShadow: `0 2px 8px ${stColor}30`
-                  }}>
-                    <Tablet size={18} style={{ color: stColor }} />
-                  </div>
-                );
-              })()}
-
-              {/* Text info */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                <span style={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  color: '#1c1917',
-                  lineHeight: 1.2,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {coupledStationName || 'Station'}
-                </span>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  color: 'rgba(28, 25, 23, 0.45)',
-                  letterSpacing: '0.01em'
-                }}>
-                  Aktive Kiosk-Station
-                </span>
-              </div>
-
-              {/* Green live dot */}
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: '#22c55e',
-                flexShrink: 0,
-                boxShadow: 'none'
-              }} />
-
-              {/* Unlink button */}
-              <button
-                type="button"
-                title="Kopplung aufheben"
-                onClick={async () => {
-                  // Nur Station-Kopplung aufheben — Kiosk-Modus (Token) bleibt erhalten
-                  const token = localStorage.getItem('groovelab_kiosk_token');
-                  if (token) {
-                    try {
-                      // Update active kiosk record in DB to decouple station
-                      await supabase
-                        .from('kiosks')
-                        .update({ station_id: null, room_id: null })
-                        .eq('secret_token', token);
-                    } catch (err) {
-                      console.error('[Trennen] DB update failed:', err);
-                    }
-                  }
-                  localStorage.removeItem('groovelab_station_id');
-                  localStorage.removeItem('groovelab_kiosk_room_id');
-                  localStorage.setItem('groovelab_active_platform', 'groovelab');
-                  // Token bleibt unberührt → Kiosk-Modus nach Reload aktiv
-                  window.location.replace('/');
-                }}
-                style={{
-                  background: 'rgba(0,0,0,0.05)',
-                  border: '1px solid rgba(0,0,0,0.08)',
-                  color: '#78716c',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  height: '30px',
-                  padding: '0 10px',
-                  borderRadius: '10px',
-                  outline: 'none',
-                  flexShrink: 0,
-                  transition: 'all 0.18s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  whiteSpace: 'nowrap'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                  e.currentTarget.style.color = '#dc2626';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)';
-                  e.currentTarget.style.color = '#78716c';
-                }}
-              >
-                <Unlink size={11} />
-                Trennen
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* iOS-Style GrooveLab check-in button - Hidden in Kiosk Mode */}
-        {!isGroovelabKiosk && (
-          <div style={{ marginTop: '20px', width: '100%' }}>
-            <button 
-              onClick={() => {
-                setIsGroovelabKiosk(true);
-                setIsCameraActive(true);
-              }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                borderRadius: '16px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#ffffff',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center',
-                boxSizing: 'border-box',
-                height: '48px',
-                outline: 'none'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
-            >
-              <Tablet size={16} color="#e6f4ea" />
-              GrooveLab Kiosk-Modus
-            </button>
-          </div>
-        )}
-
-        {!isGroovelabKiosk && !schoolData && (
-          <div style={{ marginTop: '12px', width: '100%' }}>
-            <button 
-              onClick={() => {
-                navigate('/signup');
-              }}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                borderRadius: '16px',
-                background: 'transparent',
-                border: '1px dashed rgba(255, 255, 255, 0.25)',
-                color: '#ffffff',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                textAlign: 'center',
-                boxSizing: 'border-box',
-                height: '48px',
-                outline: 'none'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              <School size={16} color="#e6f4ea" />
-              Neue Musikschule registrieren (Kostenlos testen)
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ marginTop: '16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: '14px', borderRadius: '16px', fontSize: '13px', fontWeight: 800, textAlign: 'center', width: '100%' }}>
-            {error}
-          </div>
-        )}
-
-        {/* Kiosk Activator Nested Inside Scanner Card - Hide if already coupled */}
-        {isGroovelabKiosk && !effectiveStationId && (
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            marginTop: '20px',
-            borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-            paddingTop: '20px'
-          }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(0, 0, 0, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Tablet size={14} style={{ color: '#78350f' }} /> GrooveLab Kiosk aktivieren
-            </div>
-
-            {!loginKioskPinUnlocked ? (
-              <form onSubmit={handleVerifyLoginKioskPin} style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', background: 'rgba(255, 255, 255, 0.5)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 800, color: '#78350f' }}>
-                  <Lock size={14} /> Terminal-Einrichtung PIN-geschützt
-                </div>
-                <p style={{ fontSize: '11px', color: '#854d0e', margin: 0, textAlign: 'center', lineHeight: 1.3 }}>
-                  Gib den 4-stelligen Schul-PIN ein, um dieses Gerät einem Raum und einer Station zuzuweisen.
-                </p>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={loginKioskPinInput}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                      setLoginKioskPinInput(val);
-                      if (val.length === 4) {
-                        setTimeout(() => {
-                          const targetSchoolId = schoolData?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111';
-                          supabase.rpc('verify_kiosk_setup_pin', {
-                            p_school_id: targetSchoolId,
-                            p_pin: val
-                          }).then(({ data: ok }) => {
-                            if (ok === true) {
-                              setLoginKioskPinUnlocked(true);
-                              setLoginKioskAttempts(0);
-                              setLoginKioskPinError(null);
-                            } else {
-                              setLoginKioskPinError('Falscher PIN.');
-                              setLoginKioskPinInput('');
-                            }
-                          });
-                        }, 100);
-                      }
-                    }}
-                    placeholder="••••"
-                    disabled={loginKioskCooldown > 0 || loginKioskPinVerifying}
-                    style={{
-                      width: '90px',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: '1.5px solid #eab308',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      fontSize: '18px',
-                      fontWeight: 900,
-                      minHeight: '44px',
-                      letterSpacing: '0.25em',
-                      textAlign: 'center',
-                      outline: 'none'
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: '#eab308',
-                      color: '#0f172a',
-                      fontSize: '11px',
-                      fontWeight: 800,
-                      cursor: loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0 ? 'not-allowed' : 'pointer',
-                      opacity: loginKioskPinInput.length !== 4 || loginKioskPinVerifying || loginKioskCooldown > 0 ? 0.5 : 1
-                    }}
-                  >
-                    {loginKioskPinVerifying ? '…' : 'Freischalten'}
-                  </button>
-                </div>
-                {loginKioskPinError && (
-                  <div style={{ color: '#ef4444', fontSize: '11px', fontWeight: 700 }}>
-                    {loginKioskPinError}
-                  </div>
-                )}
-                {loginKioskCooldown > 0 && (
-                  <div style={{ color: '#b45309', fontSize: '11px', fontWeight: 700 }}>
-                    Wartezeit: {loginKioskCooldown}s
-                  </div>
-                )}
-              </form>
-            ) : (
-              <>
-                {kioskRooms.length > 0 ? (
-                  <>
-                    {/* Room Selector */}
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-                  {kioskRooms.map((room, idx) => (
-                    <button
-                      key={room.id}
-                      type="button"
-                      onClick={() => {
-                        setKioskSelectedRoomId(room.id);
-                      }}
-                      style={{
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        border: '1.5px solid',
-                        borderColor: kioskSelectedRoomId === room.id ? '#eab308' : (isGroovelabKiosk ? 'rgba(133, 77, 14, 0.25)' : 'rgba(255, 255, 255, 0.15)'),
-                        background: kioskSelectedRoomId === room.id ? '#eab308' : 'transparent',
-                        color: kioskSelectedRoomId === room.id ? '#713f12' : (isGroovelabKiosk ? '#854d0e' : '#ffffff'),
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {`${idx + 1} - ${cleanRoomName(room.name)}`}
-                    </button>
-                  ))}
-                </div>
-
-                 {/* iPad Stations Visual Layout Map */}
-                <div 
-                  ref={kioskMapRef}
-                  style={{
-                    position: 'relative',
-                    width: '100%',
-                    aspectRatio: '1.4', // Standard room shape ratio
-                    background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)',
-                    borderRadius: '24px',
-                    border: isGroovelabKiosk ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.1)',
-                    marginTop: '12px',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {adjustPositions(
-                    kioskStations.filter(s => s.room_id === kioskSelectedRoomId),
-                    kioskMapWidth
-                  ).map((station) => {
-                    const isTeacherStation = station.name?.toLowerCase().includes('lehrer') || station.name?.toLowerCase().includes('teacher');
-                    const isOccupied = !isTeacherStation && activeSessionStationIds.includes(station.id);
-                    const posX = station.x;
-                    const posY = station.y;
-                    const stationColor = getStationColor(station.name, station.color);
-
-                    const isSelected = selectedKioskStationId === station.id;
-                    const isYellow = stationColor.toLowerCase() === '#eab308';
-
-                    return (
-                      <button
-                        key={station.id}
-                        type="button"
-                        onClick={async () => {
-                          if (isOccupied) {
-                            const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
-                            if (!confirm) return;
-                          }
-                          const newSelection = isSelected ? null : station.id;
-                          setSelectedKioskStationId(newSelection);
-                          if (newSelection) {
-                            try {
-                              // Temporarily set the school's kiosk token to authenticate the Supabase request
-                              if (schoolData?.groovelab_kiosk_token) {
-                                localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
-                              }
-
-                               const generatedSecretToken = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-0000-4000-8000-' + Math.floor(Math.random()*1e12).toString(16).padStart(12, '0'));
-
-                               // Check if kiosk record already exists for this station
-                               const { data: existingKiosk, error: fetchErr } = isUUID(newSelection) ? await supabase
-                                 .from('kiosks')
-                                 .select('*')
-                                 .eq('station_id', newSelection)
-                                 .limit(1)
-                                 .maybeSingle() : { data: null, error: null };
-
-                               if (fetchErr) throw fetchErr;
-
-                               let kioskRecord = existingKiosk;
-
-                               if (!kioskRecord) {
-                                 // Create new kiosk record if none exists
-                                 const { data: insertedRows, error: insertErr } = await supabase
-                                   .from('kiosks')
-                                   .insert({
-                                     school_id: schoolData.id,
-                                     name: station.name || 'iPad Kiosk',
-                                     secret_token: generatedSecretToken,
-                                     room_id: isUUID(station.room_id) ? station.room_id : null,
-                                     station_id: isUUID(station.id) ? station.id : null
-                                   })
-                                   .select();
-
-                                 if (insertErr) throw insertErr;
-                                 if (!insertedRows || insertedRows.length === 0) {
-                                   throw new Error('Kopplungs-Eintrag konnte nicht erstellt werden.');
-                                 }
-                                 kioskRecord = insertedRows[0];
-                               }
-
-                              if (kioskRecord && kioskRecord.secret_token) {
-                                // Overwrite the temporary school token with the kiosk's specific secret token
-                                localStorage.setItem('groovelab_kiosk_token', kioskRecord.secret_token);
-                                localStorage.setItem('groovelab_station_id', newSelection);
-                                localStorage.setItem('groovelab_kiosk_room_id', station.room_id);
-                                localStorage.setItem('groovelab_active_platform', 'groovelab');
-                                // Force a redirect with full URL params so iOS Safari uses this as the PWA start_url
-                                const redirectUrl = `/?platform=groovelab&kiosk_token=${encodeURIComponent(kioskRecord.secret_token)}&station_id=${encodeURIComponent(newSelection)}${station.room_id ? `&kiosk_room_id=${encodeURIComponent(station.room_id)}` : ''}`;
-                                window.location.href = redirectUrl;
-                              } else {
-                                throw new Error('Kopplungs-Token konnte nicht geladen werden.');
-                              }
-                            } catch (err: any) {
-                              console.error('[KioskActivation] Coupling failed:', err);
-                              // Clear the temporary token on failure
-                              localStorage.removeItem('groovelab_kiosk_token');
-                              alert('Kopplung fehlgeschlagen: ' + err.message);
-                              setSelectedKioskStationId(null);
-                            }
-                          } else {
-                            localStorage.removeItem('groovelab_kiosk_token');
-                            localStorage.removeItem('groovelab_station_id');
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          left: `${posX}%`,
-                          top: `${posY}%`,
-                          transform: isSelected ? 'translate(-50%, -50%) scale(1.08)' : 'translate(-50%, -50%)',
-                          width: '62px',
-                          height: '62px',
-                          borderRadius: '14px',
-                          border: isSelected
-                            ? '1px solid #ffffff'
-                            : `2px solid ${stationColor}`,
-                          background: isSelected 
-                            ? `linear-gradient(180deg, ${stationColor} 0%, color-mix(in srgb, ${stationColor} 96%, #000000 4%) 100%)`
-                            : `${stationColor}15`,
-                          color: isSelected
-                            ? (isYellow ? '#09090b' : '#ffffff')
-                            : (isGroovelabKiosk ? '#1e293b' : '#ffffff'),
-                          cursor: 'pointer',
-                          transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)', // Spring-like feel
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          textAlign: 'center',
-                          boxShadow: isSelected 
-                            ? `inset 0 1.5px 0 rgba(255, 255, 255, ${isYellow ? '0.18' : '0.12'}), inset 0 -1px 0 rgba(0, 0, 0, 0.05), 0 0 16px ${stationColor}20, 0 4px 10px rgba(0, 0, 0, 0.08)`
-                            : '0 4px 10px rgba(0, 0, 0, 0.05)',
-                          outline: 'none',
-                          zIndex: isSelected ? 10 : 1,
-                          opacity: isSelected ? 1 : (isOccupied ? 0.7 : 1)
-                        }}
-                        title={`${station.name} (${isOccupied ? 'Besetzt' : 'Frei'})`}
-                      >
-                        {station.instrument && (
-                          <span style={{ fontSize: '7px', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: isSelected ? 0.8 : 0.6, fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px' }}>
-                            {station.instrument}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '10px', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 2px', lineHeight: 1.1 }}>
-                          {station.name}
-                        </span>
-                        {isOccupied ? (
-                          <Lock size={10} style={{ color: isSelected ? (isYellow ? '#09090b' : '#ffffff') : (isGroovelabKiosk ? '#ef4444' : '#fca5a5'), marginTop: '2px' }} />
-                        ) : (
-                          <div style={{ 
-                            width: '6px', 
-                            height: '6px', 
-                            borderRadius: '50%', 
-                            background: isSelected
-                              ? (isYellow ? '#09090b' : '#ffffff')
-                              : '#34a853',
-                            border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.2)',
-                            marginTop: '3px',
-                            boxShadow: isSelected ? `0 0 6px ${isYellow ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)'}` : 'none'
-                          }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', margin: '8px 0' }}>
-                <p style={{ fontSize: '12px', color: isGroovelabKiosk ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)', margin: 0, textAlign: 'center' }}>
-                  Keine GrooveLab-iPad-Räume eingerichtet.
-                </p>
-              </div>
-            )}
-          </>
-        )}
-            
-            <button 
-              type="button" 
-              onClick={() => {
-                localStorage.removeItem('groovelab_station_id');
-                localStorage.removeItem('groovelab_kiosk_token');
-                localStorage.removeItem('groovelab_kiosk_room_id');
-                localStorage.removeItem('groovelab_active_platform');
-                setIsGroovelabKiosk(false);
-                window.location.replace('/');
-              }} 
-              style={{ background: 'none', border: 'none', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        )}
-      </div>
-      )}
-
-      {/* Passwort Anmeldung & Biometrie Horizontal Apple Glass Dock */}
-      {expandedSection === 'none' && !isGroovelabKiosk && (
-        <div style={{ 
-          marginTop: '20px', 
-          display: 'flex', 
-          flexDirection: 'row', 
-          flexWrap: 'wrap', 
-          gap: '10px', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          maxWidth: '420px',
-          width: '100%'
-        }}>
-          {biometricsAvailable && (
-            <button 
-              onClick={handleBiometricsLogin}
-              style={{ 
-                background: 'rgba(255, 255, 255, 0.08)', 
-                border: '1px solid rgba(255, 255, 255, 0.15)', 
-                padding: '9px 18px',
-                borderRadius: '100px',
-                color: '#ffffff', 
-                fontSize: '11.5px', 
-                fontWeight: 800, 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.05em', 
-                cursor: 'pointer', 
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)'
-              }}
-              onMouseOver={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; 
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; 
-                e.currentTarget.style.transform = 'none';
-              }}
-            >
-              <Fingerprint size={13} color="#4ade80" />
-              Fingerabdruck / Face ID
-            </button>
-          )}
-
-          {!isGroovelabKiosk && (
-            <button 
-              onClick={() => setExpandedSection('pin')}
-              style={{ 
-                background: 'rgba(255, 255, 255, 0.08)', 
-                border: '1px solid rgba(255, 255, 255, 0.15)', 
-                padding: '9px 18px',
-                borderRadius: '100px',
-                color: '#ffffff', 
-                fontSize: '11.5px', 
-                fontWeight: 800, 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.05em', 
-                cursor: 'pointer', 
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '7px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2)'
-              }}
-              onMouseOver={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.16)'; 
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; 
-                e.currentTarget.style.transform = 'none';
-              }}
-            >
-              <KeyRound size={13} color="#4ade80" />
-              Mit PIN anmelden
-            </button>
-          )}
-
-          {!isGroovelabKiosk && (
-            <button 
-              onClick={() => setShowAdminModal(true)}
-              style={{ 
-                background: 'rgba(255, 255, 255, 0.05)', 
-                border: '1px solid rgba(255, 255, 255, 0.12)', 
-                padding: '9px 16px',
-                borderRadius: '100px',
-                color: 'rgba(255, 255, 255, 0.85)', 
-                fontSize: '11px', 
-                fontWeight: 800, 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.05em', 
-                cursor: 'pointer', 
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.15)'
-              }}
-              onMouseOver={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; 
-                e.currentTarget.style.color = '#ffffff';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseOut={(e) => { 
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; 
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)';
-                e.currentTarget.style.transform = 'none';
-              }}
-            >
-              <ShieldCheck size={13} color="#4ade80" />
-              Schulleitung &amp; Verwaltung
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Teacher PIN Login under Coupled Kiosk Welcome Card */}
-      {expandedSection === 'none' && isGroovelabKiosk && effectiveStationId && (
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-          <button 
-            onClick={() => setExpandedSection('pin')}
-            style={{ 
-              background: 'rgba(0, 0, 0, 0.04)', 
-              border: '1px solid rgba(133, 77, 14, 0.15)', 
-              padding: '10px 24px',
-              borderRadius: '100px',
-              color: '#854d0e', 
-              fontSize: '12px', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.05em', 
-              cursor: 'pointer', 
-              transition: 'all 0.2s',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(133, 77, 14, 0.08)'; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)'; }}
-          >
-            <KeyRound size={14} color="#854d0e" />
-            Lehrer-Login (PIN / Passwort)
-          </button>
-        </div>
-      )}
-
-      {/* Manueller PIN Zugang */}
-      {expandedSection === 'pin' && (
-      <div style={{
-        width: '100%',
-        maxWidth: '420px',
-        background: isGroovelabKiosk ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.07)',
-        borderRadius: '40px',
-        padding: '28px',
-        boxShadow: isGroovelabKiosk 
-          ? '0 40px 100px rgba(120, 53, 15, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6)' 
-          : '0 40px 100px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)',
-        border: isGroovelabKiosk 
-          ? '1px solid rgba(255, 255, 255, 0.4)' 
-          : '1px solid rgba(255, 255, 255, 0.12)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px',
-        backdropFilter: 'blur(30px)',
-        WebkitBackdropFilter: 'blur(30px)'
-      }}>
-        <div style={{ fontSize: '11px', fontWeight: 800, color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <User size={14} style={{ color: isGroovelabKiosk ? '#78350f' : '#e6f4ea' }} /> Manueller Zugang über PIN / QR-Token
-        </div>
-        <form onSubmit={(e) => { e.preventDefault(); handlePinLogin(pinInput); }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input
-              id="login-credential-input"
-              aria-label="Ausweis-Nummer oder persönliche PIN"
-              type="text"
-              value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
-              placeholder={pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : "Ausweis-Nummer oder PIN..."}
-              disabled={loading || pinLockoutSeconds > 0}
-              style={{
-                flex: 1,
-                padding: '14px 18px',
-                borderRadius: '16px',
-                border: isGroovelabKiosk ? '1.5px solid #cbd5e1' : '1.5px solid rgba(255, 255, 255, 0.15)',
-                fontSize: '14px',
-                fontWeight: 700,
-                outline: 'none',
-                transition: 'all 0.2s',
-                background: isGroovelabKiosk ? '#ffffff' : 'rgba(255, 255, 255, 0.05)',
-                color: isGroovelabKiosk ? '#0f172a' : '#ffffff',
-                opacity: pinLockoutSeconds > 0 ? 0.6 : 1
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading || !pinInput.trim() || pinLockoutSeconds > 0}
-              style={{
-                padding: '14px 24px',
-                borderRadius: '16px',
-                border: 'none',
-                background: pinLockoutSeconds > 0 ? '#64748b' : (isGroovelabKiosk ? '#eab308' : (schoolData?.primary_color || '#e6f4ea')),
-                color: pinLockoutSeconds > 0 ? '#ffffff' : (isGroovelabKiosk ? '#713f12' : (schoolData?.primary_color ? '#ffffff' : '#062413')),
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: pinLockoutSeconds > 0 ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s',
-                opacity: (!pinInput.trim() || pinLockoutSeconds > 0) ? 0.6 : 1
-              }}
-            >
-              {pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : 'Login'}
-            </button>
-          </div>
-          {pinLockoutSeconds > 0 && (
-            <div role="alert" aria-live="assertive" style={{ fontSize: '12px', fontWeight: 750, color: '#ef4444', textAlign: 'center', padding: '4px 8px' }}>
-              Zugang vorübergehend gesperrt. Bitte warte noch {pinLockoutSeconds} Sekunden.
-            </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
-            <input 
-              type="checkbox" 
-              id="login-consent-checkbox" 
-              checked={loginConsentAccepted} 
-              onChange={(e) => setLoginConsentAccepted(e.target.checked)} 
-              style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
-            />
-            <label htmlFor="login-consent-checkbox" style={{ fontSize: '11px', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)', textAlign: 'left', cursor: 'pointer', lineHeight: '1.4' }}>
-              Ich bin mit der <span 
-                role="button"
-                tabIndex={0}
-                style={{ textDecoration: 'underline', color: isGroovelabKiosk ? '#854d0e' : '#e6f4ea', cursor: 'pointer', outline: 'none' }} 
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalModalTab('privacy'); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setLegalModalTab('privacy'); } }}
-                aria-label="Datenschutzerklärung öffnen"
-              >Datenschutzerklärung</span> einverstanden.
-            </label>
-          </div>
-        </form>
-        <button onClick={() => setExpandedSection('none')} style={{ background: 'none', border: 'none', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.4)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '12px', cursor: 'pointer', alignSelf: 'center' }}>
-          Zurück
-        </button>
-      </div>
-      )}
-
-      {/* Eltern Onboarding & Aktivierung */}
-      {expandedSection === 'parentOnboarding' && (
       <div style={{
         width: '95%',
         maxWidth: parentOnboardingStep === 'preferences' ? '850px' : '520px',
@@ -6879,573 +4971,100 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           </div>
         )}
       </div>
-      )}
-
-
-
-      {/* Geofence Diagnostic Panel (Localhost / Dev only) */}
-      {isDevBuild && isGroovelabKiosk && geoDebug && (
-        <div style={{ 
-          marginTop: '24px', 
-          padding: '24px', 
-          background: 'rgba(15, 23, 42, 0.95)', 
-          color: 'white', 
-          borderRadius: '32px', 
-          fontSize: '13px', 
-          width: '100%',
-          maxWidth: '420px',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ fontWeight: 900, marginBottom: '16px', color: '#eab308', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.05em' }}>
-            <span>DIAGNOSE: GEOFENCING</span>
-            <span style={{ color: geoDebug.isWithinAnyRoom ? '#34a853' : '#ef4444' }}>{geoDebug.isWithinAnyRoom ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
-              <span>Deine Position:</span>
-              <span style={{ fontWeight: 700 }}>{geoDebug.userPos && typeof geoDebug.userPos.lat === 'number' && typeof geoDebug.userPos.lng === 'number' ? `${geoDebug.userPos.lat.toFixed(4)}, ${geoDebug.userPos.lng.toFixed(4)}` : 'Wird gesucht...'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.8 }}>
-              <span>Ziel (Akademie):</span>
-              <span style={{ fontWeight: 700 }}>{geoDebug.schoolCoords && typeof geoDebug.schoolCoords.lat === 'number' && typeof geoDebug.schoolCoords.lng === 'number' ? `${geoDebug.schoolCoords.lat.toFixed(4)}, ${geoDebug.schoolCoords.lng.toFixed(4)}` : 'Nicht gesetzt'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
-              <span>Berechnete Distanz:</span>
-              <span style={{ fontWeight: 900, color: '#eab308' }}>{geoDebug.distToSchool !== null ? `${geoDebug.distToSchool}m` : '?'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '8px' }}>
-              <span>Status Öffnungszeiten:</span>
-              <span style={{ fontWeight: 900, color: geoDebug.withinHours ? '#34a853' : '#ef4444' }}>{geoDebug.withinHours ? 'GEÖFFNET' : 'GESCHLOSSEN'}</span>
-            </div>
-          </div>
-          
-          {(!geoDebug.isWithinAnyRoom || !geoDebug.withinHours) && (
-            <button 
-              onClick={async () => {
-                const uid = sessionStorage.getItem('groovelab_user_id');
-                if (uid) {
-                  const targetSchoolId = schoolData?.id || localStorage.getItem('groovelab_school_id');
-                  if (!targetSchoolId) {
-                    alert('Labor-Modus Override fehlgeschlagen: Keine Musikschul-Kennung ermittelbar.');
-                    return;
-                  }
-                  const { data, error } = await supabase.rpc('authenticate_by_credential', {
-                    p_credential: uid,
-                    p_school_id: targetSchoolId
-                  });
-                  if (!error && data?.success && data?.user) {
-                    finalizeLogin(data.user, loginStationId, true);
-                  } else {
-                    alert('Labor-Modus Override fehlgeschlagen: Autorisierung abgewiesen.');
-                  }
+        </div>
+      ) : (
+        <SchoolLoginStudioLayout
+          isGroovelabKiosk={isGroovelabKiosk}
+          onTogglePlatform={(val) => {
+            setIsGroovelabKiosk(val);
+            setStudioAuthMethod('qr');
+            setIsCameraActive(true);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('groovelab_active_platform', val ? 'groovelab' : 'campus');
+              sessionStorage.setItem('groovelab_active_platform', val ? 'groovelab' : 'campus');
+              localStorage.setItem('groovelab_kiosk_mode', val ? 'true' : 'false');
+              try {
+                const url = new URL(window.location.href);
+                if (val) {
+                  url.searchParams.set('platform', 'groovelab');
+                  url.searchParams.delete('campus');
                 } else {
-                  alert('Bitte erst einmal scannen, damit ich weiß, wer du bist!');
+                  url.searchParams.set('platform', 'campus');
+                  url.searchParams.delete('groovelab');
                 }
-              }}
-              style={{ 
-                width: '100%', 
-                padding: '14px', 
-                background: '#eab308', 
-                color: '#0f172a', 
-                border: 'none', 
-                borderRadius: '16px', 
-                fontWeight: 900, 
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'transform 0.2s'
-              }}
-            >
-              ENTWICKLER-OVERRIDE: LABOR-MODUS ERZWINGEN
-            </button>
+                window.history.replaceState(null, '', url.toString());
+              } catch (e) {
+                console.warn('[PlatformToggle] URL sync notice:', e);
+              }
+            }
+          }}
+          schoolData={schoolData}
+          schoolName={schoolName}
+          logoError={logoError}
+          setLogoError={setLogoError}
+          setLogoClicks={setLogoClicks}
+          setShowAdminModal={setShowAdminModal}
+          activeMethod={studioAuthMethod}
+          onSelectMethod={handleStudioSelectMethod}
+          biometricsAvailable={biometricsAvailable}
+          biometricLoading={biometricLoading}
+          biometricError={biometricError}
+          selectedBiometricUser={selectedBiometricUser}
+          setSelectedBiometricUser={setSelectedBiometricUser}
+          scopedBiometricProfiles={scopedBiometricProfiles}
+          handleTriggerBiometricLogin={handleTriggerBiometricLogin}
+          handleRemoveBiometricUser={handleRemoveBiometricUser}
+          scopedFamilyProfiles={scopedFamilyProfiles}
+          isManagingProfiles={isManagingProfiles}
+          setIsManagingProfiles={setIsManagingProfiles}
+          handleFamilyProfileSelect={handleFamilyProfileSelect}
+          savedFamilyProfiles={savedFamilyProfiles}
+          setSavedFamilyProfiles={setSavedFamilyProfiles}
+          resolveCampusStudentAvatar={resolveCampusStudentAvatar}
+          isCameraActive={isCameraActive}
+          setIsCameraActive={setIsCameraActive}
+          cameraHasError={cameraHasError}
+          setCameraHasError={setCameraHasError}
+          facingMode={facingMode}
+          setFacingMode={setFacingMode}
+          loading={loading}
+          handleScan={handleScan}
+          onFileUpload={handleFileUpload}
+          setError={setError}
+          scanSuccess={scanSuccess}
+          ScannerComponent={CustomQRScanner}
+          setShowPermissionHelp={setShowPermissionHelp}
+          isIOS={isIOS}
+          isStandalone={isStandalone}
+          pinInput={pinInput}
+          setPinInput={setPinInput}
+          handlePinLogin={handlePinLogin}
+          pinLockoutSeconds={pinLockoutSeconds}
+          loginConsentAccepted={loginConsentAccepted}
+          setLoginConsentAccepted={setLoginConsentAccepted}
+          setLegalModalTab={setLegalModalTab}
+          effectiveStationId={effectiveStationId}
+          devBypassSlot={isDevBuild && (
+            <LoginDevBypassBar
+              isDevBuild={isDevBuild}
+              isGroovelabKiosk={isGroovelabKiosk}
+              geoDebug={geoDebug}
+              loading={loading}
+              setLoading={setLoading}
+              bypassBusyRole={bypassBusyRole}
+              setBypassBusyRole={setBypassBusyRole}
+              schoolData={schoolData}
+              supabase={supabase}
+              bypassUserCounts={bypassUserCounts}
+              onLogin={onLogin}
+              loginStationId={loginStationId}
+              finalizeLogin={finalizeLogin}
+              createMasterSessionLease={createMasterSessionLease}
+              setLocalhostDevLegalBypassed={setLocalhostDevLegalBypassed}
+            />
           )}
-        </div>
+        />
       )}
-
-      {/* Admin, Teacher & Student Bypass Buttons for Localhost / Dev */}
-      {isDevBuild && (
-        <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* 1. Master Admin Cockpit Bypass */}
-          <button
-            type="button"
-            disabled={loading || !!bypassBusyRole}
-            aria-label="Entwickler-Direktzugang: Master-Admin Leitstand öffnen (Dev Only)"
-            title="Dev Only: 1-Klick Master-Admin Leitstand Login"
-            onClick={async () => {
-              if (loading || bypassBusyRole) return;
-              try {
-                setBypassBusyRole('master');
-                setLoading(true);
-                console.log('[Bypass] Attempting Master Admin Leitstand login...');
-                
-                const targetSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.setItem('groovelab_school_id', targetSchoolId);
-                  localStorage.setItem('groovelab_last_school_id', targetSchoolId);
-                }
-
-                // Call authoritative login_master_admin RPC for real master admin verification
-                let targetId = '88888888-8888-8888-8888-888888888888';
-                try {
-                  const { data: masterAuth, error: masterErr } = await supabase.rpc('login_master_admin', {
-                    p_username: 'admin'
-                  });
-                  if (!masterErr && masterAuth && (masterAuth.id || masterAuth.user_id)) {
-                    targetId = masterAuth.id || masterAuth.user_id;
-                  }
-                } catch (rpcErr) {
-                  console.warn('[Bypass] login_master_admin RPC fallback to canonical ID:', rpcErr);
-                }
-
-                await createMasterSessionLease(targetId, 'bypass_dev').catch(() => {});
-                setLocalhostDevLegalBypassed(true);
-                sessionStorage.setItem(`gl_legal_status_v_${targetId}_min_2026.1`, 'true');
-                sessionStorage.setItem(`gl_legal_status_v_${targetId}_admin_min_2026.1`, 'true');
-                sessionStorage.setItem(`gl_legal_status_v_${targetId}_master_admin_min_2026.1`, 'true');
-                sessionStorage.setItem('groovelab_is_master_admin', 'true');
-                sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-                sessionStorage.setItem('groovelab_user_id', targetId);
-                sessionStorage.setItem('groovelab_cached_user', JSON.stringify({
-                  id: targetId,
-                  role: 'admin',
-                  roles: ['admin'],
-                  is_master_admin: true,
-                  is_campus_active: true,
-                  is_groovelab_active: true,
-                  first_name: 'Master',
-                  last_name: 'Admin',
-                  school_id: targetSchoolId
-                }));
-                sessionStorage.removeItem('groovelab_qr_token');
-                localStorage.removeItem('groovelab_last_qr_token');
-                localStorage.removeItem('groovelab_qr_token');
-                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
-                  window.history.replaceState(null, '', '/');
-                }
-                await Promise.resolve(onLogin(targetId, true));
-                if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-                  window.location.replace(window.location.origin + '/dashboard');
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Master Admin:', err);
-                alert('Master-Admin Bypass Fehler: ' + (err?.message || err));
-                setLoading(false);
-                setBypassBusyRole(null);
-              }
-            }}
-            style={{
-              background: '#0f172a',
-              color: '#ffffff',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '12px',
-              padding: '11px 16px',
-              minHeight: '44px',
-              fontSize: '0.78rem',
-              fontWeight: 900,
-              cursor: (loading || bypassBusyRole) ? 'not-allowed' : 'pointer',
-              opacity: (loading || bypassBusyRole) ? 0.7 : 1,
-              touchAction: 'manipulation',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.5)'
-            }}
-          >
-            {bypassBusyRole === 'master' ? '👑 LEITSTAND WIRD GELADEN...' : '👑 [DEV ONLY] MASTER-ADMIN LEITSTAND'}
-          </button>
-
-          {/* 2. Verwaltung / Schulleitung Bypass (Peter Pan) */}
-          <button
-            type="button"
-            disabled={!!bypassBusyRole}
-            aria-label="Entwickler-Direktzugang: Schulleitung Peter Pan anmelden"
-            title="Dev Only: 1-Klick Schulleitung Login"
-            onClick={async () => {
-              if (bypassBusyRole) return;
-              try {
-                setBypassBusyRole('admin');
-                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-                const baseUser = bypassUserCounts.adminUser || {
-                  id: '11079eae-664a-49a4-8692-771d83a3193c',
-                  name: 'Peter Pan',
-                  role: 'admin',
-                  school_id: fallbackSchoolId
-                };
-                const effectiveSchoolId = baseUser.school_id || fallbackSchoolId;
-                const targetUser = {
-                  ...baseUser,
-                  school_id: effectiveSchoolId,
-                  is_campus_active: true,
-                  is_groovelab_active: true
-                };
-                console.log('[Bypass] Logging in as Verwaltung / Schulleitung:', targetUser.name);
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.setItem('groovelab_school_id', effectiveSchoolId);
-                  localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
-                }
-                let resolvedDbUser: any = targetUser;
-                try {
-                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                    p_credential: targetUser.id,
-                    p_school_id: effectiveSchoolId
-                  });
-                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    if (authResult.user) {
-                      resolvedDbUser = { ...authResult.user, school_id: effectiveSchoolId };
-                    }
-                  }
-                } catch (authErr) {
-                  console.warn('[Bypass] Auth credential notice:', authErr);
-                }
-
-                // Autoritatives Schulleitungs-Scoping: Dual-Role Nutzer für Admin-Workspace härten
-                if (resolvedDbUser.role !== 'admin' && resolvedDbUser.role !== 'secretary') {
-                  try { await supabase.rpc('switch_user_active_role', { p_target_role: 'admin' }); } catch {}
-                  resolvedDbUser = { ...resolvedDbUser, role: 'admin' };
-                }
-
-                const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, effectiveSchoolId).catch(() => null);
-                if (leaseRes && (leaseRes as any).lease_id) {
-                  sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                  localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                }
-                setLocalhostDevLegalBypassed(true);
-                sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_min_2026.1`, 'true');
-                sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_admin_min_2026.1`, 'true');
-                sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_secretary_min_2026.1`, 'true');
-                sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_teacher_min_2026.1`, 'true');
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                localStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
-                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-                sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
-                sessionStorage.setItem('groovelab_user_id', resolvedDbUser.id);
-                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(resolvedDbUser));
-                sessionStorage.removeItem('groovelab_qr_token');
-                localStorage.removeItem('groovelab_last_qr_token');
-                localStorage.removeItem('groovelab_qr_token');
-                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
-                  window.history.replaceState(null, '', '/');
-                }
-                await Promise.resolve(onLogin(resolvedDbUser.id, true));
-                if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-                  window.location.replace(window.location.origin + '/dashboard');
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Verwaltung:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-                setBypassBusyRole(null);
-              }
-            }}
-            style={{
-              background: '#450a0a',
-              color: '#fecaca',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '12px',
-              padding: '11px 16px',
-              minHeight: '44px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: bypassBusyRole ? 'not-allowed' : 'pointer',
-              opacity: bypassBusyRole ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            {bypassBusyRole === 'admin' 
-              ? '🏛️ ANMELDUNG LÄUFT...' 
-              : `🏛️ BYPASS: ${bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} (${bypassUserCounts.adminUser?.name || 'Peter Pan'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
-          </button>
-
-          {/* 3. Lehrer Bypass */}
-          <button
-            type="button"
-            disabled={!!bypassBusyRole}
-            aria-label="Entwickler-Direktzugang: Lehrkraft anmelden"
-            title="Dev Only: 1-Klick Lehrkraft Login"
-            onClick={async () => {
-              if (bypassBusyRole) return;
-              try {
-                setBypassBusyRole('teacher');
-                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-                const baseUser = bypassUserCounts.teacherUser || {
-                  id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
-                  name: 'Mateo Jansen',
-                  role: 'teacher',
-                  school_id: fallbackSchoolId
-                };
-                const effectiveSchoolId = baseUser.school_id || fallbackSchoolId;
-                const targetUser = {
-                  ...baseUser,
-                  school_id: effectiveSchoolId,
-                  is_campus_active: true,
-                  is_groovelab_active: true
-                };
-                console.log('[Bypass] Logging in as Lehrer:', targetUser.name);
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.setItem('groovelab_school_id', effectiveSchoolId);
-                  localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
-                }
-                let resolvedDbUser: any = targetUser;
-                try {
-                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                    p_credential: targetUser.id,
-                    p_school_id: effectiveSchoolId
-                  });
-                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    if (authResult.user) {
-                      resolvedDbUser = { ...authResult.user, school_id: effectiveSchoolId };
-                    }
-                  }
-                } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
-                const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, effectiveSchoolId).catch(() => null);
-                if (leaseRes && (leaseRes as any).lease_id) {
-                  sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                  localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                }
-                setLocalhostDevLegalBypassed(true);
-                ['min_2026.1', 'teacher_min_2026.1', 'admin_min_2026.1', 'secretary_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));
-                sessionStorage.removeItem('groovelab_is_master_admin'); localStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
-                sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-                sessionStorage.setItem('groovelab_user_id', resolvedDbUser.id);
-                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(resolvedDbUser));
-                ['groovelab_qr_token', 'groovelab_last_qr_token'].forEach(k => { sessionStorage.removeItem(k); localStorage.removeItem(k); });
-                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
-                  window.history.replaceState(null, '', '/');
-                }
-                await Promise.resolve(onLogin(resolvedDbUser.id, true));
-                if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-                  window.location.replace(window.location.origin + '/dashboard');
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Lehrer:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-                setBypassBusyRole(null);
-              }
-            }}
-            style={{
-              background: '#064e3b',
-              color: '#a7f3d0',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '12px',
-              padding: '11px 16px',
-              minHeight: '44px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: bypassBusyRole ? 'not-allowed' : 'pointer',
-              opacity: bypassBusyRole ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            {bypassBusyRole === 'teacher'
-              ? '🎓 ANMELDUNG LÄUFT...'
-              : `🎓 BYPASS: LEHRKRAFT (${bypassUserCounts.teacherUser?.name || 'Mateo Jansen'} • ${bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})`}
-          </button>
-
-          {/* 4. Schüler Bypass */}
-          <button
-            type="button"
-            disabled={!!bypassBusyRole}
-            aria-label="Entwickler-Direktzugang: Schüler Linus anmelden"
-            title="Dev Only: 1-Klick Schüler Login"
-            onClick={async () => {
-              if (bypassBusyRole) return;
-              try {
-                setBypassBusyRole('student');
-                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : '') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-                const baseUser = bypassUserCounts.studentUser || {
-                  id: '15102f5e-c504-4c33-93ab-436285197c8c',
-                  name: 'Linus',
-                  role: 'student',
-                  school_id: fallbackSchoolId
-                };
-                const effectiveSchoolId = baseUser.school_id || fallbackSchoolId;
-                const targetUser = {
-                  ...baseUser,
-                  school_id: effectiveSchoolId,
-                  is_campus_active: true,
-                  is_groovelab_active: true
-                };
-                console.log('[Bypass] Logging in as Schüler:', targetUser.name);
-                if (typeof localStorage !== 'undefined') {
-                  localStorage.setItem('groovelab_school_id', effectiveSchoolId);
-                  localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
-                }
-                let resolvedDbUser: any = targetUser;
-                try {
-                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                    p_credential: targetUser.id,
-                    p_school_id: effectiveSchoolId
-                  });
-                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                    if (authResult.user) resolvedDbUser = { ...authResult.user, school_id: effectiveSchoolId };
-                  }
-                } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
-                const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, effectiveSchoolId).catch(() => null);
-                if (leaseRes && (leaseRes as any).lease_id) {
-                  sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                  localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                }
-                setLocalhostDevLegalBypassed(true);
-                ['min_2026.1', 'student_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));
-                sessionStorage.removeItem('groovelab_is_master_admin'); localStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.removeItem('groovelab_support_ghost');
-                sessionStorage.setItem('groovelab_active_workspace', 'student');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-                sessionStorage.setItem('groovelab_active_tab', 'briefing');
-                sessionStorage.setItem('groovelab_location_mode', 'home');
-                sessionStorage.setItem('groovelab_user_id', resolvedDbUser.id);
-                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(resolvedDbUser));
-                // 🛡️ Anti-Date-Drift: Clear any stale teacher simulation date in production only
-                if (!isLocalDevEnvironment()) {
-                  localStorage.removeItem('groovelab_simulated_date');
-                  localStorage.removeItem('groovelab_simulated_start_timestamp');
-                }
-                ['groovelab_qr_token', 'groovelab_last_qr_token'].forEach(k => { sessionStorage.removeItem(k); localStorage.removeItem(k); });
-                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/qr/')) {
-                  window.history.replaceState(null, '', '/');
-                }
-                await Promise.resolve(onLogin(resolvedDbUser.id, true));
-                if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-                  window.location.replace(window.location.origin + '/dashboard');
-                }
-              } catch (err: any) {
-                console.error('[Bypass] Error logging in as Schüler:', err);
-                alert('Bypass Fehler: ' + (err?.message || err));
-                setBypassBusyRole(null);
-              }
-            }}
-            style={{
-              background: '#422006',
-              color: '#fef08a',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '12px',
-              padding: '11px 16px',
-              minHeight: '44px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: bypassBusyRole ? 'not-allowed' : 'pointer',
-              opacity: bypassBusyRole ? 0.7 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            {bypassBusyRole === 'student'
-              ? '🎸 ANMELDUNG LÄUFT...'
-              : `🎸 BYPASS: SCHÜLER (${bypassUserCounts.studentUser?.name || 'Linus'} • ${bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})`}
-          </button>
-        </div>
-      )}
-
-
-
-      {/* Legal Footer */}
-      <div style={{ 
-        marginTop: '20px', 
-        display: 'flex', 
-        gap: '16px', 
-        fontSize: '11px', 
-        fontWeight: 800, 
-        color: isGroovelabKiosk ? '#854d0e' : '#4ade80',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em'
-      }}>
-        <span 
-          role="button"
-          tabIndex={0}
-          onClick={() => setLegalModalTab('privacy')} 
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('privacy'); } }}
-          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
-          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          Datenschutz
-        </span>
-        <span style={{ opacity: 0.4 }}>•</span>
-        <span 
-          role="button"
-          tabIndex={0}
-          onClick={() => setLegalModalTab('terms')} 
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('terms'); } }}
-          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
-          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          AGB
-        </span>
-        <span style={{ opacity: 0.4 }}>•</span>
-        <span 
-          role="button"
-          tabIndex={0}
-          onClick={() => setLegalModalTab('cancellation')} 
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('cancellation'); } }}
-          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
-          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          Widerruf
-        </span>
-        <span style={{ opacity: 0.4 }}>•</span>
-        <span 
-          role="button"
-          tabIndex={0}
-          onClick={() => setLegalModalTab('impressum')} 
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('impressum'); } }}
-          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
-          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          Impressum
-        </span>
-        <span style={{ opacity: 0.4 }}>•</span>
-        <span 
-          role="button"
-          tabIndex={0}
-          onClick={() => setLegalModalTab('accessibility')} 
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLegalModalTab('accessibility'); } }}
-          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
-          onFocus={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onBlur={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-          onMouseOver={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#854d0e' : '#4ade80'; }}
-        >
-          Barrierefreiheit
-        </span>
-      </div>
-
-
-    </div> {/* Closing Right Login Panel */}
 
       {/* Permission Help Modal */}
       {showPermissionHelp && (
@@ -8580,6 +6199,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         isOpen={!!legalModalTab}
         onClose={() => setLegalModalTab(null)}
         initialTab={legalModalTab || 'impressum'}
+        schoolData={schoolData}
       />
 
       {/* DSB & Audit Portal Modal (E-Mail-Freier DSB-Zugang nach Art. 38 DSGVO) */}

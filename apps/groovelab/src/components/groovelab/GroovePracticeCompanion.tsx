@@ -1848,10 +1848,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       const secondsPerBeat = 60.0 / bpmRef.current;
       const meterInfo = getActiveMeter(selectedStyleRef.current, metronomeMeterRef.current);
       const secondsPerBar = meterInfo.stepsInBar * (secondsPerBeat / meterInfo.stepDivision);
-      
       const elapsed = ctx.currentTime - barStartAudioTimeRef.current;
-      const progressPercent = Math.min(100, Math.max(0, (elapsed / secondsPerBar) * 100));
-      setBarProgress(progressPercent);
+      const progressPercent = Math.round(Math.min(100, Math.max(0, (elapsed / secondsPerBar) * 100)));
+      setBarProgress(prev => Math.abs(prev - progressPercent) >= 2 ? progressPercent : prev);
       progressFrameRef.current = requestAnimationFrame(syncBarProgress);
     };
     progressFrameRef.current = requestAnimationFrame(syncBarProgress);

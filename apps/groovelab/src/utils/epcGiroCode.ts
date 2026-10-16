@@ -45,8 +45,12 @@ export function generateEpcGiroCodePayload(params: EpcGiroCodeParams): string {
  * Formats a German IBAN with standard 4-digit spacing for clean UI representation.
  */
 export function formatIbanWithSpaces(iban: string): string {
-  const cleaned = (iban || '').replace(/\s+/g, '').toUpperCase();
-  return cleaned.replace(/(.{4})/g, '$1 ').trim();
+  const trimmed = (iban || '').trim();
+  const cleaned = trimmed.replace(/\s+/g, '').toUpperCase();
+  if (/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(cleaned)) {
+    return cleaned.replace(/(.{4})/g, '$1 ').trim();
+  }
+  return trimmed;
 }
 
 /**

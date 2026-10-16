@@ -1,7 +1,7 @@
 /**
  * Campus-Groovelab Official DRV & Status Compliance Dossier Generator
- * Standards: BSG Az. B 12 R 3/20 R (Herrenberg-Urteil), § 7a & § 28p SGB IV,
- *            § 87 Abs. 1 Nr. 6 BetrVG / LPVG, § 266a StGB Enthaftung, § 2 & § 3 RDG
+ * Standards: BSG Az. B 12 R 3/20 R (Herrenberg-Urteil), § 7a, § 28p & § 127 SGB IV,
+ *            § 87 Abs. 1 Nr. 6 BetrVG / LPVG, § 266a StGB Enthaftung, § 3 RDG
  * 
  * Generates an official, print-ready, 4-page legal compliance dossier for 
  * German Pension Insurance (Deutsche Rentenversicherung Bund / DRV) audits,
@@ -83,7 +83,7 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
       doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
       doc.setFontSize(7.5);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text('Rechtssicher zertifiziert nach BSG B 12 R 3/20 R & § 7a SGB IV • Revisionssicher gem. § 371a ZPO', margin, pageHeight - 8);
+      doc.text('Technisches Dispositions- & Metadaten-Protokoll (BSG B 12 R 3/20 R) • Unverbindliche Fachinformation gem. § 3 RDG • § 127 SGB IV • § 371a ZPO', margin, pageHeight - 8);
       doc.text(`Seite ${pageNum} von 4`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     };
 
@@ -102,13 +102,13 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
     doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(accentBlue[0], accentBlue[1], accentBlue[2]);
-    doc.text('BEHÖRDLICHER STATUS-NACHWEIS ZUR BETRIEBSPRÜFUNG NACH § 28p SGB IV / BSG HERRENBERG', margin, curY);
+    doc.text('TECHNISCHES DISPOSITIONS- & METADATEN-PROTOKOLL ZUR PRÜFUNG NACH § 28p SGB IV / BSG HERRENBERG', margin, curY);
 
     curY += 5;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text('Kryptografisch beglaubigter Systemauszug für die Deutsche Rentenversicherung Bund & Gerichte', margin, curY);
+    doc.text('Kryptografisch beglaubigter Systemauszug (unverbindliche technische Fachinformation gem. § 3 RDG)', margin, curY);
 
     // Infobox Mandant & Prüfsumme
     curY += 8;
@@ -155,12 +155,12 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(alertGreen[0], alertGreen[1], alertGreen[2]);
-    doc.text('Gesetzlicher Hinweis gem. § 2 & § 3 Rechtsdienstleistungsgesetz (RDG):', margin + 6, curY + 6);
+    doc.text('Gesetzlicher Hinweis gem. § 3 Rechtsdienstleistungsgesetz (RDG) & § 127 SGB IV:', margin + 6, curY + 6);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    const rdgText = 'Dieses technische Dispositions- und Metadaten-Protokoll dokumentiert ausschließlich tatsächliche Systemvorgänge und Raumbelegungen. Es stellt keine Rechtsberatung gem. § 2 RDG dar und ersetzt im Statusfeststellungsverfahren nach § 7a SGB IV keine Einzelfallprüfung der vertraglichen Vereinbarungen und der tatsächlichen Durchführung durch die zuständigen Behörden (Deutsche Rentenversicherung Bund) oder Gerichte der Sozialgerichtsbarkeit.';
+    const rdgText = 'Dieses technische Dispositions- und Metadaten-Protokoll dokumentiert ausschließlich tatsächliche Systemvorgänge und Raumbelegungen. Es stellt keine Rechtsberatung gem. § 3 RDG dar und ersetzt keine Einzelfallprüfung der vertraglichen Vereinbarungen und gelebten Praxis. Eine verbindliche Statusfeststellung erfolgt ausschließlich im Verfahren nach § 7a SGB IV durch die Clearingstelle der Deutschen Rentenversicherung Bund. Bis zum 31.12.2026 ist für vor dem 01.07.2024 begründete Verträge die gesetzliche Übergangsregelung gem. § 127 SGB IV zu beachten.';
     const splitRdg = doc.splitTextToSize(rdgText, contentWidth - 12);
     doc.text(splitRdg, margin + 6, curY + 11);
 
@@ -169,7 +169,7 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('2. Zusammenfassung der Enthaftungs-Garantien (Herrenberg-Schutzschild)', margin, curY);
+    doc.text('2. Zusammenfassung der technischen Architektur-Eigenschaften (Herrenberg-Modell)', margin, curY);
 
     const pillars = [
       {
@@ -186,7 +186,7 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
       },
       {
         title: 'Zero Payroll & strikte ERP-Trennung',
-        desc: 'Campus-Groovelab berechnet 0 Honorare oder Gehälter. Vollständige Freistellung von § 266a StGB Vorenthalten von Entgelt.'
+        desc: 'Campus-Groovelab berechnet 0 Honorare oder Gehälter. Technische Trennung von der Lohn- und Finanzbuchhaltung der Schule.'
       }
     ];
 
@@ -212,7 +212,7 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
     // SEITE 2: STATUS-ATTESTIERUNG & HERRENBERG-COMPLIANCE
     // =========================================================================
     doc.addPage();
-    addHeaderBar('Status-Attestierung gem. BSG B 12 R 3/20 R & § 7 SGB IV', 2);
+    addHeaderBar('Technische Indizienfreiheit der IT-Architektur (BSG & § 7 SGB IV)', 2);
 
     curY = 26;
     doc.setFont('helvetica', 'bold');

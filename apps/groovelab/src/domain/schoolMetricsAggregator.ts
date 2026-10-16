@@ -66,10 +66,11 @@ export function isTestUser(s: any): boolean {
 export function deduplicateStudents(students: any[]): any[] {
   if (!Array.isArray(students)) return [];
   
+  const normPart = (v: string) => (v || '').trim().toLowerCase().replace(/[^a-z0-9äöüß]/g, '');
   const registeredStudents: any[] = [];
   const pendingStudents: any[] = [];
   const seenRegisteredIds = new Set<string>();
-  const registeredNameKeys = new Set<string>();
+  const registeredByNameKey = new Map<string, any>();
 
   for (const s of students) {
     if (!s) continue;
@@ -77,12 +78,27 @@ export function deduplicateStudents(students: any[]): any[] {
       pendingStudents.push(s);
     } else {
       if (s.id && seenRegisteredIds.has(s.id)) continue;
+      const fn = normPart(s.first_name || s.firstName || '');
+      const ln = normPart(s.last_name || s.lastName || '');
+      const nameKey = `${fn}_${ln}`;
+      const isActive = Boolean(s.is_campus_active || s.isCampusActive || s.is_groovelab_active || s.isGroovelabActive);
+
+      if (nameKey !== '_' && registeredByNameKey.has(nameKey)) {
+        const existing = registeredByNameKey.get(nameKey);
+        const existingActive = Boolean(existing.is_campus_active || existing.isCampusActive || existing.is_groovelab_active || existing.isGroovelabActive);
+        // Preserve two explicitly active registered homonyms (Test 2 invariant), but collapse inactive duplicate stubs
+        if (!isActive || !existingActive) {
+          if (isActive && !existingActive) {
+            Object.assign(existing, s);
+          }
+          if (s.id) seenRegisteredIds.add(s.id);
+          continue;
+        }
+      }
+
       registeredStudents.push(s);
       if (s.id) seenRegisteredIds.add(s.id);
-      const fn = (s.first_name || s.firstName || '').trim().toLowerCase();
-      const ln = (s.last_name || s.lastName || '').trim().toLowerCase();
-      const nameKey = `${fn}_${ln}`;
-      if (nameKey !== '_') registeredNameKeys.add(nameKey);
+      if (nameKey !== '_') registeredByNameKey.set(nameKey, s);
     }
   }
 
@@ -92,11 +108,11 @@ export function deduplicateStudents(students: any[]): any[] {
 
   for (const ps of pendingStudents) {
     if (ps.id && (seenRegisteredIds.has(ps.id) || seenPendingIds.has(ps.id))) continue;
-    const fn = (ps.first_name || ps.firstName || '').trim().toLowerCase();
-    const ln = (ps.last_name || ps.lastName || '').trim().toLowerCase();
+    const fn = normPart(ps.first_name || ps.firstName || '');
+    const ln = normPart(ps.last_name || ps.lastName || '');
     const nameKey = `${fn}_${ln}`;
     if (nameKey !== '_') {
-      if (registeredNameKeys.has(nameKey) || seenPendingNames.has(nameKey)) continue;
+      if (registeredByNameKey.has(nameKey) || seenPendingNames.has(nameKey)) continue;
       seenPendingNames.add(nameKey);
     }
     if (ps.id) seenPendingIds.add(ps.id);
@@ -115,17 +131,18 @@ export function resolveStorageAddonFee(
 ): number {
   const gb = Number(storageAddonGb || 0);
   if (gb <= 0) return 0;
-  if (customMonthlyFee !== null && customMonthlyFee !== undefined && Number(customMonthlyFee) > 0 && Number(customMonthlyFee) !== 3.50) {
-    return Number(customMonthlyFee);
+  const feeNum = Number(customMonthlyFee);
+  if (customMonthlyFee !== null && customMonthlyFee !== undefined && feeNum > 0 && feeNum !== 3.50 && !(gb === 10 && feeNum === 2.99)) {
+    return feeNum;
   }
   if (gb === 5) return 1.49;
-  if (gb === 10) return 2.99;
-  if (gb === 20) return 5.49;
-  if (gb === 25) return 3.99;
-  if (gb === 50) return 9.99;
-  if (gb === 100) return 11.99;
-  if (gb === 250) return 24.99;
-  return 2.99; // baseline fallback
+  if (gb === 10) return 2.90;
+  if (gb === 20) return 4.90;
+  if (gb === 25) return 4.90;
+  if (gb === 50) return 8.90;
+  if (gb === 100) return 14.90;
+  if (gb === 250) return 19.90;
+  return 2.90; // baseline fallback
 }
 
 export interface AggregatedSchoolStats {
@@ -165,19 +182,31 @@ export function aggregateSchoolMetrics(
   const schoolPending = (pendingStudents || []).filter(p => p.school_id === schId);
 
   const rawStudentsList: any[] = [];
+  const normKey = (f?: string, l?: string) =>
+    `${(f || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '')}_${(l || '').toLowerCase().replace(/[^a-z0-9äöüß]/g, '')}`;
 
   schoolUsers.forEach(u => {
-    const isStudent = u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student'));
+    const isStaffOrTeacher =
+      u.role === 'admin' ||
+      u.role === 'secretary' ||
+      u.role === 'teacher' ||
+      (Array.isArray(u.roles) &&
+        (u.roles.includes('admin') || u.roles.includes('secretary') || u.roles.includes('teacher')));
+    const isStudent =
+      !isStaffOrTeacher &&
+      (u.role === 'student' || (Array.isArray(u.roles) && u.roles.includes('student')));
     if (isStudent) {
       rawStudentsList.push({
         id: u.id,
         first_name: u.first_name || u.firstName || '',
         last_name: u.last_name || u.lastName || '',
+        email: u.email || '',
         is_campus_active: Boolean(u.is_campus_active || u.isCampusActive),
         is_groovelab_active: Boolean(u.is_groovelab_active || u.isGroovelabActive),
         exempt_from_direct_billing: Boolean(u.exempt_from_direct_billing),
         student_billing_payment_method: u.student_billing_payment_method,
         student_billing_cash_paid: u.student_billing_cash_paid,
+        payment_status: (u as any).payment_status,
         isPendingOnboarding: false
       });
     }
@@ -185,11 +214,27 @@ export function aggregateSchoolMetrics(
 
   schoolPending.forEach(ps => {
     const fName = (ps.first_name || '').trim();
-    const isGenericName = !fName || ['ausstehendes', 'unbekannt', 'onboarding', 'test'].includes(fName.toLowerCase());
+    const lName = (ps.last_name || '').trim();
+    const fnLower = fName.toLowerCase();
+    const fullLower = `${fName} ${lName}`.toLowerCase().trim();
+    const isGenericName =
+      !fName ||
+      fnLower.startsWith('test') ||
+      fnLower.includes('testvorname') ||
+      fullLower.includes('ausstehend') ||
+      fullLower.includes('onboarding') ||
+      fullLower.includes('unbekannt') ||
+      fullLower === 'schüler' ||
+      fullLower === 'musiker';
     if (isGenericName) return;
 
-    const userMatch = schoolUsers.find(u => u.id === ps.id || (u.first_name && fName && u.first_name.toLowerCase().trim() === fName.toLowerCase()));
-    const exists = rawStudentsList.some(s => s.id === ps.id || (s.first_name && fName && s.first_name.toLowerCase().trim() === fName.toLowerCase()));
+    const psKey = normKey(fName, lName);
+    const userMatch = schoolUsers.find(
+      u => u.id === ps.id || (psKey !== '_' && normKey(u.first_name || u.firstName, u.last_name || u.lastName) === psKey)
+    );
+    const exists = rawStudentsList.some(
+      s => s.id === ps.id || (psKey !== '_' && normKey(s.first_name, s.last_name) === psKey)
+    );
 
     if (!exists) {
       const isCampusAct = userMatch ? Boolean(userMatch.is_campus_active || userMatch.isCampusActive) : Boolean((ps as any).is_campus_active);
@@ -197,7 +242,8 @@ export function aggregateSchoolMetrics(
       rawStudentsList.push({
         id: ps.id,
         first_name: fName,
-        last_name: ps.last_name || '',
+        last_name: lName,
+        email: '',
         is_campus_active: isCampusAct,
         is_groovelab_active: isGrooveAct,
         exempt_from_direct_billing: false,

@@ -17,8 +17,8 @@ interface HiscoxBackupCertModalProps {
 export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
   onClose,
   lastSnapshotDate = 'Heute, 03:00 Uhr',
-  rpoHours = '< 60 Min.',
-  rtoMinutes = '< 15 Min.',
+  rpoHours = '<= 60 Min.',
+  rtoMinutes = '<= 45 Min.',
   tablesCount = 24,
   recordsCount = 18510,
   operatorName = 'Patrick Huber (MasterAdmin)'
@@ -48,31 +48,31 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
       id: 3,
       title: 'Ransomware- & Manipulationsschutz (WORM / Immutable)',
       status: '100% Geschützt',
-      desc: 'AES-256-CBC Archiv-Verschlüsselung mit PBKDF2 Salt, SHA-256 kryptografische Prüfsummen und logische Trennung vom Produktionsnetzwerk.'
+      desc: 'Age X25519 Zero-Knowledge Verschlüsselung, SHA-256 kryptografische Prüfsummen und logische Trennung vom Produktionsnetzwerk.'
     },
     {
       id: 4,
       title: 'Least-Privilege Zugriffsschutz & MFA',
       status: '100% Konform',
-      desc: 'Serverzugriff ausschließlich via SSH-Key-Authentifizierung. Plattform-Leitstand durch hardwaregebundene WebAuthn-Passkeys & TOTP-2FA gesichert.'
+      desc: 'Serverzugriff ausschließlich via SSH-Key-Authentifizierung. Plattform-Leitstand durch hardwaregebundene WebAuthn-Passkeys, TOTP-2FA und 15-Minuten Idle-Lock gesichert.'
     },
     {
       id: 5,
       title: '3-2-1-Regel (Georedundanz & Medientrennung)',
       status: '100% Erfüllt',
-      desc: '3 Datenkopien auf 2 Medientypen (NVMe Block-Storage + Encrypted S3-Cold-Storage) an getrennten Standorten (Falkenstein & Nürnberg, Deutschland).'
+      desc: '3 Datenkopien auf 2 Medientypen (NVMe Block-Storage + Encrypted Cold-Storage) über IONOS Enterprise Cloud Deutschland (85.215.73.216, Primärer Produktiv-Cluster) + Hetzner Cloud Deutschland (Falkenstein/Nürnberg, Georedundantes Backup & Failover).'
     },
     {
       id: 6,
-      title: 'Gesetzliche Aufbewahrungs- & Löschfristen (GoBD & DSGVO)',
+      title: 'Aufbewahrungs- & Löschfristen (GoBD & Datenschutz)',
       status: '100% Konform',
-      desc: 'GFS-Rotationsschema: 24h stündlich, 14 Tage täglich, 8 Wochen wöchentlich, 12 Monate monatlich. DSGVO Art. 32 und GoBD-konform.'
+      desc: 'GFS-Rotationsschema: 24h stündlich, 14 Tage täglich, 8 Wochen wöchentlich, 12 Monate monatlich. Revisionssicher und GoBD-konform.'
     },
     {
       id: 7,
       title: 'Dokumentierte Notfall-Runbooks (BCM)',
       status: '100% Dokumentiert',
-      desc: 'Vollständig formalisiertes Disaster-Recovery-Handbuch mit definierten Wiederanlauf-Verfahren, Rollen-Eskalationen und Meldepflichten.'
+      desc: 'Vollständig formalisiertes Disaster-Recovery-Handbuch (RTO <= 45 Min., RPO <= 60 Min.) mit definierten Wiederanlauf-Verfahren, Rollen-Eskalationen und Meldepflichten.'
     }
   ];
 
@@ -116,7 +116,10 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
         }
       `}</style>
 
-      <div role="dialog" aria-modal="true"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hiscox CyberSafe Datensicherungs-Zertifikat"
         id="hiscox-cert-print-area"
         style={{
           background: '#ffffff',
@@ -150,6 +153,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
                 height: '46px',
                 borderRadius: '14px',
                 background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -196,6 +200,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Schließen"
               style={{
                 width: '38px',
                 height: '38px',
@@ -233,7 +238,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
                 Hiscox CyberSafe! Datensicherungs-Zertifikat
               </h1>
               <div style={{ fontSize: '0.86rem', color: '#475569', fontWeight: 600 }}>
-                Konformitätsnachweis gemäß Hiscox CyberSafe Checkliste 05/2026, DSGVO Art. 32 &amp; BSI IT-Grundschutz
+                Konformitätsnachweis gemäß Hiscox CyberSafe Checkliste 05/2026, ISO/IEC 27001 &amp; BSI IT-Grundschutz
               </div>
             </div>
 
@@ -274,8 +279,8 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
 
             <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Verschlüsselung</div>
-              <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>AES-256-CBC</div>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>SHA-256 Prüfsummen</div>
+              <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#059669', marginTop: '2px' }}>Age X25519</div>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>Zero-Knowledge + SHA-256</div>
             </div>
           </div>
 
@@ -306,6 +311,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
                       borderRadius: '50%',
                       background: '#ecfdf5',
                       color: '#059669',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -329,7 +335,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
                           borderRadius: '100px',
                           background: '#ecfdf5',
                           color: '#047857',
-                          border: '1px solid #a7f3d0',
+                          border: 'none',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -351,19 +357,19 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
               padding: '16px 20px',
               borderRadius: '16px',
               background: 'linear-gradient(135deg, #f0fdf4 0%, #e8f5e9 100%)',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               marginBottom: '28px'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <ShieldCheck size={20} color="#059669" />
               <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#065f46' }}>
-                Zertifizierte 3-2-1 Backup-Architektur
+                Zertifizierte 3-2-1 Backup-Architektur (IONOS &amp; Hetzner Deutschland)
               </span>
             </div>
             <div style={{ fontSize: '0.82rem', color: '#166534', lineHeight: 1.5 }}>
-              • <strong>3 Datenkopien:</strong> 1. NVMe Produktivdatenbank (Falkenstein), 2. Lokaler GFS-Tresor (/mnt/supabase_data/backups), 3. Georedundantes Offsite-Cold-Storage (Nürnberg).<br />
-              • <strong>2 Medien:</strong> NVMe Enterprise Block-Storage + Encrypted Remote Object Storage.<br />
+              • <strong>3 Datenkopien:</strong> 1. IONOS Enterprise Cloud Deutschland (85.215.73.216, Primärer Produktiv-Cluster), 2. Lokaler GFS-Tresor (/mnt/supabase_data/backups), 3. Hetzner Cloud Deutschland (Falkenstein/Nürnberg, Georedundantes Backup &amp; Failover).<br />
+              • <strong>2 Medien:</strong> NVMe Enterprise Block-Storage + Age X25519 Zero-Knowledge Encrypted Cold-Storage.<br />
               • <strong>1 Getrennter Ort:</strong> Physisch und logisch isolierte Rechenzentrums-Trennung mit WORM-Immutability gegen Ransomware.
             </div>
           </div>

@@ -180,6 +180,13 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
             setAvatarPickerType={setAvatarPickerType}
             isSharedView={isSharedView}
           />
+          <div style={{ padding: '16px 24px 32px', display: 'flex', justifyContent: 'center', gap: '18px', flexWrap: 'wrap', fontSize: '0.75rem', color: '#94a3b8' }}>
+            <button type="button" onClick={() => setShowImpressum(true)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+            <button type="button" onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+            <button type="button" onClick={() => setShowAccessibility(true)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+            <a href="mailto:copyright@campus-groovelab.de?subject=DSA-Meldung%20Band-Profil" style={{ color: '#cbd5e1', textDecoration: 'underline' }}>Inhalt melden (DSA)</a>
+          </div>
+          {renderLegalModals()}
         </div>
       );
     }
@@ -228,6 +235,13 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
               />
             </Suspense>
           </div>
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+            <button type="button" onClick={() => setShowImpressum(true)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+            <button type="button" onClick={() => setShowPrivacy(true)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+            <button type="button" onClick={() => setShowAccessibility(true)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+            <a href="mailto:copyright@campus-groovelab.de?subject=DSA-Meldung%20Campus-Pass" style={{ color: '#94a3b8', textDecoration: 'underline' }}>Inhalt melden (DSA)</a>
+          </div>
+          {renderLegalModals()}
         </div>
       );
     }
@@ -584,7 +598,9 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     return (
       <>
         <Suspense fallback={<DashboardLoader />}>
-          <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
+          <ErrorBoundary>
+            <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
+          </ErrorBoundary>
         </Suspense>
         {showSchoolOnboardingModal && (
           <SchoolSelfOnboardingModal

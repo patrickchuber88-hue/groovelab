@@ -6,7 +6,7 @@
 
 set -e
 
-SERVER="${SERVER:-deployuser@178.105.10.2}"
+SERVER="${SERVER:-deployuser@85.215.73.216}"
 REMOTE_DIR="/var/www/groovelab"
 LOCAL_DIST="apps/groovelab/dist"
 RELEASE_ID="release_$(date +%Y%m%d_%H%M%S)"
@@ -186,7 +186,11 @@ if [ -n "$BFF_CONTAINER" ]; then
   ssh "$SERVER" "docker restart '$BFF_CONTAINER' >/dev/null 2>&1 || true"
   echo "  ⏳ Warte auf Socket-Bind des BFF Gateways..."
   ssh "$SERVER" "for i in \$(seq 1 15); do \
-    STATUS=\$(docker exec \$WEB_CONTAINER curl -s -o /dev/null -w '%{http_code}' http://groovelab-bff:4000/gate/verify 2>/dev/null || echo '000'); \
+    if [ -n '$WEB_CONTAINER' ]; then \
+      STATUS=\$(docker exec \$WEB_CONTAINER curl -s -o /dev/null -w '%{http_code}' http://groovelab-bff:4000/gate/verify 2>/dev/null || echo '000'); \
+    else \
+      STATUS=\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4000/gate/verify 2>/dev/null || echo '000'); \
+    fi; \
     if [ \"\$STATUS\" = '401' ] || [ \"\$STATUS\" = '200' ]; then echo '  ✓ BFF Gateway aktiv (Port 4000 gebunden).'; break; fi; \
     sleep 1; \
   done"
@@ -195,8 +199,9 @@ fi
 # 8. Post-Deployment Smoke Test & Live Perimeter Guard (Zero-Trust)
 echo ""
 echo "🩺 [POST-DEPLOY SMOKE TEST] Verifiziere Live-Server Integrität..."
-HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 https://campus-groovelab.de/healthz || echo "000")
-SPA_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 https://campus-groovelab.de/ || echo "000")
+SERVER_HOST_IP="${SERVER#*@}"
+HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 --resolve "campus-groovelab.de:443:${SERVER_HOST_IP}" https://campus-groovelab.de/healthz || echo "000")
+SPA_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 8 --resolve "campus-groovelab.de:443:${SERVER_HOST_IP}" https://campus-groovelab.de/ || echo "000")
 
 if [ "$HEALTH_CODE" != "200" ] || { [ "$SPA_CODE" != "200" ] && [ "$SPA_CODE" != "401" ]; }; then
   echo "🚨 Smoke Test FEHLGESCHLAGEN! HTTP Status: /healthz ($HEALTH_CODE), SPA ($SPA_CODE)"
@@ -205,7 +210,7 @@ fi
 echo "  ✓ HTTP Status ($SPA_CODE) für Web-Applikation und 200 für /healthz bestätigt."
 
 echo "🛡️  Prüfe Live-Perimeter & Mozilla Observatory A+ Header..."
-node scripts/verify_perimeter_headers.mjs https://campus-groovelab.de || {
+RESOLVE_IP="$SERVER_HOST_IP" node scripts/verify_perimeter_headers.mjs https://campus-groovelab.de || {
   echo "🚨 Perimeter Header Check FEHLGESCHLAGEN: Sicherheits-Header Degradation im Live-System erkannt!"
   rollback
 }

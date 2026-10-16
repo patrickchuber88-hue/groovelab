@@ -31,7 +31,9 @@ BEGIN
     SELECT count(*) INTO v_total_before FROM storage.objects;
     RAISE NOTICE 'Vorab-Prüfung: % Storage-Objekte vorhanden.', v_total_before;
 
-    -- 1. Physisches Löschen verwaister Audio-Objekte (ohne Zuordnung zu aktiven Schülern oder Hausaufgaben)
+    -- 1. Physisches Löschen verwaister Audio-Objekte (ohne Zuordnung zu Schülern, Hausaufgaben oder Audio-Biografie)
+    -- 🛡️ WICHTIG: Aktive Schüleraufnahmen gehören zur persönlichen Audio-Biografie und verbleiben das gesamte Schuljahr geschützt.
+    -- Nur echte unreferenzierte Waisen (Tombstones ohne jeden DB-Eintrag) werden nach 30 Tagen getilgt.
     WITH orphaned AS (
         SELECT id, name, bucket_id
         FROM storage.objects
@@ -41,7 +43,15 @@ BEGIN
               SELECT 1 FROM public.students s WHERE s.photo_url LIKE '%' || name || '%'
           )
           AND NOT EXISTS (
-              SELECT 1 FROM public.progress_matrix pm WHERE pm.homework_notes LIKE '%' || name || '%'
+              SELECT 1 FROM public.progress_matrix pm 
+              WHERE (pm.homework_notes IS NOT NULL AND pm.homework_notes LIKE '%' || name || '%')
+                 OR (pm.audio_url IS NOT NULL AND pm.audio_url LIKE '%' || name || '%')
+          )
+          AND (
+              to_regclass('public.user_notes') IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM public.user_notes un 
+                  WHERE un.audio_url IS NOT NULL AND un.audio_url LIKE '%' || name || '%'
+              )
           )
     )
     DELETE FROM storage.objects

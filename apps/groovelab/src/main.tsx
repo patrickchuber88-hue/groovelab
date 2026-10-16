@@ -30,11 +30,15 @@ if (typeof window !== 'undefined') {
 // Global Robust Error Boundary to prevent white screens on transient client runtime errors
 class GlobalErrorBoundary extends React.Component<
   { children: React.ReactNode }, 
-  { hasError: boolean; error: any; showDetails: boolean; copied: boolean }
+  { hasError: boolean; error: any; errorInfo: any; showDetails: boolean; copied: boolean }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null, showDetails: false, copied: false };
+    const isLocalDev = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    );
+    this.state = { hasError: false, error: null, errorInfo: null, showDetails: isLocalDev, copied: false };
   }
 
   static getDerivedStateFromError(error: any) {
@@ -43,6 +47,7 @@ class GlobalErrorBoundary extends React.Component<
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error('[GlobalErrorBoundary] Unhandled client render error:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   handleReload = () => {
@@ -61,7 +66,7 @@ class GlobalErrorBoundary extends React.Component<
   };
 
   handleCopyDiagnostics = () => {
-    const errorDetails = `Campus-Groovelab Diagnostic Report\nTimestamp: ${new Date().toISOString()}\nError: ${this.state.error?.message || String(this.state.error)}\nStack: ${this.state.error?.stack || 'N/A'}\nUserAgent: ${navigator.userAgent}`;
+    const errorDetails = `Campus-Groovelab Diagnostic Report\nTimestamp: ${new Date().toISOString()}\nError: ${this.state.error?.message || String(this.state.error)}\nStack: ${this.state.error?.stack || 'N/A'}\nComponentStack: ${this.state.errorInfo?.componentStack || 'N/A'}\nUserAgent: ${navigator.userAgent}`;
     navigator.clipboard.writeText(errorDetails).then(() => {
       this.setState({ copied: true });
       setTimeout(() => this.setState({ copied: false }), 2500);
@@ -255,9 +260,45 @@ class GlobalErrorBoundary extends React.Component<
                       {this.state.copied ? '✓ Kopiert' : 'Bericht kopieren'}
                     </button>
                   </div>
-                  <div>
+                  <div style={{ fontWeight: 700, color: '#dc2626', wordBreak: 'break-word', fontSize: '0.78rem' }}>
                     {this.state.error?.message || String(this.state.error || 'Kein Fehlertext verfügbar')}
                   </div>
+                  {this.state.error?.stack && (
+                    <div style={{
+                      marginTop: '6px',
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      fontSize: '0.66rem',
+                      color: '#334155',
+                      background: '#ffffff',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>Stacktrace:</div>
+                      {this.state.error.stack}
+                    </div>
+                  )}
+                  {this.state.errorInfo?.componentStack && (
+                    <div style={{
+                      marginTop: '6px',
+                      maxHeight: '140px',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                      fontSize: '0.64rem',
+                      color: '#64748b',
+                      background: '#ffffff',
+                      padding: '8px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0'
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>React Component Stack:</div>
+                      {this.state.errorInfo.componentStack}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

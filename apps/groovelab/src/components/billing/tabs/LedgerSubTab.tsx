@@ -10,6 +10,7 @@ import {
   Eye 
 } from 'lucide-react';
 import { generateTariffReceiptPDF } from '../../../utils/tariffReceiptPdfGenerator';
+import { computeSchoolBillingMetrics } from '../../masterAdmin/utils/computeSchoolBillingMetrics';
 import { Invoice } from '../types';
 
 interface LedgerSubTabProps {
@@ -85,11 +86,24 @@ export const LedgerSubTab: React.FC<LedgerSubTabProps> = ({
     return matchesQuery && matchesSchool && matchesType && matchesDate;
   });
 
-  // Compute KPIs
+  // Compute KPIs via SSOT computeSchoolBillingMetrics
   const totalBaseMrr = allTariffBookings.reduce((acc, b) => {
     if (b.booking_type === 'STORAGE_UPGRADE' || b.booking_type === 'STORAGE_DOWNGRADE') return acc;
     if (b.booking_type === 'REVERSAL_STORNO') return acc + Number(b.total_monthly_rate_net || 0);
-    const baseRate = (b.has_campus_subscription && b.has_groovelab_subscription) ? 19.90 : b.has_campus_subscription ? 14.90 : 9.90;
+    const metrics = computeSchoolBillingMetrics(
+      {
+        id: b.school_id,
+        status: 'active',
+        has_campus_subscription: Boolean(b.has_campus_subscription),
+        has_groovelab_subscription: Boolean(b.has_groovelab_subscription),
+        has_kombi_discount: Boolean(b.has_campus_subscription && b.has_groovelab_subscription),
+        currency: b.currency || 'EUR',
+        country: b.currency === 'CHF' ? 'CH' : 'DE',
+        is_billing_booked: true
+      },
+      {}
+    );
+    const baseRate = Number((metrics.step2CampusHosting + metrics.step3GroovelabHosting - metrics.step4KombiDiscount).toFixed(2));
     return acc + baseRate;
   }, 0);
 
@@ -115,7 +129,9 @@ export const LedgerSubTab: React.FC<LedgerSubTabProps> = ({
           <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', fontFeatureSettings: '"tnum"' }}>
             {totalBaseMrr.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
           </div>
-          <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>✓ Campus &amp; GrooveLab Hosting</span>
+          <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={11} /> Campus &amp; GrooveLab Hosting
+          </span>
         </div>
 
         <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -379,7 +395,7 @@ export const LedgerSubTab: React.FC<LedgerSubTabProps> = ({
                       </td>
                       <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
                         <strong style={{ color: b.storage_addon_gb > 0 ? '#166534' : '#64748b' }}>
-                          {b.storage_addon_gb > 0 ? `+${b.storage_addon_gb} GB (${Number(b.storage_addon_monthly_fee).toFixed(2).replace('.', ',')} €)` : '1 GB Basis (0 €)'}
+                          {b.storage_addon_gb > 0 ? `+${b.storage_addon_gb} GB (${Number(b.storage_addon_monthly_fee).toFixed(2).replace('.', ',')} €)` : '10 GB Basis (0 €)'}
                         </strong>
                         {b.storage_pending_downgrade_gb !== null && b.storage_pending_downgrade_gb !== undefined && (
                           <div style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
@@ -439,6 +455,7 @@ export const LedgerSubTab: React.FC<LedgerSubTabProps> = ({
                           </button>
                           <button
                             type="button"
+                            aria-label="GoBD-Details und Prüfung anzeigen"
                             onClick={() => onSelectBookingForDrawer(b)}
                             title="GoBD-Details & Prüfung anzeigen"
                             style={{ padding: '6px 8px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}

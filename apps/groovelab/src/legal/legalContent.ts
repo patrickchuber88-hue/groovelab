@@ -54,8 +54,8 @@ export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
       date: '18.09.2026',
       highlights: [
         'Volljuristische Entkoppelung des B2B-Haftungsdeckels (max. 10.000 €) von Regulierungsentscheidungen des Versicherers (§ 307 BGB)',
-        'SLA-Wartungsfenster: Zulässiges tägliches Regelfenster von Montag bis Sonntag 00:00–06:00 Uhr (Berlin) mit 24h-Vorankündigung',
-        'Lückenlose Verankerung der unbedingten Bruttopreisgarantie für Bestandskunden bei Übergang zur Regelbesteuerung',
+        'SLA-Wartungsfenster: Zulässiges tägliches Regelfenster von 02:00–05:00 Uhr (MEZ) mit 48h-Vorankündigung',
+        'Lückenlose Verankerung der unbedingten Bruttopreisgarantie für B2C-Bestandskunden bei Übergang zur Regelbesteuerung',
         'Herrenberg-Präzisierung: Raumbelegungsanfrage durch Lehrkraft und Verfügbarkeitsbestätigung durch das Schulsekretariat',
         'Ausschluss der verschuldensunabhängigen Garantiehaftung für anfängliche Mängel gem. § 536a Abs. 1 Alt. 1 BGB'
       ]
@@ -82,7 +82,7 @@ export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
       title: 'Präzisierung Didaktik & Urheberschutz',
       date: '13.09.2026',
       highlights: [
-        'Präzisierung des didaktischen Audio-Tresors für Instrumental-, Gesangs- und Sprachaufnahmen bis Schuljahresende',
+        'Präzisierung des didaktischen Audio-Tresors (reguläre Übe-Aufnahmen bis Schuljahresende; kuratierte Audio-Biografie-Meilensteine bis Vertragsende)',
         'Transparente Subdienstleister-Information gem. Art. 28 Abs. 2 DSGVO und 48h-Vorfallsmeldung',
         'Ausschluss von Gesundheitsdaten & Verankerung der radikalen Datenminimierung für Schüler',
         'Ausdrücklicher Urheberschutz an eigenen Audio-Loops und Notizen (§ 3 Abs. 2 Didaktik-Kodex)',
@@ -169,10 +169,10 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
       '0,00 € Lizenzgebühren für die Software: Bereitstellung als reiner, flexibler Cloud-Service gem. § 535 BGB (keine teure Kaufsoftware, keine Investitionskosten)',
       'Didaktisches Ergänzungs-Werkzeug: Bereichert den Musikschulalltag, ersetzt aber bewusst kein bestehendes Schulverwaltungssystem (wie iMikel, MSVplus oder Musikschul-Manager; § 254 BGB)',
       'Volle Datenhoheit bei der Musikschule (Art. 4 Nr. 7 DSGVO): Weisungsgebundene Auftragsverarbeitung (AVV nach Art. 28 DSGVO) inklusive vollständiger TOMs',
-      '100 % Datenschutz-Souveränität (Standort Deutschland): Ausschließliches Hosting in ISO 27001-zertifizierten Rechenzentren (Hetzner, Nürnberg/Falkenstein) • 0 % US-Cloud-Abhängigkeit',
+      '100 % Datenschutz-Souveränität (Standort Deutschland): Ausschließliches Hosting in ISO 27001-zertifizierten Rechenzentren (IONOS SE & Hetzner, Deutschland) • 0 % US-Cloud-Abhängigkeit',
       '24-Stunden-Sicherheitspuffer für die Schulleitung: Vorfallsmeldung des Betreibers binnen 48 Stunden zur stressfreien Wahrung der 72h-Behördenfrist (Art. 33 DSGVO)',
       'Pädagogische Freiheit & Herrenberg-Schutzschild: Freiheit der Unterrichtsgestaltung für Lehrkräfte; Ausschluss von Weisungsbefugnis und Leistungsüberwachung (BSG Herrenberg-Urteil)',
-      'Verlässlicher 1.000.000 € Versicherungsschutz: Haftung für einfache Fahrlässigkeit auf den vertragstypischen Schaden begrenzt (dynamischer Cap: min. 1.000 €, max. 10.000 € bzw. einfache Jahresvergütung), abgesichert durch eine gewerbliche 1-Mio.-€ IT- & Cyber-Police (2-fach maximiert)',
+      'Verlässlicher 1.000.000 € Versicherungsschutz: Haftung für einfache Fahrlässigkeit auf den vertragstypischen Schaden begrenzt (dynamischer Cap: min. 1.000 €, max. 10.000 € bzw. einfache Jahresvergütung), abgesichert durch eine gewerbliche 1-Mio.-€ IT- & Cyber-Police',
       'Moderne Cloud-Wartung statt Mängelhaftung alter Prägung: Kontinuierliche Fehlerbehebung; Ausschluss verschuldensunabhängiger Garantiehaftung (§ 536a BGB) & 12 Monate Verjährung'
     ],
     checkboxLabel: 'Ich bestätige, dass ich berechtigt bin, den B2B-Infrastrukturvertrag (AGB Teil A) sowie die Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO) inklusive der Technisch-Organisatorischen Maßnahmen (TOMs) im Namen der Musikschule bzw. des Trägers verbindlich abzuschließen (z. B. als Schulleitung, Verwaltung oder beauftragte Person).',
@@ -194,31 +194,33 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 
 ### 2. Auftragsverarbeitungsvertrag gem. Art. 28 DSGVO & Datensouveränität
 (1) **Verantwortlichkeit & Weisungsgebundenheit:** Die Musikschule ist und bleibt datenschutzrechtlich die alleinige „Verantwortliche“ (Art. 4 Nr. 7 DSGVO) für alle von ihr verarbeiteten Schüler-, Lehrkräfte- und Verwaltungsdaten. Der Betreiber verarbeitet personenbezogene Daten ausschließlich als weisungsgebundener Auftragsverarbeiter (Art. 28 DSGVO) zur Erfüllung dieses Vertrages. Ergänzend gilt die gesonderte Vereinbarung zur Auftragsverarbeitung (AVV) als integraler Vertragsbestandteil.
-(2) **Ausschließlicher Serverstandort Deutschland:** Sämtliche Verarbeitungen von personenbezogenen Daten und Cloud-Speicherungen erfolgen ausnahmslos auf ISO/IEC 27001-zertifizierten Servern innerhalb der Bundesrepublik Deutschland (Standort Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland).
+(2) **Ausschließlicher Serverstandort Deutschland:** Sämtliche Verarbeitungen von personenbezogenen Daten und Cloud-Speicherungen erfolgen ausnahmslos auf ISO/IEC 27001-zertifizierten Servern innerhalb der Bundesrepublik Deutschland (IONOS SE, Montabaur / Deutschland als primärer Produktions-Cluster sowie Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland als georedundantes Backup, Failover & Storage Box).
 (3) **Zero-US-Cloud & Schrems II Compliance:** Der Betreiber setzt für die Speicherung und Bereitstellung personenbezogener Daten keine US-Cloud-Hyperscaler ein. Das System ist vollständig immun gegen Zugriffe nach dem US CLOUD Act und FISA 702.
-(4) **Subdienstleister & Vorab-Information (Art. 28 Abs. 2 DSGVO):** Als Infrastruktur-Subdienstleister wird Hetzner Online GmbH eingesetzt. Bei beabsichtigten Änderungen an Unterauftragnehmern wird die Schule mindestens vierzehn (14) Tage vorab in Textform informiert; der Schule steht ein Widerspruchsrecht aus wichtigem, nachgewiesenem datenschutzrechtlichem Grund zu. Bei unaufschiebbaren Notfall-Migrationen zur Abwehr akuter Sicherheitsstörungen informiert der Betreiber die Schulleitung unverzüglich nach Durchführung.
+(4) **Subdienstleister & Vorab-Information (Art. 28 Abs. 2 DSGVO):** Als Infrastruktur-Subdienstleister werden ausschließlich die IONOS SE (Elgendorfer Str. 57, 56410 Montabaur, Deutschland – Primärer Produktions-Cluster) sowie die Hetzner Online GmbH (Standorte Falkenstein/Vogtland \`fsn1\` und Nürnberg \`nbg1\`, Deutschland – Georedundantes Backup, Failover & Storage Box) eingesetzt. Bei jeder beabsichtigten Hinzuziehung oder Ersetzung eines neuen Unterauftragnehmers wird die Schule ausnahmslos mindestens vierzehn (14) Tage vorab in Textform informiert; der Schule steht das gesetzliche Widerspruchsrecht gemäß Art. 28 Abs. 2 Satz 2 DSGVO zu. Unaufschiebbare technische Notfall-Failover-Umschaltungen zur Abwehr akuter Störungen erfolgen ausschließlich innerhalb der bereits vorab genehmigten deutschen Rechenzentrumsstandorte der IONOS SE und der Hetzner Online GmbH (\`nbg1\` ⇄ \`fsn1\`), niemals zu einem neuen Drittanbieter.
 (5) **Vorfallsmeldung binnen 24 bis 48 Stunden:** Der Betreiber meldet Verletzungen des Schutzes personenbezogener Daten (Art. 33 Abs. 2 DSGVO) unverzüglich, bei schwerwiegenden Datenpannen (P1) mit potentiellem Datenabfluss spätestens binnen vierundzwanzig (24) Stunden, bei sonstigen technischen Störungen spätestens binnen achtundvierzig (48) Stunden nach Bekanntwerden, an die Schulleitung, sodass der Schule ein ausreichender Puffer zur Erfüllung der gesetzlichen 72-Stunden-Meldepflicht nach Art. 33 DSGVO verbleibt.
 (6) **Zero-AI- & Zero-Model-Training-Garantie:** Sämtliche im Auftrag verarbeiteten Daten (insbesondere Schüler-, Lehrkräfte-, Stundenplan-, Text- und didaktische Audioaufnahmen) werden zu 0 % für das Training von Machine-Learning-Algorithmen, Large Language Models (LLMs) oder generativer künstlicher Intelligenz verwendet. Eine Weitergabe an externe KI-Modellanbieter ist ausgeschlossen.
 (7) **Kommunales Löschkonzept nach DIN 66398, Vertragsbeendigung & Aufbewahrungsfristen (§ 257 HGB, § 147 AO):** Bei Vertragsbeendigung werden alle Mandantendaten nach Ablauf einer 30-tägigen Karenzfrist zur Datenextraktion unwiederbringlich und revisionssicher physisch gelöscht. Der Löschung von Abrechnungs-, Rechnungs- und Buchungsbelegen stehen die zwingenden gesetzlichen Aufbewahrungsfristen von bis zu zehn Jahren nach Handels- und Steuerrecht (§ 257 HGB, § 147 AO) entgegen; diese Belege werden bis zum Ablauf der Aufbewahrungsfrist sperr- und manipulationssicher archiviert.
 (8) **Revisionssichere Beweiskraft & Integrität elektronischer Nachweise (§ 371a ZPO):** Sämtliche im Rahmen der Vertragsdurchführung und Administration generierten Audit-Logs, Einverständnis-Protokolle, Zeitstempel und Bereitstellungs-Nachweise werden kryptografisch versiegelt (SHA-256 Hash-Chaining nach GoBD-Standard) und besitzen für etwaige behördliche oder gerichtliche Prüfungen die volle Beweiskraft elektronischer Dokumente (§ 371a ZPO).
 
 ### 3. Kanonische Gebührenstruktur, Fair-Play-Entlastung, Laufzeit, Zahlungsbedingungen & Verzug (§§ 286, 288 BGB)
-(1) **Gebührenübersicht (Legal SaaS-Nomenklatur):**
+(1) **Gebührenübersicht (Legal SaaS-Nomenklatur & Bestandsgarantie):**
 - **Campus-Groovelab Software-Bereitstellung:** 0,00 € / CHF 0.00 (Inklusive).
-- **Cloud- & Datenbank-Hosting Modul Campus:** 14,90 € / Mo. (DE/AT) bzw. CHF 19.90 / Mo. (CH) feste Server-Flatrate je Musikschule.
-- **Cloud- & Datenbank-Hosting Modul GrooveLab:** 9,90 € / Mo. (DE/AT) bzw. CHF 14.90 / Mo. (CH) feste Server-Flatrate je Musikschule.
-- **Kombi-Vorteilsrabatt (Infrastruktur-Bündel):** -4,90 € / Mo. (DE/AT) bzw. -4.90 CHF / Mo. (CH) bei gemeinsamer Buchung beider Module (Flatrate: 19,90 € / Mo. bzw. CHF 29.90 / Mo.).
+- **Cloud- & Datenbank-Hosting Modul Campus:** 19,90 € / Mo. (DE/AT) bzw. CHF 25.90 / Mo. (CH) feste Server-Flatrate je Musikschule (für Bestandsverträge vor Tarifanpassung gilt lebenslanger Bestandsschutz zu 14,90 € / Mo. bzw. CHF 19.90 / Mo.).
+- **Cloud- & Datenbank-Hosting Modul GrooveLab:** 12,90 € / Mo. (DE/AT) bzw. CHF 16.80 / Mo. (CH) feste Server-Flatrate je Musikschule (Bestandsschutz für Altverträge: 9,90 € / Mo. bzw. CHF 14.90 / Mo.).
+- **Kombi-Vorteilsrabatt (Infrastruktur-Bündel):** -7,90 € / Mo. (DE/AT) bzw. -10.20 CHF / Mo. (CH) bei gemeinsamer Buchung beider Module (Kombi-Flatrate: 24,90 € / Mo. bzw. CHF 32.50 / Mo.; Bestandsschutz für Altverträge: 19,90 € / Mo. bzw. CHF 29.90 / Mo.).
 - **Service- & Administrationspauschale:** 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktive Lehrkraft. Verwaltungs- und Sekretariats-Profile (Rollen admin und secretary) sind dauerhaft 100 % inklusive (0,00 €).
 - **Basis-Bereitstellung:** 0,09 € / Mo. (DE/AT) bzw. CHF 0.20 / Mo. (CH) je registrierter Schüler (QR-Landingpages, Stundenplan-, Termin-Sync & DSGVO-Hosting).
 - **Cloud- & Modul-Bereitstellung Campus:** 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (interaktive App: Übe-Timer, Loopstation, Hausaufgaben).
 - **Cloud- & Modul-Bereitstellung GrooveLab:** 0,49 € / Mo. (DE/AT) bzw. CHF 1.00 / Mo. (CH) je aktiver Schüler (Bands, Songs; wird ausnahmslos zu 100 % von der Musikschule getragen).
+- **Inklusiv-Speicher & Optionale Speicher-Erweiterungen:** 10 GB Cloud-Speicher je Musikschule inklusive (0,00 € / CHF 0.00); optionale Speicher-Erweiterungspakete (Audio- & Dokumenten-Tresor): +10 GB (2,90 € / Mo. bzw. CHF 3.80 / Mo.), +25 GB (4,90 € / Mo. bzw. CHF 6.40 / Mo.), +50 GB (8,90 € / Mo. bzw. CHF 11.60 / Mo.), +100 GB (14,90 € / Mo. bzw. CHF 19.40 / Mo.) sowie +250 GB (19,90 € / Mo. bzw. CHF 25.90 / Mo.).
 (2) **Sammelzahler vs. Schüler-Direktabrechnung:** GrooveLab-Aktivierungen werden verbindlich immer zu 100 % von der Musikschule übernommen. Für das Campus-Modul kann die Musikschule Schüler-Direktabrechnung vereinbaren. Schüler-Direktabrechnungen mit Eltern erfolgen ausnahmslos als einmaliger, befristeter Schuljahres-Jahresbeitrag (max. 11 × 0,49 € = 5,39 € in DE/AT bzw. 11 × CHF 1.00 = CHF 11.00 in CH pro Schuljahr; 1. Monat 100 % kostenfreier Probemonat) – niemals als monatliches Abonnement. Die Bereitstellung endet automatisch mit Schuljahresende ohne Kündigungserfordernis. Erfolgt keine Folgezahlung, greift der automatische sanfte Fallback auf die von der Schule getragene Basis-Bereitstellung (0,09 €).
 (3) **Härtefall-Freikontingent & 20er-Staffel (Eltern-Direktabrechnung):** Erreicht eine Musikschule im Modell der Eltern-Direktabrechnung mindestens 20 aktivierte Vollzahler-Profile, stellt Campus-Groovelab für jeweils volle 20 aktivierte Schüler je einen kostenfreien Härtefall-Platz (0,00 €) zur Verfügung. Bruchteile unterhalb von 20 Vollzahlern begründen keinen Anspruch (strikte kaufmännische Abrundung: floor(n / 20)). Der Stichtag zur Feststellung des Kontingents ist der 1. Oktober (nach Ablauf des kostenfreien Probemonats September). Sinkt die Zahl der Vollzahler im Folgejahr, werden überzählige Härtefall-Profile nahtlos über die B2B-Rechnung der Schule zum regulären Schülerbeitrag (0,49 € / Mo. bzw. max. 5,39 € Einmalbeitrag / Schuljahr) als Träger-Überhang weitergeführt, sofern die Schule die Profile nicht vor dem Stichtag aktiv auf den Basistarif (0,09 € / Mo.) zurückstuft. Ein Ausschluss oder eine Stigmatisierung von Schülern findet zu keinem Zeitpunkt statt.
 (4) **Fair-Play Inaktivitäts-Entlastung:** Loggt sich ein Schüler über einen Zeitraum von mehr als sechzig (60) aufeinanderfolgenden Tagen nicht aktiv ein, wird das Profil automatisch auf passive Basis-Bereitstellung (0,09 € / CHF 0.20 / Mo.) umgestellt, um die Schule vor unnötigen Kosten zu schützen.
 (5) **Steuerliche Behandlung & B2B-Umsatzsteuer:** Alle vereinbarten B2B-Vergütungen verstehen sich als Netto-Preise. Soweit der Betreiber die Kleinunternehmerregelung gem. § 19 UStG (DE) bzw. § 6 Abs. 1 Z 27 UStG (AT) in Anspruch nimmt, wird keine Umsatzsteuer erhoben oder gesondert ausgewiesen. Mit dem etwaigen Übergang zur Regelbesteuerung wird auf die vereinbarten Netto-Preise die jeweils geltende gesetzliche Umsatzsteuer erhoben und in ordnungsgemäßen Rechnungen (§ 14 UStG) gesondert ausgewiesen. Für Kunden mit Sitz in der Schweiz gilt der Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG (nicht im Inland steuerbar / Bezugsteuer beim Empfänger). Entgelte der Schüler-Direktabrechnung (B2C, Teil B) bleiben hiervon unberührt und verstehen sich als Endpreise inklusive etwaiger gesetzlicher Abgaben.
 (6) **BGH-konformes Aufrechnungsverbot:** Die Musikschule kann nur mit unbestrittenen oder rechtskräftig festgestellten Forderungen aufrechnen. Dieser Ausschluss gilt ausdrücklich *nicht* für Gegenforderungen aus demselben Vertragsverhältnis, die auf Leistungsverweigerungsrechten, Minderung oder mangelbedingten Schadensersatzansprüchen beruhen (Synallagma).
 (7) **Vertragslaufzeit, Rumpf-Schuljahr & Kündigungsharmonisierung:** Verträge mit Bildungseinrichtungen laufen grundsätzlich synchron zum Schuljahr (12 Monate bis zum 31. August des jeweiligen Schuljahres) und verlängern sich jeweils um weitere zwölf (12) Monate, sofern sie nicht mit einer Frist von drei (3) Monaten zum Schuljahresende (31. Mai) in Textform gekündigt werden. Bei unterjährigem Vertragsbeginn vor dem 1. Mai läuft die Erstlaufzeit bis zum 31. August des laufenden Schuljahres (Rumpf-Schuljahr). Erfolgt der Vertragsbeginn am oder nach dem 1. Mai, umfasst die Erstlaufzeit das verbleibende Rumpf-Schuljahr sowie das unmittelbar anschließende volle Folgeschuljahr (bis zum 31. August des darauffolgenden Kalenderjahres). Das gesetzliche Recht zur außerordentlichen Kündigung aus wichtigem Grund (§ 314 BGB) bleibt unberührt.
-(8) **Zahlungsverzug & Verzugsschaden (§§ 286, 288 BGB):** Rechnungen sind innerhalb von vierzehn (14) Tagen ab Rechnungsdatum ohne Abzug zur Zahlung fällig. Gerät die Musikschule mit Zahlungen in Verzug (§ 286 BGB), ist der Betreiber berechtigt, Verzugszinsen in gesetzlicher Höhe (§ 288 Abs. 2 BGB: 9 Prozentpunkte über dem Basiszinssatz) sowie den gesetzlichen Mahnkostenpauschalsatz nach § 288 Abs. 5 BGB (40,00 €) geltend zu machen. Gesetzliche Zurückbehaltungsrechte bei qualifiziertem Zahlungsverzug bleiben unberührt.
+(8) **Zahlungsverzug & Verzugsschaden (§§ 271a, 286, 288 BGB):** Rechnungen sind innerhalb von dreißig (30) Tagen ab Rechnungsdatum ohne Abzug zur Zahlung fällig. Gerät die Musikschule mit Zahlungen in Verzug (§ 286 BGB), ist der Betreiber berechtigt, Verzugszinsen in gesetzlicher Höhe (§ 288 Abs. 2 BGB: 9 Prozentpunkte über dem Basiszinssatz) sowie den gesetzlichen Mahnkostenpauschalsatz nach § 288 Abs. 5 BGB (40,00 €) geltend zu machen. Gesetzliche Zurückbehaltungsrechte bei qualifiziertem Zahlungsverzug bleiben unberührt.
+(9) **Rechtsformwechsel & Vertragsübernahme (§ 309 Nr. 10 BGB):** Der Betreiber ist berechtigt, diesen Vertrag einschließlich des Auftragsverarbeitungsvertrages (AVV) im Zuge einer Ausgliederung oder Umwandlung des Einzelunternehmens auf eine unter seiner mehrheitlichen Beteiligung stehende Kapitalgesellschaft mit Sitz in Deutschland (insbesondere eine GmbH oder UG (haftungsbeschränkt)) zu übertragen. Der Betreiber kündigt die Übertragung mindestens vier (4) Wochen vorab in Textform unter namentlicher Benennung der übernehmenden Gesellschaft an; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Übertragung zu (§ 309 Nr. 10 lit. b BGB).
 
 ### 4. Ausschluss von Noten-Uploads & Noten-Sharing, Cover-Aufnahmen (§§ 53, 60a UrhG) & Notice-and-Takedown (Art. 6 & 16 DSA)
 (1) **Vollständiger Ausschluss von Noten-Dateien & Noten-Sharing (Reine Metadaten-Architektur gem. § 1 Abs. 2 UrhDaG):** Die Plattform stellt zu keinem Zeitpunkt Funktionen zum Hochladen, Speichern, Teilen oder Verbreiten von Noten, Notensätzen, Leadsheets, Partituren oder Noten-PDFs bereit. Jegliches Teilen von Noten-Dateien über die Plattform ist technisch ausgeschlossen und untersagt. Hausaufgaben, Aufgabenpläne und Repertoirelisten verweisen ausnahmslos auf freie bibliografische Metadaten (Titel, Lehrwerk, Seitenzahlen) zur Nutzung mit von den Schülern im Fachhandel rechtmäßig erworbenen gedruckten Original-Lehrwerken sowie auf autorisierte externe Partnerdienste (Spotify, YouTube, Tomplay). Campus-Groovelab ist kein Diensteanbieter für das Teilen von Online-Inhalten gem. § 2 UrhDaG.
@@ -229,7 +231,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 
 ### 5. Arbeitszeit-Compliance, Herrenberg-Schutzschild (BSG B 12 R 3/20 R) & Kinderschutz (§ 8a SGB VIII)
 (1) **Arbeitgeber-Alleinverantwortung nach dem Arbeitszeitgesetz (ArbZG):** Campus-Groovelab ist ein asynchrones pädagogisches Arbeits- und Lernmittel. Die Musikschule ist als Arbeitgeberin allein verantwortlich für die Einhaltung der Vorschriften des ArbZG, der Höchstarbeitszeiten sowie der 11-stündigen Ruhezeit (§ 5 ArbZG). Dem Personal steht das Recht auf Nichterreichbarkeit uneingeschränkt zu.
-(2) **Herrenberg-Compliance & Freistellung bei Honorarkräften (§ 7a SGB IV / BSG B 12 R 3/20 R):** Campus-Groovelab dient den Lehrkräften zur didaktischen Unterstützung und begründet zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt. Der Stundenplan- und Raumbelegungsprozess folgt dem zweiseitigen Ressourcenmodell gem. § 1 Abs. 5: Lehrkräfte stimmen Termine autonom mit Schülern ab und übermitteln unverbindliche Entwürfe; das Schulsekretariat prüft Raumkollisionen und weist nach eigenem Ermessen einen freien Raum zu (keine hoheitliche Terminzuteilung). Lehrkräften steht die Übermittlungsfreiheit auf herkömmlichen Wegen vollumfänglich offen. Bindet die Musikschule freie Mitarbeiter ein, stellt sie in eigener Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der BSG-Rechtsprechung (Herrenberg-Urteil) vorliegt. Die Schule stellt den Betreiber von jeglichen Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialkassen (§ 7a SGB IV) im Innenverhältnis frei, sofern diese auf der internen Beauftragungspraxis der Schule beruhen.
+(2) **Pädagogische Freiheit, Übermittlungsautonomie & Herrenberg-Übergangsrecht (§ 127 SGB IV / BSG B 12 R 3/20 R):** Campus-Groovelab garantiert allen Lehrkräften gleichermaßen die uneingeschränkte didaktische und methodische Freiheit bei der Gestaltung des Musikunterrichts. Die Plattform begründet zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt der Schulleitung und schließt Leistungs- und Verhaltenskontrollen (§ 87 Abs. 1 Nr. 6 BetrVG) aus. Der Stundenplan- und Raumbelegungsprozess folgt dem zweiseitigen Ressourcenmodell gem. § 1 Abs. 5: Lehrkräfte stimmen Termine eigenverantwortlich mit Schülern ab und übermitteln unverbindliche Entwürfe; das Schulsekretariat prüft Raumressourcen und weist einen freien Raum zu (keine hoheitliche Terminzuteilung). Allen Lehrkräften steht die Übermittlungsfreiheit auf herkömmlichen Wegen vollumfänglich offen. Soweit Musikschulen zur rechtssicheren Ausgestaltung des Unterrichtsbetriebs das gesetzliche Übergangsrecht gemäß § 127 SGB IV (Übergangsregelung zur Honorarunterrichtspraxis an Musikschulen bis zum 31. Dezember 2027) in Anspruch nehmen oder Lehrkräfte weisungsfrei einbinden, unterstützt die didaktische Plattformarchitektur die gesetzlichen Anforderungen an eine weisungsfreie, partnerschaftliche Unterrichtsorganisation in vollem Umfang. Die sozialversicherungs- und steuerrechtliche Einordnung verbleibt in der autonomen Verantwortung der Musikschule; die Schule stellt den Betreiber im Innenverhältnis von etwaigen Nachforderungen von Sozialversicherungsbeiträgen frei.
 (3) **Rechtsnatur der 1-Tap Kontaktdokumentation („Erreicht“):** Soweit Lehrkräfte im Rahmen des Ausfall- oder Krisenmanagements die telefonische Kontaktaufnahme zu Schülern bzw. Erziehungsberechtigten per 1-Tap als „Erreicht“ quittieren, handelt es sich um eine rein interne pädagogische Dokumentationsnotiz der handelnden Lehrkraft. Dieser Vermerk begründet keine gesetzliche Zugangsfiktion gem. § 130 BGB oder einen rechtssicheren Zugangsnachweis gegenüber den Erziehungsberechtigten.
 (4) **Institutioneller Kinderschutz & Vier-Augen-Prinzip (§ 8a SGB VIII):** Chatverläufe zwischen Lehrkräften und minderjährigen Schülern sind für Erziehungsberechtigte über das Eltern-Portal transparent einsehbar (Vier-Augen-Prinzip). Ein unüberwachter Privatchat zwischen Minderjährigen untereinander ist serverseitig ausgeschlossen. Verdachtsmeldungen können an kinderschutz@campus-groovelab.de gerichtet werden.
 (5) **Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG):** Die Plattform verzichtet vollständig auf Funktionen zur Verhaltens- oder Leistungskontrolle von Lehrkräften.
@@ -239,7 +241,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 (1) **Ausschluss anfänglicher Mängel (§ 536a Abs. 1 Alt. 1 BGB):** Die verschuldensunabhängige Haftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) wird ausdrücklich und vollumfänglich ausgeschlossen.
 (2) **Haftungsmaßstab:** Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Die Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.
 (3) **BGH-konformer B2B Liability Cap & Versicherungsschutz (§ 307 BGB):**
-(a) Der Betreiber unterhält zur Absicherung von Großschäden und Cyberrisiken eine gewerbliche IT-Vermögensschaden- sowie eine Cyber-Risiko-Versicherung mit einer Deckungssumme von mindestens 1.000.000,00 € je Versicherungsfall (2-fach maximiert im Versicherungsjahr).
+(a) Der Betreiber unterhält zur Absicherung von Großschäden und Cyberrisiken eine gewerbliche IT-Vermögensschaden- sowie eine Cyber-Risiko-Versicherung mit einer Deckungssumme von mindestens 1.000.000,00 € je Versicherungsfall.
 (b) Für Schäden, die durch einfache Fahrlässigkeit bei Verletzung von wesentlichen Vertragspflichten (Kardinalpflichten) verursacht werden, ist die Haftung des Betreibers der Höhe nach auf den vertragstypisch vorhersehbaren Schaden begrenzt, maximal jedoch auf die Summe der vom Kunden in den vorangegangenen zwölf (12) Monaten tatsächlich an den Betreiber gezahlten Netto-Vergütung (mindestens jedoch 1.000,00 € bzw. CHF 1'000.00, bei Standardverträgen höchstens 10.000,00 € bzw. CHF 10'000.00, bei Verträgen mit höherem Volumen begrenzt auf das 1-fache der vereinbarten Jahres-Nettovergütung je Kalenderjahr).
 (c) Die Haftungsgrenze nach Buchstabe (b) gilt als eigenständige, unbedingte Höchstbegrenzung im Sinne von § 307 BGB und besteht unabhängig davon, ob oder in welcher Höhe der Versicherer im konkreten Schadensfall leistet.
 (d) Die vorstehenden Haftungsbegrenzungen gelten nicht bei Vorsatz, grober Fahrlässigkeit, bei Verletzung von Leben, Körper oder Gesundheit sowie bei gesetzlich zwingender Haftung (Produkthaftungsgesetz).
@@ -266,7 +268,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
       'Datenschutzrechtliche Mündigkeit ab 16 Jahren (Art. 8 DSGVO): Eigenständige Audio-Einwilligung für Übe-Aufnahmen',
       'Zero-Abofalle: Feste Schuljahres-Befristung ohne automatische Verlängerung; Folgejahr beginnt erneut mit kostenfreiem Probemonat',
       'Sanfter Basis-Fallback (0,09 €): Bei Nicht-Fortführung dauerhafter Erhalt von Stundenplan und Raum ohne Kosten für die Familie',
-      'Button-Lösung nach § 312j BGB & Widerrufserlöschen gem. § 356 Abs. 5 BGB bei sofortiger Bereitstellung',
+      'Transparenter Freischalt-Prozess (§ 312j BGB), dauerhafter Datenträger (§ 312f Abs. 2 BGB via PDF-Download) & Widerrufsfrist im Probemonat',
       'Zero-Photo-Doktrin & Notenverbot: 100 % bild- und notenblattfreier Raum; Avatare und freie Metadaten',
       'PIN-Freigabelinks: Nutzung ausschließlich im engsten privaten Familienkreis gem. § 53 Abs. 1 UrhG',
       'Pädagogischer Enthaftungsschild: Kein geschuldeter Lernerfolg; rein unterstützende Übe-Werkzeuge'
@@ -276,7 +278,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 ### 1. Leistungsbeschreibung, Kostenfreiheit & Zivilrechtliche Vertragspartnerschaft (§ 2 & §§ 106 ff. BGB)
 (1) Campus-Groovelab bietet Schülerinnen, Schülern und Eltern eine geschützte digitale Begleitung für den Instrumental-, Gesangs- und Ensembleunterricht an Musikschulen.
 (2) **Zivilrechtliche Vertragspartnerschaft bis zur Volljährigkeit:** Bei minderjährigen Schülerinnen und Schülern bis zur Vollendung des 18. Lebensjahres (gesetzliche Volljährigkeit gem. § 2 BGB) sind und bleiben ausnahmslos die Erziehungsberechtigten Vertragspartner für die Plattformnutzung sowie für etwaige entgeltliche Zusatzmodule (wie Schüler-Jahresbeiträge bei Direktabrechnung). Minderjährige können ohne ausdrückliche Einwilligung ihrer gesetzlichen Vertreter keine vertraglichen Zahlungsverpflichtungen begründen (§§ 106 ff. BGB).
-(3) **Gemeinsames Sorgerecht & Vertretungsvermutung (§ 1629 Abs. 1 Satz 2 BGB):** Meldet ein Elternteil ein minderjähriges Kind an oder schaltet Module frei, versichert dieser Elternteil an Eides statt, zur gesetzlichen Vertretung allein berechtigt zu sein oder im ausdrücklichen Einvernehmen und mit Vollmacht des weiteren sorgeberechtigten Elternteils zu handeln. Der handelnde Elternteil stellt den Plattformbetreiber sowie die Musikschule im Innenverhältnis von allen Ansprüchen oder Einwendungen des anderen Elternteils frei.
+(3) **Gemeinsames Sorgerecht & Vertretungsvermutung (§ 1629 Abs. 1 Satz 2 BGB):** Meldet ein Elternteil ein minderjähriges Kind an oder schaltet Module frei, versichert dieser Elternteil verbindlich, zur gesetzlichen Vertretung allein berechtigt zu sein oder im ausdrücklichen Einvernehmen und mit Vollmacht des weiteren sorgeberechtigten Elternteils zu handeln. Der handelnde Elternteil stellt den Plattformbetreiber sowie die Musikschule im Innenverhältnis von allen Ansprüchen oder Einwendungen des anderen Elternteils frei.
 (4) Für Schülerinnen und Schüler entstehen durch die reine Basisnutzung keine gesonderten Lizenzkaufgebühren (0,00 € inklusive).
 
 ### 2. Jugendschutz, Datenschutz-Mündigkeit (Art. 8 DSGVO), Zero-Photo-Doktrin & Zero-AI
@@ -294,10 +296,13 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 Entscheiden sich die Erziehungsberechtigten für die Weiternutzung der erweiterten didaktischen Funktionen für das laufende Schuljahr, wird hierfür ein einmaliger, pauschaler Bereitstellungsbeitrag von maximal 5,39 € (DE/AT) bzw. CHF 11.00 (CH) für das gesamte verbleibende Schuljahr fällig. Die Bereitstellung endet ausnahmslos und automatisch mit Ablauf des jeweiligen Schuljahres (31. August), ohne dass es einer Kündigung bedarf. Es findet zu keinem Zeitpunkt eine automatische Verlängerung oder wiederkehrende Abbuchung statt.
 (3) **Sanfter Basis-Fallback (Kostenschutz & Ausschluss von Zahlungsverzug):**
 Leisten die Erziehungsberechtigten für ein Folgeschuljahr keinen erneuten Bereitstellungsbeitrag, entstehen keinerlei Zahlungsverpflichtungen, Mahnungen oder Verzugsschäden. Das Benutzerprofil wird in diesem Fall automatisch und unterbrechungsfrei auf die Basis-Bereitstellung (0,09 € / Mo. DE/AT bzw. CHF 0.20 / Mo. CH) umgestellt, deren Kosten vollumfänglich von der Musikschule getragen werden. Der Zugriff auf den persönlichen Stundenplan, die Raumzuweisung und die schulische Grundkommunikation bleibt dem Schüler dauerhaft und ohne Datenverlust erhalten.
-(4) **Gesetzliches Erlöschen des Widerrufsrechts (§ 356 Abs. 5 BGB):**
-Da die Bereitstellung des digitalen Zugangs unmittelbar mit der bewussten Freischaltung nach dem kostenfreien Probemonat beginnt, erlischt das gesetzliche 14-tägige Widerrufsrecht des Verbrauchers mit Beginn der Ausführung des Vertrags (§ 356 Abs. 5 BGB), nachdem der Nutzer hierzu seine ausdrückliche Zustimmung erteilt und seine Kenntnis über das Erlöschen bestätigt hat. Das Recht zur kostenfreien Nicht-Fortführung während des Probemonats (Absatz 1) bleibt hiervon unberührt.
-(5) **Button-Lösung nach § 312j Abs. 3 BGB:** Soweit eine entgeltliche Buchung ausgelöst wird, erfolgt die Bestätigung über eine eindeutig mit „Zahlungspflichtig bestellen“ beschriftete Schaltfläche. Unmittelbar darüber werden Gesamtpreis, Laufzeit und Leistungsumfang transparent zusammengefasst.
+(4) **Gesetzliches 14-tägiges Widerrufsrecht & 0,00 € Wertersatz im Probemonat (§ 356 BGB / § 357a Abs. 2 BGB):**
+Verbrauchern steht bei der entgeltlichen Freischaltung des Campus-Moduls das gesetzliche 14-tägige Widerrufsrecht zu (§ 356 BGB). Da der erste Nutzungsmonat als 30-tägige kostenfreie Schnupperphase gewährt wird, beträgt der gesetzliche Wertersatzanspruch bei fristgerechtem Widerruf gemäß § 357a Abs. 2 BGB exakt 0,00 €. Der Widerruf kann jederzeit formfrei oder direkt über die elektronische 1-Klick-Widerrufsfunktion im Elternbereich erklärt werden.
+(5) **Transparenter Freischalt-Prozess (§ 312j BGB) & Vertragsbestätigung auf dauerhaftem Datenträger (§ 312f Abs. 2 BGB):**  
+Vor Auslösung einer entgeltlichen Schuljahres-Freischaltung werden den Erziehungsberechtigten Gesamtpreis (max. 5,39 € bzw. CHF 11.00), die feste Laufzeit bis zum Schuljahresende (31. August) sowie der Leistungsumfang unmittelbar und hervorgehoben angezeigt. Die Freischaltung wird erst durch die aktive Banküberweisung des Jahresbeitrags unter Angabe der Campus-ID vollzogen; unterbleibt die Überweisung, entsteht keinerlei Zahlungsverpflichtung (automatischer Fallback auf den kostenfreien Basistarif). Zur Wahrung des 100 % Zero-User-Mail-Axioms stellt die Plattform den Erziehungsberechtigten bei Abruf der Überweisungsdaten sowie nach erfolgter Freischaltung die vollständige Vertragsbestätigung einschließlich dieser Nutzungsbedingungen und der Widerrufsbelehrung als unveränderbares, lokal speicherbares PDF-Dokument (dauerhafter Datenträger gem. § 312f Abs. 2 BGB) direkt zum 1-Klick-Download sowie im geschützten Eltern-Dokumententresor bereit.
 (6) **Härtefall- & Trägerförderung (Kostenfreiheit für Familien):** Wird das Profil eines Schülers durch die Musikschule als gefördertes Profil, Geschwisterbefreiung oder im Rahmen des Härtefall-Kontingents übernommen (§ 267 BGB), entfällt die Pflicht zur Leistung des Bereitstellungsbeitrags für die Erziehungsberechtigten vollständig (0,00 €). Etwaige Zahlungsaufforderungen oder Bezahlschranken im Benutzerkonto werden serverseitig unterdrückt. Es entstehen für die Familie keinerlei Zahlungsverpflichtungen oder Kündigungsobliegenheiten.
+(7) **Didaktischer Standalone-Übemodus bei unterjährigem Schulaustritt (Exmatrikulation):**  
+Kündigt ein Schüler oder Erziehungsberechtigter unterjährig den Unterrichtsvertrag mit der Musikschule, für den der Jahresbereitstellungsbeitrag (5,39 € bzw. CHF 11.00) entrichtet wurde, bleibt das persönliche Übestudio (Loopstation, Metronom, Stimmgerät, eigener Audio-Tresor und die bisherige musikalische Audio-Biografie) bis zum regulären Ende des Schuljahres (31. August) im entkoppelten Standalone-Modus uneingeschränkt nutzbar. Schulgebundene Funktionen (schulischer Stundenplan, Raumzuweisungen, Lehrer-Chats und schulische Ensembleräume) werden mit der Austrittsmeldung der Musikschule deaktiviert. Das Profil wird datenschutzkonform aus dem Mandanten der Musikschule entkoppelt und einer neutralen Standalone-ID zugewiesen, sodass die Musikschule mit dem Austrittsdatum von jeglichen weiteren Bereitstellungskosten entlastet wird (Schülerzähler der Schule = 0). Mit Ablauf des 31. August endet die Bereitstellung des Standalone-Übemodus absolut und automatisch ohne Kündigungserfordernis (keine automatische Verlängerung); den Nutzern steht bis zum 30. September das 30-tägige Exportfenster zur Verfügung.
 
 ### 4. Pädagogischer Enthaftungsschild (Keine Erfolgsgarantie) & Sensorik
 (1) **Kein geschuldeter Lernerfolg:** Der Betreiber stellt rein technische Hilfsmittel (Übe-Timer, Metronom, Loopstation, Gamification) bereit. Die didaktische Unterrichtsgestaltung, der persönliche Lernerfolg, Schulnoten, Prüfungsergebnisse und die tatsächliche musikalische Beherrschung des Instruments verbleiben in der ausschließlichen pädagogischen Verantwortung von Musikschule, Lehrkraft und Schüler. Ein bestimmter Lernerfolg wird nicht geschuldet und ist ausgeschlossen.
@@ -314,9 +319,9 @@ Da die Bereitstellung des digitalen Zugangs unmittelbar mit der bewussten Freisc
 ### 6. Vollständiger Ausschluss von Noten-Uploads & Noten-Sharing (§ 1 Abs. 2 UrhDaG)
 Die Plattform stellt für Schüler und Erziehungsberechtigte zu keinem Zeitpunkt Funktionen zum Hochladen, Speichern, Teilen oder Verbreiten von Noten, Notenblättern, Partituren oder Noten-PDFs bereit. Jegliches Teilen von Noten-Dateien ist technisch ausgeschlossen und untersagt. Didaktische Hausaufgaben verweisen ausnahmslos auf freie bibliografische Metadaten (Titel, Lehrwerk, Seitenzahlen) zur Nutzung mit im Fachhandel legal erworbenen Druckwerken.
 
-### 7. Mehrjährige didaktische Bildungsbiografie & PIN-Freigabelinks (§ 53 UrhG vs. § 19a UrhG)
-(1) Im Rahmen der didaktischen Bildungsbiografie (Vinyl-Plattentasche, Meisterwerk-Protokoll) werden erstellte Übe- und Songaufnahmen des Schülers kumulativ über die gesamte Dauer des bestehenden Musikschulunterrichtsvertrages gespeichert, um die langfristige musikalische Entwicklung zu begleiten. Die physische Löschung erfolgt endgültig dreißig (30) Tage nach formeller Beendigung des Unterrichtsvertrages (Exmatrikulation).
-(2) Soweit die Plattform die Erstellung PIN-geschützter Freigabelinks (z. B. 4-stellige PIN für Playlists) oder lokaler Archiv-Exporte (Zip-Dateien) ermöglicht, dürfen diese Freigaben ausnahmslos und ausschließlich im engsten privaten Kreis der Familie und Verwandten (§ 53 Abs. 1 UrhG) genutzt werden. Jede öffentliche Zugänglichmachung (§ 19a UrhG), insbesondere das Teilen von Freigabelinks, Passwörtern oder PINs auf öffentlich zugänglichen Webseiten, sozialen Netzwerken (wie YouTube, TikTok, Instagram, Facebook) oder in öffentlichen Messenger-Gruppen ist urheberrechtlich strengstens untersagt und berechtigt zur sofortigen Sperrung des Freigabelinks.
+### 7. Differenzierte Aufbewahrung (Schuljahres-Bereinigung vs. Audio-Biografie) & PIN-Freigabelinks (§ 53 UrhG vs. § 19a UrhG)
+(1) Reguläre Übe-, Hausaufgaben- und Loopstation-Aufnahmen werden jeweils zum Schuljahreswechsel (31. August bzw. 30. September nach 30-tägiger Exportkarenz) automatisch bereinigt. Bewusst von Schüler, Eltern oder Lehrkraft in die mehrjährige didaktische Bildungsbiografie (Vinyl-Plattentasche / Meisterwerk-Portfolio) aufgenommene Meilenstein-Aufnahmen bleiben über Schuljahre hinweg bis dreißig (30) Tage nach formeller Beendigung des Unterrichtsvertrages (Exmatrikulation) erhalten; eine 1-Klick-Sofortlöschung durch Eltern oder Schüler ist jederzeit möglich (Art. 17 DSGVO).
+(2) Soweit die Plattform die Erstellung PIN-geschützter Freigabelinks (mit strikt getrennter Übermittlung von Freigabelink und 4- bis 6-stelliger Familien-PIN) oder lokaler Archiv-Exporte (Zip-Dateien) ermöglicht, dürfen diese Freigaben ausnahmslos und ausschließlich im engsten privaten Kreis der Familie und Verwandten (§ 53 Abs. 1 UrhG) genutzt werden. Jede öffentliche Zugänglichmachung (§ 19a UrhG), insbesondere das Teilen von Freigabelinks, Passwörtern oder PINs auf öffentlich zugänglichen Webseiten, sozialen Netzwerken (wie YouTube, TikTok, Instagram, Facebook) oder in öffentlichen Messenger-Gruppen ist urheberrechtlich strengstens untersagt und berechtigt zur sofortigen Sperrung des Freigabelinks.
 (3) Bei der Nutzung der lokalen Zip-Exportfunktion obliegt die sichere Verwahrung der heruntergeladenen Dateien allein dem Nutzer. Der Betreiber haftet nicht für Datenverluste auf Endgeräten des Nutzers (§ 254 BGB).
 
 ### 8. Didaktik-Gamification & Punkte-Ausschluss (DSA Art. 25 & § 3 GlüStV)
@@ -327,7 +332,7 @@ Die in der Plattform integrierten didaktischen Spielfunktionen (Didaktik-Match, 
 (2) Bei der Nutzung von Gemeinschaftsterminals, Schüler-Tablets oder Kiosk-Stationen in den Räumen der Musikschule ist der Nutzer verpflichtet, sich nach Beendigung der Übeeinheit ordnungsgemäß über die Schaltfläche „Abmelden“ auszuloggen. Für den unbefugten Einblick Dritter in Benutzerprofile, die auf ein unterlassenes Ausloggen an geteilten Geräten zurückzuführen sind, übernimmt der Betreiber keine Haftung.
 
 ### 10. Verbraucherstreitbeilegung (§ 36 VSBG) & Salvatorische Klausel
-(1) Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen. Die OS-Plattform der EU ist erreichbar unter: https://ec.europa.eu/consumers/odr.
+(1) Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen (§ 36 Abs. 1 Nr. 1 VSBG).
 (2) Sollten Bestimmungen unwirksam sein, gelten die gesetzlichen Vorschriften (§ 306 Abs. 2 BGB).
     `.trim()
   },
@@ -395,9 +400,9 @@ Die in der Plattform integrierten didaktischen Spielfunktionen (Didaktik-Match, 
     summaryPoints: [
       'Freiwillige Freigabe für instrumentale und stimmliche Übe-Audios (Instrument, Gesang, Loopstation, Übe-Studio)',
       'Audio-Feedback der Lehrkraft (Play-Alongs, Vorspielen, Einsprechen) direkt im Hausaufgabenheft anhören',
-      'Geschützter Audio-Tresor: Gespeichert im privaten, isolierten Speicher mit 60-Sekunden-Zugriffstoken (keine öffentliche Abrufbarkeit)',
-      'Meisterwerke & Bildungsbiografie: Aufnahmen bleiben für die Dauer des Schuljahres (bis 31. August) bzw. während der aktiven Unterrichtszeit erhalten',
-      '100 % freiwillig & jederzeit im Profil widerrufbar (ohne Nachteile für den regulären Unterricht)'
+      'Geschützter Audio-Tresor: Gespeichert im privaten, isolierten Speicher mit temporären Zugriffstokens (maximal 30 Minuten / 1.800s Gültigkeit, keine öffentliche Abrufbarkeit)',
+      'Differenzierte Aufbewahrung: Reguläre Übe-Aufnahmen bis Schuljahresende (31. August); kuratierte Meilensteine der Audio-Biografie schuljahresübergreifend während der aktiven Unterrichtszeit',
+      '100 % freiwillig & jederzeit im Profil mit 1 Klick lösch- und widerrufbar (ohne Nachteile für den regulären Unterricht)'
     ],
     checkboxLabel: 'Ich willige freiwillig ein, dass im Rahmen des Musikunterrichts didaktische Audioaufnahmen (Instrumental-, Gesangs-, Stimm- und Übe-Aufnahmen sowie Loopstation-Spuren) zwischen Schüler und Lehrkraft über den geschützten Audio-Tresor ausgetauscht werden dürfen (Widerruf jederzeit mit Wirkung für die Zukunft möglich).',
     fullTextMarkdown: `
@@ -405,10 +410,10 @@ Die in der Plattform integrierten didaktischen Spielfunktionen (Didaktik-Match, 
 (1) Im Rahmen des Musikunterrichts (Instrumental-, Gesangs- und Ensembleunterricht) können Schülerinnen, Schüler und Lehrkräfte didaktische Audioaufnahmen anfertigen (z. B. Play-Alongs der Lehrkraft, Einspielen eigener Instrumental- und Gesangsspuren, Loopstation-Spuren sowie didaktisches Feedback).
 (2) Diese Aufnahmen dienen ausschließlich der pädagogischen Unterstützung des Übens zu Hause, der musikalischen Gehörbildung und der didaktischen Erfolgskontrolle.
 
-### 2. Geschützter Audio-Tresor, Zugriffstoken & Speicherdauer
-(1) Alle Audios werden in einem isolierten, privaten Cloud-Speicher (Audio-Tresor) verschlüsselt gehalten. Der Zugriff erfolgt ausschließlich über ephemere, kryptografisch signierte HMAC-Sicherheits-Tokens mit einer Gültigkeitsdauer von maximal 60 Sekunden.
+### 2. Geschützter Audio-Tresor, Zugriffstoken & Differenzierte Speicherdauer
+(1) Alle Audios werden in einem isolierten, privaten Cloud-Speicher (Audio-Tresor) verschlüsselt gehalten. Der Zugriff erfolgt ausschließlich über ephemere, kryptografisch signierte Sicherheits-Tokens (Signed-URLs) mit einer technischen Gültigkeitsdauer von maximal 30 Minuten (1.800 Sekunden).
 (2) Aufnahmen sind ausschließlich für die zugeordnete Lehrkraft sowie die Schülerin bzw. den Schüler und deren Erziehungsberechtigte abrufbar. Es erfolgt keinerlei öffentliche Bereitstellung, kein Suchmaschinen-Indexing und keine Weitergabe an Dritte.
-(3) **Meisterwerke & Schuljahres-Aufbewahrung:** Didaktische Audioaufnahmen dokumentieren die musikalische Lernbiografie. Sie verbleiben für die Dauer des jeweiligen Schuljahres (bis zum 31. August) bzw. während der aktiven Unterrichtszeit im Tresor und werden zum Schuljahresende im Rahmen der standardisierten Jahresabschluss-Wartung gelöscht, sofern sie nicht zuvor manuell durch den Nutzer entfernt wurden.
+(3) **Differenzierte Aufbewahrung (Übe-Alltag vs. Audio-Biografie):** Reguläre Übe- und Hausaufgabenaufnahmen verbleiben für die Dauer des jeweiligen Schuljahres (bis zum 31. August) im Tresor und werden zum Schuljahresende im Rahmen der standardisierten Jahresabschluss-Wartung gelöscht. Ausdrücklich als Meilensteine kuratierte Aufnahmen der musikalischen „Audio-Biografie“ (Meisterwerke) bleiben schuljahresübergreifend für die Dauer des aktiven Unterrichtsverhältnisses bis 30 Tage nach Vertragsende erhalten und können jederzeit im Schüler- bzw. Elternprofil mit einem Klick gelöscht werden.
 (4) **Zweckbindung:** Der Audio-Tresor dient ausschließlich musikalisch-didaktischen Zwecken. Reine Privataufnahmen außerhalb des Musikunterrichts sind unzulässig.
 
 ### 3. Freiwilligkeit & Widerrufsrecht (Art. 7 Abs. 3 DSGVO)
@@ -433,7 +438,7 @@ Didaktische Audioaufnahmen erfolgen ausschließlich im gegenseitigen Einvernehme
     summaryPoints: [
       'Behördentauglicher Stand-Alone Vertrag nach Art. 28 Abs. 3 DSGVO für Schulträger und Datenschutzbeauftragte',
       'Gegenstand & Dauer: Auftragsverarbeitung zur Bereitstellung der Bildungs- und Schul-Cloud Campus-Groovelab',
-      'Ausschließlicher Verarbeitungsort: Bundesrepublik Deutschland (Hetzner Online GmbH Falkenstein & Nürnberg)',
+      'Ausschließlicher Verarbeitungsort: Bundesrepublik Deutschland (IONOS SE Montabaur & Hetzner Online GmbH Falkenstein/Nürnberg)',
       'Vorfallsmeldung des Auftragnehmers binnen 48 Stunden zur Wahrung der 72h-Meldepflicht nach Art. 33 DSGVO',
       'Anlage 1: Detaillierter Katalog der Datenarten und Kategorien betroffener Personen',
       'Anlage 2: Vollständiger Katalog der Technisch-Organisatorischen Maßnahmen (TOMs gem. Art. 32 DSGVO)',
@@ -454,24 +459,24 @@ Didaktische Audioaufnahmen erfolgen ausschließlich im gegenseitigen Einvernehme
 
 ### 3. Verpflichtung auf das Datengeheimnis, Serverstandort & Schweizer Angemessenheit
 (1) Der Auftragnehmer gewährleistet, dass sich die zur Verarbeitung der Daten befugten Personen schriftlich zur Vertraulichkeit verpflichtet haben oder einer angemessenen gesetzlichen Verschwiegenheitspflicht unterliegen.
-(2) Sämtliche Daten werden zu 100 % auf Servern in ISO/IEC 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein & Nürnberg) verarbeitet. Ein Transfer in unsichere Drittstaaten (insbesondere USA) findet nicht statt (0 % US-Cloud-Doktrin / Immunität gegen US CLOUD Act und FISA 702). Für Auftraggeber aus der Schweizerischen Eidgenossenschaft erfolgt die grenzüberschreitende Bekanntgabe der Personendaten nach Deutschland auf Grundlage des verbindlichen Angemessenheitsbeschlusses des Bundesrates gemäss Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 der Datenschutzverordnung (DSV).
+(2) Sämtliche Daten werden zu 100 % auf Servern in ISO/IEC 27001-zertifizierten deutschen Rechenzentren (IONOS SE, Montabaur / Deutschland als primärer Produktions-Cluster sowie Hetzner Online GmbH, Falkenstein & Nürnberg als georedundantes Backup, Failover & Storage Box) verarbeitet. Ein Transfer in unsichere Drittstaaten (insbesondere USA) findet nicht statt (0 % US-Cloud-Doktrin / Immunität gegen US CLOUD Act und FISA 702). Für Auftraggeber aus der Schweizerischen Eidgenossenschaft erfolgt die grenzüberschreitende Bekanntgabe der Personendaten nach Deutschland auf Grundlage des verbindlichen Angemessenheitsbeschlusses des Bundesrates gemäss Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 der Datenschutzverordnung (DSV).
 
 ### 4. Technisch-Organisatorische Maßnahmen (Art. 32 DSGVO / Art. 8 nDSG & BSI IT-Grundschutz)
 (1) Der Auftragnehmer trifft alle nach Art. 32 DSGVO und Art. 8 nDSG erforderlichen technischen und organisatorischen Maßnahmen (TOMs), um ein dem Risiko für die Rechte und Freiheiten der betroffenen Personen angemessenes Schutzniveau zu gewährleisten.
 (2) Die konkret vereinbarten Maßnahmen ergeben sich aus **Anlage 2** zu diesem Vertrag. Der Auftragnehmer behält sich vor, Sicherheitsmaßnahmen an den Stand der Technik anzupassen, sofern das vereinbarte Schutzniveau nicht unterschritten wird.
 
 ### 5. Unterauftragsverhältnisse & Zero-User-Mail Benachrichtigungsweg (Art. 28 Abs. 3 lit. d DSGVO)
-(1) Der Auftraggeber erteilt seine allgemeine Genehmigung zur Hinzuziehung von Unterauftragsverarbeitern. Genehmigt ist der Einsatz der **Hetzner Online GmbH**, Industriestr. 25, 91710 Gunzenhausen, Deutschland (Serverstandorte: Falkenstein/Vogtland und Nürnberg; ISO/IEC 27001 zertifiziert).
+(1) Der Auftraggeber erteilt seine allgemeine Genehmigung zur Hinzuziehung von Unterauftragsverarbeitern. Genehmigt ist der Einsatz der **IONOS SE**, Elgendorfer Str. 57, 56410 Montabaur, Deutschland (Primärer Produktions-Cluster, ISO/IEC 27001 zertifiziert) sowie der **Hetzner Online GmbH**, Industriestr. 25, 91710 Gunzenhausen, Deutschland (Serverstandorte: Falkenstein/Vogtland und Nürnberg; Georedundantes Backup, Failover & Storage Box; ISO/IEC 27001 zertifiziert).
 (2) Der Auftragnehmer informiert den Auftraggeber mindestens vierzehn (14) Tage im Voraus über jede beabsichtigte Hinzuziehung oder Ersetzung von Unterauftragsverarbeitern. In Übereinstimmung mit dem 100 % Zero-User-Mail-Axiom erfolgt diese Benachrichtigung per Textform an die offizielle institutionelle Schul-E-Mail (\`schools.email\` / \`schools.billing_email\`) bzw. über das autoritative Broadcast-Center im Schulleitungs-Cockpit. Dem Auftraggeber steht ein Widerspruchsrecht aus wichtigem datenschutzrechtlichem Grund zu.
 
 ### 6. Unterstützungspflichten, Vorfallsmeldung & DPO-Behördenkoffer (Art. 28 Abs. 3 lit. e & f DSGVO)
-(1) **Betroffenenrechte:** Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisatorischen Maßnahmen (u. a. über das integrierte DPO- & Audit-Portal sowie DSGVO-Dossier-Exporte mit SHA-256 Siegel) bei der Erfüllung der Betroffenenrechte (Art. 12–22 DSGVO / Art. 25–29 nDSG).
+(1) **Betroffenenrechte:** Der Auftragnehmer unterstützt den Auftraggeber mit geeigneten technischen und organisischen Maßnahmen (u. a. über das integrierte DPO- & Audit-Portal sowie DSGVO-Dossier-Exporte mit SHA-256 Siegel) bei der Erfüllung der Betroffenenrechte (Art. 12–22 DSGVO / Art. 25–29 nDSG).
 (2) **Meldung von Datenschutzverletzungen:** Der Auftragnehmer meldet dem Auftraggeber Verletzungen des Schutzes personenbezogener Daten unverzüglich, spätestens binnen **24 bis maximal 48 Stunden** nach Bekanntwerden, sodass dem Auftraggeber ausreichender Puffer zur Erfüllung der gesetzlichen Meldepflichten (72h gem. Art. 33 DSGVO bzw. „so rasch als möglich“ an den EDÖB gem. Art. 24 nDSG) verbleibt.
-(3) **Datenschutz-Folgenabschätzungen & Behördenkoffer:** Der Auftragnehmer unterstützt den Auftraggeber bei der Einhaltung der Art. 32–36 DSGVO durch schlüsselfertige Bereitstellung des kommunalen DPO-Compliance-Dossiers (VVT gem. Art. 30 DSGVO, DSFA-Schwellwertprüfung gem. Art. 35 DSGVO, Personalrats-Attest gem. § 87 BetrVG).
+(3) **Datenschutz-Folgenabschätzungen & Behördenkoffer:** Der Auftragnehmer unterstützt den Auftraggeber bei der Einhaltung der Art. 32–36 DSGVO durch schlüsselfertige Bereitstellung des kommunalen DPO-Compliance-Dossiers (VVT gem. Art. 30 DSGVO, DSFA-Unterstützungs- & Schwellwertprüfung gem. Art. 28 Abs. 3 lit. f / Art. 35 DSGVO, Personalrats-Attest gem. § 87 BetrVG).
 
-### 7. Löschung, DIN 66398 & Dynamischer Schuljahres-Purge (Art. 17 & 28 Abs. 3 lit. g DSGVO)
+### 7. Löschung, DIN 66398 & Differenzierter Schuljahres-Purge (Art. 17 & 28 Abs. 3 lit. g DSGVO)
 (1) Nach Beendigung der Verarbeitungsleistungen löscht der Auftragnehmer alle Daten nach Ablauf einer 30-tägigen Karenzfrist für den Datenexport unwiederbringlich nach DIN 66398.
-(2) **Didaktische Audio-Retention & Schuljahres-Purge (Migration 454):** Temporäre Übe- und Hausaufgabenaufnahmen verbleiben für die Dauer des laufenden Schuljahres und werden am Monatsletzten des ersten Monats des individuellen Schuljahres der Musikschule automatisiert bereinigt, nachdem Erziehungsberechtigten eine einmonatige Exportfrist gem. Art. 20 DSGVO gewährt wurde.
+(2) **Didaktische Audio-Retention & Differenzierter Schuljahres-Purge (Migration 454):** Reguläre Übe- und Hausaufgabenaufnahmen (Löschklasse LK 2) verbleiben für die Dauer des laufenden Schuljahres (bis zum 31. August) und werden nach Einräumung einer einmonatigen Exportfrist gem. Art. 20 DSGVO automatisiert bereinigt. Ausdrücklich als Meilensteine kuratierte Aufnahmen der musikalischen „Audio-Biografie“ (Meisterwerke, Löschklasse LK 4) bleiben schuljahresübergreifend während der aktiven Unterrichtszeit bis 30 Tage nach Vertragsende erhalten und sind jederzeit per 1-Klick-Löschung entfernbar.
 
 ### 8. Nachweis-, Inspektions- & Schulträgerrechte (Art. 28 Abs. 3 lit. h DSGVO)
 Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen Datenschutzbeauftragten (bDSB) kreisfreier Städte, Landkreise oder Schulverbände alle erforderlichen Nachweise zur Verfügung. Vor-Ort-Inspektionen werden nach angemessener Vorankündigung (in der Regel mindestens 14 Werktage) während der üblichen Betriebszeiten unter Wahrung von Betriebs- und Geschäftsgeheimnissen ermöglicht.
@@ -502,18 +507,18 @@ Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen D
 - Erziehungsberechtigte: Identifikator der Elternfreigabe, verschlüsselter Hash der Eltern-PIN, Quittierungszeitstempel für häusliches Üben.
 - Didaktische Daten: Übe-Zeiten, Gamification-XP, Level, Hausaufgaben-Notizen, temporäre didaktische Audioaufnahmen (Hausaufgaben- und Loopstation-Spuren im privaten Audio-Tresor).
 - Metadaten & Logfiles: IP-Adresse (anonymisiert/gehasht), User-Agent, Sitzungs-Lease-ID, Audit-Logs für Sicherheitsereignisse.
-4. **Ausdrücklich ausgeschlossene Datenkategorien:** Besondere Kategorien personenbezogener Daten gem. Art. 9 DSGVO / Art. 5 lit. c nDSG (insbesondere Gesundheitsdaten, Atteste, Diagnosen oder biometrische Erkennungsdaten), Bank-, SEPA- oder Kreditkartendaten von Schülern und Eltern sowie urheberrechtlich geschützte digitale Notenblätter (PDFs) und reale Porträtfotos von Schülern (strikte Zero-Photo-Doktrin mit 3D-Avataren).
+4. **Ausdrücklich ausgeschlossene Datenkategorien:** Besondere Kategorien personenbezogener Daten gem. Art. 9 DSGVO / Art. 5 lit. c nDSG (insbesondere Gesundheitsdaten, Atteste, Diagnosen oder biometrische Erkennungsdaten), Bank-, SEPA- oder Kreditkartendaten von Schülern und Eltern auf Plattform-Servern (Zero-In-App-Payment-Storage; steuerrechtliche Überweisungsdaten verbleiben in der externen Fibu des Betreibers gem. § 147 AO) sowie urheberrechtlich geschützte digitale Notenblätter (PDFs) und reale Porträtfotos von Schülern (strikte Zero-Photo-Doktrin mit 3D-Avataren).
 
 ---
 
 ### ANLAGE 2: Technisch-Organisatorische Maßnahmen (TOMs gem. Art. 32 DSGVO & BSI IT-Grundschutz)
 
 1. **Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO / Art. 8 nDSG):**
-- *Zutrittskontrolle:* Zertifiziertes Sicherheitskonzept der Hetzner Online GmbH (biometrische Vereinzelungsschleusen, 24/7-Kameraüberwachung, ISO/IEC 27001).
-- *Zugangskontrolle:* Authentifizierung über passwortlose FIDO2-Hardware-Passkeys (WebAuthn), kryptografische Schulausweis-Tokens und **Bcrypt-gehashte PINs (10 Runden Blowfish gem. BSI TR-02102 / Migration 510)** im isolierten Datenbankschema \`private_auth.user_secrets\`. Progressive Rate-Limiter (Dual-Key Lockout) gegen Brute-Force.
+- *Zutrittskontrolle:* Zertifiziertes Sicherheitskonzept der IONOS SE und der Hetzner Online GmbH (biometrische Vereinzelungsschleusen, 24/7-Kameraüberwachung, ISO/IEC 27001).
+- *Zugangskontrolle:* Authentifizierung über passwortlose FIDO2-Hardware-Passkeys (WebAuthn), kryptografische Schulausweis-Tokens sowie **serverseitiges Salted Bcrypt Key-Stretching (Blowfish, 10 Runden via \`pgcrypto\`) im isolierten Datenbankschema \`private_auth.user_secrets\` und \`private_auth.school_secrets\` kombiniert mit clientseitigem Zero-Knowledge Key-Stretching gem. BSI TR-02102-1 und OWASP ASVS Level 3 (WebCrypto PBKDF2-HMAC-SHA-512 mit 100.000 Runden und AES-256-GCM für lokale Tresore & Recovery-Schlüssel)**. Progressive Rate-Limiter (Dual-Key Lockout) gegen Brute-Force.
 - *Zugriffskontrolle:* Kernel-erzwungene PostgreSQL Row Level Security (RLS) mit Mandantentrennung auf Datenbankebene (\`school_id = get_current_user_school_id()\`). Zero-Trust View-Maskierung sensibler Felder (\`public.users_view\` liefert niemals Klartext-Geheimnisse).
 - *Trennungskontrolle:* Mandantenisolierte Datenspeicherung; rollenbasierte Autorisierungs-Gates (Admin, Teacher, Student).
-- *Pseudonymisierung & Verschlüsselung:* Durchgehende TLS 1.3 Transportverschlüsselung mit Mozilla Observatory A+ Konformität; Ruhedatenverschlüsselung (AES-256); Ephemere signierte HMAC-Zugriffstokens (60s Gültigkeit) für Audio-Streams mit **Zero-Heap-Buffering (HTTP 307 Redirects direkt zum Storage-Edge)**.
+- *Pseudonymisierung & Verschlüsselung:* Durchgehende TLS 1.3 Transportverschlüsselung mit Mozilla Observatory A+ Konformität; Ruhedatenverschlüsselung (AES-256); Ephemere signierte Sicherheits-Tokens (Signed-URLs mit maximal 30 Minuten / 1.800s Gültigkeit) für Audio-Streams mit **Zero-Heap-Buffering (HTTP 307 Redirects direkt zum Storage-Edge)**.
 2. **Integrität (Art. 32 Abs. 1 lit. b DSGVO):**
 - *Weitergabekontrolle:* Kein unverschlüsselter Datentransport; Übertragungen erfolgen ausschließlich über HTTPS/WSS mit HSTS Preload.
 - *Eingabekontrolle:* Revisionssichere, manipulationsgeschützte Audit-Logs (\`public.audit_logs\`) mit SHA-256 Merkle-Hash-Chaining nach GoBD- und OWASP ASVS Level 3-Standard.
@@ -521,7 +526,7 @@ Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen D
 - **Stündliche automatisierte Backups (0 * * * *) mit asymmetrischer Age X25519 Zero-Knowledge-Verschlüsselung** und kryptografischem SHA-256 Siegel.
 - **Georedundante Offsite-Replikation auf Hetzner Storage Box (Port 23)** mit kontinuierlicher Restricted-Shell Vorab-Speicherplatzprüfung (Fail-Closed bei >= 95 % Auslastung gem. SEC-77).
 - **DSGVO Art. 17 WORM-Tombstone Reconciliation:** Automatischer Abgleich gelöschter Datensätze bei Notfall-Restores gegen Zombie-Zustände.
-- Redundante Stromversorgung (USV/Diesel) und mehrfach redundante Netzanbindungen im Hetzner-Rechenzentrum Falkenstein & Nürnberg.
+- Redundante Stromversorgung (USV/Diesel) und mehrfach redundante Netzanbindungen in den deutschen Rechenzentren der IONOS SE sowie der Hetzner Online GmbH (Falkenstein & Nürnberg).
 - Lokaler IndexedDB Audio-Tresor auf Endgeräten für 0ms Offline-Pufferung und Ausfallsicherheit.
 - RPO <= 60 Minuten, RTO <= 45 Minuten im Notfall-Runbook.
 4. **Verfahren zur regelmäßigen Überprüfung & Bewertung (Art. 32 Abs. 1 lit. d DSGVO):**
@@ -545,7 +550,7 @@ Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen D
       'Verfügbarkeitsgarantie von 99,5 % im jeweiligen Kalendermonat am Übergabepunkt an das öffentliche Internet',
       'Strikter Ausschluss der Drittbegünstigung (§ 328 BGB): Gilt ausschließlich im B2B-Verhältnis mit der Schule (0 % Endnutzer-SLA)',
       'Subsidiaritäts- & Redundanzdoktrin (§ 254 BGB): Kein Ersatz von Dozentenhonoraren oder Unterrichtsausfällen',
-      'Geplante Wartungsfenster (werktags 22:00–06:00 Uhr) & unaufschiebbare Notfall-Sicherheits-Patches',
+      'Geplante Wartungsfenster (täglich 02:00–05:00 Uhr MEZ mit 48h Vorankündigung) & unaufschiebbare Notfall-Sicherheits-Patches',
       'Beitragsfreies Gratismonate-Kompensationsmodell (1, 2, 3 oder 6 Gratismonate) auf die monatliche Hosting-Basispauschale',
       'Vollständiger Ausschluss von Barauszahlungen (No Cash Value) und 30-tägige Ausschlussfrist (Log-Parität)'
     ],
@@ -563,12 +568,12 @@ $$\\text{Verfügbarkeit} = \\frac{\\text{Gesamtzeit im Monat} - \\text{Wartungsz
 (3) Die Plattform gilt als verfügbar, wenn autorisierte Nutzer auf die Kernfunktionen (Authentifizierung, Datenbank-RPCs und Hauptnavigation) über das Internet zugreifen können. Reine Latenzerhöhungen im Millisekundenbereich stellen keine Nichtverfügbarkeit dar.
 
 ### 3. Wartungsfenster & Notfall-Sicherheits-Patches
-(1) **Planmäßige Wartung:** Erforderliche Wartungsarbeiten (Infrastruktur-Upgrades, Betriebssystem-Patches, Datenbankoptimierungen) finden vorzugsweise außerhalb der Kernunterrichtszeiten statt (werktags zwischen 22:00 Uhr und 06:00 Uhr MEZ sowie an Sonn- und bundeseinheitlichen Feiertagen). Sie werden mindestens 48 Stunden im Voraus über das System-Banner im Schul-Dashboard oder an die offizielle Kontaktadresse der Schule (\`schools.email\`) angekündigt und dürfen ein Gesamtkontingent von 12 Stunden im Kalendermonat nicht überschreiten.
+(1) **Planmäßige Wartung:** Erforderliche Wartungsarbeiten (Infrastruktur-Upgrades, Betriebssystem-Patches, Datenbankoptimierungen) finden im nächtlichen Regelfenster außerhalb der Unterrichtszeiten statt (täglich zwischen 02:00 Uhr und 05:00 Uhr MEZ sowie an Sonn- und bundeseinheitlichen Feiertagen). Sie werden mindestens 48 Stunden im Voraus über das System-Banner im Schul-Dashboard oder an die offizielle Kontaktadresse der Schule (\`schools.email\`) angekündigt und dürfen ein Gesamtkontingent von 12 Stunden im Kalendermonat nicht überschreiten.
 (2) **Dringende Notfall-Wartung:** Unaufschiebbare Notfallmaßnahmen zur Abwehr akuter Cyber-Angriffe, zur Schließung kritischer Sicherheitslücken (Zero-Day-Exploits) oder zur Abwendung schwerer Datenverluste können ohne Einhaltung einer Vorankündigungsfrist durchgeführt werden. Der Betreiber informiert den Kunden hierüber unverzüglich.
 (3) Zeiten ordnungsgemäßer planmäßiger oder unaufschiebbarer Notfall-Wartungsfenster gelten nicht als Ausfallzeiten und bleiben bei der Berechnung der Verfügbarkeitsquote unberücksichtigt.
 
 ### 4. Störungsklassen & Support-Reaktionszeiten
-Meldungen über technische Beeinträchtigungen werden während der regulären Supportzeiten (Werktage Mo–Fr 08:30–17:30 Uhr MEZ) nach folgendem Schema priorisiert:
+Meldungen über technische Beeinträchtigungen werden während der regulären Service- und Supportzeiten (Mo: 08:00–10:00 Uhr, Do: 08:30–11:00 Uhr, Fr: 08:30–11:00 Uhr MEZ sowie für asynchrone elektronische Tickets an Werktagen Mo–Fr) nach folgendem Schema priorisiert:
 
 • **Priorität 1 (Kritisch – Gesamtausfall):** Kernsysteme (Login, Datenbank) sind für alle oder die Mehrheit der Nutzer unbenutzbar.  
   ➔ *Ziel-Reaktionszeit (Beginn der Entstörung):* **< 2 Stunden** (außerhalb der Supportzeit max. 4 Stunden).  
@@ -597,7 +602,7 @@ Meldungen über technische Beeinträchtigungen werden während der regulären Su
 | **95,00 % bis 97,99 %** | mehr als 14,4 Stunden Ausfall | **3 Gratismonate** (ein volles Folgequartal beitragsfrei) |
 | **Unter 95,00 %** | mehr als 36,0 Stunden Ausfall | **6 Gratismonate** (ein volles Folgehalbjahr beitragsfrei) |
 
-(2) **Strikte Bemessungsgrundlage:** Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 14,90 €, GrooveLab 9,90 € bzw. Kombi 19,90 €). Schüleraktivierungsgebühren, Pädagogen- & Administrationspauschalen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.
+(2) **Strikte Bemessungsgrundlage:** Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 19,90 € / CHF 25.90, GrooveLab 12,90 € / CHF 16.80 bzw. Kombi 24,90 € / CHF 32.50; Bestandsschutz für Altverträge: 14,90 € / 9,90 € / 19,90 € bzw. CHF 19.90 / 14.90 / 29.90). Schüleraktivierungsgebühren, Pädagogen- & Administrationspauschalen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.
 (3) **Erfüllung & Anrechnung:** Bei monatlicher Zahlweise wird die Hosting-Basispauschale für die Folgemonate auf 0,00 € gesetzt. Bei jährlicher Vorauszahlung (mit Rabatt) werden die Gratismonate beitragsfrei an das vereinbarte Ende der bezahlten Schuljahresperiode angehängt, sodass sich der nächste Rechnungsstichtag entsprechend nach hinten verschiebt.
 (4) **Barausschluss & Verfall (No Cash Value):** Gratismonate stellen eine reine Sachkompensation dar. Ein Anspruch auf Barauszahlung, Überweisung, Verrechnung mit Drittforderungen oder Konvertierung in Geld ist unwiderruflich ausgeschlossen. Bei Beendigung des Vertragsverhältnisses durch ordentliche Kündigung des Kunden verfallen noch nicht verbrauchte Gratismonate ersatzlos.
 (5) **Antrags- und Nachweispflicht (Ausschlussfrist):** Gratismonate werden nicht automatisch gewährt. Der Kunde hat die Unterschreitung innerhalb einer **harten Ausschlussfrist von 30 Kalendertagen** nach Ablauf des betroffenen Monats in Textform (über das Support-Ticket-System oder an die offizielle Support-Adresse) unter nachvollziehbarer Angabe der festgestellten Ausfallzeiten geltend zu machen. Nach Ablauf dieser Frist ist die Geltendmachung endgültig ausgeschlossen (DSGVO-konforme Log-Rotationsparität nach DIN 66398).
@@ -606,7 +611,7 @@ Meldungen über technische Beeinträchtigungen werden während der regulären Su
 ### 6. Ausschlüsse (Haftungsbefreiung)
 Als Ausfallzeit gelten nicht Störungen, die zurückzuführen sind auf:  
 (a) Höhere Gewalt, kriegerische Ereignisse, Arbeitskämpfe, Naturkatastrophen oder behördliche Anordnungen;  
-(b) flächendeckende Störungen überregionaler Internet-Backbones, von Tier-1-Telekommunikationsprovidern oder DNS-Routing außerhalb des Hetzner-Rechenzentrums;  
+(b) flächendeckende Störungen überregionaler Internet-Backbones, von Tier-1-Telekommunikationsprovidern oder DNS-Routing außerhalb der Rechenzentren (IONOS SE / Hetzner Online GmbH);  
 (c) DDoS-Angriffe oder Cyber-Attacken, die trotz angemessener und dem Stand der Technik entsprechender Schutzmaßnahmen (wie Rate-Limiting und Fail2Ban) nicht abgewehrt werden konnten;  
 (d) Ausfälle, die auf Fehlbedienungen, unzureichenden lokalen Bandbreiten, restriktiven Schul-Firewalls (z. B. Port-Sperren für WebSockets) oder veralteter Endgeräte-Hard-/Software auf Seiten des Kunden oder der Endnutzer beruhen.
     `.trim()
@@ -669,14 +674,14 @@ Die Plattform arbeitet nach dem Grundsatz „Privacy by Design & by Default“ (
 
 ### 5. Auftragsverarbeitung & 100 % Rechenzentren in Deutschland (0 % US-Cloud)
 Zur Bereitstellung der Software bedient sich die Musikschule des technischen Dienstleisters **Patrick Huber – Campus-Groovelab Plattformbetrieb** (Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland) als weisungsgebundenem Auftragsverarbeiter gemäß **Art. 28 DSGVO** bzw. **Art. 9 nDSG**.
-• Sämtliche Daten werden ausschließlich in ISO/IEC 27001-zertifizierten deutschen Hochsicherheits-Rechenzentren der **Hetzner Online GmbH** (Falkenstein/Vogtland und Nürnberg) verarbeitet.
+• Sämtliche Daten werden ausschließlich in ISO/IEC 27001-zertifizierten deutschen Hochsicherheits-Rechenzentren der **IONOS SE** (Montabaur, Primärer Produktions-Cluster) sowie der **Hetzner Online GmbH** (Falkenstein/Vogtland und Nürnberg, Georedundantes Backup & Storage Box) verarbeitet.
 • Es findet **keinerlei Datenübermittlung in Drittstaaten** außerhalb des EWR und insbesondere keine Übertragung an US-Cloud-Hyperscaler statt (vollständige Immunität gegen FISA 702 und US CLOUD Act).
 • Für Schweizer Musikschulen: Die Datenübermittlung von der Schweiz nach Deutschland ist durch den **Angemessenheitsbeschluss des Schweizer Bundesrates** (Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 DSV) vollumfänglich genehmigt und rechtlich gesichert.
 
 ### 6. Speicherdauer, DIN 66398 & Autonomer Eltern-Lösch-Tresor
 • **Unterrichtsdaten:** Personenbezogene Stamm- und Fortschrittsdaten bleiben für die Dauer des aktiven Unterrichtsverhältnisses an der Musikschule gespeichert.
 • **Autonomer Eltern-Lösch-Tresor:** Erziehungsberechtigte können im Einstellungsbereich des Elternportals alle didaktischen Sprach- und Audioaufnahmen ihres Kindes mit **einem Klick sofort, unwiderruflich und ohne Genehmigung der Schule physisch vernichten** (Migration 453).
-• **Schuljahres-Purge & DIN 66398 Löschkonzept:** Didaktische Medienaufnahmen verfallen standardmäßig mit Ablauf des jeweiligen Schuljahres (31. August). Nach Beendigung des Musikschulvertrags werden alle verbleibenden Daten nach einer 30-tägigen Karenzfrist für den Datenexport endgültig und unwiederbringlich gelöscht.
+• **Differenzierte Audio-Aufbewahrung & DIN 66398 Löschkonzept:** Reguläre didaktische Übe- und Hausaufgabenaufnahmen (Löschklasse LK 2) verfallen standardmäßig mit Ablauf des jeweiligen Schuljahres (31. August). Ausdrücklich als Meilensteine kuratierte Aufnahmen der musikalischen „Audio-Biografie“ (Meisterwerke, Löschklasse LK 4) bleiben schuljahresübergreifend für die Dauer des aktiven Unterrichtsverhältnisses erhalten. Nach Beendigung des Musikschulvertrags werden alle verbleibenden Daten nach einer 30-tägigen Karenzfrist für den Datenexport endgültig und unwiederbringlich gelöscht.
 
 ### 7. Ihre Rechte als betroffene Person (Art. 15–21 DSGVO & Art. 25–29 nDSG)
 Sie haben gegenüber der Musikschule jederzeit folgende gesetzliche Rechte:
@@ -714,7 +719,8 @@ Zum Schutz des Kindeswohls und zur Prävention digitaler Grenzverletzungen verpf
       'Automatischer ChatRespectGuard mit instrumentenpädagogischer Whitelist (Fagott, Mundstück, Notenständer etc.)',
       'KUG § 22 Zero-Photo-Doktrin (3D-Avatare statt Schüler-Porträts) & UrhG § 73 Audio-TTL',
       'Screenless Practice & Didaktische Altersstufen-Governance (Junior / Teen / Pro)',
-      'DSA Art. 16 Meldeverfahren (Notice & Action) & 24/7 DACH-Notrufketten für Deutschland, Schweiz und Österreich'
+      'DSA Art. 16 Meldeverfahren (Notice & Action) & 24/7 DACH-Notrufketten für Deutschland, Schweiz und Österreich',
+      'Gesetzliches Speicherverbot (§ 72a Abs. 5 SGB VIII): Keine Speicherung von Führungszeugnissen auf Plattform-Servern; Einsichtnahme obliegt der Schulleitung vor Ort'
     ],
     checkboxLabel: 'Ich erkenne die Kinderschutz-Charta und den institutionellen Grenzachtungs-Kodex an.',
     fullTextMarkdown: `
@@ -735,9 +741,9 @@ Zum Schutz des Kindeswohls und zur Prävention digitaler Grenzverletzungen verpf
 (1) **Echtzeit-Prävention (Code-as-Policy):** Interne Textnachrichten werden vor der Auslieferung durch den automatischen \`chatRespectGuard\` analysiert. Nachrichten mit beleidigenden, herabwürdigenden, bedrohenden oder diskriminierenden Inhalten werden blockiert und dem Verfasser mit einem didaktischen Reflexionshinweis zurückgewiesen.
 (2) **Instrumentenpädagogische Fachbegriffs-Whitelist:** Um Fehlblockaden im Musikunterricht auszuschließen, verfügt das Filtersystem über eine linguistische Whitelist für instrumentenspezifische Fachbegriffe (u. a. *„Fagott“*, *„Mundstück“*, *„Notenständer“*, *„Dämpfer“*, *„Blasen“*, *„Zupfen“*). Fachliche Korrespondenz bleibt vollumfänglich gewährleistet.
 
-### 5. KUG § 22 Zero-Photo-Doktrin & UrhG § 73 Audio-TTL
+### 5. KUG § 22 Zero-Photo-Doktrin & UrhG § 73 Audio-Biografie
 (1) **Zero-Photo-Doktrin (§ 22 KUG):** Zum Schutz der visuellen Identität Minderjähriger und zur Vorbeugung von Bildnismissbrauch, Deepfakes oder Pädokriminalität werden auf der Plattform keine realen Porträtfotos von Schülerinnen und Schülern hochgeladen oder gespeichert. Die Schüler-Identität wird im System ausnahmslos durch stilisierte 3D-Canvas-Avatare visualisiert.
-(2) **Audio-Speichergrenzen (UrhG § 73):** Freiwillig erstellte Audioaufnahmen im Rahmen des häuslichen Übens dienen ausschließlich der pädagogischen Gehörbildung und Lernkontrolle. Sie unterliegen einer strikten Time-to-Live (TTL $\\le$ 1800s bei Übe-Loops bzw. automatischem Verfall zum Schuljahresende) und können von Erziehungsberechtigten im Elternbereich jederzeit autonom gelöscht werden (DSGVO Art. 17).
+(2) **Audio-Biografie & Schuljahres-Aufbewahrungsgarantie:** Freiwillig erstellte Audioaufnahmen im Rahmen des häuslichen Übens gehören zur persönlichen musikalischen Audio-Biografie des Schülers. Sie sind über das gesamte laufende Schuljahr garantiert verfügbar und geschützt. Nach Ende des Unterrichtsjahres steht Schülern und Erziehungsberechtigten ein 60-tägiges Download-Fenster (1. August bis 30. September) zum lokalen Sichern und Archivieren zur Verfügung. Besondere Meilensteine (Meisterwerke) bleiben dauerhaft erhalten; Erziehungsberechtigte besitzen jederzeit volle 1-Klick-Selbstlöschautonomie (DSGVO Art. 17).
 
 ### 6. Screenless Practice & Didaktische Altersstufen-Governance
 (1) **Bildschirmfreies Üben für jüngere Kinder:** Für Schülerinnen und Schüler im Grundschulalter (insbesondere 6 bis 9 Jahre, Junior-Modus) empfiehlt und unterstützt Campus-Groovelab das didaktische Konzept des *Screenless Practice*. Das Smartphone oder Tablet verbleibt bei den Erziehungsberechtigten; Übezeiten am echten Instrument werden über eine 1-Klick-Quittierung verbucht, ohne dass Kinder während des Musizierens auf Bildschirme schauen müssen.
@@ -760,6 +766,12 @@ Zum Schutz des Kindeswohls und zur Prävention digitaler Grenzverletzungen verpf
   – Rat auf Draht (Notruf für Kinder & Jugendliche): **147**
   – Österreichische Kinderschutzzentren: **0800 567 567**
 • **Betreiber-Clearingstelle:** Meldungen an den Plattformbetreiber können jederzeit vertraulich an **kinderschutz@campus-groovelab.de** gerichtet werden.
+
+---
+
+### 8. Gesetzliches Speicherverbot für Führungszeugnisse (§ 72a Abs. 5 SGB VIII / § 30a BZRG)
+(1) **Striktes Plattform-Speicherverbot:** Zur Wahrung des Bundeskinderschutzgesetzes und des Prinzips der Datenminimierung (Art. 5 Abs. 1 lit. c DSGVO) werden auf den Servern und Datenbanken von Campus-Groovelab für keine Lehrkräfte, Dozenten oder Verwaltungsmitarbeiter Scans, Kopien oder Auszüge erweiterter Führungszeugnisse (§ 30a BZRG) gespeichert oder verarbeitet.
+(2) **Hoheitliche Vor-Ort-Verantwortung:** Die gesetzliche Einsichtnahme und die behördliche Dokumentation nach § 72a Abs. 5 SGB VIII obliegen ausnahmslos und eigenverantwortlich der Schulleitung vor Ort im amtlichen Primär-Verwaltungssystem der Musikschule.
     `.trim()
   },
 
@@ -788,22 +800,31 @@ Zum Schutz des Kindeswohls und zur Prävention digitaler Grenzverletzungen verpf
 (1) **Ausschließlicher Verbraucher-Geltungsbereich:** Dieses Widerrufsrecht gilt ausnahmslos für natürliche Personen, die als Erziehungsberechtigte oder volljährige Schülerinnen und Schüler ein Rechtsgeschäft zu Zwecken abschließen, die überwiegend weder ihrer gewerblichen noch ihrer selbstständigen beruflichen Tätigkeit zugerechnet werden können (§ 13 BGB / § 1 österr. KSchG; Modell B: Schüler-Direktabrechnung).
 (2) **B2B-Ausschluss:** Für Schulträger, Musikschulen, Vereine, Gebietskörperschaften und sonstige Unternehmer (§ 14 BGB), die Plattform-Infrastrukturverträge (Modell A: Träger-Sammelabrechnung) abschließen, ist ein gesetzliches Widerrufsrecht ausgeschlossen.
 
-### 2. Widerrufsbelehrung (Widerrufsrecht für Deutschland & Österreich)
-(1) **Widerrufsrecht:** Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen (in Österreich: vom Vertrag zurückzutreten).
-(2) **Widerrufsfrist:** Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses (Freischaltung des erweiterten Campus-Profils).
-(3) **Ausübung des Widerrufs:** Um Ihr Widerrufsrecht auszuüben, müssen Sie uns:  
+### 2. Gesetzliche Widerrufsbelehrung (Amtliches Muster gem. Anlage 1 zu Art. 246a § 1 Abs. 2 Satz 2 EGBGB)
+
+**Widerrufsbelehrung**
+
+**Widerrufsrecht**  
+Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen.  
+Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses.
+
+Um Ihr Widerrufsrecht auszuüben, müssen Sie uns:  
 **Patrick Huber – Campus-Groovelab Plattformbetrieb**  
 Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland  
 E-Mail: kontakt@campus-groovelab.de  
-mittels einer eindeutigen Erklärung über Ihren Entschluss informieren. Die Ausübung kann wahlweise erfolgen:
-1. **Elektronische 1-Klick-Widerrufsfunktion:** Direkt über den PIN-geschützten Elternbereich in den Kontoeinstellungen der Web-App (schnellster und papierloser Weg).
-2. **In Textform:** Per E-Mail oder Brief unter Verwendung des untenstehenden Muster-Widerrufsformulars (unter zwingender Angabe der Musikschule sowie der Schülernummer / Campus-ID).
-(4) **Fristwahrung:** Zur Wahrung der Frist reicht es aus, dass Sie die Mitteilung vor Ablauf der 14-tägigen Frist absenden.
+mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder eine E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das beigefügte Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist.
 
-### 3. Folgen des Widerrufs, Kostenfreier Probemonat & Sanfter Fallback
-(1) **Rückzahlung empfangener Zahlungen:** Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, unverzüglich und spätestens binnen vierzehn Tagen ab Eingang der Widerrufserklärung zurückzuzahlen. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden Ihnen Entgelte berechnet.
-(2) **Vollständiger Wertersatz-Ausschluss (0,00 €):** Da die Bereitstellung des Dienstes im ersten Monat (September bzw. 30-tägige Kennenlernphase) vollständig kostenfrei erfolgt und der Betreiber vor Ablauf der Widerrufsfrist keine vorzeitigen Zahlungen einzieht, schulden Sie im Falle eines Widerrufs während der Probezeit **keinerlei Wertersatz oder Nutzungsentschädigung (§ 357a Abs. 2 BGB / § 16 FAGG)**.
-(3) **Pädagogische Kontinuität & Sanfter Fallback:** Mit Wirksamwerden des Widerrufs erlischt lediglich der Zugang zu den kostenpflichtigen Zusatzfunktionen des Campus-Moduls (interaktiver Übe-Timer, Loopstation, Audio-Aufnahme-Tresor). Das Schülerprofil wird **nicht gelöscht**, sondern fällt nahtlos und dauerhaft auf die von der Musikschule getragene **Basis-Bereitstellung** (0,09 € Basistarif; digitaler Schulausweis, Stundenplan- & Kalendereinsicht) zurück.
+Zur Wahrung der Widerrufsfrist reicht es aus, dass Sie die Mitteilung über die Ausübung des Widerrufsrechts vor Ablauf der Widerrufsfrist absenden.
+
+**Folgen des Widerrufs**  
+Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, einschließlich der Lieferkosten (mit Ausnahme der zusätzlichen Kosten, die sich daraus ergeben, dass Sie eine andere Art der Lieferung als die von uns angebotene, günstigste Standardlieferung gewählt haben), unverzüglich und spätestens binnen vierzehn Tagen ab dem Tag zurückzuzahlen, an dem die Mitteilung über Ihren Widerruf dieses Vertrags bei uns eingegangen ist. Für diese Rückzahlung verwenden wir dasselbe Zahlungsmittel, das Sie bei der ursprünglichen Transaktion eingesetzt haben, es sei denn, mit Ihnen wurde ausdrücklich etwas anderes vereinbart; in keinem Fall werden Ihnen wegen dieser Rückzahlung Entgelte berechnet.
+
+### 3. Besondere vertragliche Garantien, September-Aktivierungs-Architektur & 1-Klick-Widerruf
+(1) **September-Aktivierungs-Standard (Widerrufsfrist im kostenfreien Probemonat):** Bei regulärer Schuljahresanmeldung im Modell der Schüler-Direktabrechnung (Modell B) wird das Campus-Modul zu Beginn des Schuljahres (1. September) zur sofortigen unterrichtlichen Nutzung freigeschaltet. Die 14-tägige gesetzliche Widerrufsfrist läuft verbindlich im kostenfreien Probemonat vom 1. bis einschließlich 15. September.
+(2) **Vollständiger Wertersatz-Ausschluss (0,00 € gem. § 357a Abs. 2 BGB / § 16 FAGG):** Da die ersten 30 Tage (September) als uneingeschränkt kostenfreie Schnupperphase gewährt werden, schulden Erziehungsberechtigte bei einem Widerruf innerhalb der Frist keinerlei Wertersatz oder Nutzungsentschädigung (0,00 €). Da vor dem 16. September keine Zahlungen geleistet werden, entsteht für Familien keinerlei Zahlungsverpflichtung und für den Betreiber kein Rücküberweisungsaufwand.
+(3) **Zahlungsziel & Rechtssicherheit ab 1. Oktober:** Die Überweisung des einmaligen Jahresbeitrags (5,39 € bzw. CHF 11.00) wird erst nach Ablauf der Widerrufsfrist zum 30. September fällig. Mit Eingang der Zahlung zum 1. Oktober besteht für das verbleibende Schuljahr bis zum 31. August vollständige Rechts- und Planungssicherheit für Schule, Familie und Betreiber.
+(4) **Zusätzliche elektronische 1-Klick-Widerrufsfunktion:** Unbeschadet der gesetzlichen Schriftformwege nach Ziffer 2 können Erziehungsberechtigte den Widerruf innerhalb der 14-tägigen Frist mit einem einzigen Klick direkt über den PIN-geschützten Elternbereich auslösen.
+(5) **Pädagogische Kontinuität & Sanfter Fallback:** Mit Wirksamwerden des Widerrufs erlischt lediglich der Zugang zu den kostenpflichtigen Zusatzfunktionen des Campus-Moduls (interaktiver Übe-Timer, Loopstation, Audio-Aufnahme-Tresor). Das Schülerprofil wird **nicht gelöscht**, sondern fällt nahtlos und dauerhaft auf die von der Musikschule getragene **Basis-Bereitstellung** (0,09 € Basistarif; digitaler Schulausweis, Stundenplan- & Kalendereinsicht) zurück.
 
 ### 4. Besondere Regelungen für die Schweiz & Österreich
 (1) **Freiwillige Widerrufsgarantie Schweiz (OR):** Da das Schweizer Recht (Obligationenrecht) kein gesetzliches Widerrufsrecht für im Fernabsatz geschlossene digitale Dienstleistungsverträge vorsieht, gewährt der Betreiber Nutzerinnen und Nutzern mit Wohnsitz in der Schweiz dieses 14-tägige Widerrufsrecht auf **freiwilliger vertraglicher Basis im identischen Umfang**.
@@ -929,11 +950,11 @@ Sollten Sie auf Ihre Kontaktaufnahme über den Feedback-Mechanismus innerhalb vo
     summaryPoints: [
       'Diensteanbieter: Patrick Huber, Softwareentwicklung & Cloud-Dienstleistungen (Einzelunternehmen), Rheinfelden (Baden)',
       'Zuständige Gewerbebehörde: Gewerbeamt der Stadt Rheinfelden (Baden), Kirchplatz 2, 79618 Rheinfelden (Baden)',
-      'Elektronischer & telefonischer Schnellkontakt (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07): Telefon (Mo & Do 09:00–11:00 Uhr MEZ), kontakt@campus-groovelab.de & In-App-Support',
+      'Elektronischer & telefonischer Schnellkontakt (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07): Servicezeiten (Mo: 08:00–10:00 Uhr, Do: 08:30–11:00 Uhr, Fr: 08:30–11:00 Uhr MEZ), kontakt@campus-groovelab.de & In-App-Support',
       'DSA Art. 11, 12 & 16: Zentrale behördliche Kontaktstelle & strukturiertes Meldeverfahren für Urheberrechtsverletzungen (copyright@campus-groovelab.de)',
       'Umsatzsteuer: Steuerbefreit gem. § 19 UStG (DE) / § 6 Abs. 1 Z 27 UStG 1994 (AT) / Art. 8 MWSTG (CH)',
       'Redaktionell Verantwortlicher gem. § 18 Abs. 2 MStV / § 25 MedienG: Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)',
-      'EU-Streitschlichtung & Verbraucherstreitbeilegung (§ 36 VSBG): Keine Teilnahme an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle'
+      'Verbraucherstreitbeilegung (§ 36 VSBG): Keine Teilnahme an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle'
     ],
     checkboxLabel: 'Ich habe das Impressum und die Anbieterkennzeichnung zur Kenntnis genommen.',
     fullTextMarkdown: `
@@ -959,13 +980,13 @@ Campus-Groovelab ist eine eigenständige Softwareentwicklung von Patrick Huber. 
 ### 3. Elektronische Kontaktaufnahme, Telefon & Unmittelbare Erreichbarkeit (§ 5 Abs. 1 Nr. 2 DDG / EuGH C-298/07 / Art. 3 UWG CH)
 - **E-Mail:** kontakt@campus-groovelab.de
 - **Support & Schulbetreuung:** support@campus-groovelab.de
-- **Telefon:** +49 (0) 7623 / 741 78 40
-- **Telefonische Servicezeiten:** Montag 09:00–11:00 Uhr & Donnerstag 09:00–11:00 Uhr MEZ
+- **Telefonischer Kundenservice & Rückruf:** Telefonischer Support während der Servicezeiten sowie prioritärer Rückruf-Service via kontakt@campus-groovelab.de & In-App-Schnellkontakt
+- **Telefonische Servicezeiten:** Mo: 08:00–10:00 Uhr, Do: 08:30–11:00 Uhr, Fr: 08:30–11:00 Uhr MEZ
 - **In-App-Support & Ticketsystem:** Direkt über das integrierte Hilfe-Zentrum (2-Wege-Schnellkontakt mit protokollierter Ticketnummer)
 - **Website:** https://campus-groovelab.de
 
 **⚡ Unmittelbare Erreichbarkeit & effizienter Schnellkontakt (EuGH C-298/07 / BGH I ZR 238/14):**  
-Gemäß § 5 Abs. 1 Nr. 2 DDG sowie der europäischen und bundesgerichtlichen Rechtsprechung wird eine unmittelbare und effiziente Kommunikation sowohl über telefonische Sprechzeiten (Mo & Do 09:00–11:00 Uhr MEZ) als auch über zwei vollwertige elektronische Schnellkontaktwege (E-Mail & In-App-Supportsystem mit protokollierter Ticketnummer) gewährleistet. Dies sichert eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen **in der Regel innerhalb von 60 Minuten** (Kernzeiten: Mo 09:00–12:00 Uhr • Do 08:00–11:00 Uhr MEZ).
+Gemäß § 5 Abs. 1 Nr. 2 DDG sowie der europäischen und bundesgerichtlichen Rechtsprechung wird eine unmittelbare und effiziente Kommunikation sowohl über telefonische Sprechzeiten (Mo: 08:00–10:00 Uhr, Do: 08:30–11:00 Uhr, Fr: 08:30–11:00 Uhr MEZ) als auch über zwei vollwertige elektronische Schnellkontaktwege (E-Mail & In-App-Supportsystem mit protokollierter Ticketnummer) gewährleistet. Dies sichert eine lückenlose Dokumentation, prioritäre Bearbeitung und eine Antwortzeit an Werktagen **in der Regel innerhalb von 60 Minuten** während der Servicezeiten.
 
 **🛡️ Hinweis zur Zuständigkeit:**  
 Für Auskünfte zu Unterrichtszeiten, Stundenplänen, Raumzuteilungen, Lehrkraft-Vertretungen, Abwesenheitsmeldungen oder Musikschulverträgen wenden Sie sich bitte direkt an das **Sekretariat Ihrer Musikschule vor Ort**. Der Plattform-Support betreut als technischer Infrastrukturdienstleister ausschließlich Software-, Login- und Systemfragen.
@@ -998,14 +1019,23 @@ Information und Bereitstellung digitaler Werkzeuge zur pädagogischen Organisati
 
 ---
 
-### 7. EU-Streitschlichtung & Verbraucherstreitbeilegung (§ 36 VSBG)
-Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: https://ec.europa.eu/consumers/odr/.  
-Unsere E-Mail-Adresse finden Sie oben im Impressum. Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.
+### 7. Verbraucherstreitbeilegung (§ 36 VSBG)
+Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle im Sinne des Verbraucherstreitbeilegungsgesetzes (§ 36 VSBG) teilzunehmen. *(Hinweis: Die frühere EU-Plattform zur Online-Streitbeilegung wurde zum 20. Juli 2025 gemäß Verordnung (EU) 2024/3228 endgültig eingestellt.)*
 
 ---
 
 ### 8. Haftung für Inhalte & Hosting-Immunität (DSA / DDG / ECG)
 Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Für übermittelte oder gespeicherte fremde Informationen sind wir als Host-Provider gemäß Art. 6 Verordnung (EU) 2022/2065 (Digital Services Act – DSA) i. V. m. § 7 Abs. 2 DDG nicht verpflichtet, diese proaktiv zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen. Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen ab dem Zeitpunkt der tatsächlichen Kenntnis einer konkreten Rechtsverletzung bleiben hiervon unberührt.
+
+---
+
+### 9. Open-Source-Software & Lizenzhinweise (LGPL-3.0)
+Diese Anwendung nutzt für die optionale clientseitige MP3-Audiokodierung die dynamisch als isoliertes Modul nachgeladene Bibliothek **\`@breezystack/lamejs\`** (basiert auf LAME / lamejs, lizenziert unter der **GNU Lesser General Public License v3.0 – LGPL-3.0**). Gemäß § 4 LGPL-3.0 wird \`@breezystack/lamejs\` als eigenständiges, getrenntes JavaScript-Modul (\`vendor-lamejs-lgpl\`) über dynamisches \`import()\` eingebunden. Der vollständige Lizenztext der LGPL-3.0 sowie der Quellcode der Bibliothek sind unter https://www.gnu.org/licenses/lgpl-3.0.html sowie https://github.com/breezystack/lamejs abrufbar.
+
+---
+
+### 10. Barrierefreiheit & Gesetzliche Ausnahme für Kleinstunternehmen (§ 3 Abs. 3 BFSG)
+Als Diensteanbieter von reinen Dienstleistungen im Bereich Bildungssoftware mit weniger als zehn Beschäftigten und einem Jahresumsatz von höchstens 2 Millionen Euro fällt der Betreiber unter die **gesetzliche Ausnahme für Kleinstunternehmen gemäß § 3 Abs. 3 BFSG** (zur Umsetzung der Richtlinie (EU) 2019/882 / European Accessibility Act). Ungeachtet dessen setzt Campus-Groovelab die technischen Qualitätsstandards der BITV 2.0 sowie der Web Content Accessibility Guidelines (WCAG) 2.2 auf Konformitätsstufe AA freiwillig und umfassend um. Die vollständige Erklärung zur Barrierefreiheit und der zugehörige Feedback-Mechanismus sind im Tab „Barrierefreiheit“ einsehbar.
     `.trim()
   },
 
@@ -1022,11 +1052,12 @@ Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG / § 16 ECG für eigene Inh
     summaryPoints: [
       'Rollen-Dualität (Art. 4 Nr. 7 vs. Art. 28 DSGVO): Musikschule ist Verantwortliche für Unterrichtsdaten; Betreiber Patrick Huber ist Auftragsverarbeiter',
       '100 % Zero-User-Mail-Axiom: Keine Speicherung persönlicher E-Mail-Adressen von Schülern, Eltern oder Lehrkräften; passwortloser Login via Schulausweis & PIN',
-      'Keine Speicherung von Bank- oder Zahlungsdaten der Familien auf der Plattform (Zero-Payment-Storage)',
-      '100 % Europäisches Hosting in ISO/IEC-27001 zertifizierten Rechenzentren (Hetzner Nürnberg/Falkenstein, Deutschland)',
+      'Keine Speicherung von Bank- oder Zahlungsdaten der Familien auf den Plattform-Servern (Zero-In-App-Payment-Storage); strikte Trennung von App-DB und externer Finanzbuchhaltung (§ 147 AO)',
+      'Zero-Static-PDF RAM-Invoicing: Rechnungen & DSGVO-Exporte entstehen rein flüchtig im Arbeitsspeicher (RAM) via jsPDF/ZUGFeRD – keine statischen PDFs in Cloud-Speichern; 10 Jahre GoBD-WORM-Archivierung (§ 147 AO) in PostgreSQL',
+      '100 % Europäisches Hosting in ISO/IEC-27001 zertifizierten Rechenzentren (IONOS SE & Hetzner, Deutschland)',
       'Zero-Tracking: Keine Marketing- oder Drittanbieter-Cookies; alle lokalen Speicherungen technisch zwingend gem. § 25 Abs. 2 Nr. 2 TDDDG',
       'Strikter Ausschluss von Stimmbiometrie (Art. 9 DSGVO): Audio-Aufnahmen dienen rein dem didaktischen Üben',
-      'Kommunales DIN 66398 Löschkonzept mit 5 definierten Löschklassen',
+      'Kommunales DIN 66398 Löschkonzept mit 5 definierten Löschklassen & garantierter Schuljahres-Aufbewahrung für die Audio-Biografie',
       'Vollständige Betroffenenrechte gem. Art. 15–21 DSGVO / nDSG (Zuständige Behörde: LfDI Baden-Württemberg / EDÖB Bern)'
     ],
     checkboxLabel: 'Ich habe die Plattform-Datenschutzerklärung zur Kenntnis genommen.',
@@ -1041,13 +1072,13 @@ Im regulären Musikschulbetrieb ist die **jeweilige Musikschule bzw. ihr Schultr
   Zentrale E-Mail: kontakt@campus-groovelab.de • Technischer Support: support@campus-groovelab.de
 
 **(2) Offizielle Datenschutz-Kontaktstelle & DPO-Verbindung:**  
-Für behördliche Datenschutzbeauftragte, Schulleitungen und betroffene Personen unterhalten wir eine dedizierte Ansprechstelle für Datenschutzfragen und Betroffenenrechte: E-Mail: datenschutz@campus-groovelab.de. Behördliche Datenschutzprüfer können zudem über das integrierte DPO-Audit-Portal direkt auf standardisierte Verzeichnisse von Verarbeitungstätigkeiten (VVT gem. Art. 30 DSGVO) und Schwellwertanalysen (DSFA gem. Art. 35 DSGVO) zugreifen.
+Für behördliche Datenschutzbeauftragte, Schulleitungen und betroffene Personen unterhalten wir eine dedizierte Ansprechstelle für Datenschutzfragen und Betroffenenrechte: E-Mail: datenschutz@campus-groovelab.de. Behördliche Datenschutzprüfer können zudem über das integrierte DPO-Audit-Portal direkt auf standardisierte Verzeichnisse von Verarbeitungstätigkeiten (VVT gem. Art. 30 DSGVO) und technische Unterstützungsdossiers (Art. 28 Abs. 3 lit. f / Art. 35 DSGVO) zugreifen.
 
 ---
 
 ### 2. Grundsatz der Datenminimierung, 100 % Zero-User-Mail-Axiom & Bildschirmfreies Üben (Art. 5 & 8 DSGVO / Art. 6 nDSG)
-**(1) Keine Zahlungs- oder Bankdaten von Familien:**  
-Auf Campus-Groovelab werden keinerlei Bank-, SEPA-, Kreditkarten- oder Abrechnungsvertragsdaten von Schülern oder Eltern gespeichert.
+**(1) Keine Zahlungs- oder Bankdaten auf den Plattform-Servern (Zero-In-App-Payment-Storage):**  
+Auf den Webservern und in der Cloud-Datenbank von Campus-Groovelab werden zu keinem Zeitpunkt IBAN-, Bankkonto-, SEPA-Lastschrift- oder Kreditkartendaten von Schülern oder Eltern erhoben oder gespeichert. Im Falle der Träger-Sammelabrechnung (Modell A) erfolgt die Abrechnung ausschließlich mit der Musikschule. Entscheidet sich eine Familie im Modell der Schüler-Direktabrechnung (Modell B) nach dem kostenfreien Probemonat aktiv für die Freischaltung per Banküberweisung (Einmalbeitrag), wird in der Plattform-Datenbank lediglich der pseudonyme Freischaltstatus (paid_until) des Schülerprofils hinterlegt; die Zahlungsdaten des Bankkontoauszugs (Überweisender, IBAN, Betrag, Campus-ID im Verwendungszweck) verbleiben ausschließlich in der externen, steuerrechtlichen Finanzbuchhaltung des Betreibers (eigenständige Verantwortlichkeit gem. Art. 6 Abs. 1 lit. b und c DSGVO i. V. m. § 147 AO / § 257 HGB).
 
 **(2) 100 % Zero-User-Mail-Axiom & Entfall personenbezogener E-Mail-Adressen:**  
 Auf den Servern und Datenbanken von Campus-Groovelab werden zu keinem Zeitpunkt personenbezogene E-Mail-Adressen natürlicher Personen (weder von Schülerinnen und Schülern, Erziehungsberechtigten, Lehrkräften noch von Mitgliedern der Schulleitung oder Verwaltung) erhoben, gespeichert oder verarbeitet. Die Authentifizierung erfolgt passwortlos über physische Schulausweise (QR-Code / Ausweisnummer) in Kombination mit einer serverseitig gehashten PIN oder Passkeys (WebAuthn FIDO2). Als einzige institutionelle Ausnahme wird die zentrale Kontakt- und Abrechnungs-E-Mail der Musikschule als juristischer Person (Träger) für buchhalterische Pflichtbelege (§ 14 UStG) und SLA-Mitteilungen verarbeitet. Plattformfunktionen zum Teilen von Zugängen rufen rein clientseitig das lokale Mailprogramm des Endgeräts auf (mailto:); Empfänger-E-Mail-Adressen werden zu 0 % über unsere Server übertragen oder gespeichert.
@@ -1075,15 +1106,20 @@ Unsere Webanwendung verwendet lokale Speichertechnologien des Browsers (LocalSto
 **(2) Keine Tracking- oder Werbe-Cookies (Banner-Immunität):**  
 Es werden zu keinem Zeitpunkt Marketing-, Profiling- oder Drittanbieter-Tracking-Cookies gesetzt. Sämtliche client-seitigen Speicherungen sind gemäß **§ 25 Abs. 2 Nr. 2 TDDDG** (DE) sowie **§ 165 Abs. 3 TKG 2021** (AT) technisch unbedingt erforderlich. Ein Cookie-Banner ist daher gesetzlich entbehrlich.
 
-**(3) Transparenzmatrix der lokalen Speicher-Schlüssel:**  
+**(3) Transparenzmatrix der lokalen Speicher-Schlüssel (§ 25 Abs. 2 Nr. 2 TDDDG):**  
 - \`gl_active_session_lease_id\` (LocalStorage): Kryptografischer Session-Lease-Token zum Schutz vor Session-Hijacking (Dauer: bis Abmeldung / max. 30 Tage; Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`gl_global_device_key\` (LocalStorage): Hardware-gebundener Geräteschlüssel zur Sitzungs- und Kiosk-Verifikation (Dauer: dauerhaft bis Cache-Leerung; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`groovelab_user_id\` & \`groovelab_school_id\` (LocalStorage): Aktive Mandanten- und Profil-Zuordnung für Offline-Resilienz (Dauer: bis Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`groovelab_cached_user\` (LocalStorage): Bereinigtes Sitzungs-Profil ohne Geheimnisse (0 PINs, 0 Passwörter, 0 Ausweis-Klartext) für unterbrechungsfreien Offline-Start (Dauer: bis Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`groovelab_legal_consented_<userId>\` (LocalStorage): Lokaler Nachweis-Cache über bestätigte Rechtstext-Versionen (Dauer: bis Versionswechsel / Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
 - \`groovelab_active_platform\` (LocalStorage): Beibehaltung des ausgewählten Moduls (Campus vs. GrooveLab) (Dauer: dauerhaft bis Cache-Leerung; § 25 Abs. 2 Nr. 2 TDDDG)  
 - \`campus_family_profiles\` (LocalStorage): Verschlüsselte Schnellumschaltung zwischen Geschwistern auf Familien-Geräten (Dauer: bis Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
 - \`groovelab_kiosk_token\` (LocalStorage): Hardware-Kopplung der Proberaum-Terminals im Kiosk-Betrieb der Musikschule (Dauer: bis Terminal-Reset; § 25 Abs. 2 Nr. 2 TDDDG)  
 - \`cg_tax_mode\` (LocalStorage): Steuer-Konfiguration (Regelbesteuerung vs. Kleinunternehmer; § 25 Abs. 2 Nr. 2 TDDDG)  
+- \`cg_events_swr_*\` & \`cg_schedule_swr_*\` (LocalStorage): Flüchtige Stale-While-Revalidate (SWR) Zwischenspeicher für Stundenplan- und Veranstaltungsansichten; werden beim Abmelden über \`scrubSharedDeviceCache()\` restlos bereinigt (Dauer: bis Abmeldung; § 25 Abs. 2 Nr. 2 TDDDG)  
 
-**(4) Schutz lokaler Daten:**  
-Es werden keine Klartext-Passwörter im Browser gespeichert. Flüchtige Sitzungs-Identifikatoren verfallen automatisch. Sensible lokale Zwischenspeicher werden auf dem Endgerät über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2 mit 100.000 Runden SHA-512 und AES-256-GCM).
+**(4) Schutz lokaler Daten & Duale Kryptografie-Architektur:**  
+Es werden zu keinem Zeitpunkt Klartext-Passwörter, PINs oder Ausweis-Geheimnisse im Browser gespeichert. Serverseitige PINs und Zugangsgeheimnisse werden im isolierten Schema (\`private_auth.user_secrets\` und \`private_auth.school_secrets\`) mittels Salted Bcrypt (Blowfish, 10 Runden) gehasht. Lokale Zwischenspeicher und Recovery-Tresore auf dem Endgerät werden über die browser-eigene Web Crypto API kryptografisch geschützt (PBKDF2-HMAC-SHA-512 mit 100.000 Runden und AES-256-GCM).
 
 **(5) Lokaler Audio-Tresor (IndexedDB):**  
 Zur Gewährleistung eines unterbrechungsfreien Probenbetriebs in schallisolierten Räumen ohne Internetverbindung werden temporäre Übe- und Playback-Audios lokal in geschützten IndexedDB-Datenspeichern des Browsers vorgehalten und bei aktiver Verbindung synchronisiert.
@@ -1113,7 +1149,7 @@ Wird eine Tonaufnahme oder ein Schülerprofil gelöscht, wird die zugehörige Au
 Vertragspartner für die Plattformnutzung sowie für etwaige entgeltliche Leistungen (insbesondere Schüler-Jahresbeiträge bei Direktabrechnung) sind bei Minderjährigen bis zur Vollendung des 18. Lebensjahres (gesetzliche Volljährigkeit gem. § 2 BGB) ausnahmslos die Erziehungsberechtigten. Minderjährige können ohne ausdrückliche Genehmigung der gesetzlichen Vertreter keine kostenpflichtigen Verträge eingehen.
 
 **(2) Gemeinsames Sorgerecht & Gesetzliche Vertretungsvermutung (§ 1629 Abs. 1 Satz 2 BGB):**  
-Nimmt ein Elternteil die Registrierung, Freischaltung oder PIN-Verwaltung für ein minderjähriges Kind vor, versichert dieser an Eides statt, zur alleinigen Vertretung berechtigt zu sein oder im ausdrücklichen Einvernehmen mit dem weiteren sorgeberechtigten Elternteil zu handeln. Der anmeldende Elternteil stellt den Betreiber sowie die Musikschule im Innenverhältnis von etwaigen Einwendungen oder Streitigkeiten des anderen Elternteils frei.
+Nimmt ein Elternteil die Registrierung, Freischaltung oder PIN-Verwaltung für ein minderjähriges Kind vor, versichert dieser verbindlich, zur alleinigen Vertretung berechtigt zu sein oder im ausdrücklichen Einvernehmen mit dem weiteren sorgeberechtigten Elternteil zu handeln. Der anmeldende Elternteil stellt den Betreiber sowie die Musikschule im Innenverhältnis von etwaigen Einwendungen oder Streitigkeiten des anderen Elternteils frei.
 
 **(3) Datenschutzrechtliche Mündigkeit (Art. 8 DSGVO i. V. m. § 16 TDDDG):**  
 Für Schüler bis zum vollendeten 16. Lebensjahr ist für didaktische Audio-Aufnahmen und die Profilnutzung die aktive Freigabe der Erziehungsberechtigten erforderlich. Jugendliche zwischen dem vollendeten 16. und 18. Lebensjahr besitzen die gesetzliche Mündigkeit, ihre datenschutzrechtliche Einwilligung in didaktische Audioaufnahmen selbstständig zu erteilen oder zu widerrufen (die zivilrechtliche Vertragspartnerschaft für das Benutzerkonto verbleibt hiervon unberührt bis zum 18. Lebensjahr bei den Erziehungsberechtigten).
@@ -1124,31 +1160,35 @@ Die Verifikation erfolgt über die physische Ausgabe des Schulausweises durch di
 ---
 
 ### 6. Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Art. 28 & 32 DSGVO)
-Sämtliche Kernsysteme (Webanwendung, API-Gateway, PostgreSQL-Datenbank und Cloud-Audiospeicher) werden in nach ISO/IEC 27001 zertifizierten deutschen Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland) betrieben. Mit dem Hosting-Provider besteht ein DSGVO-konformer Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO. Die Datenübertragung erfolgt durchgehend TLS 1.3 verschlüsselt.
+Sämtliche Kernsysteme (Webanwendung, API-Gateway, PostgreSQL-Datenbank und Cloud-Audiospeicher) werden in nach ISO/IEC 27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur, Deutschland – Primärer Produktions-Cluster) sowie der Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland – Georedundantes Backup, Failover & Storage Box) betrieben. Mit den Hosting-Providern bestehen DSGVO-konforme Auftragsverarbeitungsverträge (AVV) nach Art. 28 DSGVO. Die Datenübertragung erfolgt durchgehend TLS 1.3 verschlüsselt.
 
 ---
 
 ### 7. Keine Einbindung externer Drittanbieter- oder US-Cloud-Dienste (Zero US Cloud Governance)
 Zur strikten Einhaltung europäischer Datenschutzstandards (Schrems II / DSGVO) verzichtet Campus-Groovelab vollständig auf US-Cloud-Dienste, Tracking-Netzwerke oder externe Hilfsdienste:  
 - Sämtliche QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden zu keinem Zeitpunkt Daten an externe QR-Dienste übertragen.  
-- Die Protokollierung von Administrator-IPs beim B2B-Onboarding erfolgt ausnahmslos serverintern im ISO 27001-zertifizierten Hetzner-Rechenzentrum in Deutschland. Es werden keine externen IP-Dienste oder US-Abfrage-APIs genutzt.  
+- Die Protokollierung von Administrator-IPs beim B2B-Onboarding erfolgt ausnahmslos serverintern im ISO 27001-zertifizierten deutschen Rechenzentrum (IONOS SE / Hetzner Online GmbH in Deutschland). Es werden keine externen IP-Dienste oder US-Abfrage-APIs genutzt.  
 - **Missbrauchsschutz & Abwehr automatisierter Angriffe (Proof-of-Work):** Zur Abwehr von Brute-Force-Angriffen und automatisierten Bot-Attacken beim Anmeldevorgang setzen wir ein vollständig serverseitiges, datensparsames kryptografisches Nachweisverfahren (Proof-of-Work) ein. Hierbei werden weder Cookies gesetzt noch gerätespezifische Merkmale ausgelesen (kein Device-Fingerprinting) und keine Daten an Dritte oder US-Server übertragen (Art. 6 Abs. 1 lit. f DSGVO i. V. m. Art. 32 DSGVO).  
 - Kalendersynchronisationen und Ferienabfragen erfolgen direkt und ohne Zwischenschaltung ungesicherter Drittanbieter-Proxies.
 
 ---
 
-### 8. Urheberrechtsfreie Metadaten-Architektur (UrhG & DSA)
+### 8. Urheberrechtsfreie Metadaten-Architektur & Zero-Static-PDF RAM-Invoicing (UrhG, DSA & GoBD § 147 AO)
+**(1) Notenblätter & Urheberrecht:**  
 Campus-Groovelab speichert und hostet keine geschützten Notenblätter oder Partituren als PDF. Es werden ausschließlich bibliografische Metadaten (Songtitel, Komponist, Lehrbuchseite) sowie externe Verlinkungen (z. B. Streaming-Dienste) verarbeitet.
+
+**(2) Zero-Static-PDF RAM-Invoicing & GoBD-Archivierung (§ 147 AO / § 257 HGB):**  
+Im Gegensatz zu herkömmlichen Verwaltungssystemen werden auf den Cloud-Speichern von Campus-Groovelab zu keinem Zeitpunkt statische PDF-Dateien von Rechnungen, Schüler-Zahlungsbelegen, Schulausweisen oder DSGVO-Datenauskünften abgelegt. Sämtliche Dokumente und ZUGFeRD-Belege werden rein bedarfsgesteuert, flüchtig im Arbeitsspeicher (RAM) des anfragenden Browsers erzeugt (client-side in-memory generation via jsPDF). Die steuer- und handelsrechtliche Aufbewahrungspflicht der Abrechnungsdaten erfolgt revisionssicher und manipulationsgeschützt als unveränderbarer WORM-Ledger (Write Once, Read Many) direkt in der relationalen PostgreSQL-Datenbank im deutschen ISO 27001 Rechenzentrum.
 
 ---
 
-### 9. Kommunales Löschkonzept nach DIN 66398 (5 definierte Löschklassen)
+### 9. Kommunales Löschkonzept nach DIN 66398 (5 definierte Löschklassen & Audio-Biografie)
 Zur Einhaltung des Grundsatzes der Speicherbegrenzung (Art. 5 Abs. 1 lit. e DSGVO) implementiert Campus-Groovelab ein behördliches Löschkonzept gemäß **DIN 66398** mit fünf standardisierten Löschklassen:  
 - **⚡ LK 1 – Flüchtige Sitzungsdaten:** Sofortiger Verfall flüchtiger Token bei Benutzerabmeldung oder Schließen des Browsers.  
-- **🎵 LK 2 – Didaktische Schüler-Audioaufnahmen:** Speicherung auf das laufende Schuljahr befristet (automatischer Stichtag 31.08. mit Vorab-Exportfunktion); sofortige physische Löschung bei manuellem Löschen durch Schüler/Eltern.  
+- **🎵 LK 2 – Reguläre didaktische Übe- & Hausaufgaben-Audioaufnahmen (Audio-Biografie):** Volle Aufbewahrungsgarantie für das gesamte laufende Schuljahr; anschließendes 60-tägiges Download- und Exportfenster für Familien (1. August bis 30. September); automatisierte DIN 66398 Jahresbereinigung am 1. Oktober für temporäre Übe-Memos; jederzeitige 1-Klick-Selbstlöschung durch Schüler/Eltern.  
 - **💤 LK 3 – Inaktivitätsstatus (Fair-Play):** Nach 60 aufeinanderfolgenden Tagen ohne Schüler-Login automatische Überführung in den passiven Basis-Status zur Kostenentlastung der Musikschule.  
-- **🎓 LK 4 – Bildungsbiografie & Meisterwerke:** Fortlaufende Bereitstellung während der aktiven Unterrichtszeit an der Musikschule; endgültige physische Löschung 30 Tage nach Vertragsbeendigung des Schülers.  
-- **📑 LK 5 – B2B-Abrechnungsbelege der Musikschule:** 10 Jahre gesetzliche Aufbewahrungsfrist gem. § 147 AO / § 257 HGB (reine Sammelrechnungen an die Schule ohne Klarnamen Minderjähriger).
+- **🎓 LK 4 – Kuratierte Audio-Biografie & Meisterwerke:** Schuljahresübergreifende Bereitstellung ausgewählter Meilenstein-Aufnahmen während der gesamten aktiven Unterrichtszeit an der Musikschule (jederzeit per 1-Klick löschbar); endgültige physische Löschung 30 Tage nach Vertragsbeendigung des Schülers.  
+- **📑 LK 5 – B2B-Abrechnungsbelege der Musikschule & steuerrechtliche Bankkontoauszüge:** 10 Jahre gesetzliche Aufbewahrungsfrist gem. § 147 AO / § 257 HGB (B2B-Sammelrechnungen an die Schule ohne Klarnamen Minderjähriger sowie steuerrechtliche Bankkontoauszüge bei Direktüberweisung in der abgetrennten Finanzbuchhaltung des Betreibers).
 
 ---
 
@@ -1167,6 +1207,53 @@ Sie haben das Recht auf Beschwerde bei einer zuständigen Datenschutz-Aufsichtsb
 - **Schweiz:** Eidgenössischer Datenschutz- und Öffentlichkeitsbeauftragter (EDÖB), Feldeggweg 1, CH-3003 Bern (www.edoeb.admin.ch).
 
 **Hinweis für Nutzer in der Schweiz:** Deutschland verfügt gemäß Beschluss des Schweizer Bundesrats vom 25. August 2023 über ein angemessenes Schutzniveau (Art. 16 Abs. 1 nDSG i. V. m. Anhang 1 VDSG).
+    `.trim()
+  },
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 13. KINDGERECHTE DATENSCHUTZ-ERKLÄRUNG IN LEICHTER SPRACHE (ART. 12 ABS. 1 DSGVO)
+  // ──────────────────────────────────────────────────────────────────────────
+  junior_privacy: {
+    type: 'junior_privacy',
+    title: 'Datenschutz für Kinder & Jugendliche (Einfach erklärt)',
+    subtitle: 'Kindgerechte Transparenz-Information in leichter Sprache gemäß Art. 12 Abs. 1 DSGVO & ErwGr. 58',
+    badge: 'Art. 12 DSGVO • Kinderleicht erklärt',
+    isMandatory: false,
+    version: ACTIVE_LEGAL_VERSION,
+    summaryPoints: [
+      'Keine echten Fotos: Du nutzt eine coole 3D-Musikfigur statt eines echten Fotos von dir',
+      'Keine E-Mail-Adresse nötig: Du meldest dich sicher mit deinem Musikschul-Ausweis und deiner Geheimzahl (PIN) an',
+      'Deine Tonaufnahmen gehören dir: Nur deine Lehrkraft, deine Eltern und du können deine Übe-Aufnahmen hören',
+      'Jederzeit löschen: Du und deine Eltern können jede Aufnahme sofort mit einem Klick löschen',
+      'Sicherer Ort ohne Werbung: Es gibt keine Werbung, kein heimliches Ausspionieren und keine fremden Personen im Chat'
+    ],
+    checkboxLabel: 'Ich habe verstanden, wie meine Daten in der Musikschul-App geschützt werden.',
+    fullTextMarkdown: `
+### Hallo! Schön, dass du mit Campus-Groovelab Musik machst!
+Wenn du unsere App für deinen Musikunterricht benutzt, speichern wir ein paar Infos, damit alles klappt. Hier erklären wir dir ganz einfach, wie wir auf deine Daten aufpassen:
+
+### 1. Wer sieht meinen Namen und mein Bild?
+- **Dein Name wird geschützt:** In Listen steht nur dein Vorname und der erste Buchstabe von deinem Nachnamen (zum Beispiel „Lukas M.“).
+- **Coole 3D-Figur statt Foto:** In unserer App gibt es keine echten Fotos von Kindern. Du suchst dir einfach eine coole 3D-Musikfigur mit deinem Lieblingsinstrument aus.
+- **Keine E-Mail und keine Handynummer:** Du brauchst bei uns keine eigene E-Mail-Adresse und keine Handynummer. Du meldest dich einfach mit deinem Musikschul-Ausweis (QR-Code) an.
+
+### 2. Was passiert mit meinen Musik-Aufnahmen?
+- Wenn du mit deinem Instrument übst, kannst du freiwillig eine Tonaufnahme machen, damit deine Lehrerin oder dein Lehrer dir Tipps geben kann.
+- **Wer darf das hören?** Nur du, deine Eltern und deine Musiklehrerin oder dein Musiklehrer. Niemand sonst im Internet kann deine Aufnahmen finden.
+- **Wie lange bleibt das gespeichert?** Normale Übe-Aufnahmen werden am Ende des Schuljahres (am 31. August) automatisch aufgeräumt. Besondere Lieblingsstücke in deiner „Audio-Biografie“ bleiben gespeichert, solange du an der Musikschule bist.
+- **Sofort löschen:** Wenn dir eine Aufnahme nicht mehr gefällt, können du oder deine Eltern sie jederzeit sofort mit einem Klick löschen.
+
+### 3. Wer liest die Nachrichten im Hausaufgabenheft?
+- Im Hausaufgabenheft oder im Schul-Chat schreibst du nur mit deiner Lehrerin oder deinem Lehrer über deinen Musikunterricht.
+- **Deine Eltern schauen mit:** Damit du immer sicher bist, können deine Eltern alle Nachrichten und Hausaufgaben in ihrem Elternbereich mitlesen.
+- **Keine Fremden:** Fremde Personen oder andere Schüler können dir keine privaten Nachrichten schicken.
+
+### 4. Gibt es Werbung oder Spionage?
+- **Nein!** In Campus-Groovelab gibt es absolut keine Werbung.
+- Wir verkaufen deine Daten niemals an andere Firmen. Unsere Computer (Server) stehen sicher verschlossen in Deutschland.
+
+### 5. Deine Rechte – Du bestimmst mit!
+Du und deine Eltern dürft jederzeit fragen, welche Infos wir über dich gespeichert haben. Ihr könnt auch jederzeit sagen, dass alle Aufnahmen gelöscht werden sollen. Wenn du Fragen hast, frag einfach deine Eltern oder im Büro deiner Musikschule nach!
     `.trim()
   }
 };

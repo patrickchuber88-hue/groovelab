@@ -67,7 +67,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Campus-Groovelab erfüllt die höchsten europäischen Standards für Kinderschutz und Datensicherheit (BSI IT-Grundschutz, ISO/IEC 27001, DSGVO Art. 25/32 und COPPA). Als unterstützendes Convenience-Werkzeug („Fast-Track“) zur didaktischen Unterrichtsbegleitung schützt die Plattform durch Zero-Knowledge- und Zero-Mail-Architektur vor Datenlecks: Keine Speicherung von Schüler-E-Mails, Passwörtern oder Bankdaten.';
+    const summaryText = 'Campus-Groovelab erfüllt die höchsten europäischen Standards für Kinderschutz und Datensicherheit (BSI IT-Grundschutz, ISO/IEC 27001, DSGVO Art. 8/25/32 und § 8a SGB VIII). Als unterstützendes Convenience-Werkzeug („Fast-Track“) zur didaktischen Unterrichtsbegleitung schützt die Plattform durch Zero-Knowledge- und Zero-Mail-Architektur vor Datenlecks: Keine Speicherung von Schüler-E-Mails, Passwörtern oder Bankdaten.';
     const splitSummary = doc.splitTextToSize(cleanPdfText(summaryText), contentWidth - 12);
     doc.text(splitSummary, margin + 6, 58);
 
@@ -85,7 +85,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       },
       {
         title: 'B. Zero-Mail IAM & Biometrische Passkeys',
-        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens und PBKDF2/Argon2id-Hashes. Konten sind 100% phishing-immun.'
+        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens und Bcrypt-Hashes (10 Runden Blowfish gem. BSI TR-02102). Konten sind 100% phishing-immun.'
       },
       {
         title: 'C. 100% PostgreSQL FORCE Row-Level Security (RLS)',
@@ -97,7 +97,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       },
       {
         title: 'E. Subresource Integrity (SRI) & Deutsche ISO 27001 Cloud',
-        desc: 'Alle Bundles sind mit SHA-384 Hashes versiegelt. 100% Hosting in Deutschland (Hetzner Falkenstein/Nürnberg) mit stündlich automatisierten, verschlüsselten Backups.'
+        desc: 'Alle Bundles sind mit SHA-384 Hashes versiegelt. 100% Hosting in Deutschland (IONOS SE & Hetzner Falkenstein/Nürnberg) mit stündlich automatisierten, verschlüsselten Backups.'
       }
     ];
 
@@ -148,7 +148,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       {
         cat: '1. Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO & BSI IT-Grundschutz)',
         items: [
-          '• Physische Zutrittskontrolle: ISO 27001 zertifiziertes Rechenzentrum (Hetzner Online GmbH, Falkenstein/Nürnberg, Deutschland).',
+          '• Physische Zutrittskontrolle: ISO 27001 zertifizierte Rechenzentren (IONOS SE & Hetzner Online GmbH, Deutschland).',
           '• BFF Token-Isolation: Sessions verschlüsselt in __Host-session JWE HttpOnly-Cookies (AES-256-GCM); 0% Tokens im Browser-Speicher.',
           '• Mandantentrennung: PostgreSQL FORCE Row-Level Security auf allen 97 Tabellen (school_id Isolation auf Kernel-Ebene).'
         ]
@@ -158,13 +158,13 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
         items: [
           '• Anti-CSRF Origin-Guard: Fail-Closed Prüfung mit browser-nativem Sec-Fetch-Site Filtering & Host-Poisoning-Schutz.',
           '• Revisionssicherheit: Manipulationssicheres WORM Audit-Ledger & SHA-384 Subresource Integrity (SRI).',
-          '• Hash-Standards: PBKDF2 Zero-Knowledge Hashing mit 100.000 Runden (SHA-512 / SHA-256) für PINs und Kiosk-Tokens.'
+          '• Hash-Standards: Bcrypt Zero-Knowledge Hashing (10 Runden Blowfish gem. BSI TR-02102) im isolierten Schema private_auth für PINs.'
         ]
       },
       {
         cat: '3. Verfügbarkeit & Löschkonzept (Art. 32 & Art. 17 DSGVO / DIN 66398)',
         items: [
-          '• Datensicherung: Stündlich automatisierte, verschlüsselte Datenbank-Backups (RTO < 15 Min, RPO < 1 Std.).',
+          '• Datensicherung: Stündlich automatisierte, Age X25519 verschlüsselte Datenbank-Backups (RTO <= 45 Min., RPO <= 60 Min.).',
           '• DIN 66398 Löschkonzept (5 Klassen): 60-Tage Sparmodus-Wechsel auf Basis-Bereitstellung (0,09 €); physische Profillöschung erst 30 Tage nach Exmatrikulation; Meisterwerke kumulativ über Ausbildungsdauer.',
           '• Offline-Resilienz: IndexedDB Audio-Tresor (groovelab_audio_vault) für unterbrechungsfreie Musikproben.'
         ]
@@ -205,7 +205,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: Subsidiaritäts-Doktrin (Fast-Track-Werkzeug, offizielle Dienstwege bleiben beim Träger), VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko), BYOD-Schutz für Lehrkräfte sowie 100% deutsches ISO 27001 Cloud-Hosting (Hetzner Falkenstein/Nürnberg).';
+    const hostText = 'Vollständige Konformität für Städte, Gemeinden und Schulämter: Subsidiaritäts-Doktrin (Fast-Track-Werkzeug, offizielle Dienstwege bleiben beim Träger), VVT-Muster nach Art. 30 DSGVO, formelle DSFA-Schwellwertprüfung nach Art. 35 DSGVO (kein hohes Risiko), BYOD-Schutz für Lehrkräfte sowie 100% deutsches ISO 27001 Cloud-Hosting (IONOS SE & Hetzner Falkenstein/Nürnberg).';
     const splitHost = doc.splitTextToSize(cleanPdfText(hostText), contentWidth - 12);
     doc.text(splitHost, margin + 6, curY + 15);
 
@@ -213,20 +213,20 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     curY += 44;
     doc.setDrawColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
     doc.setLineWidth(1);
-    doc.line(margin, curY, margin + 60, curY);
-    doc.line(pageWidth - margin - 60, curY, pageWidth - margin, curY);
+    doc.line(margin, curY, margin + 70, curY);
+    doc.line(pageWidth - margin - 70, curY, pageWidth - margin, curY);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
     doc.text('Technisches Sicherheits-Board', margin, curY + 5);
-    doc.text('Campus-Groovelab IT-Security', pageWidth - margin - 60, curY + 5);
+    doc.text('Campus-Groovelab SaaS Operator (Patrick Huber)', pageWidth - margin - 70, curY + 5);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text('BSI A+ / ISO 27001 Konformitätsprüfung', margin, curY + 9);
-    doc.text('https://campus-groovelab.de', pageWidth - margin - 60, curY + 9);
+    doc.text('Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden)', pageWidth - margin - 70, curY + 9);
 
     // Footer Page 2
     doc.setFontSize(7.5);

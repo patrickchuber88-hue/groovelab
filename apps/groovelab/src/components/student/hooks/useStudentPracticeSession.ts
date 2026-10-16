@@ -285,6 +285,9 @@ export function useStudentPracticeSession({
       }
     }, 400);
 
+    let lastFlatVal: boolean | null = null;
+    let lastFlatTypeVal: 'face-up' | 'face-down' | 'none' | null = null;
+
     const handleOrientation = (e: DeviceOrientationEvent) => {
       const beta = e.beta;
       const gamma = e.gamma;
@@ -292,8 +295,8 @@ export function useStudentPracticeSession({
         hasReceivedSensorEventRef.current = true;
       }
       if (beta === null || gamma === null) {
-        setIsPhoneFlat(false);
-        setFlatType('none');
+        if (lastFlatVal !== false) { lastFlatVal = false; setIsPhoneFlat(false); }
+        if (lastFlatTypeVal !== 'none') { lastFlatTypeVal = 'none'; setFlatType('none'); }
         return;
       }
 
@@ -303,12 +306,19 @@ export function useStudentPracticeSession({
       const faceDown = Math.abs(Math.abs(beta) - 180) < 22 && Math.abs(gamma) < 22;
 
       const isOrientedFlat = faceUp || faceDown;
-      setFlatType(faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none'));
+      const nextFlatType: 'face-up' | 'face-down' | 'none' = faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none');
+      if (lastFlatTypeVal !== nextFlatType) {
+        lastFlatTypeVal = nextFlatType;
+        setFlatType(nextFlatType);
+      }
 
       const isStill = !isDeviceMovingRef.current;
       const isTrulyFlat = isOrientedFlat && isStill;
 
-      setIsPhoneFlat(isTrulyFlat);
+      if (lastFlatVal !== isTrulyFlat) {
+        lastFlatVal = isTrulyFlat;
+        setIsPhoneFlat(isTrulyFlat);
+      }
     };
 
     const handleMotion = (e: DeviceMotionEvent) => {
@@ -325,7 +335,10 @@ export function useStudentPracticeSession({
       // Schwellenwert > 2.0 m/s^2: Handy wird in der Hand gehalten / bewegt
       if (magnitude > 2.0) {
         isDeviceMovingRef.current = true;
-        setIsPhoneFlat(false);
+        if (lastFlatVal !== false) {
+          lastFlatVal = false;
+          setIsPhoneFlat(false);
+        }
 
         if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
         motionTimeoutRef.current = setTimeout(() => {

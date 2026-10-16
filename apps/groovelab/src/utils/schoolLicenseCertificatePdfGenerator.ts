@@ -74,7 +74,7 @@ export const createSchoolLicenseCertificateDocument = async (
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('Campus-Groovelab • Amtliche Schullizenz-Bescheinigung', 22, 25);
+  doc.text('Campus-Groovelab • Offizielle Schullizenz-Bescheinigung', 22, 25);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
@@ -93,7 +93,7 @@ export const createSchoolLicenseCertificateDocument = async (
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(10.5);
   doc.setFont('helvetica', 'bold');
-  doc.text('SCHULBESCHEINIGUNG & BEREITSTELLUNGSNACHWEIS', 22, curY);
+  doc.text('OFFIZIELLE TEILNAHME- & GEBÜHRENBESCHEINIGUNG', 22, curY);
 
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
@@ -113,7 +113,7 @@ export const createSchoolLicenseCertificateDocument = async (
   const costRawText = 'Die Musikschule übernimmt sämtliche Bereitstellungs-, Cloud-Hosting- und Datenbankkosten im Rahmen der kommunalen Schullizenz. Für das Schülerprofil fallen keine Software-Kaufgebühren, keine monatlichen Nutzungsentgelte und keine In-App-Käufe an.';
   const costLines = doc.splitTextToSize(costRawText, 152);
 
-  const butRawText = 'Dieses Dokument gilt als amtlicher Nachweis über die Bereitstellung digitaler Lehrmittel zur Vorlage bei Trägern der Grundsicherung (Leistungen für Bildung und Teilhabe - BuT gem. § 28 Abs. 7 SGB II bzw. § 34 Abs. 7 SGB XII), Arbeitgebern zur Inanspruchnahme betrieblicher Familienförderungen sowie dem Finanzamt (außerschulische Bildungsaufwendungen).';
+  const butRawText = 'Dieses Dokument gilt als offizieller Nachweis über die Bereitstellung digitaler Lehrmittel zur Vorlage bei Trägern der Grundsicherung (Leistungen für Bildung und Teilhabe - BuT gem. § 28 Abs. 7 SGB II bzw. § 34 Abs. 7 SGB XII), Kommunen sowie Arbeitgebern zur Inanspruchnahme betrieblicher Familienförderungen.';
   const butLines = doc.splitTextToSize(butRawText, 152);
 
   // Dynamic Box Heights

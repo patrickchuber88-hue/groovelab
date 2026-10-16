@@ -153,38 +153,38 @@ function testPricingAndFinancialInvariants() {
   const pricingHookPath = path.resolve(__dirname, '../components/masterAdmin/hooks/useMasterAdminPricing.ts');
   const pricingContent = fs.readFileSync(pricingHookPath, 'utf-8');
 
-  // Campus: 14.90 €, GrooveLab: 9.90 €, Kombi: 19.90 €
-  const hasCampusPrice = pricingContent.includes('14.90') || pricingContent.includes('14.9');
-  const hasGroovelabPrice = pricingContent.includes('9.90') || pricingContent.includes('9.9');
-  const hasKombiPrice = pricingContent.includes('19.90') || pricingContent.includes('19.9');
+  // Campus: 19.90 €, GrooveLab: 12.90 €, Kombi: 24.90 €
+  const hasCampusPrice = pricingContent.includes('19.90') || pricingContent.includes('19.9');
+  const hasGroovelabPrice = pricingContent.includes('12.90') || pricingContent.includes('12.9');
+  const hasKombiPrice = pricingContent.includes('24.90') || pricingContent.includes('24.9');
 
   assert(
     hasCampusPrice,
     'Canonical Pricing',
-    'Campus base server-hosting fee default matches canonical 14,90 €'
+    'Campus base server-hosting fee default matches canonical 19,90 €'
   );
 
   assert(
     hasGroovelabPrice,
     'Canonical Pricing',
-    'GrooveLab base server-hosting fee default matches canonical 9,90 €'
+    'GrooveLab base server-hosting fee default matches canonical 12,90 €'
   );
 
   assert(
     hasKombiPrice,
     'Canonical Pricing',
-    'Kombi-Vorteil bundle fee default matches canonical 19,90 € (saving 4,90 €/Mo)'
+    'Kombi-Vorteil bundle fee default matches canonical 24,90 € (saving 7,90 €/Mo)'
   );
 
   // Bundle math validation
-  const campus = 14.90;
-  const groovelab = 9.90;
-  const kombi = 19.90;
+  const campus = 19.90;
+  const groovelab = 12.90;
+  const kombi = 24.90;
   const savings = Math.round((campus + groovelab - kombi) * 100) / 100;
   assert(
-    savings === 4.90,
+    savings === 7.90,
     'Canonical Pricing',
-    `Bundle discount computes precisely 4,90 €/Mo savings (Got: ${savings.toFixed(2)} €)`
+    `Bundle discount computes precisely 7,90 €/Mo savings (Got: ${savings.toFixed(2)} €)`
   );
 
   // Storage tiers validation: standard tier must be 0 € (inklusive)

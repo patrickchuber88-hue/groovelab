@@ -35,9 +35,9 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
     ? 'Pro-Level (ab 16 J.)' 
     : (uiLevelRaw === 'teen' ? 'Teen-Level (11–15 J.)' : 'Junior-Level (6–10 J.)');
 
-  // Hauptfach-Auflösung (0,1% Goldstandard: Reales Instrument statt Platzhalter 'Musikunterricht' / 'Musiker')
+  // Hauptfach-Auflösung (0,1% Goldstandard: Reales Instrument statt statischem Dummy-Fallback)
   const rawInst = getEffectiveInstrument(studentUser) || studentUser?.instrument;
-  const instrument = (!rawInst || isGenericInstrument(rawInst)) ? 'Gitarre' : rawInst;
+  const instrument = (!rawInst || isGenericInstrument(rawInst)) ? 'Instrumental- / Vokalunterricht' : rawInst;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

@@ -1,11 +1,27 @@
 import React from 'react';
-import { History as HistoryIcon } from 'lucide-react';
+import { History as HistoryIcon, Check } from 'lucide-react';
+
+interface PrapInvoiceRecord {
+  id?: string;
+  amount?: number;
+  status?: string;
+  type?: string;
+}
 
 interface PrapSubTabProps {
   totalMonthlyRevenue: number;
+  dbInvoices?: PrapInvoiceRecord[];
 }
 
-export const PrapSubTab: React.FC<PrapSubTabProps> = ({ totalMonthlyRevenue }) => {
+export const PrapSubTab: React.FC<PrapSubTabProps> = ({ totalMonthlyRevenue, dbInvoices = [] }) => {
+  // Real calculation from paid/issued invoices in DB without invented multipliers
+  const paidInvoicesTotal = dbInvoices
+    .filter(inv => inv.status === 'paid' || inv.status === 'Bezahlt')
+    .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
+
+  const cashInflow = paidInvoicesTotal > 0 ? paidInvoicesTotal : totalMonthlyRevenue;
+  const deferredRevenue = Math.max(0, Number((cashInflow - totalMonthlyRevenue).toFixed(2)));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
       <div style={{
@@ -37,9 +53,11 @@ export const PrapSubTab: React.FC<PrapSubTabProps> = ({ totalMonthlyRevenue }) =
         <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Cash Inflow (Zahlungseingang kumuliert)</span>
           <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a' }}>
-            {(totalMonthlyRevenue * 1.15).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            {cashInflow.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
           </div>
-          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700 }}>✓ Reales Bankguthaben</span>
+          <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={12} /> Reales Bankguthaben / Faktura-Ist
+          </span>
         </div>
 
         <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -53,7 +71,7 @@ export const PrapSubTab: React.FC<PrapSubTabProps> = ({ totalMonthlyRevenue }) =
         <div style={{ background: '#ffffff', padding: '24px', borderRadius: '20px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Deferred Revenue Pool (PRAP-Konto 0980)</span>
           <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#d97706' }}>
-            {((totalMonthlyRevenue * 1.15) - totalMonthlyRevenue).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+            {deferredRevenue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
           </div>
           <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 700 }}>Abgrenzungsposten Folgemonate</span>
         </div>

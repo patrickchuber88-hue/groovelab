@@ -20,10 +20,10 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 
 | Tarif / Komponente | Monatspreis Netto (EUR) | Monatspreis Netto (CHF) | Leistungsumfang & Bounded Context |
 |---|---|---|---|
-| **Campus Modul** | **14,90 € / Mo.** | **CHF 19.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung (inkl. 10 GB Audio-Tresor) |
-| **GrooveLab Modul** | **9,90 € / Mo.** | **CHF 14.90 / Mo.** | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
-| **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | **CHF 29.90 / Mo.** | Beide Module vollständig gebucht (**4,90 € bzw. CHF 4.90 / Mo. Ersparnis** gegenüber Einzelsumme) |
-| **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Pro aktivem Administrator-, Schulleiter- oder Lehrer-Profil |
+| **Campus Modul** | **19,90 € / Mo.** *(Bestand: 14,90 €)* | **CHF 25.90 / Mo.** *(Bestand: 19.90)* | Didaktik, Messenger, Hausaufgaben, Schwarzes Brett, Stundenplan & Raumverwaltung (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **12,90 € / Mo.** *(Bestand: 9,90 €)* | **CHF 16.80 / Mo.** *(Bestand: 14.90)* | WebAudio Synthesizer, Loopstation, Practice Companion, Band-Matching & DAW-Engine (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** *(Bestand: 19,90 €)* | **CHF 32.50 / Mo.** *(Bestand: 29.90)* | Beide Module vollständig gebucht (**7,90 € bzw. CHF 10.20 / Mo. Ersparnis** gegenüber Einzelsumme) |
+| **Service Fee (Lehrkräfte)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Pro aktivem Lehrer-Profil (Schulleitung `admin` & Sekretariat `secretary` dauerhaft **0,00 € / CHF 0.00 inklusive**) |
 
 > 🏛️ **B2B-Steuer-Axiom (Release 2026.6):**  
 > Alle B2B-Preise verstehen sich als **Netto-Preise**. Solange die Kleinunternehmerregelung (§ 19 UStG) angewendet wird, wird keine Umsatzsteuer berechnet. Bei Übergang zur Regelbesteuerung wird die gesetzliche USt (19 %) ordnungsgemäß auf den Nettopreis aufgeschlagen und ausgewiesen. Schüler-Direktabrechnungen (B2C, Modell B) bleiben hiervon unberührt und verstehen sich als Endpreise.
@@ -49,8 +49,8 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 *Für Eltern und Schüler ist die Nutzung zu 100% kostenfrei.*
 
 1. **Variable monatliche Abrechnung:**
-   - Basispauschale (z. B. Kombi 19,90 € / Mo.)
-   - + Team-Profile (0,49 € / Lehrer / Mo.)
+   - Basispauschale (z. B. Kombi 24,90 € / Mo.; Altverträge 19,90 € / Mo.)
+   - + Aktive Lehrkräfte-Profile (0,49 € / aktive Lehrkraft / Mo.; Admin & Sekretariat 0,00 €)
    - + Aktive Schüleraktivierungen (0,49 € / aktiver Schüler / Mo.)
    - **Kostenairbag:** War ein Schüler länger als **2 Monate nicht eingeloggt**, wird das Profil automatisch inaktiviert, sodass Kosten nur bei tatsächlicher Nutzung anfallen.
 2. **Jahresbeitrag bei Aktivierung (10% Rabatt):**
@@ -114,10 +114,10 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 ```
 1. Campus-Groovelab Software-Bereitstellung:  0,00 € (Inklusive)
 2. Cloud- & Datenbank-Hosting (Basispauschale):
-   - Campus Modul:                            14,90 € / Mo.
-   - GrooveLab Modul:                          9,90 € / Mo.
-   - Kombi-Vorteil Bundle:                    19,90 € / Mo.
-3. Pädagogen- & Verwaltungslizenzen:          0,49 € / aktives Team-Profil / Mo.
+   - Campus Modul:                            19,90 € / Mo. (Bestandsschutz Altverträge: 14,90 € / Mo.)
+   - GrooveLab Modul:                         12,90 € / Mo. (Bestandsschutz Altverträge: 9,90 € / Mo.)
+   - Kombi-Vorteil Bundle:                    24,90 € / Mo. (Bestandsschutz Altverträge: 19,90 € / Mo.)
+3. Pädagogen- & Administrationspauschale:     0,49 € / aktive Lehrkraft / Mo. (Verwaltung & Schulleitung 0,00 € inklusive)
 4. Schüler-Aktivierungen:
    - Campus Schüleraktivierung:               0,49 € / Mo. (oder Jahresbeitrag via Eltern)
    - GrooveLab Schüleraktivierung:            0,49 € / Mo. (100% Sammelzahler durch Schule)
@@ -129,9 +129,9 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 
 | Tarif / Komponente | 🇪🇺 Deutschland & Österreich (EUR) | 🇨🇭 Schweiz (CHF) (SSOT / pricingEngine.ts) | Bounded Context & Governance |
 |---|---|---|---|
-| **Campus Modul** | **14,90 € / Mo.** | **CHF 19.90 / Mo.** | Didaktik, Messenger, Hausaufgaben, Raum- & Stundenplan (inkl. 10 GB Audio-Tresor) |
-| **GrooveLab Modul** | **9,90 € / Mo.** | **CHF 14.90 / Mo.** | WebAudio Synth, Loopstation, Practice Companion & DAW (inkl. 10 GB Audio-Tresor) |
-| **Kombi-Vorteil Bundle** | **19,90 € / Mo.** | **CHF 29.90 / Mo.** | Volles Paket (**4,90 € bzw. CHF 4.90** monatliche Ersparnis) |
+| **Campus Modul** | **19,90 € / Mo.** *(Bestand: 14,90 €)* | **CHF 25.90 / Mo.** *(Bestand: 19.90)* | Didaktik, Messenger, Hausaufgaben, Raum- & Stundenplan (inkl. 10 GB Audio-Tresor) |
+| **GrooveLab Modul** | **12,90 € / Mo.** *(Bestand: 9,90 €)* | **CHF 16.80 / Mo.** *(Bestand: 14.90)* | WebAudio Synth, Loopstation, Practice Companion & DAW (inkl. 10 GB Audio-Tresor) |
+| **Kombi-Vorteil Bundle** | **24,90 € / Mo.** *(Bestand: 19,90 €)* | **CHF 32.50 / Mo.** *(Bestand: 29.90)* | Volles Paket (**7,90 € bzw. CHF 10.20** monatliche Ersparnis) |
 | **Service Fee (Team)** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Je aktives Pädagogen-Profil (Admin & Sekretariat 0,00 € / CHF 0.00) |
 | **Schülerbeitrag monatlich** | **0,49 € / Mo.** | **CHF 1.00 / Mo.** | Bereitstellung je aktiver Schüler im Monat |
 | **Max. Jahresbeitrag Direkt** | **5,39 € / Schuljahr** | **CHF 11.00 / Schuljahr** | 1 Probemonat gratis + bis zu 11 Monate berechnet |
@@ -183,9 +183,11 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 6. **Kalendermäßiges Zahlungsziel & Werktags-Klausel (§§ 286, 193 BGB):**
    - Das formelle Zahlungsziel auf B2B-Rechnungen ist auf **30 Tage netto** festgesetzt (harmonisiert mit dem gesetzlichen Leitbild des § 286 Abs. 3 BGB; Begründung der rechtlichen Fälligkeit).
    - Fällt der 30. Tag auf ein Wochenende (Samstag/Sonntag) oder einen gesetzlichen Feiertag, verschiebt sich die Fälligkeit gemäß § 193 BGB automatisch auf den nächsten Werktag (Montag).
-7. **EPC-GiroCode (Europäischer QR-Standard):**
-   - Jede Rechnung enthält den offiziellen EPC-QR-Code (European Payments Council) zur beleglosen 1-Scan-Zahlung in Banking-Apps.
-   - Bankverbindung des Plattformbetriebs: *Campus-Groovelab Plattformbetrieb*, IBAN `DE89 3704 0044 0532 9482 11`, BIC `COBADEFFXXX` (Commerzbank AG).
+7. **EPC-GiroCode & Zero-Stripe B2B-Standard (Direkter Banktransfer):**
+   - **Kanonischer B2B-Zahlungsweg:** Für den Plattformbetrieb wird bewusst auf US-Fintech-Gateways (wie Stripe) verzichtet. Musikschulen, Träger und Kommunen in DACH begleichen B2B-Rechnungen zu 100 % per banküblicher **SEPA-Banküberweisung**.
+   - **Zero-Disagio & 100 % Cashflow:** Durch den Verzicht auf Kreditkarten-Acquirer verbleiben 100 % der Einnahmen ohne Transaktionsgebühren (0 % Abzug) beim Betreiber.
+   - **EPC-QR-Code (European Payments Council):** Jede Rechnung enthält den offiziellen EPC-QR-Code zur fehlerfreien 1-Scan-Zahlung in allen europäischen Banking-Apps (Sparkasse, Volksbank, Commerzbank etc.) mit vorausgefüllter IBAN, Betrag und Rechnungsnummer (`RE-2026-MUSA-XXXX`).
+   - **Bankverbindung des Plattformbetriebs:** Gesteuert über die Single Source of Truth `OPERATOR_BANKING_CONFIG` (`apps/groovelab/src/config/operatorBanking.ts`). Solange das Geschäftskonto in Einrichtung ist, wird ein neutraler Platzhalter ohne Dummy-IBAN ausgegeben.
 8. **Didaktische Immunität & Schonfristen (§ 242 BGB):**
    - Musikschulen erhalten nach Fälligkeit eine reale **Schonfrist von weiteren 30 Tagen (Stufe 1 & 2 als Ambient-Hinweise)** und in den Sommermonaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
    - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).

@@ -34,13 +34,13 @@
  * - Pure RAW: -14.5 LUFS / -1.0 dBTP (Exakt 0.5 LUFS subtiler, satter Master-Vergleich)
  * ==============================================================================
  */
-
-import * as lamejs from '@breezystack/lamejs';
 import { reportAudioError } from '../lib/errorTelemetry';
 import { SharedAudioEngine } from './sharedAudioEngine';
 
 // 🌟 CENTRAL PLATFORM-WIDE LOUDNESS & PEAK STANDARDS
 export const TARGET_STUDIO_LUFS = -14.0;
+export const TARGET_LOOP_TRACK_LUFS = -16.0; // 🏛️ 0,1% Loopstation Goldstandard: -16.0 LUFS Einzelspur-Präsenz, summiert sich bei 4 Spuren perfekt auf -13.5 bis -14.0 LUFS Master-Punch
+export const TARGET_LOOP_TRACK_PEAK_DBTP = -1.5; // 🏛️ Multi-Track Headroom (-1.5 dBTP): Verhindert Clipping beim 4-Spur-Summieren
 export const TARGET_PURE_RAW_LUFS = -18.5; // 🏛️ Musikschul-Goldstandard (-18.5 LUFS): EBU R128 Musik-Referenz, volle Akustik-Dynamik & perfekte Durchsetzungsfähigkeit auf mobilen Geräten
 export const TARGET_PEAK_DBTP = -1.0;      // 🏛️ Broadcast-Headroom (-1.0 dBTP): Zero Intersample Clipping nach EBU R128
 export const TARGET_PURE_RAW_PEAK_DBTP = -1.0;
@@ -1374,16 +1374,19 @@ export function processPureRawAudioBuffer(
     applySlapTransientNotch(audioBuffer, 3400.0, -1.5, 2.4);
   }
 
-  // 4. 5ms Equal-Power Micro-Fades (Click/Pop prevention at boundaries)
-  const fadeSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(length * 0.05));
-  if (fadeSamples > 0) {
-    for (let c = 0; c < numChannels; c++) {
-      const data = audioBuffer.getChannelData(c);
-      for (let i = 0; i < fadeSamples; i++) {
-        const t = i / fadeSamples;
-        const fadeIn = Math.sin((t * Math.PI) / 2);
-        data[i] *= fadeIn;
-        data[length - 1 - i] *= fadeIn;
+  // 4. 5ms Equal-Power Micro-Fades (Click/Pop prevention at boundaries for non-looping audio)
+  // For cyclic loops (isLoop === true), boundary zero-muting is skipped to preserve seamless seam continuity without volume dips.
+  if (!isLoop) {
+    const fadeSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(length * 0.05));
+    if (fadeSamples > 0) {
+      for (let c = 0; c < numChannels; c++) {
+        const data = audioBuffer.getChannelData(c);
+        for (let i = 0; i < fadeSamples; i++) {
+          const t = i / fadeSamples;
+          const fadeIn = Math.sin((t * Math.PI) / 2);
+          data[i] *= fadeIn;
+          data[length - 1 - i] *= fadeIn;
+        }
       }
     }
   }
@@ -1573,7 +1576,7 @@ export async function processPureRawBlob(
   });
   const processedUrl = URL.createObjectURL(wavBlob);
 
-  const streamingRes = audioBufferToStreamingBlob(decodedBuffer, {
+  const streamingRes = await audioBufferToStreamingBlob(decodedBuffer, {
     title: 'Campus-Groovelab Pure RAW Audio',
     artist: 'Campus-Groovelab',
     bitrateKbps: 256
@@ -1888,7 +1891,7 @@ export async function processStudioMasteringAudioBuffer(
   const masteredUrl = URL.createObjectURL(wavBlob);
 
   // 📦 Tier-1 Audiophile Streaming Blob (256 kbit/s MP3, saves ~90% bandwidth)
-  const streamingRes = audioBufferToStreamingBlob(renderedBuffer, {
+  const streamingRes = await audioBufferToStreamingBlob(renderedBuffer, {
     title: 'Campus-Groovelab Studio Master',
     artist: 'Campus-Groovelab',
     bitrateKbps: 256
@@ -1995,7 +1998,7 @@ export async function processDualMastering(
   });
   const rawNormalizedUrl = URL.createObjectURL(rawWavBlob);
 
-  const rawStreamingRes = audioBufferToStreamingBlob(rawBuffer, {
+  const rawStreamingRes = await audioBufferToStreamingBlob(rawBuffer, {
     title: 'Campus-Groovelab Pure RAW Audio',
     artist: 'Campus-Groovelab',
     bitrateKbps: 256
@@ -2164,19 +2167,20 @@ export function audioBufferToWavBlob(buffer: AudioBuffer, metadata?: { title?: s
 // ==============================================================================
 // 📦 TIER-1 AUDIOPHILE STREAMING ENCODER (192-256 kbit/s Transparent Quality)
 // ==============================================================================
-export function audioBufferToStreamingBlob(
+export async function audioBufferToStreamingBlob(
   buffer: AudioBuffer,
   options?: {
     bitrateKbps?: number;
     title?: string;
     artist?: string;
   }
-): { blob: Blob; mimeType: string; fileNameExt: string } {
+): Promise<{ blob: Blob; mimeType: string; fileNameExt: string }> {
   const bitrate = options?.bitrateKbps || 256;
   const channels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
 
   try {
+    const lamejs = await import('@breezystack/lamejs');
     const Mp3EncoderClass = (lamejs as any).Mp3Encoder || (lamejs as any).default?.Mp3Encoder || (window as any).lamejs?.Mp3Encoder;
     if (Mp3EncoderClass) {
       const mp3encoder = new Mp3EncoderClass(channels, sampleRate, bitrate);

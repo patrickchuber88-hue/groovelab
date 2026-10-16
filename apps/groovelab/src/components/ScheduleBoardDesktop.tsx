@@ -45,7 +45,7 @@ import {
   matchStudentNameOrInitial,
   extractStudentTokensFromName
 } from '../utils/nameHelper';
-import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleCalendarViewDesktop';
+const ScheduleCalendarView = React.lazy(() => import('./ScheduleCalendarViewDesktop').then(m => ({ default: m.ScheduleCalendarViewDesktop })));
 import { ScheduleLifecycleHero } from './teacher/designer/ScheduleLifecycleHero';
 import { ScheduleDesignerStudioBar } from './teacher/designer/ScheduleDesignerStudioBar';
 import { safeLocalStorageSet, safeLocalStorageRemove } from '../utils/storageQuotaGuard';
@@ -3022,6 +3022,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
 
+          const syncPromises: Promise<any>[] = [];
           for (const b of boardsToSave) {
             const cleanRoomId = isUUID(b.roomId) ? b.roomId : null;
             const dayName = DAYS_OF_WEEK.find(d => d.value === b.dayOfWeek)?.name || 'Unterrichtstag';
@@ -3032,47 +3033,38 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
               for (const stId of studentIds) {
                 if (!isUUID(stId)) continue;
+                syncPromises.push((async () => {
+                  await supabase.from('schedules').upsert({
+                    school_id: effectiveSchoolId, teacher_id: cleanTeacherId, student_id: stId,
+                    day_of_week: b.dayOfWeek, time_slot: s.assignedTime, room_id: cleanRoomId,
+                    duration: s.duration || 30, status: 'approved'
+                  }, { onConflict: 'school_id,teacher_id,student_id' });
 
-                // 1. Update / Upsert schedules table
-                await supabase.from('schedules').upsert({
-                  school_id: effectiveSchoolId,
-                  teacher_id: cleanTeacherId,
-                  student_id: stId,
-                  day_of_week: b.dayOfWeek,
-                  time_slot: s.assignedTime,
-                  room_id: cleanRoomId,
-                  duration: s.duration || 30,
-                  status: 'approved'
-                }, { onConflict: 'school_id,teacher_id,student_id' });
+                  const { data: upcomingOccs } = await supabase
+                    .from('schedule_occurrences')
+                    .select('id, date, start_time')
+                    .eq('student_id', stId)
+                    .eq('teacher_id', cleanTeacherId)
+                    .gte('date', todayStr)
+                    .order('date', { ascending: true })
+                    .limit(1);
 
-                // 2. Update future occurrences for this student with this teacher via authoritative reschedule RPC
-                const { data: upcomingOccs } = await supabase
-                  .from('schedule_occurrences')
-                  .select('id, date, start_time')
-                  .eq('student_id', stId)
-                  .eq('teacher_id', cleanTeacherId)
-                  .gte('date', todayStr)
-                  .order('date', { ascending: true })
-                  .limit(1);
-
-                if (upcomingOccs && upcomingOccs.length > 0) {
-                  const occ = upcomingOccs[0];
-                  await supabase.rpc('reschedule_lesson_authoritative', {
-                    p_occurrence_id: occ.id,
-                    p_student_id: stId,
-                    p_teacher_id: cleanTeacherId,
-                    p_date: occ.date,
-                    p_start_time: s.assignedTime.length === 5 ? `${s.assignedTime}:00` : s.assignedTime,
-                    p_original_date: occ.date,
-                    p_original_start_time: occ.start_time,
-                    p_duration: s.duration || 30,
-                    p_template_room_id: cleanRoomId,
-                    p_notes: `Termin auf Stundenplan-Board verschoben auf ${dayName} ${s.assignedTime} Uhr`
-                  });
-                }
+                  if (upcomingOccs && upcomingOccs.length > 0 && s.assignedTime) {
+                    const occ = upcomingOccs[0];
+                    const safeTime = s.assignedTime;
+                    await supabase.rpc('reschedule_lesson_authoritative', {
+                      p_occurrence_id: occ.id, p_student_id: stId, p_teacher_id: cleanTeacherId,
+                      p_date: occ.date, p_start_time: safeTime.length === 5 ? `${safeTime}:00` : safeTime,
+                      p_original_date: occ.date, p_original_start_time: occ.start_time,
+                      p_duration: s.duration || 30, p_template_room_id: cleanRoomId,
+                      p_notes: `Termin auf Stundenplan-Board verschoben auf ${dayName} ${safeTime} Uhr`
+                    });
+                  }
+                })());
               }
             }
           }
+          if (syncPromises.length > 0) await Promise.all(syncPromises);
           window.dispatchEvent(new CustomEvent('refresh-bookings'));
         } catch (liveSyncErr) {
           console.warn('[ScheduleBoardDesktop] Approved live schedule sync note:', liveSyncErr);
@@ -6392,6 +6384,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       `}</style>
       
       {activeTab === 'calendar' ? (
+        <React.Suspense fallback={null}>
         <ScheduleCalendarView 
           schoolId={schoolId} 
           userId={selectedTeacherId} 
@@ -6420,10 +6413,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           currentUserRole={currentUserRole}
           hasSubmittedSchedule={hasSubmittedSchedule}
           scheduleStatus={scheduleStatus}
-          onStartTour={() => {
-            startCalendarTour();
-          }}
+          onStartTour={() => startCalendarTour()}
         />
+        </React.Suspense>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
           {/* Header Panel — sticky on iPad / desktop */}

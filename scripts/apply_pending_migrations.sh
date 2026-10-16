@@ -2,12 +2,12 @@
 # ==============================================================================
 # 🛡️ Campus-Groovelab Authoritative DB Migration Engine [0,1% Goldstandard]
 # Standards: OWASP ASVS Level 3 / Fail-Closed / ISO 27001 / BSI IT-Grundschutz
-# Target: Hetzner Cloud Production Cluster (deployuser@178.105.10.2)
+# Target: IONOS Cloud Production Cluster Frankfurt (deployuser@85.215.73.216)
 # ==============================================================================
 
 set -euo pipefail
 
-SERVER="${SERVER:-deployuser@178.105.10.2}"
+SERVER="${SERVER:-deployuser@85.215.73.216}"
 MIGRATIONS_DIR="supabase/migrations"
 
 echo "=============================================================================="

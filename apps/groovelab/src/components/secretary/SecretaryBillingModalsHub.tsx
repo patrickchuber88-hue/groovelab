@@ -632,7 +632,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               '• Dynamische Restzeit: Sie zahlen immer nur die tatsächlich verbleibenden Monate bis zum Schuljahresende (kein 12-Monats-Zwang).',
               '• Kein Abo & keine Verlängerung: Einmalige Schuljahresgebühr • endet automatisch zum Schuljahresende.',
               '• GrooveLab-Vorteil: Band-Rooms, Repertoire & Songs bleiben für Ihr Kind 100% kostenfrei (Schule übernimmt).',
-              '• 100% Datenschutz: Keine Speicherung von Bankdaten Minderjähriger (DSGVO/COPPA-konform).',
+              '• 100% Datenschutz: Keine Speicherung von Bankdaten Minderjähriger (DSGVO Art. 8-konform).',
               '',
               'So schalten Sie den Zugang für Ihr Kind frei:',
               '1. Öffnen Sie die Campus-Groovelab App auf dem Smartphone oder Tablet Ihres Kindes.',
@@ -2149,7 +2149,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                     color: '#b45309',
                     lineHeight: '1.4'
                   }}>
-                    <strong>Info zur Kündigungsfrist:</strong> Die Kündigung muss mit einer Frist von 1 Monat zum Schuljahresende (31.08.) eingereicht werden. Da das aktuelle Schuljahr am {yearInfo.formattedDate} endet, wird diese Kündigung wirksam zum <strong>{yearInfo.formattedDate}, 23:59 Uhr</strong>. Bis dahin bleibt dein Zugang für alle Lehrkräfte und Schüler voll aktiv.
+                    <strong>Info zur Kündigungsfrist:</strong> Die ordentliche Kündigung erfolgt mit einer Frist von 3 Monaten zum Schuljahresende (Stichtag 31.05. zum 31.08. gem. AGB Teil A Ziffer 4 Abs. 2; im verkürzten Rumpf-Schuljahr 2 Wochen). Diese Kündigung wird wirksam zum <strong>{yearInfo.formattedDate}, 23:59 Uhr</strong>. Bis dahin bleibt dein Zugang für alle Lehrkräfte und Schüler voll aktiv.
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2192,27 +2192,17 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                     <button
                       onClick={async () => {
                         try {
-                          const endStr = yearInfo.endDateIso;
-                          let generatedId = `KD-${schoolNumericId}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
-
-                          // 1. Authoritative RPC call
+                          // 1. Authoritative Fail-Closed RPC call
                           const { data: rpcRes, error: rpcErr } = await supabase.rpc('cancel_school_subscription', {
                             p_school_id: schoolId,
-                            p_reason: cancellationReason || 'Ordentliche Kündigung zum Schuljahresende',
-                            p_actor_id: (currentSchoolProfile as any)?.user_id || null,
-                            p_simulated_date: simulatedToday || null
+                            p_cancellation_reason: cancellationReason || 'Ordentliche Kündigung zum Schuljahresende'
                           });
-
-                          if (rpcErr) {
-                            console.warn("RPC cancel_school_subscription failed, using resilient direct fallback:", rpcErr);
-                            const { error: directErr } = await supabase
-                              .from('schools')
-                              .update({ contract_ends_at: endStr })
-                              .eq('id', schoolId);
-                            if (directErr) throw directErr;
-                          } else if (rpcRes && rpcRes.cancellation_id) {
-                            generatedId = rpcRes.cancellation_id;
+                          if (rpcErr || !rpcRes || rpcRes.success === false) {
+                            throw new Error(rpcErr?.message || rpcRes?.error || 'Kündigungs-RPC fehlgeschlagen.');
                           }
+                          const endStr = rpcRes.contract_ends_at || yearInfo.endDateIso;
+                          const effectiveInfo = getSchoolYearEndInfo(simulatedToday, endStr);
+                          const generatedId = rpcRes.cancellation_id || `KD-${schoolNumericId}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
 
                           if (setLastCancellationId) {
                             setLastCancellationId(generatedId);
@@ -2228,7 +2218,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                           downloadCancellationReceiptPdf({
                             cancellationId: generatedId,
                             cancelledAt: new Date(),
-                            effectiveEndDateFormatted: yearInfo.formattedDate,
+                            effectiveEndDateFormatted: effectiveInfo.formattedDate,
                             schoolName: schoolName || currentSchoolProfile?.name
                           });
                         } catch (err: any) {

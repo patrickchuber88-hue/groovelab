@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import type { School } from '../../MasterAdminTypes';
+import { Users, X } from 'lucide-react';
+import type { School, SpecialOffer } from '../../MasterAdminTypes';
 
 interface SchoolRedemptionDetailModalProps {
-  selectedOfferForSchools: any;
+  selectedOfferForSchools: SpecialOffer | null;
   schools: School[];
   onClose: () => void;
   onAssignSchool: (offerId: string, schoolId: string) => void;
@@ -35,7 +36,7 @@ export const SchoolRedemptionDetailModal: React.FC<SchoolRedemptionDetailModalPr
       zIndex: 999999,
       padding: '20px'
     }}>
-      <div role="dialog" aria-modal="true" style={{
+      <div role="dialog" aria-modal="true" aria-label="Zugeordnete Mandanten" style={{
         background: '#ffffff',
         borderRadius: '24px',
         width: '100%',
@@ -48,8 +49,8 @@ export const SchoolRedemptionDetailModal: React.FC<SchoolRedemptionDetailModalPr
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-              👥 Zugeordnete Mandanten
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
+              <Users size={18} color="#0f172a" /> Zugeordnete Mandanten
             </h3>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
               Aktion: <strong>{selectedOfferForSchools.name}</strong> ({selectedOfferForSchools.discount_percent}% Rabatt)
@@ -58,9 +59,10 @@ export const SchoolRedemptionDetailModal: React.FC<SchoolRedemptionDetailModalPr
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}
+            aria-label="Schließen"
+            style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 

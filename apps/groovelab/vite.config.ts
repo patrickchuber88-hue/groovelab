@@ -91,6 +91,7 @@ export default defineConfig({
             dep.includes('vendor-jspdf') ||
             dep.includes('vendor-canvas') ||
             dep.includes('vendor-qr') ||
+            dep.includes('vendor-lamejs-lgpl') ||
             dep.includes('id-badge-') ||
             dep.includes('StudentAvatarDashboard') ||
             dep.includes('student-') ||
@@ -114,6 +115,9 @@ export default defineConfig({
  */`,
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
+            if (id.includes('@breezystack/lamejs') || id.includes('lamejs')) {
+              return 'vendor-lamejs-lgpl';
+            }
             if (id.includes('react-dom') || id.includes('react-router') || id.includes('/react/') || id.includes('react-use')) {
               return 'vendor-react';
             }
@@ -129,6 +133,9 @@ export default defineConfig({
           // Shared domain and calculation utilities (prevents cycles between master-admin, billing, and secretary)
           if (id.includes('domain/pricingEngine') || id.includes('domain/schoolMetricsAggregator') || id.includes('domain/schoolDunningEngine') || id.includes('domain/billingCalculator') || id.includes('context/MasterPricingContext')) {
             return 'domain-pricing-suite';
+          }
+          if (id.includes('utils/pdfGenerator')) {
+            return 'pdf-generator-suite';
           }
           // Shared identity, user name formatting and badge helpers (prevents cycles between admin, secretary, and master-admin)
           if (id.includes('utils/userDisplayName') || id.includes('utils/nameHelper') || id.includes('utils/adminColorHelpers') || id.includes('utils/instruments') || id.includes('constants/instruments')) {
@@ -235,7 +242,7 @@ export default defineConfig({
           if (id.includes('MeisterwerkDocumentationModal')) {
             return 'meisterwerk-suite';
           }
-          if (id.includes('GrooveLoopstation')) {
+          if (id.includes('CampusLoopstation') || id.includes('GrooveLoopstation')) {
             return 'audio-loopstation';
           }
           if (id.includes('CampusAppModalsHub') || id.includes('components/modals/')) {

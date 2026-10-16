@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building, QrCode, Users, Clock, Calendar, MapPin } from 'lucide-react';
+import { Building, QrCode, Users, Clock, Calendar, MapPin, Music } from 'lucide-react';
 import { StudioAvatar } from '../StudioAvatar';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
 
@@ -55,7 +55,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
           background: 'rgba(255, 255, 255, 0.72)',
           backdropFilter: 'blur(24px) saturate(1.8)',
           WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-          border: '1px solid rgba(52, 168, 83, 0.2)',
+          border: '1px solid #e2e8f0',
           borderRadius: '32px',
           display: 'flex',
           alignItems: 'stretch',
@@ -73,7 +73,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
             flexShrink: 0,
             position: 'relative',
             overflow: 'hidden',
-            borderRight: '1px solid rgba(52, 168, 83, 0.15)',
+            borderRight: '1px solid #f1f5f9',
           }}
         >
           <StudioAvatar
@@ -164,16 +164,16 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: 'rgba(52, 168, 83, 0.07)',
-                    border: '1px solid rgba(52, 168, 83, 0.18)',
-                    color: '#34a853',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    color: '#334155',
                     padding: '5px 14px',
                     borderRadius: '12px',
                     fontSize: '0.8rem',
                     fontWeight: 800,
                   }}
                 >
-                  <span>🎵</span>
+                  <Music size={14} color="#475569" />
                   <span>{inst}</span>
                 </div>
               ))}
@@ -236,15 +236,17 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
               height: '48px',
               width: '48px',
               borderRadius: '14px',
-              background: 'rgba(0, 122, 255, 0.08)',
-              color: '#007aff',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
             }}
           >
-            <Users size={22} />
+            <Users size={22} color="#0f172a" />
           </div>
           <div>
             <div
@@ -283,15 +285,17 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
               height: '48px',
               width: '48px',
               borderRadius: '14px',
-              background: 'rgba(52, 168, 83, 0.08)',
-              color: '#34a853',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
             }}
           >
-            <Clock size={22} />
+            <Clock size={22} color="#0f172a" />
           </div>
           <div>
             <div
@@ -330,15 +334,17 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
               height: '48px',
               width: '48px',
               borderRadius: '14px',
-              background: 'rgba(245, 158, 11, 0.08)',
-              color: '#f59e0b',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
             }}
           >
-            <Calendar size={22} />
+            <Calendar size={22} color="#0f172a" />
           </div>
           <div>
             <div
@@ -379,15 +385,17 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
               height: '48px',
               width: '48px',
               borderRadius: '14px',
-              background: 'rgba(139, 92, 246, 0.08)',
-              color: '#8b5cf6',
+              background: '#f8fafc',
+              border: '1.5px solid #e2e8f0',
+              color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
             }}
           >
-            <MapPin size={22} />
+            <MapPin size={22} color="#0f172a" />
           </div>
           <div>
             <div
@@ -433,7 +441,7 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
               gap: '8px',
             }}
           >
-            <Calendar size={20} style={{ color: '#007aff' }} />
+            <Calendar size={20} color="#0f172a" />
             Unterrichtstage & Startzeiten
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -505,16 +513,14 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
                             width: '36px',
                             borderRadius: '10px',
                             background: '#ffffff',
-                            border: '1px solid rgba(0,0,0,0.04)',
-                            color: '#0f172a',
+                            border: '1px solid #e2e8f0',
+                            color: '#475569',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '0.9rem',
-                            fontWeight: 900,
                           }}
                         >
-                          🗓️
+                          <Calendar size={18} color="#475569" />
                         </div>
                         <div>
                           <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
@@ -528,14 +534,25 @@ export const CampusStaffProfileView: React.FC<CampusStaffProfileViewProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span
                           style={{
-                            background: 'rgba(0, 122, 255, 0.08)',
-                            color: '#007aff',
-                            padding: '4px 10px',
-                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            color: '#334155',
+                            padding: '3px 10px',
+                            borderRadius: '100px',
                             fontSize: '0.7rem',
                             fontWeight: 800,
                           }}
                         >
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: '#34a853',
+                            boxShadow: '0 0 6px rgba(52, 168, 83, 0.45)'
+                          }} />
                           Aktiv
                         </span>
                       </div>

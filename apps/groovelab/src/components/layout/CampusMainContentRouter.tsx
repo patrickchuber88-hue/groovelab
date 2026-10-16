@@ -4,8 +4,7 @@ import { ErrorBoundary, DashboardLoader } from '../ui/ErrorBoundary';
 import { generateRandomBandName } from '../../utils/bandNameGenerator';
 
 const EnsembleDashboard = lazy(() => import('../EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
-const teacherDashboardPromise = import('../TeacherDashboard');
-const TeacherDashboard = lazy(() => teacherDashboardPromise.then(m => ({ default: m.TeacherDashboard })));
+const TeacherDashboard = lazy(() => import('../TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
 const StudentAvatarDashboard = lazy(() => import('../StudentAvatarDashboard').then(m => ({ default: m.StudentAvatarDashboard })));
 const AdminDashboard = lazy(() => import('../AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const CampusStaffProfileView = lazy(() => import('../campus/CampusStaffProfileView').then(m => ({ default: m.CampusStaffProfileView })));

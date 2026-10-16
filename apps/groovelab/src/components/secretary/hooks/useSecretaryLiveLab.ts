@@ -72,12 +72,28 @@ export function useSecretaryLiveLab({
   const fetchLiveStatusData = useCallback(async () => {
     if (!schoolId) return;
     try {
-      // Fetch active sessions for Live Lab
-      const { data: sessData, error: sessErr } = await supabase
-        .from('sessions')
-        .select('id, user_id, station_id, check_in_time, check_out_time, users!inner(id, first_name, last_name, instrument, avatar_url, photo_url, school_id), stations(id, name, school_id)')
-        .is('check_out_time', null)
-        .eq('users.school_id', schoolId);
+      const [
+        { data: sessData, error: sessErr },
+        { data: helpData },
+        { data: ticketsData }
+      ] = await Promise.all([
+        supabase
+          .from('sessions')
+          .select('id, user_id, station_id, check_in_time, check_out_time, users!inner(id, first_name, last_name, instrument, avatar_url, photo_url, school_id), stations(id, name, school_id)')
+          .is('check_out_time', null)
+          .eq('users.school_id', schoolId),
+        supabase
+          .from('help_requests')
+          .select('id, user_id, station_id, message, status, created_at, school_id, users(id, first_name, last_name, instrument)')
+          .eq('school_id', schoolId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('groovelab_tickets')
+          .select('id, school_id, title, status, priority, created_at')
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false })
+      ]);
 
       if (!sessErr && sessData) {
         const schoolSess = sessData
@@ -93,23 +109,8 @@ export function useSecretaryLiveLab({
         setActiveSessions(schoolSess);
       }
 
-      // Fetch help requests
-      const { data: helpData } = await supabase
-        .from('help_requests')
-        .select('id, user_id, station_id, message, status, created_at, school_id, users(id, first_name, last_name, instrument)')
-        .eq('school_id', schoolId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
       setHelpRequests(helpData || []);
-
-      // Fetch groovelab tickets
-      const { data: ticketsData } = await supabase
-        .from('groovelab_tickets')
-        .select('id, school_id, title, status, priority, created_at')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
       if (ticketsData) setTickets(ticketsData);
-
     } catch (err) {
       console.error('[useSecretaryLiveLab] Error fetching live status data:', err);
     }

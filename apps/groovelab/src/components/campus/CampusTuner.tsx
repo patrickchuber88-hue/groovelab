@@ -1,22 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
-  ArrowLeft,
-  RotateCcw,
-  Check,
-  ArrowUp,
-  ArrowDown,
-  Sparkles,
-  ChevronDown,
-  Lock,
-  Minus,
-  Plus,
-  Radio
+  Mic, MicOff, Volume2, VolumeX, ArrowLeft, RotateCcw, Check,
+  ArrowUp, ArrowDown, Sparkles, ChevronDown, Lock, Minus, Plus, Radio
 } from 'lucide-react';
 import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
+import { TunerA11ySonificationEngine } from '../../utils/tunerA11ySonificationEngine';
 
 // Musikalische Noten-Definitionen
 const NOTE_NAMES_INTL = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -287,6 +275,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
   const [smoothedCents, setSmoothedCents] = useState<number>(0);
 
   const [tunedStrings, setTunedStrings] = useState<Record<number, boolean>>({});
+  const [a11yAudioGuideEnabled, setA11yAudioGuideEnabled] = useState<boolean>(false);
+  const sonificationRef = useRef<TunerA11ySonificationEngine>(new TunerA11ySonificationEngine());
 
   const engineRef = useRef<YinAudioWorkletEngine | null>(null);
   const uiAudioContextRef = useRef<AudioContext | null>(null);
@@ -476,13 +466,13 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           }
         } else {
           inTuneFramesRef.current = 0;
+          sonificationRef.current.triggerDirectionalGuidancePulse(uiAudioContextRef.current, clampedCents, a11yAudioGuideEnabled);
         }
       } else {
         // 🌟 Transposition anwenden: Wir verschieben die erkannte MIDI-Note um den Offset des Presets
         const physicalNoteNum = noteFromPitch(pitch, a4Reference);
         const activeOffset = selectedPreset.transpositionOffset || 0;
         const transposedNoteNum = physicalNoteNum + activeOffset;
-        
         const noteNameList = useGermanNotation ? NOTE_NAMES_GERMAN : NOTE_NAMES_INTL;
         const noteName = noteNameList[transposedNoteNum % 12 < 0 ? (transposedNoteNum % 12) + 12 : transposedNoteNum % 12];
         const octave = Math.floor(transposedNoteNum / 12) - 1;
@@ -493,20 +483,12 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
         setDetectedOctave(octave);
         setCentsDeviation(clampedCents);
 
-        let targetCentsPhys = clampedCents;
-        if (Math.abs(clampedCents) <= 3) {
-          targetCentsPhys = clampedCents * 0.1;
-        }
-
-        // 🌟 0,1% Goldstandard: Kritisch gedämpfte Masse-Feder-Gleichung (Schwere, langsame Nadel)
-        // stiffness (Federkonstante): Sehr niedrig (0.04), die Nadel ist träge und fühlt sich wie ein schweres analoges Bauteil an.
-        // damping (Dämpfung): Hoch (0.40 = 2 * sqrt(0.04)), verhindert jegliches Überschießen (Critical Damping).
+        let targetCentsPhys = Math.abs(clampedCents) <= 3 ? clampedCents * 0.1 : clampedCents;
         const stiffness = 0.04;
         const damping = 0.40;
         const force = stiffness * (targetCentsPhys - smoothedCentsRef.current) - damping * velocityCentsRef.current;
         velocityCentsRef.current += force;
         smoothedCentsRef.current += velocityCentsRef.current;
-
         setSmoothedCents(Math.round(smoothedCentsRef.current * 10) / 10);
 
         if (Math.abs(clampedCents) <= 3) {
@@ -523,25 +505,24 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           }
         } else {
           inTuneFramesRef.current = 0;
+          sonificationRef.current.triggerDirectionalGuidancePulse(uiAudioContextRef.current, clampedCents, a11yAudioGuideEnabled);
         }
 
         if (selectedPreset.strings.length > 0) {
-            const bestIdx = findMatchingStringIndex(noteName, octave, pitch, selectedPreset.strings, useGermanNotation);
-          if (bestIdx !== -1) {
-            setSelectedStringIndex(bestIdx);
-          }
+          const bestIdx = findMatchingStringIndex(noteName, octave, pitch, selectedPreset.strings, useGermanNotation);
+          if (bestIdx !== -1) setSelectedStringIndex(bestIdx);
         }
       }
     } else {
       inTuneFramesRef.current = 0;
       smoothedCentsRef.current = smoothedCentsRef.current * 0.90;
       if (Math.abs(smoothedCentsRef.current) < 0.5) smoothedCentsRef.current = 0;
-    velocityCentsRef.current = 0;
+      velocityCentsRef.current = 0;
       setSmoothedCents(Math.round(smoothedCentsRef.current));
     }
 
     animationFrameRef.current = requestAnimationFrame(updatePitch);
-  }, [a4Reference, selectedPreset.strings, lockedStringIndex, useGermanNotation, playLockInChime]);
+  }, [a4Reference, selectedPreset.strings, lockedStringIndex, useGermanNotation, playLockInChime, a11yAudioGuideEnabled]);
 
   // Start Microphone mit 4096-Puffer für Bass/Cello
   const startListening = async () => {
@@ -549,11 +530,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
     const sessionId = ++audioSessionIdRef.current;
     try {
       const stream = await acquireAudioStream({
-        audio: {
-          echoCancellation: false,
-          autoGainControl: true,
-          noiseSuppression: false
-        }
+        audio: { echoCancellation: false, autoGainControl: true, noiseSuppression: false }
       });
       if (sessionId !== audioSessionIdRef.current) {
         releaseAudioStream(stream);
@@ -737,23 +714,14 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             />
           </div>
 
-          {/* Deutsche H / B Noten-Nomenklatur Umschalter mit Cyan-Akzent */}
+          {/* Deutsche H / B Noten-Nomenklatur Umschalter & BFSG Audio-Leitimpuls */}
           <button
             type="button"
             onClick={() => setUseGermanNotation(prev => !prev)}
             style={{
-              padding: '6px 12px',
-              borderRadius: '10px',
-              border: useGermanNotation ? '1.5px solid #06b6d4' : '1.5px solid #e2e8f0',
-              background: useGermanNotation ? 'rgba(6, 182, 212, 0.08)' : '#ffffff',
-              color: useGermanNotation ? '#0891b2' : '#0f172a',
-              fontSize: '0.76rem',
-              fontWeight: 850,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              transition: 'all 0.15s ease'
+              padding: '6px 12px', borderRadius: '10px', border: useGermanNotation ? '1.5px solid #06b6d4' : '1.5px solid #e2e8f0',
+              background: useGermanNotation ? 'rgba(6, 182, 212, 0.08)' : '#ffffff', color: useGermanNotation ? '#0891b2' : '#0f172a',
+              fontSize: '0.76rem', fontWeight: 850, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
             }}
             className="hover-scale"
             title="Zwischen deutscher H-Notation und internationaler B-Notation umschalten"
@@ -762,6 +730,25 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setUseGermanNotation(p => !p); }}
           >
             <span>{useGermanNotation ? 'Notation: H' : 'Notation: B'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setA11yAudioGuideEnabled(prev => !prev)}
+            aria-pressed={a11yAudioGuideEnabled}
+            aria-label="Akustische Richtungsführung beim Stimmen umschalten"
+            title="Barrierefreie Audio-Richtungsführung (Tonimpuls für zu tief / zu hoch)"
+            style={{
+              padding: '6px 12px', borderRadius: '10px', border: a11yAudioGuideEnabled ? 'none' : '1.5px solid #e2e8f0',
+              background: a11yAudioGuideEnabled ? '#0891b2' : '#ffffff', color: a11yAudioGuideEnabled ? '#ffffff' : '#0f172a',
+              fontSize: '0.76rem', fontWeight: 850, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setA11yAudioGuideEnabled(p => !p); }}
+          >
+            <Volume2 size={13} />
+            <span>{a11yAudioGuideEnabled ? 'Audio-Leitton: An' : 'Audio-Leitton'}</span>
           </button>
         </div>
 

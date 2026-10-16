@@ -12,6 +12,7 @@ export interface EInvoiceParty {
   city: string;
   countryCode?: string; // Default: 'DE'
   vatId?: string;
+  taxNumber?: string;
   contactName?: string;
   email?: string;
   iban?: string;
@@ -55,7 +56,7 @@ const formatUNCEFACTDate = (dateStr: string): string => {
 
 /**
  * Mathematische Validierung der amtlichen Leitweg-ID (KoSIT / DIN ISO 7064 MOD 97-10)
- * Format: Grobadressierung-Feinadressierung-Prüfziffer (z. B. 05111-01001-44 oder 991-12345-12)
+ * Format: Grobadressierung-Feinadressierung-Prüfziffer (z. B. 05111-01001-54 oder 04011000-1234512345-06)
  */
 export interface LeitwegIdValidationResult {
   isValid: boolean;
@@ -71,7 +72,7 @@ export const validateLeitwegId = (rawId?: string): LeitwegIdValidationResult => 
   const cleanId = rawId.trim();
   const parts = cleanId.split('-');
   if (parts.length < 2 || parts.length > 4) {
-    return { isValid: false, normalizedId: cleanId, error: 'Ungültiges Leitweg-ID Format (erwartet: z. B. 05111-01001-44).' };
+    return { isValid: false, normalizedId: cleanId, error: 'Ungültiges Leitweg-ID Format (erwartet: z. B. 05111-01001-54).' };
   }
 
   const checkDigitsStr = parts[parts.length - 1];
@@ -84,16 +85,49 @@ export const validateLeitwegId = (rawId?: string): LeitwegIdValidationResult => 
     return { isValid: false, normalizedId: cleanId, error: 'Die Leitweg-ID enthält ungültige Zeichen.' };
   }
 
+  // ISO 7064 MOD 97-10 Prüfziffernberechnung (Buchstaben A-Z -> 10-35)
+  let numericPayload = '';
+  for (let i = 0; i < payloadStr.length; i++) {
+    const ch = payloadStr[i].toUpperCase();
+    const code = ch.charCodeAt(0);
+    if (code >= 65 && code <= 90) {
+      numericPayload += String(code - 55);
+    } else {
+      numericPayload += ch;
+    }
+  }
+
+  try {
+    const fullNumber = BigInt(numericPayload + checkDigitsStr);
+    if (fullNumber % 97n !== 1n) {
+      const expectedCheck = String(98n - (BigInt(numericPayload + '00') % 97n)).padStart(2, '0');
+      return {
+        isValid: false,
+        normalizedId: cleanId,
+        error: `Ungültige ISO 7064 MOD 97-10 Prüfziffer in Leitweg-ID (erwartet: -${expectedCheck}).`
+      };
+    }
+  } catch {
+    return { isValid: false, normalizedId: cleanId, error: 'Prüfziffernberechnung der Leitweg-ID fehlgeschlagen.' };
+  }
+
   return { isValid: true, normalizedId: cleanId };
 };
 
 /**
- * Generates standard-compliant XRechnung 2.2 / ZUGFeRD 2.2 XML
+ * Generates standard-compliant XRechnung 3.0 / ZUGFeRD 2.2 XML
  */
 export const generateXRechnungXML = (data: EInvoicePayload): string => {
   const currency = data.currency || 'EUR';
   const issueDateFormatted = formatUNCEFACTDate(data.issueDate);
   const dueDateFormatted = data.dueDate ? formatUNCEFACTDate(data.dueDate) : issueDateFormatted;
+  const buyerCountry = (data.buyer.countryCode || (currency === 'CHF' ? 'CH' : 'DE')).toUpperCase();
+
+  const exemptionReasonText = buyerCountry === 'CH' || currency === 'CHF'
+    ? 'Nicht steuerbare sonstige Leistung gem. § 3a Abs. 2 UStG (Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG – Bezugsteuerverfahren).'
+    : buyerCountry === 'AT'
+      ? 'Steuerbefreit gem. § 19 UStG (Kleinunternehmerregelung) bzw. § 3a Abs. 2 UStG (Reverse-Charge / § 6 Abs. 1 Z 27 UStG AT).'
+      : 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).';
   
   // Validierung der Leitweg-ID (KoSIT BuyerReference)
   let buyerReferenceClean = data.buyerReference || 'N/A';
@@ -119,10 +153,10 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
   xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
   xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
   
-  <!-- 1. Context Specification (XRechnung / ZUGFeRD 2.2 Profile) -->
+  <!-- 1. Context Specification (XRechnung 3.0 / EN 16931 Profile) -->
   <rsm:ExchangedDocumentContext>
     <ram:GuidelineSpecifiedDocumentContextParameter>
-      <ram:ID>urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_2.2</ram:ID>
+      <ram:ID>urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0</ram:ID>
     </ram:GuidelineSpecifiedDocumentContextParameter>
   </rsm:ExchangedDocumentContext>
 
@@ -162,7 +196,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
       <ram:SpecifiedLineTradeSettlement>
         <ram:ApplicableTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
-          <ram:CategoryCode>${(item.vatPercent || 0) === 0 ? 'O' : 'S'}</ram:CategoryCode>
+          ${(item.vatPercent || 0) === 0 ? '<ram:CategoryCode>E</ram:CategoryCode>' : '<ram:CategoryCode>S</ram:CategoryCode>'}
           <ram:RateApplicablePercent>${(item.vatPercent || 0).toFixed(2)}</ram:RateApplicablePercent>
         </ram:ApplicableTradeTax>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
@@ -187,6 +221,9 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
         ${data.seller.vatId ? `
         <ram:SpecifiedTaxRegistration>
           <ram:ID schemeID="VA">${escapeXml(data.seller.vatId)}</ram:ID>
+        </ram:SpecifiedTaxRegistration>` : data.seller.taxNumber ? `
+        <ram:SpecifiedTaxRegistration>
+          <ram:ID schemeID="FC">${escapeXml(data.seller.taxNumber)}</ram:ID>
         </ram:SpecifiedTaxRegistration>` : ''}
       </ram:SellerTradeParty>
 
@@ -197,7 +234,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
           <ram:PostcodeCode>${escapeXml(data.buyer.zipCode)}</ram:PostcodeCode>
           <ram:LineOne>${escapeXml(data.buyer.street)}</ram:LineOne>
           <ram:CityName>${escapeXml(data.buyer.city)}</ram:CityName>
-          <ram:CountryID>${data.buyer.countryCode || 'DE'}</ram:CountryID>
+          <ram:CountryID>${buyerCountry}</ram:CountryID>
         </ram:PostalTradeAddress>
       </ram:BuyerTradeParty>
     </ram:ApplicableHeaderTradeAgreement>
@@ -232,9 +269,9 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
         <ram:CalculatedAmount>${vatTotal.toFixed(2)}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
         <ram:BasisAmount>${netTotal.toFixed(2)}</ram:BasisAmount>
-        <ram:CategoryCode>${vatTotal > 0 ? 'S' : 'O'}</ram:CategoryCode>
+        ${vatTotal > 0 ? '<ram:CategoryCode>S</ram:CategoryCode>' : '<ram:CategoryCode>E</ram:CategoryCode>'}
         <ram:RateApplicablePercent>${vatTotal > 0 ? ((vatTotal / (netTotal || 1)) * 100).toFixed(2) : '0.00'}</ram:RateApplicablePercent>
-        ${vatTotal === 0 ? '<ram:ExemptionReason>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</ram:ExemptionReason>' : ''}
+        ${vatTotal === 0 ? `<ram:ExemptionReason>${escapeXml(exemptionReasonText)}</ram:ExemptionReason>` : ''}
       </ram:ApplicableTradeTax>
 
       <!-- Payment Terms -->
@@ -242,7 +279,7 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
         <ram:DueDateDateTime>
           <udt:DateTimeString format="102">${dueDateFormatted}</udt:DateTimeString>
         </ram:DueDateDateTime>
-        <ram:Description>Zahlbar innerhalb von 30 Tagen ohne Abzug (§ 286 Abs. 3 BGB).</ram:Description>
+        <ram:Description>Zahlbar innerhalb von 30 Tagen ab Rechnungsdatum ohne Abzug (§§ 271a, 286 BGB).</ram:Description>
       </ram:SpecifiedTradePaymentTerms>
 
       <!-- Final Summation -->

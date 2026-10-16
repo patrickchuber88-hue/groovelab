@@ -148,6 +148,7 @@ export const MasterIdleLockModal: React.FC<MasterIdleLockModalProps> = ({
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={6}
+              aria-label="Google Authenticator 6-stelliger Code"
               placeholder="Google Authenticator (6 Ziffern)"
               value={idlePinInput}
               onChange={(e) => setIdlePinInput(e.target.value.replace(/[^0-9]/g, ''))}
@@ -164,6 +165,7 @@ export const MasterIdleLockModal: React.FC<MasterIdleLockModalProps> = ({
                 boxSizing: 'border-box',
                 fontFamily: 'monospace',
                 background: '#f8fafc',
+                color: '#0f172a',
               }}
             />
             <button
@@ -185,40 +187,6 @@ export const MasterIdleLockModal: React.FC<MasterIdleLockModalProps> = ({
               Code bestätigen &amp; entsperren
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              try {
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                localStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                localStorage.setItem('groovelab_active_workspace', 'secretary');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-              } catch (e) {
-                console.warn('Storage operation failed in MasterIdleLockModal:', e);
-              }
-              window.location.reload();
-            }}
-            style={{
-              background: 'rgba(56, 189, 248, 0.1)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              color: '#38bdf8',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              padding: '8px 12px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              marginBottom: '6px',
-            }}
-          >
-            🏛️ Zur Schulleitung wechseln
-          </button>
 
           <button
             type="button"

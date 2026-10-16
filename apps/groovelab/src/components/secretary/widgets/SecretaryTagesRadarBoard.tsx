@@ -16,9 +16,11 @@ import { Calendar, DoorOpen, BookOpen } from 'lucide-react';
 
 export interface SecretaryTagesRadarBoardProps {
   rooms: any[];
+  buildings?: any[];
   todayAllocations: any[];
   todayTeachersCount: number;
   todayDayNum: number;
+  simulatedToday?: string;
   userMap?: Record<string, string>;
   setRoomsSubView?: (view: 'overview' | 'settings' | 'plan') => void;
   setRoomSearchQuery?: (query: string) => void;
@@ -30,9 +32,11 @@ export interface SecretaryTagesRadarBoardProps {
 
 export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> = ({
   rooms,
+  buildings = [],
   todayAllocations,
   todayTeachersCount,
   todayDayNum,
+  simulatedToday,
   userMap = {},
   setRoomsSubView,
   setRoomSearchQuery,
@@ -44,8 +48,58 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
   const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
   const dayName = days[todayDayNum === 7 ? 0 : todayDayNum] || 'Heute';
 
+  // Aktiver Gebäude-Filter ('all' | buildingId | 'unassigned')
+  const [selectedBuildingId, setSelectedBuildingId] = React.useState<string>('all');
+
+  // Reale Gebäude (Zero-Dummy: nur echte DB-Einträge mit id und name)
+  const validBuildings = React.useMemo(() => {
+    return (buildings || []).filter((b: any) => b && b.id && b.name && typeof b.name === 'string' && b.name.trim().length > 0);
+  }, [buildings]);
+
+  // Prüfen, ob es unzugeordnete Räume gibt
+  const hasUnassignedRooms = React.useMemo(() => {
+    return (rooms || []).some((r: any) => !r.building_id);
+  }, [rooms]);
+
+  // Raum-Filterung anhand des gewählten echten Gebäudes
+  const filteredRooms = React.useMemo(() => {
+    if (validBuildings.length === 0 || selectedBuildingId === 'all') {
+      return rooms || [];
+    }
+    if (selectedBuildingId === 'unassigned') {
+      return (rooms || []).filter((r: any) => !r.building_id);
+    }
+    return (rooms || []).filter((r: any) => r.building_id === selectedBuildingId);
+  }, [rooms, validBuildings, selectedBuildingId]);
+
+  // Aktuelle Referenzzeit (unter Berücksichtigung von simuliertem Datum)
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const todayDayIndex = now.getDay() === 0 ? 7 : now.getDay();
+  const isViewingCurrentDay = todayDayNum === todayDayIndex;
+
   // Bis zu 15 Räume anzeigen (3 Zeilen à 5 Spalten bei Desktop)
-  const displayRooms = (rooms || []).slice(0, 15);
+  const displayRooms = filteredRooms.slice(0, 15);
+
+  // Gebäude mit aktivem Live-Betrieb ermitteln (für den pulsierenden Beacon im Tab-Header)
+  const isBuildingActiveLive = React.useCallback((buildingId: string) => {
+    if (!isViewingCurrentDay) return false;
+    const bRooms = buildingId === 'all' 
+      ? (rooms || []) 
+      : buildingId === 'unassigned' 
+        ? (rooms || []).filter((r: any) => !r.building_id)
+        : (rooms || []).filter((r: any) => r.building_id === buildingId);
+
+    const bRoomIds = new Set(bRooms.map((r: any) => r.id));
+    return todayAllocations.some((alloc: any) => {
+      if (!bRoomIds.has(alloc.roomId)) return false;
+      const [sh, sm] = (alloc.startTime || '08:00').split(':').map(Number);
+      const [eh, em] = (alloc.endTime || '08:45').split(':').map(Number);
+      const sMin = (sh || 0) * 60 + (sm || 0);
+      const eMin = (eh || 0) * 60 + (em || 0);
+      return currentMinutes >= sMin && currentMinutes < eMin;
+    });
+  }, [rooms, todayAllocations, isViewingCurrentDay, currentMinutes]);
 
   const handleRoomClick = (roomName: string) => {
     if (setRoomSearchQuery) setRoomSearchQuery(roomName);
@@ -174,6 +228,191 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
         </div>
       </div>
 
+      {/* GEBÄUDE-FILTER (Apple Squircle Segmented Control - strikt Zero-Dummy: nur bei angelegten Gebäuden) */}
+      {validBuildings.length > 0 && (
+        <div 
+          role="tablist" 
+          aria-label="Räume nach Gebäude filtern"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: '#f1f5f9',
+            padding: '4px',
+            borderRadius: '12px',
+            width: 'fit-content',
+            border: '1px solid rgba(0, 0, 0, 0.04)',
+            flexWrap: 'wrap'
+          }}
+        >
+          {/* Tab: Alle */}
+          {(() => {
+            const isSelected = selectedBuildingId === 'all';
+            const count = (rooms || []).length;
+            const hasLive = isBuildingActiveLive('all');
+            return (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedBuildingId('all')}
+                style={{
+                  background: isSelected ? '#ffffff' : 'transparent',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.74rem',
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <span>Alle</span>
+                <span style={{
+                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  fontSize: '0.66rem',
+                  fontWeight: 750
+                }}>
+                  {count}
+                </span>
+                {hasLive && (
+                  <span 
+                    title="Aktiver Live-Unterricht"
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: '#f59e0b',
+                      display: 'inline-block',
+                      animation: 'pulse 1.8s infinite'
+                    }} 
+                  />
+                )}
+              </button>
+            );
+          })()}
+
+          {/* Tabs für jedes real angelegte Gebäude */}
+          {validBuildings.map((b: any) => {
+            const isSelected = selectedBuildingId === b.id;
+            const count = (rooms || []).filter((r: any) => r.building_id === b.id).length;
+            const hasLive = isBuildingActiveLive(b.id);
+            return (
+              <button
+                key={b.id}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedBuildingId(b.id)}
+                style={{
+                  background: isSelected ? '#ffffff' : 'transparent',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.74rem',
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <span>{b.name}</span>
+                <span style={{
+                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  fontSize: '0.66rem',
+                  fontWeight: 750
+                }}>
+                  {count}
+                </span>
+                {hasLive && (
+                  <span 
+                    title={`Aktiver Live-Unterricht in ${b.name}`}
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: '#f59e0b',
+                      display: 'inline-block',
+                      animation: 'pulse 1.8s infinite'
+                    }} 
+                  />
+                )}
+              </button>
+            );
+          })}
+
+          {/* Tab: Ohne Zuordnung (nur wenn unzugeordnete Räume existieren) */}
+          {hasUnassignedRooms && (() => {
+            const isSelected = selectedBuildingId === 'unassigned';
+            const count = (rooms || []).filter((r: any) => !r.building_id).length;
+            const hasLive = isBuildingActiveLive('unassigned');
+            return (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                onClick={() => setSelectedBuildingId('unassigned')}
+                style={{
+                  background: isSelected ? '#ffffff' : 'transparent',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  border: 'none',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.74rem',
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                <span>Ohne Zuordnung</span>
+                <span style={{
+                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  color: isSelected ? '#0f172a' : '#64748b',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  fontSize: '0.66rem',
+                  fontWeight: 750
+                }}>
+                  {count}
+                </span>
+                {hasLive && (
+                  <span 
+                    title="Aktiver Live-Unterricht"
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: '#f59e0b',
+                      display: 'inline-block',
+                      animation: 'pulse 1.8s infinite'
+                    }} 
+                  />
+                )}
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
       {/* RAUM-RASTER (3x5 Raster für bis zu 15 Räume) */}
       <div 
         style={{ 
@@ -183,8 +422,10 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
         }}
       >
         {displayRooms.length === 0 ? (
-          <div style={{ padding: '24px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', gridColumn: '1 / -1' }}>
-            Keine Räume für diese Schule hinterlegt.
+          <div style={{ padding: '32px 24px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', gridColumn: '1 / -1', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+            {selectedBuildingId !== 'all' 
+              ? 'Keine Räume für das ausgewählte Gebäude zugeordnet.' 
+              : 'Keine Räume für diese Schule hinterlegt.'}
           </div>
         ) : (
           displayRooms.map((room: any) => {
@@ -194,13 +435,50 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
             const isOccupied = roomAllocs.length > 0;
             const roomTeachers = Array.from(new Set(roomAllocs.map((a: any) => a.teacherName || (a.teacherId ? (userMap[a.teacherId] || '') : '')).filter(Boolean)));
             
-            // Zeit-Kontext berechnen
+            // Live-Betrieb und didaktischen Zeitkontext ermitteln
+            let isLiveNow = false;
+            let activeLiveAlloc: any = null;
+            let remainingMinutes = 0;
+            let nextUpcomingAlloc: any = null;
+
+            if (isOccupied && isViewingCurrentDay) {
+              for (const alloc of roomAllocs) {
+                const [sh, sm] = (alloc.startTime || '08:00').split(':').map(Number);
+                const [eh, em] = (alloc.endTime || '08:45').split(':').map(Number);
+                const sMin = (sh || 0) * 60 + (sm || 0);
+                const eMin = (eh || 0) * 60 + (em || 0);
+
+                if (currentMinutes >= sMin && currentMinutes < eMin) {
+                  isLiveNow = true;
+                  activeLiveAlloc = alloc;
+                  remainingMinutes = Math.max(1, eMin - currentMinutes);
+                  break;
+                } else if (sMin > currentMinutes && !nextUpcomingAlloc) {
+                  nextUpcomingAlloc = alloc;
+                }
+              }
+            }
+
+            // Zeit-Kontext berechnen (Zero Mental Math)
             let timeSpanText = 'Frei für Spontan-Üben';
             if (isOccupied) {
-              const firstSlot = roomAllocs[0];
-              const lastSlot = roomAllocs[roomAllocs.length - 1];
-              const teacherStr = roomTeachers.length > 0 ? roomTeachers[0] : 'Unterricht belegt';
-              timeSpanText = `${firstSlot.startTime || '14:00'}–${lastSlot.endTime || '18:00'} • ${teacherStr}`;
+              if (isLiveNow && activeLiveAlloc) {
+                const teacherStr = activeLiveAlloc.teacherName || (activeLiveAlloc.teacherId ? (userMap[activeLiveAlloc.teacherId] || '') : '') || roomTeachers[0] || 'Unterricht';
+                const remFormatted = remainingMinutes >= 60 
+                  ? `${Math.floor(remainingMinutes / 60)}h ${remainingMinutes % 60}m` 
+                  : `${remainingMinutes} Min.`;
+                timeSpanText = `🔴 Jetzt: ${teacherStr} • noch ${remFormatted}`;
+              } else if (nextUpcomingAlloc) {
+                const nextTeacher = nextUpcomingAlloc.teacherName || (nextUpcomingAlloc.teacherId ? (userMap[nextUpcomingAlloc.teacherId] || '') : '') || roomTeachers[0] || 'Unterricht';
+                timeSpanText = `🟢 Frei bis ${nextUpcomingAlloc.startTime || '14:00'} • danach ${nextTeacher}`;
+              } else if (isViewingCurrentDay) {
+                timeSpanText = '✓ Heute beendet • Jetzt frei';
+              } else {
+                const firstSlot = roomAllocs[0];
+                const lastSlot = roomAllocs[roomAllocs.length - 1];
+                const teacherStr = roomTeachers.length > 0 ? roomTeachers[0] : 'Unterricht belegt';
+                timeSpanText = `${firstSlot.startTime || '14:00'}–${lastSlot.endTime || '18:00'} • ${teacherStr}`;
+              }
             }
 
             return (
@@ -208,7 +486,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                 key={room.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`Raum ${room.name}: ${isOccupied ? `${roomAllocs.length} Termine heute, ${timeSpanText}` : 'Heute frei für Spontan-Üben'}`}
+                aria-label={`Raum ${room.name}: ${isLiveNow ? `Gerade live im Unterricht (${timeSpanText})` : (isOccupied ? `${roomAllocs.length} Termine heute, ${timeSpanText}` : 'Heute frei für Spontan-Üben')}`}
                 onClick={() => handleRoomClick(room.name)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -219,15 +497,18 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                 style={{
                   background: isOccupied ? '#ffffff' : '#f8fafc',
                   border: isOccupied ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                  borderLeft: isLiveNow ? '3px solid #f59e0b' : (isOccupied ? '1px solid #e2e8f0' : '1px dashed #cbd5e1'),
                   borderRadius: '16px',
-                  padding: '12px 14px',
+                  padding: isLiveNow ? '12px 14px 12px 12px' : '12px 14px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   minHeight: '102px',
                   cursor: 'pointer',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                  boxShadow: isOccupied ? '0 2px 6px rgba(15, 23, 42, 0.02)' : 'none'
+                  boxShadow: isLiveNow 
+                    ? '0 4px 16px -2px rgba(245, 158, 11, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04)' 
+                    : (isOccupied ? '0 2px 6px rgba(15, 23, 42, 0.02)' : 'none')
                 }}
                 className="hover-scale"
               >
@@ -242,23 +523,66 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      maxWidth: '125px'
+                      maxWidth: isLiveNow ? '110px' : '125px'
                     }}
                   >
                     {room.name}
                   </span>
-                  <span style={{
-                    background: isOccupied ? '#eff6ff' : '#f0fdf4',
-                    color: isOccupied ? '#1d4ed8' : '#15803d',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '0.66rem',
-                    fontWeight: 750,
-                    border: isOccupied ? '1px solid #dbeafe' : '1px solid #dcfce7',
-                    flexShrink: 0
-                  }}>
-                    {isOccupied ? `${roomAllocs.length} ${roomAllocs.length === 1 ? 'Slot' : 'Slots'}` : 'Frei'}
-                  </span>
+                  {isOccupied ? (
+                    isLiveNow ? (
+                      <span style={{
+                        background: '#fffbeb',
+                        color: '#b45309',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        border: '1px solid #fde68a',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        flexShrink: 0
+                      }}>
+                        <span 
+                          style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: '#f59e0b',
+                            display: 'inline-block',
+                            animation: 'pulse 1.8s infinite'
+                          }} 
+                        />
+                        LIVE
+                      </span>
+                    ) : (
+                      <span style={{
+                        background: '#fffbeb',
+                        color: '#b45309',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.66rem',
+                        fontWeight: 750,
+                        border: '1px solid #fde68a',
+                        flexShrink: 0
+                      }}>
+                        {roomAllocs.length} {roomAllocs.length === 1 ? 'Slot' : 'Slots'}
+                      </span>
+                    )
+                  ) : (
+                    <span style={{
+                      background: '#f0fdf4',
+                      color: '#15803d',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.66rem',
+                      fontWeight: 750,
+                      border: '1px solid #dcfce7',
+                      flexShrink: 0
+                    }}>
+                      Frei
+                    </span>
+                  )}
                 </div>
 
                 {/* Mittlere Zeile: Zeithorizont & Lehrkraft */}
@@ -266,8 +590,8 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   title={timeSpanText}
                   style={{ 
                     fontSize: '0.70rem', 
-                    color: isOccupied ? '#334155' : '#64748b', 
-                    fontWeight: isOccupied ? 600 : 500,
+                    color: isLiveNow ? '#0f172a' : (isOccupied ? '#334155' : '#64748b'), 
+                    fontWeight: isLiveNow ? 700 : (isOccupied ? 600 : 500),
                     margin: '6px 0', 
                     overflow: 'hidden', 
                     textOverflow: 'ellipsis', 
@@ -292,22 +616,29 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                     {isOccupied && roomAllocs.map((alloc: any, idx: number) => {
                       const [sh, sm] = (alloc.startTime || '08:00').split(':').map(Number);
                       const [eh, em] = (alloc.endTime || '08:45').split(':').map(Number);
-                      const startMins = Math.max(0, (sh - 8) * 60 + (sm || 0));
-                      const endMins = Math.min(720, (eh - 8) * 60 + (em || 0));
+                      const sMin = (sh || 0) * 60 + (sm || 0);
+                      const eMin = (eh || 0) * 60 + (em || 0);
+                      const startMins = Math.max(0, sMin - 480);
+                      const endMins = Math.min(720, eMin - 480);
                       const leftPct = Math.max(0, Math.min(100, (startMins / 720) * 100));
                       const widthPct = Math.max(3, Math.min(100 - leftPct, ((endMins - startMins) / 720) * 100));
+                      const isThisSlotLive = isLiveNow && (alloc.id ? alloc.id === activeLiveAlloc?.id : (currentMinutes >= sMin && currentMinutes < eMin));
 
                       return (
                         <div
                           key={alloc.id || idx}
+                          title={`${alloc.startTime || '14:00'}–${alloc.endTime || '18:00'} Uhr${isThisSlotLive ? ' • JETZT LIVE' : ''}`}
                           style={{
                             position: 'absolute',
                             left: `${leftPct}%`,
                             width: `${widthPct}%`,
                             top: 0,
                             bottom: 0,
-                            background: '#3b82f6',
-                            borderRadius: '2px'
+                            background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                            borderRadius: '2px',
+                            boxShadow: isThisSlotLive 
+                              ? '0 0 8px rgba(245, 158, 11, 0.7), 0 1px 3px rgba(217, 119, 6, 0.4)' 
+                              : '0 1px 3px rgba(217, 119, 6, 0.28)'
                           }}
                         />
                       );

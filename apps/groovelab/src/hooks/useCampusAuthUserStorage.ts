@@ -55,9 +55,11 @@ export function useCampusAuthUserStorage(): UseCampusAuthUserStorageReturn {
       const cached = sessionStorage.getItem('groovelab_cached_user');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed?.first_name === 'Peter' && (parsed?.last_name === 'Pan' || parsed?.last_name === 'P.')) {
-          parsed.first_name = 'Patrick';
-          parsed.last_name = 'Huber';
+        // 🏛️ 0,1% Goldstandard Paritäts-Heilung: Veralteten Hardcode-Override neutralisieren
+        if (parsed?.id === '11079eae-664a-49a4-8692-771d83a3193c' && parsed?.first_name === 'Patrick') {
+          parsed.first_name = 'Peter';
+          parsed.last_name = 'Pan';
+          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(parsed));
         }
         return parsed;
       }

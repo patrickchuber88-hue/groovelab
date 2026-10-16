@@ -6,13 +6,15 @@ export interface RoomSidebarToggleBtnProps {
   onToggle: () => void;
   brandColor?: string;
   variant?: 'header' | 'sidebar-close';
+  showDivider?: boolean;
 }
 
 export const RoomSidebarToggleBtn: React.FC<RoomSidebarToggleBtnProps> = ({
   isOpen,
   onToggle,
   brandColor = '#34a853',
-  variant = 'header'
+  variant = 'header',
+  showDivider = true
 }) => {
   if (variant === 'sidebar-close') {
     return (
@@ -57,15 +59,17 @@ export const RoomSidebarToggleBtn: React.FC<RoomSidebarToggleBtnProps> = ({
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
       {/* 0,1% Goldstandard Divider: Visual Decoupling of Calendar Date Controls from Board-Level Layout Action */}
-      <div
-        aria-hidden="true"
-        style={{
-          width: '1px',
-          height: '20px',
-          background: '#e5e5ea',
-          margin: '0 2px'
-        }}
-      />
+      {showDivider && (
+        <div
+          aria-hidden="true"
+          style={{
+            width: '1px',
+            height: '20px',
+            background: '#e5e5ea',
+            margin: '0 2px'
+          }}
+        />
+      )}
       <button
         type="button"
         onClick={onToggle}

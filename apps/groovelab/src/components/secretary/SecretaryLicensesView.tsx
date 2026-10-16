@@ -1896,7 +1896,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     <strong style={{ color: '#1e293b', display: 'block', marginBottom: '2px' }}>
                                       Vertragsbeginn &amp; Testphasen-Abschluss:
                                     </strong>
-                                    Mit dem Klick auf <em>„Zahlungspflichtig buchen &amp; freischalten“</em> beendest du deine unverbindliche 30-Tage-Testphase und wandelst sie in einen regulären Produktivvertrag für deine Musikschule um. Die monatliche Bereitstellung (Rechnung A) startet ab dem heutigen Tag mit 14 Tagen Zahlungsziel zum Monatsende.
+                                    Mit dem Klick auf <em>„Zahlungspflichtig buchen &amp; freischalten“</em> beendest du deine unverbindliche 30-Tage-Testphase und wandelst sie in einen regulären Produktivvertrag für deine Musikschule um. Die monatliche Bereitstellung (Rechnung A) startet ab dem heutigen Tag mit 30 Tagen Zahlungsziel zum Monatsende.
                                   </div>
                                 </div>
 
@@ -1922,7 +1922,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       style={{ width: '16px', height: '16px', accentColor: '#34a853', marginTop: '2px', cursor: 'pointer' }}
                                     />
                                     <span style={{ fontSize: '0.74rem', color: '#475569', lineHeight: '1.4' }}>
-                                      Hiermit bestätige ich die kostenpflichtige Buchung per Rechnung (Zahlungsziel: 14 Tage). Ich stimme zu, dass Rechnungen an die angegebene Rechnungsadresse gesendet werden.
+                                      Hiermit bestätige ich die kostenpflichtige Buchung per Rechnung (Zahlungsziel: 30 Tage). Ich stimme zu, dass Rechnungen an die angegebene Rechnungsadresse gesendet werden.
                                     </span>
                                   </label>
                                 </div>
@@ -2422,14 +2422,21 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 justifyContent: 'center',
                                 marginBottom: '10px'
                               }}>
-                                <div style={{
-                                  background: '#f1f5f9',
-                                  borderRadius: '14px',
-                                  padding: '4px',
-                                  display: 'inline-flex',
-                                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
-                                }}>
+                                <div
+                                  role="tablist"
+                                  aria-label="Abrechnung & Infrastruktur Bereiche"
+                                  style={{
+                                    background: '#f1f5f9',
+                                    borderRadius: '14px',
+                                    padding: '4px',
+                                    display: 'inline-flex',
+                                    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+                                  }}
+                                >
                                   <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeBillingSubTab === 'overview'}
                                     onClick={() => setActiveBillingSubTab('overview')}
                                     style={{
                                       background: activeBillingSubTab === 'overview' ? '#ffffff' : 'transparent',
@@ -2438,16 +2445,22 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       padding: '8px 20px',
                                       fontSize: '0.78rem',
                                       fontWeight: activeBillingSubTab === 'overview' ? 800 : 600,
-                                      color: activeBillingSubTab === 'overview' ? '#1e293b' : '#64748b',
+                                      color: activeBillingSubTab === 'overview' ? '#0f172a' : '#64748b',
                                       cursor: 'pointer',
                                       boxShadow: activeBillingSubTab === 'overview' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                      transition: 'all 0.15s ease'
+                                      transition: 'all 0.15s ease',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px'
                                     }}
                                   >
-                                    <BarChart2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Übersicht
+                                    <BarChart2 size={14} style={{ verticalAlign: 'middle' }} /> Übersicht
                                   </button>
                                   
                                   <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeBillingSubTab === 'history'}
                                     onClick={() => setActiveBillingSubTab('history')}
                                     style={{
                                       background: activeBillingSubTab === 'history' ? '#ffffff' : 'transparent',
@@ -2456,16 +2469,22 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       padding: '8px 20px',
                                       fontSize: '0.78rem',
                                       fontWeight: activeBillingSubTab === 'history' ? 800 : 600,
-                                      color: activeBillingSubTab === 'history' ? '#1e293b' : '#64748b',
+                                      color: activeBillingSubTab === 'history' ? '#0f172a' : '#64748b',
                                       cursor: 'pointer',
                                       boxShadow: activeBillingSubTab === 'history' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                      transition: 'all 0.15s ease'
+                                      transition: 'all 0.15s ease',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px'
                                     }}
                                   >
-                                    <FileText size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Rechnungsverlauf
+                                    <FileText size={14} style={{ verticalAlign: 'middle' }} /> Rechnungsverlauf
                                   </button>
                                   
                                   <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeBillingSubTab === 'ledger'}
                                     onClick={() => {
                                       setActiveBillingSubTab('ledger');
                                       fetchTariffBookings();
@@ -2477,7 +2496,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       padding: '8px 20px',
                                       fontSize: '0.78rem',
                                       fontWeight: activeBillingSubTab === 'ledger' ? 800 : 600,
-                                      color: activeBillingSubTab === 'ledger' ? '#1e293b' : '#64748b',
+                                      color: activeBillingSubTab === 'ledger' ? '#0f172a' : '#64748b',
                                       cursor: 'pointer',
                                       boxShadow: activeBillingSubTab === 'ledger' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                       transition: 'all 0.15s ease',
@@ -2490,6 +2509,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   </button>
                                   
                                   <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeBillingSubTab === 'compliance'}
                                     onClick={() => setActiveBillingSubTab('compliance')}
                                     style={{
                                       background: activeBillingSubTab === 'compliance' ? '#ffffff' : 'transparent',
@@ -2498,7 +2520,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       padding: '8px 20px',
                                       fontSize: '0.78rem',
                                       fontWeight: activeBillingSubTab === 'compliance' ? 800 : 600,
-                                      color: activeBillingSubTab === 'compliance' ? '#15803d' : '#64748b',
+                                      color: activeBillingSubTab === 'compliance' ? '#0f172a' : '#64748b',
                                       cursor: 'pointer',
                                       boxShadow: activeBillingSubTab === 'compliance' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                       transition: 'all 0.15s ease',
@@ -2560,7 +2582,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>Campus Modul</span>
                                                     <span style={{ fontSize: '0.62rem', background: '#dcfce7', color: '#15803d', padding: '2px 6px', borderRadius: '100px', fontWeight: 800 }}>
-                                                      Kombi-Vorteil +10,00 € / Mo.
+                                                      Kombi-Vorteil +{(effectiveSchoolRates.priceKombi - effectiveSchoolRates.priceGroovelab).toFixed(2).replace('.', ',')} € / Mo.
                                                     </span>
                                                   </div>
                                                   <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -2618,7 +2640,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>GrooveLab Modul</span>
                                                     <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#854d0e', padding: '2px 6px', borderRadius: '100px', fontWeight: 800 }}>
-                                                      Kombi-Vorteil +5,00 € / Mo.
+                                                      Kombi-Vorteil +{(effectiveSchoolRates.priceKombi - effectiveSchoolRates.priceCampus).toFixed(2).replace('.', ',')} € / Mo.
                                                     </span>
                                                   </div>
                                                   <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
@@ -2683,7 +2705,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                 {billingPayer === 'school' ? 'Zahlung: Musikschule' : 'Zahlung: Eltern'}
                                               </div>
                                               <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
-                                                {billingPayer === 'school' ? 'Sammelabrechnung Träger (0,49 € / Mo.)' : 'Direktabrechnung (Jahresbeitrag)'}
+                                                {billingPayer === 'school' ? (
+                                                  <>Sammelabrechnung Träger <span style={{ whiteSpace: 'nowrap' }}>({effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} € / Mo.)</span></>
+                                                ) : 'Direktabrechnung (Jahresbeitrag)'}
                                               </div>
                                             </div>
 
@@ -2812,8 +2836,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                 boxSizing: 'border-box'
                                               }}>
                                                 <div>
-                                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '8px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                                                       <div style={{
                                                         width: '8px',
                                                         height: '8px',
@@ -2822,17 +2846,17 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                         background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981',
                                                         boxShadow: 'none'
                                                       }} />
-                                                      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                                                         Audio-Tresor Speicher
                                                       </span>
                                                     </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                                       {currentSchoolProfile?.storage_pending_downgrade_gb !== null && currentSchoolProfile?.storage_pending_downgrade_gb !== undefined && (
-                                                        <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                                                        <span style={{ fontSize: '0.62rem', background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '6px', fontWeight: 800, whiteSpace: 'nowrap' }}>
                                                           ⏳ Downgrade ({currentSchoolProfile?.storage_pending_downgrade_gb} GB)
                                                         </span>
                                                       )}
-                                                      <span style={{ fontSize: '0.66rem', background: isCritical ? '#fee2e2' : isWarning ? '#fef3c7' : addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: isCritical ? '#991b1b' : isWarning ? '#92400e' : addonGb > 0 ? '#166534' : '#475569', padding: '1px 7px', borderRadius: '6px', fontWeight: 700 }}>
+                                                      <span style={{ fontSize: '0.66rem', background: isCritical ? '#fee2e2' : isWarning ? '#fef3c7' : addonGb > 0 ? '#dcfce7' : '#f1f5f9', color: isCritical ? '#991b1b' : isWarning ? '#92400e' : addonGb > 0 ? '#166534' : '#475569', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                                         {isCritical ? '🚨 95% Belegt' : isWarning ? '⚠️ 80% Belegt' : addonGb > 0 ? `+${addonGb} GB` : '1 GB Basis'}
                                                       </span>
                                                     </div>
@@ -3479,10 +3503,10 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <div>
                                 <strong style={{ display: 'block', fontSize: '1.25rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800 }}>
-                                  {10 + (selectedStorageAddonGb || 0)} GB Inklusive
+                                  {1 + Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0)} GB Gesamtspeicher
                                 </strong>
                                 <span style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  <ShieldCheck size={13} color="#16a34a" /> Frankfurt a. M. • 0% US-Cloud
+                                  <ShieldCheck size={13} color="#16a34a" /> ISO 27001 Deutschland • 0% US-Cloud
                                 </span>
                               </div>
                             </div>
@@ -3521,6 +3545,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             border: '1px solid #e2e8f0',
                             borderRadius: '24px',
                             padding: '18px 22px',
+                            marginBottom: '18px',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '12px',
@@ -3898,14 +3923,18 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     minute: '2-digit'
                                   });
 
+                                  const displayActor = (!b.booked_by_name || /\sL\.$/.test(String(b.booked_by_name)))
+                                    ? (isBaseline ? 'System-Baseline' : 'Schulleitung')
+                                    : b.booked_by_name;
+
                                   return (
                                     <div
                                       key={b.id || idx}
                                       style={{
                                         padding: '16px 20px',
                                         borderBottom: idx < tariffBookings.length - 1 ? '1px solid #f1f5f9' : 'none',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
+                                        display: 'grid',
+                                        gridTemplateColumns: 'minmax(275px, 1.15fr) 1.45fr minmax(230px, 0.95fr)',
                                         alignItems: 'center',
                                         gap: '16px',
                                         transition: 'background 0.15s ease'
@@ -3913,40 +3942,33 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       onMouseEnter={(e) => e.currentTarget.style.background = '#fafbfc'}
                                       onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
                                     >
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '180px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                           <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>
                                             {b.receipt_number}
                                           </span>
-                                          <span style={{
-                                            fontSize: '0.65rem',
-                                            fontWeight: 800,
-                                            background: badgeBg,
-                                            color: badgeColor,
-                                            padding: '2px 8px',
-                                            borderRadius: '6px'
-                                          }}>
+                                          <span style={{ fontSize: '0.65rem', fontWeight: 800, background: badgeBg, color: badgeColor, padding: '2px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
                                             {typeLabel}
                                           </span>
                                         </div>
                                         <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                                          {formattedDate} Uhr • Gebucht durch: <strong>{b.booked_by_name || 'Schulleitung'}</strong>
+                                          {formattedDate} Uhr • Gebucht durch: <strong>{displayActor}</strong>
                                         </div>
                                       </div>
 
-                                      {/* Modules and Storage Details */}
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, justifyContent: 'center' }}>
+                                      {/* Modules and Storage Details (Vertically aligned across all rows) */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                         <div style={{ fontSize: '0.72rem', color: '#475569' }}>
                                           <span>Module: </span>
                                           <strong style={{ color: '#0f172a' }}>
                                             {b.has_campus_subscription && b.has_groovelab_subscription ? 'Campus + GrooveLab (Kombi)' : b.has_campus_subscription ? 'Campus' : 'GrooveLab'}
                                           </strong>
                                         </div>
-                                        <div style={{ width: '1px', height: '18px', background: '#e2e8f0' }} />
+                                        <div style={{ width: '1px', height: '18px', background: '#e2e8f0', flexShrink: 0 }} />
                                         <div style={{ fontSize: '0.72rem', color: '#475569' }}>
                                           <span>Audio-Tresor: </span>
                                           <strong style={{ color: b.storage_addon_gb > 0 ? '#166534' : '#0f172a' }}>
-                                            {b.storage_addon_gb > 0 ? `+${b.storage_addon_gb} GB (${Number(b.storage_addon_monthly_fee).toFixed(2).replace('.', ',')} €)` : '1 GB Basis (0,00 €)'}
+                                            {b.storage_addon_gb > 0 ? `+${b.storage_addon_gb} GB (${Number(b.storage_addon_monthly_fee).toFixed(2).replace('.', ',')} €)` : '10 GB Basis (0,00 €)'}
                                           </strong>
                                           {b.storage_pending_downgrade_gb !== null && b.storage_pending_downgrade_gb !== undefined && (
                                             <span style={{ color: '#d97706', marginLeft: '6px', fontWeight: 700 }}>
@@ -3957,13 +3979,13 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       </div>
 
                                       {/* Net Rate & Download Action */}
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'right' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '14px', textAlign: 'right' }}>
                                         <div>
-                                          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>
+                                          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
                                             {Number(b.total_monthly_rate_net || 0).toFixed(2).replace('.', ',')} € / Mo.
                                           </div>
-                                          <div style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700 }}>
-                                            ✓ Verifiziert
+                                          <div style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                            ✓ Verifiziert • Grundtarif &amp; Speicher
                                           </div>
                                         </div>
 
@@ -3985,7 +4007,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                   city: currentSchoolProfile?.city || '',
                                                   country: currentSchoolProfile?.country || 'DE'
                                                 },
-                                                bookedBy: b.booked_by_name || 'Schulleitung',
+                                                bookedBy: displayActor,
                                                 bookingType: b.booking_type,
                                                 hasCampus: b.has_campus_subscription,
                                                 hasGroovelab: b.has_groovelab_subscription,
@@ -4006,28 +4028,12 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                           })}
                                           aria-label={`Buchungsbeleg ${b.receipt_number} in der Vorschau öffnen`}
                                           style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            padding: '8px 14px',
-                                            borderRadius: '10px',
-                                            border: '1.5px solid #cbd5e1',
-                                            background: '#ffffff',
-                                            color: '#0f172a',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                            transition: 'all 0.15s ease'
+                                            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px',
+                                            border: '1.5px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontSize: '0.74rem',
+                                            fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', transition: 'all 0.15s ease'
                                           }}
-                                          onMouseEnter={(e) => {
-                                            e.currentTarget.style.borderColor = '#0f172a';
-                                            e.currentTarget.style.color = '#0f172a';
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.borderColor = '#cbd5e1';
-                                            e.currentTarget.style.color = '#0f172a';
-                                          }}
+                                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
+                                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
                                         >
                                           <Eye size={13} strokeWidth={2} />
                                           Beleg Vorschau
@@ -4044,31 +4050,15 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                       {/* SUB-TAB 5: RECHT & COMPLIANCE (B2B) */}
                       {activeBillingSubTab === 'compliance' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                          <div style={{
-                            background: '#ffffff',
-                            borderRadius: '20px',
-                            border: '1.5px solid #e2e8f0',
-                            padding: '24px',
-                            boxShadow: '0 4px 12px -2px rgba(0,0,0,0.03)'
-                          }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                          <div style={{ background: '#ffffff', borderRadius: '20px', border: '1.5px solid #e2e8f0', padding: '22px 24px', boxShadow: '0 4px 12px -2px rgba(0,0,0,0.03)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                              <div style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '12px',
-                                background: '#f8fafc',
-                                border: '1.5px solid #e2e8f0',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#0f172a'
-                              }}>
+                              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#f8fafc', border: '1.5px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', flexShrink: 0 }}>
                                 <ShieldCheck size={24} />
                               </div>
                               <div>
                                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
-                                  B2B Recht-, Datenschutz- & Compliance-Zentrale
+                                  B2B Recht-, Datenschutz- &amp; Compliance-Zentrale
                                 </h3>
                                 <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                                   Revisionssichere Dokumente, Zertifikate und Nachweise für Schulträger, Personalräte, Datenschutzbeauftragte und Kommunalprüfer.
@@ -4077,179 +4067,130 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             </div>
                           </div>
 
+                          {/* Hero Card 0: Amtliches B2B-Vertragszertifikat (Full-Width) */}
+                          <div style={{
+                            background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                            borderRadius: '20px',
+                            border: '1.5px solid #bbf7d0',
+                            padding: '22px 24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '20px'
+                          }}>
+                            <div style={{ flex: '1 1 420px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '11px', background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+                                  <Award size={20} />
+                                </div>
+                                <div>
+                                  <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
+                                    B2B-SaaS-Vertragszertifikat
+                                  </h4>
+                                  <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800 }}>
+                                    Software-Nutzungsvertrag &amp; AVV (Haupturkunde)
+                                  </span>
+                                </div>
+                              </div>
+                              <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: 0 }}>
+                                Amtliche Vertragsurkunde für Rechnungsprüfungsamt, Gemeinderat und Schulträger mit Gebührenordnung, SLA-Zusagen, Revisions-Hash und Zeichnungsnachweis.
+                              </p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => openPdfPreview({
+                                  title: 'B2B-SaaS-Vertragszertifikat',
+                                  subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                  badgeText: '1 Seite • Amtliches Zertifikat',
+                                  filename: `Campus_Groovelab_B2B_Vertragszertifikat_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+                                  generate: async () => {
+                                    const { generateB2BContractCertificatePDF } = await import('../../utils/pdfGenerator');
+                                    return generateB2BContractCertificatePDF({
+                                      schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                      schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
+                                      schoolCity: `${currentSchoolProfile?.zip_code || schoolZipCode || ''} ${currentSchoolProfile?.city || schoolCity || ''}`.trim(),
+                                      schoolSigneeName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName,
+                                      schoolId: schoolId,
+                                      avvSignedAt: currentSchoolProfile?.avv_signed_at,
+                                      returnBlob: true
+                                    });
+                                  }
+                                })}
+                                aria-label="Kompakt-Vertragszertifikat (1 Seite) in der Vorschau öffnen"
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 16px',
+                                  borderRadius: '12px', background: '#ffffff', color: '#0f172a', fontSize: '0.76rem', fontWeight: 800,
+                                  border: '1.5px solid #cbd5e1', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
+                                }}
+                              >
+                                <Eye size={14} strokeWidth={2} />
+                                Kompakt-Zertifikat (1 Seite)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openPdfPreview({
+                                  title: 'B2B-SaaS-Mietvertrag & AVV (DIN 5008)',
+                                  subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                  badgeText: '4 Seiten • DIN 5008 • Revisionssicher',
+                                  filename: `Campus-Groovelab_B2B_Vertrag_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}_${ACTIVE_LEGAL_VERSION}.pdf`,
+                                  generate: async () => {
+                                    const { generateB2BContractPackagePDF } = await import('../../utils/b2bContractPdfGenerator');
+                                    return generateB2BContractPackagePDF({
+                                      schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                      schoolId: schoolId,
+                                      adminName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName || 'Schulleitung',
+                                      address: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
+                                      postalCode: currentSchoolProfile?.zip_code || schoolZipCode || '',
+                                      city: currentSchoolProfile?.city || schoolCity || '',
+                                      country: currentSchoolProfile?.country === 'CH' ? 'CH' : 'DE',
+                                      selectedModule: (hasCampusSub && hasGroovelabSub) ? 'kombi' : (hasCampusSub ? 'campus' : (hasGroovelabSub ? 'groovelab' : 'kombi')),
+                                      teacherCount: billableTeachersCount || allTeachers?.length || 0,
+                                      studentDirectBilling: !isSammelzahler,
+                                      confirmationDate: currentSchoolProfile?.avv_signed_at,
+                                      isMunicipalCarrier: Boolean(currentSchoolProfile?.is_municipal || currentSchoolProfile?.carrier_type === 'municipal'),
+                                      returnBlob: true
+                                    });
+                                  }
+                                })}
+                                aria-label="Amtliches 4-teiliges B2B-Vertragspaket (DIN 5008 mit AVV & SLA) in der Vorschau öffnen"
+                                style={{
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 18px',
+                                  borderRadius: '12px', background: '#15803d', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800,
+                                  border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s'
+                                }}
+                              >
+                                <FileText size={14} strokeWidth={2} />
+                                B2B-Vollvertrag &amp; AVV (DIN 5008)
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Symmetrisches 4er-Grid für die behördlichen Fach-Zertifikate */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                             gap: '16px'
                           }}>
-                            {/* Card 0: Amtliches B2B-Vertragszertifikat (SaaS-Mietvertrag & AVV) */}
-                            <div style={{
-                              background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)',
-                              borderRadius: '20px',
-                              border: '1.5px solid #10b981',
-                              padding: '22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              boxShadow: 'none'
-                            }}>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
-                                    background: '#10b981',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#ffffff',
-                                    boxShadow: 'none'
-                                  }}>
-                                    <Award size={20} />
-                                  </div>
-                                  <div>
-                                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
-                                      B2B-SaaS-Vertragszertifikat
-                                    </h4>
-                                    <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800 }}>
-                                      Software-Nutzungsvertrag &amp; AVV
-                                    </span>
-                                  </div>
-                                </div>
-                                <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: '0 0 18px' }}>
-                                  Amtliche Vertragsurkunde für Rechnungsprüfungsamt, Gemeinderat und Schulträger mit Gebührenordnung, SLA-Zusagen, Revisions-Hash und Zeichnungsnachweis.
-                                </p>
-                              </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => openPdfPreview({
-                                    title: 'B2B-SaaS-Mietvertrag & AVV (DIN 5008)',
-                                    subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                    badgeText: '4 Seiten • DIN 5008 • Revisionssicher',
-                                    filename: `Campus-Groovelab_B2B_Vertrag_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}_${ACTIVE_LEGAL_VERSION}.pdf`,
-                                    generate: async () => {
-                                      const { generateB2BContractPackagePDF } = await import('../../utils/b2bContractPdfGenerator');
-                                      return generateB2BContractPackagePDF({
-                                        schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                        schoolId: schoolId,
-                                        adminName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName || 'Schulleitung',
-                                        address: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
-                                        postalCode: currentSchoolProfile?.zip_code || schoolZipCode || '',
-                                        city: currentSchoolProfile?.city || schoolCity || '',
-                                        country: currentSchoolProfile?.country === 'CH' ? 'CH' : 'DE',
-                                        selectedModule: (hasCampusSub && hasGroovelabSub) ? 'kombi' : (hasCampusSub ? 'campus' : (hasGroovelabSub ? 'groovelab' : 'kombi')),
-                                        teacherCount: billableTeachersCount || allTeachers?.length || 0,
-                                        studentDirectBilling: !isSammelzahler,
-                                        confirmationDate: currentSchoolProfile?.avv_signed_at,
-                                        isMunicipalCarrier: Boolean(currentSchoolProfile?.is_municipal || currentSchoolProfile?.carrier_type === 'municipal'),
-                                        returnBlob: true
-                                      });
-                                    }
-                                  })}
-                                  aria-label="Amtliches 4-teiliges B2B-Vertragspaket (DIN 5008 mit AVV & SLA) in der Vorschau öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    padding: '11px 16px',
-                                    borderRadius: '12px',
-                                    background: '#15803d',
-                                    color: '#ffffff',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 800,
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: 'none',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  <FileText size={14} strokeWidth={2} />
-                                  B2B-Vollvertrag & AVV (DIN 5008)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openPdfPreview({
-                                    title: 'B2B-SaaS-Vertragszertifikat',
-                                    subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                    badgeText: '1 Seite • Amtliches Zertifikat',
-                                    filename: `Campus_Groovelab_B2B_Vertragszertifikat_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
-                                    generate: async () => {
-                                      const { generateB2BContractCertificatePDF } = await import('../../utils/pdfGenerator');
-                                      return generateB2BContractCertificatePDF({
-                                        schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
-                                        schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
-                                        schoolCity: `${currentSchoolProfile?.zip_code || schoolZipCode || ''} ${currentSchoolProfile?.city || schoolCity || ''}`.trim(),
-                                        schoolSigneeName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName,
-                                        schoolId: schoolId,
-                                        avvSignedAt: currentSchoolProfile?.avv_signed_at,
-                                        returnBlob: true
-                                      });
-                                    }
-                                  })}
-                                  aria-label="Kompakt-Vertragszertifikat (1 Seite) in der Vorschau öffnen"
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    padding: '8px 12px',
-                                    borderRadius: '10px',
-                                    background: '#f1f5f9',
-                                    color: '#334155',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                    border: '1px solid #cbd5e1',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s'
-                                  }}
-                                >
-                                  <Eye size={13} strokeWidth={2} />
-                                  Kompakt-Zertifikat (1 Seite)
-                                </button>
-                              </div>
-                            </div>
-
                             {/* Card 1: AVV & TOMs */}
-                            <div style={{
-                              background: '#ffffff',
-                              borderRadius: '20px',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)'
-                            }}>
-
+                            <div style={{ background: '#ffffff', borderRadius: '20px', border: '1.5px solid #e2e8f0', padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)' }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
-                                    background: '#f0fdf4',
-                                    border: '1px solid #bbf7d0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#166534'
-                                  }}>
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', flexShrink: 0 }}>
                                     <FileText size={18} />
                                   </div>
                                   <div>
                                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                                      AVV nach Art. 28 DSGVO & TOMs
+                                      AVV nach Art. 28 DSGVO &amp; TOMs
                                     </h4>
-                                    <span style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700 }}>
+                                    <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700 }}>
                                       ISO 27001 / BSI C5 / EU-Hosting
                                     </span>
                                   </div>
                                 </div>
                                 <p style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, margin: '0 0 18px' }}>
-                                  Auftragsverarbeitungsvertrag inklusive Anlage 1 (Technische und organisatorische Maßnahmen gem. Art. 32 DSGVO) sowie Subunternehmerverzeichnis mit reinem EU-Speicherort (Frankfurt am Main).
+                                  Auftragsverarbeitungsvertrag inklusive Anlage 1 (Technische und organisatorische Maßnahmen gem. Art. 32 DSGVO) sowie Subunternehmerverzeichnis mit deutschem Speicherort.
                                 </p>
                               </div>
                               <div style={{ display: 'flex', gap: '8px' }}>
@@ -4265,24 +4206,13 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   }}
                                   aria-label="Auftragsverarbeitungsvertrag öffnen und digital zeichnen"
                                   style={{
-                                    flex: 1,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '6px',
-                                    padding: '10px 14px',
-                                    borderRadius: '12px',
-                                    background: '#0f172a',
-                                    color: '#ffffff',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 800,
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px',
+                                    borderRadius: '12px', background: '#0f172a', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800,
+                                    border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                   }}
                                 >
                                   <FileText size={14} />
-                                  AVV öffnen & zeichnen
+                                  AVV öffnen &amp; zeichnen
                                 </button>
                                 <button
                                   type="button"
@@ -4302,17 +4232,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   title="Sicherheits-Whitepaper in der Vorschau öffnen"
                                   aria-label="Enterprise Sicherheits-Whitepaper in der Vorschau öffnen"
                                   style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    padding: '10px 14px',
-                                    borderRadius: '12px',
-                                    background: '#f8fafc',
-                                    color: '#0f172a',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    border: '1.5px solid #cbd5e1',
-                                    cursor: 'pointer'
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px 14px', borderRadius: '12px',
+                                    background: '#f8fafc', color: '#0f172a', fontSize: '0.78rem', fontWeight: 700, border: '1.5px solid #cbd5e1', cursor: 'pointer'
                                   }}
                                 >
                                   <Eye size={14} strokeWidth={2} />
@@ -4321,36 +4242,18 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             </div>
 
                             {/* Card 2: Personalrats- & Mitbestimmungs-Attest */}
-                            <div style={{
-                              background: '#ffffff',
-                              border: '1.5px solid #e2e8f0',
-                              borderRadius: '20px',
-                              padding: '22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)'
-                            }}>
+                            <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: '20px', padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)' }}>
                               <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-                                  <div style={{
-                                    width: '42px',
-                                    height: '42px',
-                                    borderRadius: '12px',
-                                    background: '#eff6ff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#1e40af'
-                                  }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', flexShrink: 0 }}>
                                     <Award size={18} />
                                   </div>
                                   <div>
                                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
                                       Personalrats- &amp; Mitbestimmungs-Attest
                                     </h4>
-                                    <span style={{ fontSize: '0.72rem', color: '#1e40af', fontWeight: 700 }}>
-                                      Personalrats-Zertifikat (Keine Verhaltenskontrolle)
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>
+                                      BetrVG 87 (Keine Verhaltenskontrolle)
                                     </span>
                                   </div>
                                 </div>
@@ -4361,7 +4264,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               <button
                                 type="button"
                                 onClick={() => openPdfPreview({
-                                  title: 'Personalrats- & Mitbestimmungs-Attest',
+                                  title: 'Personalrats- &amp; Mitbestimmungs-Attest',
                                   subtitle: currentSchoolProfile?.name || schoolName || 'Musikschule',
                                   badgeText: 'DIN A4 • BetrVG 87 • Revisionssicher',
                                   filename: `Personalrats_Attest_${(currentSchoolProfile?.name || schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
@@ -4375,19 +4278,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 })}
                                 aria-label="Personalrats- und Mitbestimmungs-Attest in der Vorschau öffnen"
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  padding: '10px 14px',
-                                  borderRadius: '12px',
-                                  background: '#1d4ed8',
-                                  color: '#ffffff',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px',
+                                  borderRadius: '12px', background: '#0f172a', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800,
+                                  border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
                                 <Eye size={14} strokeWidth={2} />
@@ -4396,37 +4289,18 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             </div>
 
                             {/* Card 3: DSB / DPO Compliance Dossier */}
-                            <div style={{
-                              background: '#ffffff',
-                              borderRadius: '20px',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)'
-                            }}>
+                            <div style={{ background: '#ffffff', borderRadius: '20px', border: '1.5px solid #e2e8f0', padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)' }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
-                                    background: '#fef3c7',
-                                    border: '1px solid #fde68a',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#92400e'
-                                  }}>
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', flexShrink: 0 }}>
                                     <CheckCircle2 size={18} />
                                   </div>
                                   <div>
                                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
                                       DSB / DPO Compliance Dossier
                                     </h4>
-                                    <span style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 700 }}>
-                                      Verfahrensverzeichnis &amp; Datenschutz-Folgenabschätzung
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>
+                                      Art. 30 VVT &amp; Art. 35 DSFA-Prüfung
                                     </span>
                                   </div>
                                 </div>
@@ -4451,19 +4325,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 })}
                                 aria-label="Datenschutzbeauftragten Compliance Dossier in der Vorschau öffnen"
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  padding: '10px 14px',
-                                  borderRadius: '12px',
-                                  background: '#854d0e',
-                                  color: '#ffffff',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px',
+                                  borderRadius: '12px', background: '#0f172a', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800,
+                                  border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
                                 <Eye size={14} strokeWidth={2} />
@@ -4472,37 +4336,18 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             </div>
 
                             {/* Card 4: Kinderschutz-Zertifikat */}
-                            <div style={{
-                              background: '#ffffff',
-                              borderRadius: '20px',
-                              border: '1.5px solid #e2e8f0',
-                              padding: '22px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                              boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)'
-                            }}>
+                            <div style={{ background: '#ffffff', borderRadius: '20px', border: '1.5px solid #e2e8f0', padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)' }}>
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                                  <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
-                                    background: '#fdf2f8',
-                                    border: '1px solid #fbcfe8',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#9d174d'
-                                  }}>
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', flexShrink: 0 }}>
                                     <ShieldCheck size={18} />
                                   </div>
                                   <div>
                                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                                      Kinderschutz- & Safe-Space Zertifikat
+                                      Kinderschutz- &amp; Safe-Space Zertifikat
                                     </h4>
-                                    <span style={{ fontSize: '0.72rem', color: '#9d174d', fontWeight: 700 }}>
-                                      Kinderschutz-Charta &amp; Vier-Augen-Prinzip
+                                    <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>
+                                      SGB VIII 8a &amp; Vier-Augen-Prinzip
                                     </span>
                                   </div>
                                 </div>
@@ -4527,19 +4372,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 })}
                                 aria-label="Kinderschutz und Safe Space Zertifikat in der Vorschau öffnen"
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '6px',
-                                  padding: '10px 14px',
-                                  borderRadius: '12px',
-                                  background: '#9d174d',
-                                  color: '#ffffff',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '10px 14px',
+                                  borderRadius: '12px', background: '#0f172a', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800,
+                                  border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
                                 <Eye size={14} strokeWidth={2} />

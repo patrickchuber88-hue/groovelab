@@ -1,11 +1,25 @@
 import { useState, useCallback, useEffect } from 'react';
 import JSZip from 'jszip';
 import { getBlob } from '../../../../utils/blobStorage';
+import { upsertSharedBiographyLink } from '../services/sharedBiographyRpcService';
 
 interface UseAudioSharingProps {
   studentId: string;
   studentName?: string;
   schoolName?: string;
+}
+
+function generateCryptoFourDigitPin(): string {
+  try {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      const randomValues = new Uint32Array(1);
+      window.crypto.getRandomValues(randomValues);
+      return (1000 + (randomValues[0] % 9000)).toString();
+    }
+  } catch {
+    // fallback below
+  }
+  return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 export function useAudioSharing(
@@ -46,21 +60,13 @@ export function useAudioSharing(
       const currentStored = localStorage.getItem('campus_share_pin_current');
       if (currentStored && /^\d{4}$/.test(currentStored)) return currentStored;
 
-      let randomPin = '4829';
-      if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
-        const randomValues = new Uint32Array(1);
-        window.crypto.getRandomValues(randomValues);
-        randomPin = (1000 + (randomValues[0] % 9000)).toString();
-      } else {
-        randomPin = Math.floor(1000 + Math.random() * 9000).toString();
-      }
-
+      const randomPin = generateCryptoFourDigitPin();
       localStorage.setItem(`campus_share_pin_${id}`, randomPin);
       localStorage.setItem('campus_share_pin_current', randomPin);
       localStorage.setItem('campus_share_pin_global', randomPin);
       return randomPin;
     } catch {
-      return '4829';
+      return generateCryptoFourDigitPin();
     }
   }, []);
 
@@ -73,31 +79,46 @@ export function useAudioSharing(
     }
   }, [studentId, shareTargetPlaylistId, getOrInitStableSharePin]);
 
+  // Authoritative Server-Side Bcrypt Sync when Share Modal opens
+  useEffect(() => {
+    if (!showShareModal || !studentId || studentId === 'anonymous_student' || !/^\d{4}$/.test(sharePin)) return;
+    void upsertSharedBiographyLink({
+      studentId,
+      pin: sharePin,
+      studentDisplayName: studentName,
+      schoolDisplayName: schoolName
+    });
+  }, [showShareModal, studentId, sharePin, studentName, schoolName]);
+
   const savePinToStorage = useCallback((newPin: string) => {
-    setSharePin(newPin);
-    try {
-      if (studentId) {
-        localStorage.setItem(`campus_share_pin_${studentId}`, newPin);
-        if (shareTargetPlaylistId) {
-          localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, newPin);
+    const clean = newPin.replace(/\D/g, '').slice(0, 4);
+    setSharePin(clean);
+    if (clean.length === 4) {
+      try {
+        if (studentId) {
+          localStorage.setItem(`campus_share_pin_${studentId}`, clean);
+          if (shareTargetPlaylistId) {
+            localStorage.setItem(`campus_share_pin_${studentId}_${shareTargetPlaylistId}`, clean);
+          }
         }
+        localStorage.setItem('campus_share_pin_current', clean);
+        localStorage.setItem('campus_share_pin_global', clean);
+      } catch (e) {
+        console.warn('Could not save PIN to storage:', e);
       }
-      localStorage.setItem('campus_share_pin_current', newPin);
-      localStorage.setItem('campus_share_pin_global', newPin);
-    } catch (e) {
-      console.warn('Could not save PIN to storage:', e);
+      if (studentId && studentId !== 'anonymous_student') {
+        void upsertSharedBiographyLink({
+          studentId,
+          pin: clean,
+          studentDisplayName: studentName,
+          schoolDisplayName: schoolName
+        });
+      }
     }
-  }, [studentId, shareTargetPlaylistId]);
+  }, [studentId, shareTargetPlaylistId, studentName, schoolName]);
 
   const reRollPin = useCallback(() => {
-    let newPin = '1234';
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
-      const randomValues = new Uint32Array(1);
-      window.crypto.getRandomValues(randomValues);
-      newPin = (1000 + (randomValues[0] % 9000)).toString();
-    } else {
-      newPin = Math.floor(1000 + Math.random() * 9000).toString();
-    }
+    const newPin = generateCryptoFourDigitPin();
     savePinToStorage(newPin);
   }, [savePinToStorage]);
 
@@ -108,11 +129,20 @@ export function useAudioSharing(
     params.set('student', studentId);
     if (shareTargetPlaylistId) params.set('playlist', shareTargetPlaylistId);
     if (shareAnonymously) params.set('anon', '1');
+    // Zero-Trust: Never append plaintext PIN or PIN-hash to URL query parameters
     return `${origin}/campus/share?${params.toString()}`;
   }, [studentId, shareTargetPlaylistId, shareAnonymously]);
 
   const copyShareLink = useCallback(async () => {
     const url = buildShareUrl();
+    if (studentId && studentId !== 'anonymous_student' && /^\d{4}$/.test(sharePin)) {
+      await upsertSharedBiographyLink({
+        studentId,
+        pin: sharePin,
+        studentDisplayName: studentName,
+        schoolDisplayName: schoolName
+      });
+    }
     try {
       await navigator.clipboard.writeText(url);
       setCopySuccess(true);
@@ -120,7 +150,7 @@ export function useAudioSharing(
     } catch (err) {
       console.warn('Clipboard write failed:', err);
     }
-  }, [buildShareUrl]);
+  }, [buildShareUrl, studentId, sharePin, studentName, schoolName]);
 
   const copyToClipboard = useCallback((text: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -140,7 +170,6 @@ export function useAudioSharing(
     const folderName = `${track.title.replace(/[/\\?%*:|"<>]/g, '_')}`;
     const folder = zip.folder(folderName) || zip;
 
-    // Fetch master blob
     let masterBlob = await getBlob(`campus_audio_${track.id}_master`);
     if (!masterBlob && track.masteredAudioUrl) {
       try {
@@ -154,7 +183,6 @@ export function useAudioSharing(
       folder.file(`${folderName}_Studio_Master.wav`, masterBlob);
     }
 
-    // Fetch raw blob
     let rawBlob = await getBlob(`campus_audio_${track.id}_raw`);
     if (!rawBlob && track.audioUrl) {
       try {
@@ -168,7 +196,6 @@ export function useAudioSharing(
       folder.file(`${folderName}_Pure_RAW.wav`, rawBlob);
     }
 
-    // Add info note
     const metaText = `Campus-Groovelab Audio Portfolio\n=================================\nTitel: ${track.title}\nSchüler: ${studentName || 'Schüler'}\nMusikschule: ${schoolName || 'Campus-Groovelab'}\nDatum: ${new Date().toLocaleDateString('de-DE')}\nNotiz: ${track.personalNote || 'Keine persönliche Notiz hinterlegt.'}\n`;
     folder.file('Track_Info.txt', metaText);
 

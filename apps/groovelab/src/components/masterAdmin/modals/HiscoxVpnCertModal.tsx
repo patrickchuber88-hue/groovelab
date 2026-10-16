@@ -26,7 +26,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
       id: 1,
       question: 'Sind Fernzugriffe klar geregelt und technisch abgesichert?',
       status: '100% Erfüllt',
-      desc: 'Fernzugriffe auf Host- und Cluster-Ebene (Hetzner Bare Metal Falkenstein/Nürnberg) sind über asymmetrische SSH-Keys (Ed25519), Fail2ban und UFW Host-Firewall abgesichert. Der MasterAdmin-Leitstand ist durch TLS 1.3, Auth-RPCs und 45-Minuten Privacy-Screen-Lockout geschützt.'
+      desc: 'Fernzugriffe auf Host- und Cluster-Ebene (IONOS Enterprise Cloud Deutschland 85.215.73.216, Primärer Produktiv-Cluster + Hetzner Cloud Deutschland Falkenstein/Nürnberg, Georedundantes Backup & Failover) sind über asymmetrische SSH-Keys (Ed25519), Fail2ban und UFW Host-Firewall abgesichert. Der MasterAdmin-Leitstand ist durch TLS 1.3, Auth-RPCs und 15-Minuten Idle-Lock geschützt.'
     },
     {
       id: 2,
@@ -100,7 +100,10 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
         }
       `}</style>
 
-      <div role="dialog" aria-modal="true"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hiscox CyberSafe VPN und Fernzugriffe Audit-Zertifikat"
         id="hiscox-vpn-cert-print"
         style={{
           background: '#ffffff',
@@ -134,6 +137,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                 height: '46px',
                 borderRadius: '14px',
                 background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -180,6 +184,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Schließen"
               style={{
                 width: '38px',
                 height: '38px',
@@ -212,7 +217,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
           {/* CERTIFICATE HEADER BADGE */}
           <div
             style={{
-              border: '2px solid #0284c7',
+              border: 'none',
               borderRadius: '20px',
               padding: '24px',
               background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
@@ -226,6 +231,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                     style={{
                       background: '#0284c7',
                       color: '#ffffff',
+                      border: 'none',
                       fontSize: '0.70rem',
                       fontWeight: 900,
                       textTransform: 'uppercase',
@@ -244,7 +250,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                       fontWeight: 900,
                       padding: '3px 9px',
                       borderRadius: '6px',
-                      border: '1px solid #a7f3d0'
+                      border: 'none'
                     }}
                   >
                     100% Bestanden (6/6 Kriterien)
@@ -298,6 +304,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                           borderRadius: '6px',
                           background: '#0284c7',
                           color: '#ffffff',
+                          border: 'none',
                           fontSize: '0.72rem',
                           fontWeight: 900,
                           display: 'flex',
@@ -324,7 +331,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
                       fontWeight: 900,
                       padding: '4px 10px',
                       borderRadius: '100px',
-                      border: '1px solid #a7f3d0',
+                      border: 'none',
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
@@ -403,15 +410,15 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
             <div>
               <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Geprüft &amp; verifiziert durch Leitstand:</div>
               <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a' }}>{operatorName}</div>
-              <div style={{ fontSize: '0.70rem', color: '#94a3b8' }}>Campus-Groovelab Cloud Ops (Hetzner Bare Metal Falkenstein/Nürnberg)</div>
+              <div style={{ fontSize: '0.70rem', color: '#94a3b8' }}>Campus-Groovelab Cloud Ops (IONOS Enterprise Cloud Deutschland 85.215.73.216 + Hetzner Cloud Deutschland Falkenstein/Nürnberg)</div>
             </div>
 
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '0.70rem', color: '#94a3b8' }}>
                 Entspricht Hiscox CyberSafe Leitfaden 05/2026 • OWASP ASVS Level 3 • BSI IT-Grundschutz
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800, marginTop: '2px' }}>
-                ✓ Cyber-Versicherungsschutz uneingeschränkt wirksam
+              <div style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 800, marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Check size={12} strokeWidth={3} /> Cyber-Versicherungsschutz uneingeschränkt wirksam
               </div>
             </div>
           </div>

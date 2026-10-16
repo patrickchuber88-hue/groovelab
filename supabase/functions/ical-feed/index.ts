@@ -621,11 +621,11 @@ Deno.serve(async (req) => {
       instrumentName = user.instrument || schedules?.[0]?.teacher?.instrument || '';
     }
 
-    const effectiveFeedInstrument = cleanInstrument(instrumentName) || 'Gitarre';
+    const effectiveFeedInstrument = cleanInstrument(instrumentName) || 'Musikunterricht';
     const lessonType = formatInstrumentLesson(effectiveFeedInstrument);
-    const calendarName = teacherName
-      ? `${lessonType} - ${teacherName}`
-      : `${lessonType} (${first_name})`;
+    const calendarName = role === 'student'
+      ? (first_name ? `Campus · ${first_name}` : 'Campus · Musikunterricht')
+      : (teacherName ? `${lessonType} - ${teacherName}` : `${lessonType} (${first_name})`);
 
     let icsContent = [
       'BEGIN:VCALENDAR',
@@ -748,11 +748,9 @@ Deno.serve(async (req) => {
             ? '↻ Verlegt: Campus-Groovelab Termin'
             : 'Campus-Groovelab Termin';
         } else if (role === 'student') {
-          if (prefix) {
-            summary = `${prefix}Musikunterricht bei ${teacherName}${instrumentSuffix}`;
-          } else {
-            summary = `${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`;
-          }
+          // 🏛️ 0,1% Goldstandard (Pfad A): Fach · Lehrkraft (z. B. Gitarre · Peter Pan)
+          // 100% Sperrbildschirm-Datenschutz (Art. 8 DSGVO), Null-Abkürzung auf Apple Watch & Widgets
+          summary = `${prefix}${effectiveInstrument} · ${teacherName}`;
         } else {
           if (prefix) {
             summary = `${prefix}${studentName}${instrumentSuffix}`;

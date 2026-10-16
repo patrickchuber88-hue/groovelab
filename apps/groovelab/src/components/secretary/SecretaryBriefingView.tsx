@@ -37,6 +37,7 @@ export interface SecretaryBriefingViewProps {
   roomIssues: any[];
   setRoomIssues: React.Dispatch<React.SetStateAction<any[]>>;
   rooms: any[];
+  buildings?: any[];
   students: any[];
   campusTeachers: any[];
   bypassTeachers: any[];
@@ -104,6 +105,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   roomIssues = [],
   setRoomIssues,
   rooms = [],
+  buildings = [],
   students = [],
   campusTeachers = [],
   bypassTeachers = [],
@@ -156,7 +158,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const safeStudents = students || [];
             const safeAllocations = matrixAllocations || [];
 
-            // 1. Raumauslastung Heute (Memoized)
+            // 1. Raumauslastung Heute & Storage Backup Metrics (Memoized)
             const { todayAllocations, roomOccupancyRate, todayTeachersCount } = useMemo(() => {
               const safeAllocs = matrixAllocations || [];
               const safeRms = rooms || [];
@@ -164,12 +166,19 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
               const totalSlots = safeRms.length * 8; // standard 8 slots per room per day
               const occRate = totalSlots > 0 ? Math.round((todayAllocs.length / totalSlots) * 100) : 0;
               const teacherIds = Array.from(new Set(todayAllocs.map((p: any) => p.teacherId).filter(Boolean)));
-              return {
-                todayAllocations: todayAllocs,
-                roomOccupancyRate: occRate,
-                todayTeachersCount: teacherIds.length
-              };
+              return { todayAllocations: todayAllocs, roomOccupancyRate: occRate, todayTeachersCount: teacherIds.length };
             }, [rooms, matrixAllocations, todayDayNum]);
+
+            const downloadedBackupCount = useMemo(() => {
+              let count = 0;
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('campus_storage_backup_downloaded_') && localStorage.getItem(k) === 'true') count++;
+              }
+              return count;
+            }, [students.length, currentSchoolProfile?.storage_termination_status]);
+
+            const memoizedEffectiveUsedBytes = useMemo(() => getEffectiveStorageUsedBytes(currentSchoolProfile), [getEffectiveStorageUsedBytes, currentSchoolProfile]);
 
             // 2. Heutige Abwesenheiten (Memoized)
             const activeAusfallTeachers = useMemo(() => {
@@ -382,39 +391,14 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     const diffDays = Math.max(0, Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
                     const deadlineStr = deadlineDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
 
-                    // Count how many students have downloaded backup
-                    let downloadedCount = 0;
-                    for (let i = 0; i < localStorage.length; i++) {
-                      const k = localStorage.key(i);
-                      if (k && k.startsWith('campus_storage_backup_downloaded_') && localStorage.getItem(k) === 'true') {
-                        downloadedCount++;
-                      }
-                    }
+                    const downloadedCount = downloadedBackupCount;
                     const totalStudents = students.length || 1;
                     const backupPct = Math.min(100, Math.round((downloadedCount / totalStudents) * 100));
 
                     return (
-                      <div style={{
-                        background: '#ecfdf5',
-                        border: '1.5px solid #10b981',
-                        borderRadius: '24px',
-                        padding: '20px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '16px',
-                        boxShadow: 'none'
-                      }}>
+                      <div style={{ background: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: '24px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', boxShadow: 'none' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{
-                            background: '#ffffff',
-                            borderRadius: '16px',
-                            padding: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid #10b981'
-                          }}>
+                          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #10b981' }}>
                             <span style={{ fontSize: '1.5rem' }}>⏳</span>
                           </div>
                           <div>
@@ -447,16 +431,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 } catch (e) {}
                               }
                             }}
-                            style={{
-                              background: '#ffffff',
-                              color: '#475569',
-                              border: '1.5px solid #cbd5e1',
-                              borderRadius: '12px',
-                              padding: '9px 14px',
-                              fontWeight: 800,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer'
-                            }}
+                            style={{ background: '#ffffff', color: '#475569', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '9px 14px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}
                           >
                             Kündigung abbrechen
                           </button>
@@ -467,22 +442,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                               if (confirm(`Möchtest du den Stichtag jetzt sofort ausführen? Der Cloud-Speicher wird geleert und dein Paket auf Standard (0,00 €) umgestellt.`)) {
                                 try {
                                   await supabase.from('schools').update({
-                                    storage_used_bytes: 0,
-                                    storage_addon_gb: 0,
-                                    storage_addon_monthly_fee: 0,
-                                    storage_addon_status: 'active',
-                                    storage_termination_status: 'completed'
+                                    storage_used_bytes: 0, storage_addon_gb: 0, storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active', storage_termination_status: 'completed'
                                   }).eq('id', schoolId);
 
                                   const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
                                   const overrides = JSON.parse(overridesStr);
                                   overrides[schoolId] = {
                                     ...(overrides[schoolId] || {}),
-                                    storage_used_bytes: 0,
-                                    storage_addon_gb: 0,
-                                    storage_addon_monthly_fee: 0,
-                                    storage_addon_status: 'active',
-                                    storage_termination_status: 'completed'
+                                    storage_used_bytes: 0, storage_addon_gb: 0, storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active', storage_termination_status: 'completed'
                                   };
                                   localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
                                   localStorage.setItem('groovelab_storage_addon_active', 'false');
@@ -491,12 +460,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   localStorage.setItem('campus_storage_addon_gb', '0');
 
                                   setCurrentSchoolProfile((prev: any) => prev ? {
-                                    ...prev,
-                                    storage_used_bytes: 0,
-                                    storage_addon_gb: 0,
-                                    storage_addon_monthly_fee: 0,
-                                    storage_addon_status: 'active',
-                                    storage_termination_status: 'completed'
+                                    ...prev, storage_used_bytes: 0, storage_addon_gb: 0, storage_addon_monthly_fee: 0,
+                                    storage_addon_status: 'active', storage_termination_status: 'completed'
                                   } : prev);
 
                                   window.dispatchEvent(new Event('groovelab_school_updated'));
@@ -506,17 +471,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 }
                               }
                             }}
-                            style={{
-                              background: '#16a34a',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '9px 16px',
-                              fontWeight: 800,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              boxShadow: 'none'
-                            }}
+                            style={{ background: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer', boxShadow: 'none' }}
                           >
                             Stichtag jetzt ausführen (0,00 €)
                           </button>
@@ -530,7 +485,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
                     const baseGb = 1.0;
                     const currentTotalCapGb = baseGb + activeAddonGb;
-                    const usedBytes = getEffectiveStorageUsedBytes(currentSchoolProfile);
+                    const usedBytes = memoizedEffectiveUsedBytes;
                     const usedGb = usedBytes / (1024 * 1024 * 1024);
                     const usedMb = usedBytes / (1024 * 1024);
                     const usagePct = currentTotalCapGb > 0 ? (usedGb / currentTotalCapGb) * 100 : 0;
@@ -815,29 +770,36 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     );
                   })()}
                   
-                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs) */}
-                  <div id="tour-secretary-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs - 0,1% Goldstandard 4-Spalten-Festraster) */}
+                  <div 
+                    id="tour-secretary-kpis" 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', 
+                      gap: '12px' 
+                    }}
+                  >
                     
                     {/* Card 1: Raumauslastung (Blue Gradient) */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
                       borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
+                      padding: '14px 15px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Raumauslastung Heute</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Raumauslastung</span>
                         <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
                           <DoorOpen size={13} color="white" />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                          {todayDayNum === 7 ? '% (Sonntagsruhe)' : todayDayNum === 6 ? '% (Samstag)' : `% (${todayAllocations.length} Slots)`}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{roomOccupancyRate}</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9 }}>
+                          {todayDayNum === 7 ? '% (Sonntag)' : todayDayNum === 6 ? '% (Samstag)' : `% (${todayAllocations.length} Slots)`}
                         </span>
                       </div>
                     </div>
@@ -847,20 +809,20 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       position: 'relative', overflow: 'hidden',
                       background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
                       borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
+                      padding: '14px 15px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler-Aktivierung</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Aktivierung</span>
                         <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
                           <UserCheck size={13} color="white" />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{activationRate}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount} / {totalStudentsCount})</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{activationRate}</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount}/{totalStudentsCount})</span>
                       </div>
                     </div>
 
@@ -871,23 +833,23 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       color: '#0f172a',
                       borderRadius: '20px',
                       boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
+                      padding: '14px 15px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       border: scheduleConflicts.length === 0 ? '1px solid #e2e8f0' : 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#64748b' : '#1e293b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Terminkonflikte</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#64748b' : '#1e293b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Konflikte</span>
                         <div style={{ background: scheduleConflicts.length === 0 ? '#f0fdf4' : 'rgba(0, 0, 0, 0.08)', padding: '5px', borderRadius: '8px' }}>
                           <ShieldAlert size={13} color={scheduleConflicts.length === 0 ? '#16a34a' : '#0f172a'} />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a', lineHeight: 1 }}>
                           {scheduleConflicts.length}
                         </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#16a34a' : '#1e293b' }}>
-                          {scheduleConflicts.length === 0 ? 'System-Prüfung stabil' : 'Konflikte gefunden'}
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#16a34a' : '#1e293b' }}>
+                          {scheduleConflicts.length === 0 ? 'Stabil ✓' : 'Konflikt'}
                         </span>
                       </div>
                     </div>
@@ -898,23 +860,23 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       background: activeAusfallTeachers.length === 0 ? '#ffffff' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                       color: activeAusfallTeachers.length === 0 ? '#0f172a' : 'white',
                       borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '80px',
-                      padding: '16px', boxSizing: 'border-box',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
+                      padding: '14px 15px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                       border: activeAusfallTeachers.length === 0 ? '1px solid #e2e8f0' : 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#64748b' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle Heute</span>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#64748b' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ausfälle Heute</span>
                         <div style={{ background: activeAusfallTeachers.length === 0 ? '#f0fdf4' : 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
                           <CalendarX size={13} color={activeAusfallTeachers.length === 0 ? '#16a34a' : 'white'} />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: activeAusfallTeachers.length === 0 ? '#0f172a' : 'white' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: activeAusfallTeachers.length === 0 ? '#0f172a' : 'white', lineHeight: 1 }}>
                           {activeAusfallTeachers.length}
                         </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#16a34a' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.9 }}>
-                          {activeAusfallTeachers.length === 0 ? 'Kein Ausfallbedarf' : (activeAusfallTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet')}
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#16a34a' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.9 }}>
+                          {activeAusfallTeachers.length === 0 ? 'Planmäßig ✓' : (activeAusfallTeachers.length === 1 ? '1 Ausfall' : `${activeAusfallTeachers.length} Ausfälle`)}
                         </span>
                       </div>
                     </div>
@@ -924,9 +886,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                   {/* 📅 LIVE CAMPUS RADAR & HEUTE IM HAUS (Operatives Tages-Cockpit, 0,1% Goldstandard Satellit) */}
                   <SecretaryTagesRadarBoard
                     rooms={rooms}
+                    buildings={buildings}
                     todayAllocations={todayAllocations}
                     todayTeachersCount={todayTeachersCount}
                     todayDayNum={todayDayNum}
+                    simulatedToday={simulatedToday}
                     userMap={userMap}
                     setRoomsSubView={setRoomsSubView}
                     setRoomSearchQuery={setRoomSearchQuery}

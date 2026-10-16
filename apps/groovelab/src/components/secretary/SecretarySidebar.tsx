@@ -834,121 +834,124 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
               </div>
             </div>
 
-            {/* ── 2. Symmetrischer Dual-Dock: Schulsekretariat Profil-Button (50px) ── */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                setActiveTab?.('secretary');
-                setSecretarySubTab('settings');
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
+            {/* ── 2. Symmetrischer Dual-Dock: Schulsekretariat Profil-Button & Logout (50px) ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', height: '50px' }}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
                   setActiveTab?.('secretary');
                   setSecretarySubTab('settings');
-                }
-              }}
-              title="Einstellungen & Schulprofil öffnen"
-              aria-label="Einstellungen & Schulprofil öffnen"
-              style={{
-                width: '100%',
-                height: '50px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                padding: '6px 10px',
-                borderRadius: '12px',
-                background: (activeTab === 'secretary' && secretarySubTab === 'settings') ? '#f1f5f9' : '#f8fafc',
-                border: (activeTab === 'secretary' && secretarySubTab === 'settings') ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
-                cursor: 'pointer',
-                transition: 'all 0.18s ease',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-              className="hover-scale"
-            >
-              {/* Left: Avatar (34×34px Historisches Tafelbild SSOT CAM-89) */}
-              <div style={{ position: 'relative', width: '34px', height: '34px', flexShrink: 0 }}>
-                <div style={{
-                  width: '34px',
-                  height: '34px',
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
-                }}>
-                  <img 
-                    src="/campus_login_hero.png"
-                    alt="" 
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} 
-                    loading="lazy" 
-                  />
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setActiveTab?.('secretary');
+                    setSecretarySubTab('settings');
+                  }
+                }}
+                title="Einstellungen & Schulprofil öffnen"
+                aria-label="Einstellungen & Schulprofil öffnen"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: '50px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 10px',
+                  borderRadius: '12px',
+                  background: (activeTab === 'secretary' && secretarySubTab === 'settings') ? '#f1f5f9' : '#f8fafc',
+                  border: (activeTab === 'secretary' && secretarySubTab === 'settings') ? '1.5px solid #cbd5e1' : '1px solid #e2e8f0',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                  boxSizing: 'border-box',
+                  outline: 'none'
+                }}
+                className="hover-scale"
+              >
+                {/* Left: Avatar (34×34px Historisches Tafelbild SSOT CAM-89) */}
+                <div style={{ position: 'relative', width: '34px', height: '34px', flexShrink: 0 }}>
+                  <div style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                  }}>
+                    <img 
+                      src="/campus_login_hero.png"
+                      alt="" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} 
+                      loading="lazy" 
+                    />
+                  </div>
+                </div>
+
+                {/* Center: Name & Subtitle */}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    color: '#0f172a',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    lineHeight: 1.2
+                  }}>
+                    {userName}
+                  </div>
+                  <div style={{
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {moduleConfig.roleSubtitle}
+                  </div>
                 </div>
               </div>
 
-              {/* Center: Name & Subtitle */}
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  color: '#0f172a',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  lineHeight: 1.2
-                }}>
-                  {userName}
-                </div>
-                <div style={{
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  color: '#64748b',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {moduleConfig.roleSubtitle}
-                </div>
-              </div>
-
-              {/* Right: De-escalated Logout Icon Button */}
+              {/* Right: Dedicated Standalone Logout Button (BFSG 2025 compliant >= 44px tap target) */}
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSecretaryLogout();
-                }}
+                onClick={handleSecretaryLogout}
                 title="Sicher von der Verwaltung abmelden"
                 aria-label="Abmelden"
                 style={{
+                  width: '42px',
+                  height: '50px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'transparent',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
                   color: '#94a3b8',
                   cursor: 'pointer',
                   padding: 0,
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0
+                  transition: 'all 0.18s ease',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                  outline: 'none'
                 }}
                 className="hover-scale"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = '#ef4444';
                   e.currentTarget.style.background = '#fef2f2';
+                  e.currentTarget.style.borderColor = '#fecaca';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = '#94a3b8';
-                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
                 }}
               >
-                <LogOut size={15} strokeWidth={2} />
+                <LogOut size={16} strokeWidth={2} />
               </button>
             </div>
 

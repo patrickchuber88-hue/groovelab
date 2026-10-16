@@ -20,9 +20,9 @@ export const getSchoolYearEndInfo = (simDate?: string | Date | null, existingEnd
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1-12
   // Standard Schuljahr: 01.09. bis 31.08.
-  // Frist 1 Monat zum 31.08. (d.h. 31.07.)
-  // Bei Kündigung ab August (Monat 8) oder später gilt Kündigung zum 31.08. des Folgejahres
-  const targetEndYear = currentMonth >= 8 ? currentYear + 1 : currentYear;
+  // Frist 3 Monate zum 31.08. (d.h. 31.05. gem. AGB Teil A Ziffer 4 Abs. 2)
+  // Bei Kündigung ab Juni (Monat 6) oder später gilt Kündigung zum 31.08. des Folgejahres
+  const targetEndYear = currentMonth >= 6 ? currentYear + 1 : currentYear;
   const schoolYearStartYear = targetEndYear - 1;
   const endDate = new Date(Date.UTC(targetEndYear, 7, 31, 21, 59, 59, 999));
   return {

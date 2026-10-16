@@ -1,27 +1,33 @@
 <!DOCTYPE html>
-<html lang="de" class="dark">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-  <title>Geschützter Zugang • Campus-GrooveLab</title>
+  <title>Geschützter Zugang • Campus-Groovelab</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <style>
     :root {
-      --bg-deep: #090d16;
-      --card-bg: rgba(15, 23, 42, 0.88);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --accent-gold: #facc15;
-      --accent-gold-hover: #eab308;
-      --accent-gold-glow: rgba(250, 204, 21, 0.16);
+      --bg-canvas: #f8fafc;
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --card-border: rgba(226, 232, 240, 0.9);
       --campus-green: #34a853;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --input-bg: rgba(2, 6, 23, 0.7);
-      --input-border: rgba(148, 163, 184, 0.2);
-      --error-bg: rgba(239, 68, 68, 0.12);
-      --error-border: rgba(239, 68, 68, 0.35);
-      --error-text: #fca5a5;
+      --campus-green-dark: #15803d;
+      --campus-green-surface: #f0fdf4;
+      --campus-green-border: #bbf7d0;
+      --groovelab-yellow: #eab308;
+      --groovelab-yellow-bright: #facc15;
+      --groovelab-yellow-hover: #eab308;
+      --hyphen-color: #94a3b8;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-muted: #64748b;
+      --input-bg: #ffffff;
+      --input-border: #cbd5e1;
+      --input-focus: #34a853;
+      --error-bg: #fef2f2;
+      --error-border: #fecaca;
+      --error-text: #b91c1c;
     }
 
     * {
@@ -33,10 +39,11 @@
     body {
       min-height: 100vh;
       min-height: 100dvh;
-      background-color: var(--bg-deep);
+      background-color: var(--bg-canvas);
       background-image: 
-        radial-gradient(circle at 50% 15%, var(--accent-gold-glow) 0%, transparent 45%),
-        radial-gradient(circle at 85% 80%, rgba(52, 168, 83, 0.06) 0%, transparent 40%);
+        radial-gradient(circle at 12% 15%, rgba(52, 168, 83, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 88% 85%, rgba(250, 204, 21, 0.16) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.65) 0%, transparent 100%);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Plus Jakarta Sans", sans-serif;
       display: flex;
@@ -57,17 +64,17 @@
       backdrop-filter: blur(28px);
       -webkit-backdrop-filter: blur(28px);
       border-radius: 28px;
-      padding: 36px 32px;
+      padding: 38px 32px 32px;
       box-shadow: 
-        0 20px 40px -15px rgba(0, 0, 0, 0.7),
-        0 0 0 1px rgba(255, 255, 255, 0.05);
-      transition: transform 0.2s ease;
+        0 20px 45px -10px rgba(15, 23, 42, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .badge-wrapper {
       display: flex;
       justify-content: center;
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
 
     .security-badge {
@@ -76,9 +83,9 @@
       gap: 8px;
       padding: 6px 14px;
       border-radius: 9999px;
-      background: rgba(250, 204, 21, 0.1);
-      border: 1px solid rgba(250, 204, 21, 0.25);
-      color: var(--accent-gold);
+      background: var(--campus-green-surface);
+      border: 1px solid var(--campus-green-border);
+      color: var(--campus-green-dark);
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.08em;
@@ -88,20 +95,21 @@
     .security-badge svg {
       width: 13px;
       height: 13px;
+      color: var(--campus-green);
     }
 
     .badge-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background-color: var(--accent-gold);
-      box-shadow: 0 0 8px var(--accent-gold);
+      background-color: var(--campus-green);
+      box-shadow: 0 0 8px rgba(52, 168, 83, 0.65);
       animation: pulse 2s infinite ease-in-out;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 0.45; transform: scale(0.85); }
     }
 
     .header-text {
@@ -110,25 +118,37 @@
     }
 
     .header-text h1 {
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #ffffff;
+      letter-spacing: -0.025em;
+      color: var(--text-main);
       margin-bottom: 8px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 0;
     }
 
-    .header-text h1 span.gold {
-      color: var(--accent-gold);
+    .header-text h1 span.campus {
+      color: var(--campus-green);
+      font-weight: 800;
+    }
+
+    .header-text h1 span.hyphen {
+      color: var(--hyphen-color);
+      font-weight: 800;
+      margin: 0 1px;
+    }
+
+    .header-text h1 span.groovelab {
+      color: var(--groovelab-yellow);
+      font-weight: 800;
     }
 
     .header-text p {
       font-size: 14px;
-      line-height: 1.5;
-      color: var(--text-muted);
+      line-height: 1.55;
+      color: var(--text-sub);
     }
 
     .form-group {
@@ -141,7 +161,7 @@
     .form-group label {
       font-size: 13px;
       font-weight: 600;
-      color: #cbd5e1;
+      color: #334155;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -156,23 +176,23 @@
     .input-wrapper input {
       width: 100%;
       background: var(--input-bg);
-      border: 1px solid var(--input-border);
+      border: 1.5px solid var(--input-border);
       border-radius: 14px;
       padding: 14px 46px 14px 16px;
-      color: #ffffff;
+      color: var(--text-main);
       font-size: 16px;
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
     }
 
     .input-wrapper input:focus {
-      border-color: var(--accent-gold);
-      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.2);
-      background: rgba(2, 6, 23, 0.9);
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px rgba(52, 168, 83, 0.18);
+      background: #ffffff;
     }
 
     .input-wrapper input::placeholder {
-      color: #64748b;
+      color: #94a3b8;
       font-size: 14px;
     }
 
@@ -182,7 +202,7 @@
       background: none;
       border: none;
       padding: 6px;
-      color: #94a3b8;
+      color: #64748b;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -192,17 +212,17 @@
     }
 
     .toggle-pwd-btn:hover {
-      color: #f8fafc;
-      background: rgba(255, 255, 255, 0.05);
+      color: #0f172a;
+      background: #f1f5f9;
     }
 
     .toggle-pwd-btn:focus-visible {
-      outline: 2px solid var(--accent-gold);
+      outline: 2px solid var(--campus-green);
     }
 
     .submit-btn {
       width: 100%;
-      background-color: var(--accent-gold);
+      background-color: var(--groovelab-yellow-bright);
       color: #0f172a;
       border: none;
       border-radius: 14px;
@@ -215,7 +235,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.35);
+      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.4);
       transition: background-color 0.15s, transform 0.1s, box-shadow 0.15s;
       min-height: 48px;
       user-select: none;
@@ -223,8 +243,8 @@
     }
 
     .submit-btn:hover {
-      background-color: var(--accent-gold-hover);
-      box-shadow: 0 6px 18px rgba(250, 204, 21, 0.45);
+      background-color: var(--groovelab-yellow-hover);
+      box-shadow: 0 6px 18px rgba(234, 179, 8, 0.5);
     }
 
     .submit-btn:active {
@@ -232,7 +252,7 @@
     }
 
     .submit-btn:focus-visible {
-      outline: 2px solid #ffffff;
+      outline: 2px solid #0f172a;
       outline-offset: 2px;
     }
 
@@ -290,18 +310,8 @@
       margin-top: 24px;
       text-align: center;
       font-size: 11px;
-      color: #64748b;
+      color: var(--text-muted);
       letter-spacing: 0.02em;
-    }
-
-    .footer-note a {
-      color: #94a3b8;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .footer-note a:hover {
-      color: var(--accent-gold);
     }
   </style>
 </head>
@@ -320,8 +330,17 @@
     </div>
 
     <div class="header-text">
-      <h1>Campus <span class="gold">GrooveLab</span></h1>
-      <p>Diese Plattform befindet sich im geschützten Vorabzugang. Bitte autorisiere dich mit dem autorisierten Zugangscode.</p>
+      <h1>
+        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle; margin-right:8px; flex-shrink:0;">
+          <path d="M7 6.8L18 3.8V6.6L7 9.6Z" fill="#34a853"/>
+          <line x1="7" y1="7" x2="7" y2="16.5" stroke="#34a853" stroke-width="2.4" stroke-linecap="round"/>
+          <line x1="18" y1="4" x2="18" y2="13.5" stroke="#34a853" stroke-width="2.4" stroke-linecap="round"/>
+          <ellipse cx="5" cy="17" rx="3.2" ry="2.4" transform="rotate(-24 5 17)" fill="#34a853"/>
+          <ellipse cx="16" cy="14" rx="3.2" ry="2.4" transform="rotate(-24 16 14)" fill="#34a853"/>
+        </svg>
+        <span class="campus">Campus</span><span class="hyphen">-</span><span class="groovelab">Groovelab</span>
+      </h1>
+      <p>Diese Plattform befindet sich im geschützten Vorabzugang. Bitte autorisiere dich mit dem gültigen Zugangscode.</p>
     </div>
 
     <div id="errorBox" class="error-box" role="alert" aria-live="polite">
@@ -375,7 +394,7 @@
     </form>
 
     <div class="footer-note">
-      Enterprise+ Ingress Shield • OWASP ASVS Level 3 • Hetzner Datacenter DE
+      Enterprise+ Ingress Shield • OWASP ASVS Level 3 • Sovereign Cloud DE
     </div>
   </main>
 

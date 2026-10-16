@@ -61,9 +61,9 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   const isCH = data.currency === 'CHF' || data.schoolAddress?.country === 'CH';
   const currencySymbol = isCH ? 'CHF' : '€';
   const netAmount = Number(data.totalMonthlyRateNet || 0);
-  const vatRate = isCH ? 0 : 0.19;
-  const vatAmount = isCH ? 0 : Math.round(netAmount * vatRate * 100) / 100;
-  const grossAmount = isCH ? netAmount : Math.round((netAmount + vatAmount) * 100) / 100;
+  const vatRate = 0; // Kleinunternehmer gem. § 19 UStG (DE) / Art. 8 MWSTG (CH)
+  const vatAmount = 0;
+  const grossAmount = netAmount;
 
   const formatPrice = (val: number): string => {
     return isCH 
@@ -153,9 +153,11 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
   doc.text(data.schoolName || 'Musikschule', col1X, currentY + 8);
 
-  const street = (data.schoolAddress?.street || '').trim();
-  const zipCode = (data.schoolAddress?.zipCode || '').trim();
-  const city = (data.schoolAddress?.city || '').trim();
+  const rawStreet = (data.schoolAddress?.street || '').trim();
+  const isOpFallback = /karl-f[üu]rstenberg/i.test(rawStreet);
+  const street = isOpFallback ? '' : rawStreet;
+  const zipCode = isOpFallback ? '' : (data.schoolAddress?.zipCode || '').trim();
+  const city = isOpFallback ? '' : (data.schoolAddress?.city || '').trim();
   const cityZip = `${zipCode} ${city}`.trim();
   
   let addrY = currentY + 13;
@@ -286,7 +288,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
       pos: posCounter++,
       name: 'Cloud- & Datenbank-Hosting: Modul Campus',
       desc: 'Zentraler Stundenplan, Raum-Engine, Schüler-Protokoll & Hausaufgabenheft',
-      amount: `14,90 ${currencySymbol} / Mo.`
+      amount: `${formatPrice(isCH ? 25.90 : 19.90)} / Mo.`
     });
   }
 
@@ -296,7 +298,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
       pos: posCounter++,
       name: 'Cloud- & Datenbank-Hosting: Modul GrooveLab',
       desc: 'Band-Verwaltung, Live Lab, Repertoire-Planer & Song-Bibliotheken',
-      amount: `9,90 ${currencySymbol} / Mo.`
+      amount: `${formatPrice(isCH ? 16.80 : 12.90)} / Mo.`
     });
   }
 
@@ -306,7 +308,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
       pos: posCounter++,
       name: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
       desc: 'Dauerhafter Bündelvorteil bei paralleler Nutzung beider Module',
-      amount: `-4,90 ${currencySymbol} / Mo.`,
+      amount: `-${formatPrice(isCH ? 10.20 : 7.90)} / Mo.`,
       highlight: true
     });
   }
@@ -322,7 +324,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   } else {
     lineItems.push({
       pos: posCounter++,
-      name: 'Audio-Tresor Cloud-Speicher: 1 GB Basis',
+      name: 'Audio-Tresor Cloud-Speicher: 10 GB Basis',
       desc: 'Standard-Speichervolumen für Schülereinzelaufnahmen & Sprachmemos',
       amount: `0,00 ${currencySymbol} (Inklusive)`
     });
@@ -399,11 +401,11 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
 
   if (isCH) {
-    doc.text('USt. / MwSt. (Schweiz):', sumLabelX, currentY);
-    doc.text('CHF 0.00 (Reverse Charge)', sumValueX, currentY, { align: 'right' });
+    doc.text('USt. / MwSt. (Art. 8 MWSTG):', sumLabelX, currentY);
+    doc.text('CHF 0.00 (Bezugsteuer)', sumValueX, currentY, { align: 'right' });
   } else {
-    doc.text('zzgl. 19 % USt. (Deutschland):', sumLabelX, currentY);
-    doc.text(`${formatPrice(vatAmount)} / Mo.`, sumValueX, currentY, { align: 'right' });
+    doc.text('Umsatzsteuer (§ 19 UStG):', sumLabelX, currentY);
+    doc.text('0,00 € (steuerbefreit)', sumValueX, currentY, { align: 'right' });
   }
 
   // Summary Sub-Divider
@@ -417,7 +419,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text(isCH ? 'Monatliche Basisrate (Gesamt):' : 'Gesamt-Basisrate (Brutto):', sumLabelX, currentY);
+  doc.text('Monatliche Basisrate (Gesamt):', sumLabelX, currentY);
 
   doc.setFontSize(11);
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -427,7 +429,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
   doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-  doc.text('Abrechnung erfolgt monatlich via hinterlegter Zahlungsart.', sumValueX, currentY, { align: 'right' });
+  doc.text('Abrechnung erfolgt monatlich auf Rechnung (30 Tage Zahlungsziel).', sumValueX, currentY, { align: 'right' });
 
   // Legal, GoBD & Security Seal Box
   currentY += 12;
@@ -447,7 +449,7 @@ export const generateTariffReceiptPDF = async (data: TariffBookingReceiptData) =
     'Dieser Buchungsbeleg dokumentiert eine autorisierte Tarif- und Infrastrukturänderung im revisionssicheren Cloud-Journal.\n' +
     `Append-Only Journal-Hash: SHA-256 ${auditHashes.fullHash} • PostgreSQL Transaction Audit-Trail.\n` +
     'Aussteller: Campus-Groovelab • Patrick Huber • Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), Deutschland.\n' +
-    'Server-Standort: Falkenstein/Vogtland, Deutschland (Hetzner Online GmbH • AVV gem. Art. 28 DSGVO • OWASP ASVS Level 3).',
+    'Server-Standort: Deutschland (IONOS SE & Hetzner Online GmbH • AVV gem. Art. 28 DSGVO • OWASP ASVS Level 3).',
     25,
     currentY + 11.5
   );

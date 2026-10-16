@@ -56,20 +56,6 @@ export function MasterAdminSidebar({
   isGlobalMaintenanceActive,
   pendingStorageCount
 }: MasterAdminSidebarProps) {
-  const handleSwitchToSecretary = () => {
-    try {
-      sessionStorage.removeItem('groovelab_is_master_admin');
-      localStorage.removeItem('groovelab_is_master_admin');
-      sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-      localStorage.setItem('groovelab_active_workspace', 'secretary');
-      sessionStorage.setItem('groovelab_active_platform', 'campus');
-      sessionStorage.setItem('campus_active_tab', 'briefing');
-    } catch (e) {
-      console.warn('Storage operation failed in handleSwitchToSecretary:', e);
-    }
-    window.location.reload();
-  };
-
   return (
     <div style={{
       background: 'rgba(255, 255, 255, 0.8)',
@@ -83,7 +69,8 @@ export function MasterAdminSidebar({
       height: '100vh',
       position: 'sticky',
       top: 0,
-      boxShadow: '4px 0 24px rgba(15, 23, 42, 0.01)'
+      boxShadow: '4px 0 24px rgba(15, 23, 42, 0.01)',
+      fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif"
     }}>
       <div>
         {/* App Logo & Branding */}
@@ -101,7 +88,7 @@ export function MasterAdminSidebar({
             <Shield size={20} color="#ffffff" />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
               Campus-Groovelab
             </h1>
             <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -204,7 +191,7 @@ export function MasterAdminSidebar({
                 {tab.id === 'maintenance' && isGlobalMaintenanceActive && (
                   <span style={{
                     background: '#fee2e2',
-                    border: '1px solid #fca5a5',
+                    border: 'none',
                     color: '#dc2626',
                     fontSize: '0.68rem',
                     fontWeight: 850,
@@ -283,7 +270,7 @@ export function MasterAdminSidebar({
             padding: '11px 14px',
             borderRadius: '12px',
             background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.04) 0%, rgba(234, 67, 53, 0.08) 100%)',
-            border: '1px solid rgba(234, 67, 53, 0.25)',
+            border: 'none',
             color: '#0f172a',
             fontWeight: 800,
             fontSize: '0.82rem',
@@ -313,34 +300,6 @@ export function MasterAdminSidebar({
           </span>
         </button>
 
-        {/* Zur Schulleitung wechseln */}
-        <button
-          type="button"
-          onClick={handleSwitchToSecretary}
-          style={{
-            width: '100%',
-            padding: '11px',
-            marginBottom: '8px',
-            borderRadius: '12px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            color: '#334155',
-            fontWeight: 800,
-            fontSize: '0.82rem',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-            <Building2 size={15} color="#475569" />
-            <span>Zur Schulleitung wechseln</span>
-          </span>
-        </button>
-
         {/* Logout */}
         <button
           type="button"
@@ -350,7 +309,7 @@ export function MasterAdminSidebar({
             padding: '12px',
             borderRadius: '12px',
             background: 'rgba(239, 68, 68, 0.08)',
-            border: '1px solid rgba(239, 68, 68, 0.15)',
+            border: 'none',
             color: '#dc2626',
             fontWeight: 800,
             fontSize: '0.85rem',

@@ -14,6 +14,7 @@ export interface LegalModalsHubProps {
   showSla?: boolean;
   showSchoolParentInfo?: boolean;
   showChildProtection?: boolean;
+  schoolData?: any;
   onClose: () => void;
 }
 
@@ -32,6 +33,7 @@ export const LegalModalsHub: React.FC<LegalModalsHubProps> = ({
   showSla,
   showSchoolParentInfo,
   showChildProtection,
+  schoolData,
   onClose,
 }) => {
   const isLegalOpen =
@@ -62,6 +64,7 @@ export const LegalModalsHub: React.FC<LegalModalsHubProps> = ({
       <LegalTextModal 
         isOpen={isLegalOpen}
         initialTab={initialTab}
+        schoolData={schoolData}
         onClose={onClose}
       />
     </Suspense>

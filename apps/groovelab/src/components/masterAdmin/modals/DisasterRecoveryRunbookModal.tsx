@@ -21,8 +21,8 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
     {
       id: 1,
       title: 'Stufe 1: Alarmierung, Triage & Mandanten-Isolation',
-      leadTime: '< 2 Min.',
-      desc: 'Erkennen eines Integritäts-Zwischenfalls oder Datenverlusts. Unmittelbares Schalten der betroffenen Schule in den schreibgeschützten Wartungsmodus.',
+      leadTime: '< 5 Min.',
+      desc: 'Erkennen eines Integritäts-Zwischenfalls oder Datenverlusts auf dem primären Produktiv-Cluster (IONOS Enterprise Cloud Deutschland 85.215.73.216). Unmittelbares Schalten der betroffenen Schule in den schreibgeschützten Wartungsmodus.',
       actions: [
         'Prüfen des Vorfalls im ClientErrorTelemetryPanel & Audit Trail.',
         'Schalten des Wartungsmodus im Master-Admin Cockpit (MaintenanceTab: MaintenanceLockoutOverlay aktivieren).',
@@ -32,36 +32,36 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
     {
       id: 2,
       title: 'Stufe 2: Point-in-Time-Recovery (Datenbank-Wiederherstellung)',
-      leadTime: '~ 10-15 Min.',
-      desc: 'Wiederherstellung der PostgreSQL-Datenbank aus dem letzten validierten GFS-Snapshot mit automatischer Staging-Prüfung.',
+      leadTime: '~ 15-25 Min.',
+      desc: 'Wiederherstellung der PostgreSQL-Datenbank aus dem letzten validierten GFS-Snapshot (Age X25519 Zero-Knowledge Verschlüsselung) mit automatischer Staging-Prüfung.',
       actions: [
         'Ermitteln des letzten sauberen Snapshots (scripts/backup_supabase_enterprise.sh: HOURLY oder DAILY Dump).',
         'Validieren der kryptografischen Prüfsumme: sha256sum -c backup_*.sql.gz.sha256.',
-        'Entschlüsseln und Einspielen in Staging-DB via scripts/verify_backup_restore.sh.',
-        'Prüfen der 24 Tabellen-Integritäten (students, kiosks, schedules, billing_invoices).',
-        'Atomarer Swap des produktiven PostgreSQL-Clusters.'
+        'Age X25519 Zero-Knowledge Entschlüsselung und Einspielen in Staging-DB via scripts/verify_backup_restore.sh.',
+        'Prüfen der 24 Tabellen-Integritäten sowie Tombstone-Reconciliation gegen gelöschte Datensätze.',
+        'Atomarer Swap des produktiven PostgreSQL-Clusters (IONOS Enterprise Cloud Deutschland 85.215.73.216 bzw. Hetzner Cloud Deutschland Failover).'
       ]
     },
     {
       id: 3,
       title: 'Stufe 3: Audio-Tresor & Objektspeicher-Resynchronisation',
-      leadTime: '~ 5-10 Min.',
-      desc: 'Abgleich des Hetzner Volume Mounts (/mnt/supabase_data/storage) und Rekonstruktion unvollständiger Audio-Deskriptoren.',
+      leadTime: '~ 10-15 Min.',
+      desc: 'Abgleich des Volume Mounts (/mnt/supabase_data/storage) zwischen IONOS Enterprise Cloud Deutschland und Hetzner Cloud Deutschland (Falkenstein/Nürnberg, Georedundantes Backup & Failover).',
       actions: [
         'Prüfen des Volume Mounts auf dem Server: df -h /mnt/supabase_data.',
         'Verifizieren der Audio-Tresor Hash-Tabellen (recordings, loopstation_tracks, audio_biographies).',
-        'Synchronisieren fehlender Blöcke aus dem georedundanten Cold-Storage (scripts/sync_offsite_backup.sh).'
+        'Synchronisieren fehlender Blöcke aus dem georedundanten Hetzner Storage Box Cold-Storage (scripts/sync_offsite_backup.sh).'
       ]
     },
     {
       id: 4,
       title: 'Stufe 4: Freigabe, Audit-Dokumentation & Meldepflichten',
       leadTime: '< 72 Std.',
-      desc: 'Wiederfreigabe der Plattform, Erstellung des forensischen Abschlussberichts und ggf. Information der Cyber-Versicherung (Hiscox) und DPO.',
+      desc: 'Wiederfreigabe der Plattform, Erstellung des forensischen Abschlussberichts und ggf. Information der Cyber-Versicherung (Hiscox) und Datenschutzbeauftragten (DPO).',
       actions: [
         'Freigabe der Mandanten-Umgebung: Deaktivieren des Wartungsmodus.',
         'Revisionssichere Protokollierung des Vorfalls in public.audit_logs und cg_master_backup_audit.',
-        'Falls personenbezogene Daten kompromittiert wurden: DSGVO Art. 33 Meldung innerhalb von 72 Stunden an die Aufsichtsbehörde.',
+        'Falls personenbezogene Daten kompromittiert wurden: Fristgerechte Meldung innerhalb von 72 Stunden an die zuständige Aufsichtsbehörde.',
         'Meldung des Vorfalls an den Hiscox Krisendienstleister zur Versicherungsregulierung.'
       ]
     }
@@ -83,7 +83,10 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
         animation: 'fadeIn 0.2s ease-out'
       }}
     >
-      <div role="dialog" aria-modal="true"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Disaster Recovery und Notfall-Runbook"
         style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -115,6 +118,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
                 height: '44px',
                 borderRadius: '14px',
                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -163,6 +167,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
             <button
               type="button"
               onClick={onClose}
+              aria-label="Schließen"
               style={{
                 width: '38px',
                 height: '38px',
@@ -199,7 +204,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <AlertOctagon size={20} color="#ef4444" />
               <div style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 650 }}>
-                Maximale garantierte Wiederherstellungszeit (RTO): <strong>&lt; 15 Minuten</strong> • Maximaler Datenverlust (RPO): <strong>&lt; 60 Minuten</strong>.
+                Maximale garantierte Wiederherstellungszeit (RTO): <strong>&lt;= 45 Min.</strong> • Maximaler Datenverlust (RPO): <strong>&lt;= 60 Min.</strong>
               </div>
             </div>
             <span
@@ -210,7 +215,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
                 borderRadius: '999px',
                 background: '#ecfdf5',
                 color: '#059669',
-                border: '1px solid #a7f3d0'
+                border: 'none'
               }}
             >
               Hiscox SLA konform
@@ -230,7 +235,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
                     flex: 1,
                     padding: '12px 14px',
                     borderRadius: '14px',
-                    border: isSelected ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                    border: isSelected ? 'none' : '1px solid #e2e8f0',
                     background: isSelected ? '#fef2f2' : '#ffffff',
                     textAlign: 'left',
                     cursor: 'pointer',
@@ -274,7 +279,7 @@ export const DisasterRecoveryRunbookModal: React.FC<DisasterRecoveryRunbookModal
                       borderRadius: '100px',
                       background: '#eff6ff',
                       color: '#1d4ed8',
-                      border: '1px solid #bfdbfe'
+                      border: 'none'
                     }}
                   >
                     Richtzeit: {s.leadTime}

@@ -5,6 +5,8 @@ import { generateEpcGiroCodePayload, formatIbanWithSpaces } from './epcGiroCode'
 import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
 import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
 import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../config/operatorBanking';
+import { generateXRechnungXML } from './eInvoiceGenerator';
+import { supabase } from '../lib/supabase';
 
 export const generateConsentPDF = async (
   schoolName: string, 
@@ -238,8 +240,8 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   const doc = new jsPDF();
 
   doc.setProperties({
-    title: 'Datenschutz- & IT-Sicherheitsdossier - Campus-Groovelab Enterprise',
-    subject: 'Offizielles DSB-Freigabepaket, DSFA, TOMs & AVV nach Art. 28, 32, 35 DSGVO',
+    title: 'Technisches TOM- & DSFA-Unterstützungsdossier - Campus-Groovelab Enterprise',
+    subject: 'Technisches Unterstützungsdossier gem. Art. 28 Abs. 3 lit. f & Art. 32 DSGVO zur DSFA-Prüfung (Art. 35 DSGVO)',
     author: 'Campus-Groovelab Enterprise Trust Center',
     creator: 'Campus-Groovelab Platform'
   });
@@ -275,15 +277,15 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
 
   // Title
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('Datenschutz- & IT-Sicherheitsdossier', 20, 20);
+  doc.text('Technisches TOM- & DSFA-Unterstützungsdossier', 20, 20);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text(`Offizielles DSB-Freigabepaket für Kommunen & Träger • Schulpartner: ${schoolName}`, 20, 26);
-  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB | Stand: August 2026 | ISO 27001 RZ & DSGVO Konform`, 20, 31);
+  doc.text(`Prüfungsgrundlage gem. Art. 28 Abs. 3 lit. f & Art. 32 DSGVO für den bDSB • Schulpartner: ${schoolName}`, 20, 26);
+  doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB | Stand: Schuljahr 2026/2027 | ISO 27001 RZ & DSGVO Konform`, 20, 31);
   
   doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
   doc.line(20, 35, 190, 35);
@@ -298,21 +300,21 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(22, 101, 52);
-  doc.text('[COMPLIANCE-NACHWEIS] 22 / 22 SICHERHEITS- & DATENSCHUTZ-STANDARDS ERFÜLLT', 25, y + 8);
+  doc.text('[TECHNISCHER NACHWEIS] 22 / 22 SICHERHEITS- & DATENSCHUTZ-STANDARDS DOKUMENTIERT', 25, y + 8);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.2);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
   doc.text('Hosting 100% in Deutschland (Hetzner ISO 27001) • 0% US-Cloud-Act Risiko • Privacy by Design & Default', 25, y + 15);
-  doc.text('Vollständige Einhaltung aller Vorgaben der DSGVO, des BSI-Grundschutzes und kommunaler Schulgesetze.', 25, y + 20);
+  doc.text('Vorbereitete Vorlage zur Unterstützung der Schulleitung und des behördlichen Datenschutzbeauftragten (bDSB).', 25, y + 20);
 
   y += 32;
 
-  // Section 1: DSFA (Art. 35 DSGVO)
+  // Section 1: DSFA-Unterstützung (Art. 28 Abs. 3 lit. f / Art. 35 DSGVO)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('1. Muster-Datenschutz-Folgenabschätzung (DSFA nach Art. 35 DSGVO)', 20, y);
+  doc.text('1. Technische DSFA-Schwellwert- & Risikoanalyse (Art. 28 Abs. 3 lit. f / Art. 35 DSGVO)', 20, y);
   y += 6;
 
   const dsfaPoints = [
@@ -320,7 +322,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
     'Keine sensiblen Stammdaten: Keine Erfassung von Schüler-E-Mails, Wohnadressen, Telefonnummern oder Bankdaten.',
     'Pflichtmaskierung von Nachnamen: Schutz vor Schulterblick-Spionage im Schulbetrieb (Vorname + 1. Buchstabe).',
     'Hardware-Sicherheit: Automatische Mikrofon- & Kamera-Abschaltung beim Verlassen aller Audio-Module.',
-    'Dienst- & Persönlichkeitsschutz: 48-Stunden Auto-Freeze für Chat-Nachrichten zur Wahrung des Schulrechts.'
+    'Speicherbegrenzung (DIN 66398): Schuljahres-Löschung für Übedaten (31.08.) & 10-jährige GoBD-Belegarchivierung.'
   ];
 
   dsfaPoints.forEach(pt => {
@@ -342,10 +344,10 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
     ['Mandantentrennung:', 'PostgreSQL Row-Level Security (RLS) erzwingt strikte Multi-Tenancy Isolation.'],
     ['Append-Only Audit Logs:', 'WORM-Prinzip in Postgres – System-Logs für Nutzer & Admins unmodifizierbar.'],
     ['Content Security Policy:', 'Strikte CSP (script-src self) schützt vor Cross-Site Scripting (XSS).'],
-    ['PIN & Passwort Hashing:', 'Kryptografische Einweg-Hashes (Argon2id/Bcrypt) mit serverseitigem Pepper.'],
-    ['Infrastruktur Throttling:', 'Netzwerk-Rate-Limiting (Kong/Nginx) schützt vor Brute-Force & DDoS.'],
+    ['PIN & Passwort Hashing:', 'Kryptografische Einweg-Hashes (Bcrypt 10 Runden) im Schema private_auth.'],
+    ['Infrastruktur Throttling:', 'Netzwerk-Rate-Limiting (Nginx/BFF) schützt vor Brute-Force & DDoS.'],
     ['Background-Blurring:', 'Automatisches Unscharfschalten (blur: 16px) bei Tab- oder App-Wechsel.'],
-    ['Offsite-Backups:', 'Tägliche verschlüsselte Backups (AES-256) inkl. automatisierter Restore-Tests.']
+    ['Offsite-Backups:', 'Stündliche verschlüsselte Backups (Age X25519) inkl. WORM-Tombstone-Abgleich.']
   ];
 
   toms.forEach(([label, desc]) => {
@@ -392,7 +394,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text(`Campus-Groovelab Enterprise Trust Center • DSB-Freigabepaket`, 20, 14);
+  doc.text(`Campus-Groovelab Enterprise Trust Center • TOM- & DSFA-Unterstützungsdossier`, 20, 14);
   doc.text(`Dokumenten-ID: CG-TRUST-2026-DSB`, 140, 14);
   doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
   doc.line(20, 17, 190, 17);
@@ -426,7 +428,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
 
   const subProcessors = [
     ['Hetzner Online GmbH', 'High-Security Rechenzentrum & Host', 'Falkenstein / Nürnberg', 'ISO 27001'],
-    ['Supabase (Self-Hosted)', 'Datenhaltung & RLS Engine', 'Inhouse (Hetzner DE)', 'DSGVO / RLS'],
+    ['PostgreSQL / PostgREST (Self-Hosted)', 'Datenhaltung & RLS Engine', 'Inhouse (Hetzner DE)', 'DSGVO / RLS'],
   ];
 
   subProcessors.forEach(([name, functionDesc, location, cert]) => {
@@ -478,9 +480,9 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   y += 6;
 
   const rights = [
-    'Auskunftsrecht & Datenübertragbarkeit (Art. 15, 20 DSGVO): Export aller Daten auf Knopfdruck als JSON/CSV.',
-    'Recht auf Löschung (Art. 17 DSGVO): Sofortige und vollständige Anonymisierung / Physische Löschung bei Vertragsende.',
-    'Automatisches Verfallsdatum: Automatische Inaktivierung von ungenutzten Schülerprofilen nach 2 Monaten.'
+    'Auskunftsrecht & Datenübertragbarkeit (Art. 15, 20 DSGVO): Export aller Daten auf Knopfdruck mit SHA-256 Siegel.',
+    'Recht auf Löschung (Art. 17 DSGVO): Autonomer 1-Klick-Eltern-Löschtresor & Löschung nach DIN 66398 bei Vertragsende.',
+    'Fair-Play Inaktivitätsschutz: Automatische Passivschaltung ungenutzter Schülerprofile nach 60 Tagen.'
   ];
 
   rights.forEach(r => {
@@ -494,7 +496,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('5. Offizielles DSB-Freigabeprotokoll & Prüfentscheidung', 20, y);
+  doc.text('5. Formblatt zur Prüfdokumentation durch den Datenschutzbeauftragten (Art. 35 DSGVO)', 20, y);
   y += 6;
 
   doc.setFillColor(248, 250, 252);
@@ -502,24 +504,24 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.roundedRect(20, y, 170, 56, 3, 3, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(22, 101, 52);
-  doc.text('PRÜFERGEBNIS: FREIGEGEBEN FÜR SCHUL- UND KOMMUNALBETRIEB', 25, y + 8);
+  doc.text('VORLAGE ZUR PRÜFUNGSDOKUMENTATION DURCH VERANTWORTLICHEN & BDSB', 25, y + 8);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Datenschutzrechtliche Freigabeempfehlung gemäß Art. 35 DSGVO für ${schoolName} erteilt.`, 25, y + 14);
+  doc.text(`Die formale Entscheidung und Durchführung einer DSFA gem. Art. 35 DSGVO obliegt der verantwortlichen Schule (${schoolName}).`, 25, y + 14);
 
   // Form Fields for Municipal DPO Signoff
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
 
-  doc.text(`Freigegebene Musikschule / Träger:  ${schoolName}`, 25, y + 24);
-  doc.text(`Datum der DSB-Freigabe:  _________________________________________`, 25, y + 32);
-  doc.text(`Name des Datenschutzbeauftragten:  _________________________________________`, 25, y + 40);
-  doc.text(`Unterschrift / Dienststempel:  _________________________________________`, 25, y + 48);
+  doc.text(`Verantwortliche Musikschule / Träger:  ${schoolName}`, 25, y + 24);
+  doc.text(`Datum der Prüfung / Stellungnahme:  _________________________________________`, 25, y + 32);
+  doc.text(`Zuständiger Datenschutzbeauftragter (bDSB):  ___________________________________`, 25, y + 40);
+  doc.text(`Unterschrift / Prüfvermerk der Stelle:  ________________________________________`, 25, y + 48);
 
   // Footer Page 2
   doc.setFont('helvetica', 'normal');
@@ -528,7 +530,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.text(`Ausgestellt für: ${schoolName} • Erstellt über Campus-Groovelab Enterprise Trust Center`, 20, 282);
   doc.text(`Seite 2 von 2`, 175, 282);
 
-  doc.save(`DSB_Freigabepaket_TOM_AVV_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+  doc.save(`TOM_DSFA_Unterstuetzungsdossier_${schoolName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 };
 
 // 5-minute In-Memory PDF Document Cache for instant 0ms repeat downloads
@@ -1276,7 +1278,7 @@ export const generateResilienceAuditPDF = async (data: ResiliencePDFData) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
-  doc.text('Campus-Groovelab • ISO 27001 zertifiziertes deutsches Rechenzentrum (Hetzner Falkenstein) • DSGVO & COPPA konform', 20, 285);
+  doc.text('Campus-Groovelab • ISO 27001 zertifiziertes deutsches Rechenzentrum (Hetzner Falkenstein) • Art. 8 DSGVO & § 8a SGB VIII konform', 20, 285);
 
   const cleanTierName = data.tierName.replace(/[^a-zA-Z0-9]/g, '_');
   const dateStr = new Date().toISOString().split('T')[0];
@@ -1771,6 +1773,7 @@ export interface InvoicePDFParams {
   invoiceId: string;
   invoiceDate: string;
   dueDateStr?: string;
+  period?: string;
   amount: number;
   schoolName: string;
   schoolStreet?: string;
@@ -1783,6 +1786,9 @@ export interface InvoicePDFParams {
   operatorCity?: string;
   operatorIban?: string;
   operatorBic?: string;
+  operatorTaxId?: string;
+  operatorEmail?: string;
+  isStandardVat?: boolean;
   hasCampus?: boolean;
   hasGroovelab?: boolean;
   hasKombiDiscount?: boolean;
@@ -1936,7 +1942,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
     addRow(
       'Cloud- & Datenbank-Hosting: Modul Campus',
       'Intelligenter Stundenplan, Raum-Engine & Hausaufgabenheft-Sync',
-      '14,90 € / Mo.'
+      '19,90 € / Mo.'
     );
   }
 
@@ -1945,7 +1951,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
     addRow(
       'Cloud- & Datenbank-Hosting: Modul GrooveLab',
       'Band-Management, Repertoire-Planer & Songs meistern',
-      '9,90 € / Mo.'
+      '12,90 € / Mo.'
     );
   }
 
@@ -1954,7 +1960,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
     addRow(
       'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
       'Vergünstigter Hosting-Kombipreis bei Doppelbuchung',
-      '-4,90 € / Mo.',
+      '-7,90 € / Mo.',
       true
     );
   }
@@ -2025,10 +2031,10 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
       : 'small_business';
 
   if (platformTaxMode === 'standard_vat') {
-    const totalGross = Number(params.amount || 0);
-    const net = +(totalGross / 1.19).toFixed(2);
-    const vat = +(totalGross - net).toFixed(2);
-    doc.text(`Rechnungsbetrag inkl. 19 % MwSt. (Netto: ${net.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} + MwSt.: ${vat.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}).`, 20, y);
+    const net = Number(params.amount || 0);
+    const vat = +(net * 0.19).toFixed(2);
+    const gross = +(net + vat).toFixed(2);
+    doc.text(`B2B-Nettobetrag: ${net.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} zzgl. 19 % USt. (${vat.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}) = Brutto: ${gross.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}.`, 20, y);
   } else {
     doc.text('Umsatzsteuerbefreit gem. § 19 UStG (Kleinunternehmerregelung).', 20, y);
   }
@@ -2048,8 +2054,8 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   doc.setFontSize(7.5);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
   doc.text(`Empfänger: ${opCompany}`, 25, y + 11);
-  doc.text(`IBAN: ${params.operatorIban || 'DE89 3704 0044 0532 9482 11'}`, 25, y + 15.5);
-  doc.text(`BIC: ${params.operatorBic || 'WELADED1XYZ'}`, 25, y + 20);
+  doc.text(`IBAN: ${params.operatorIban || formatOperatorIban()}`, 25, y + 15.5);
+  doc.text(`BIC: ${params.operatorBic || OPERATOR_BANKING_CONFIG.bic}`, 25, y + 20);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -2531,7 +2537,7 @@ export interface B2BInvoiceParams {
 
 /**
  * Berechnet das kalendermäßige Zahlungsziel unter Beachtung von § 193 BGB.
- * Fällt der 30. Tag auf einen Samstag oder Sonntag, verschiebt sich die Fälligkeit
+ * Fällt der 14. Tag auf einen Samstag oder Sonntag, verschiebt sich die Fälligkeit
  * automatisch auf den nächsten Bankarbeitstag (Montag).
  */
 export function calculateDueDateWithBgb193(startDate: Date, days: number = 30): Date {
@@ -2596,7 +2602,12 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFontSize(7.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   doc.text('Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden) • Deutschland', 20, 32);
-  doc.text('Steuer-Nr.: 13083/03882 (Finanzamt Lörrach) • Server-Standort: Deutschland (Hetzner ISO 27001)', 20, 36);
+  const operatorTaxDisplay = OPERATOR_BANKING_CONFIG.ustIdNr
+    ? `USt-IdNr.: ${OPERATOR_BANKING_CONFIG.ustIdNr}`
+    : OPERATOR_BANKING_CONFIG.taxNumber
+      ? `Steuer-Nr.: ${OPERATOR_BANKING_CONFIG.taxNumber} (Finanzamt Lörrach)`
+      : 'Kleinunternehmer gem. § 19 UStG (Finanzamt Lörrach)';
+  doc.text(`${operatorTaxDisplay} • Server-Standort: Deutschland (IONOS & Hetzner ISO 27001)`, 20, 36);
   doc.text('E-Mail: kontakt@campus-groovelab.de • Web: campus-groovelab.de', 20, 40);
 
   // Invoice Details (Right Aligned Column)
@@ -2696,8 +2707,8 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
       description: 'Cloud- & Datenbank-Hosting: Modul Campus',
       detail: 'Dedizierte Cloud-Infrastruktur & Schüler-Protokoll-Server',
       qty: '1 Monat',
-      unitPrice: '14,90 €',
-      totalPrice: 14.90
+      unitPrice: '19,90 €',
+      totalPrice: 19.90
     });
   }
 
@@ -2708,8 +2719,8 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
       description: 'Cloud- & Datenbank-Hosting: Modul GrooveLab',
       detail: 'Dedizierte Band-Room-Server & Echtzeit-Repertoire-Cloud',
       qty: '1 Monat',
-      unitPrice: '9,90 €',
-      totalPrice: 9.90
+      unitPrice: '12,90 €',
+      totalPrice: 12.90
     });
   }
 
@@ -2720,8 +2731,8 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
       description: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
       detail: 'Monatlicher Kombinationsvorteil für Campus + GrooveLab',
       qty: '1 Paket',
-      unitPrice: '-4,90 €',
-      totalPrice: -4.90
+      unitPrice: '-7,90 €',
+      totalPrice: -7.90
     });
   }
 
@@ -2957,12 +2968,13 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   const isSlaAchieved = uptime >= 99.50;
   const isMinorBreach = uptime >= 98.00 && !isSlaAchieved;
 
-  // Staged Service Credits
-  let serviceCredit = 0;
+  // Staged Service Credits (Gratismonate auf die monatliche Hosting-Grundpauschale gem. § 2b AGB)
+  let serviceCreditLabel = '0 Gratismonate';
   if (!isSlaAchieved) {
-    if (uptime >= 99.00) serviceCredit = 10;
-    else if (uptime >= 95.00) serviceCredit = 25;
-    else serviceCredit = 50;
+    if (uptime >= 99.00) serviceCreditLabel = '1 Gratismonat (auf Hosting-Grundpauschale)';
+    else if (uptime >= 98.00) serviceCreditLabel = '2 Gratismonate (auf Hosting-Grundpauschale)';
+    else if (uptime >= 95.00) serviceCreditLabel = '3 Gratismonate (auf Hosting-Grundpauschale)';
+    else serviceCreditLabel = '6 Gratismonate (auf Hosting-Grundpauschale)';
   }
 
   doc.setProperties({
@@ -3018,7 +3030,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
     doc.text('Status: [OK] SLA-Ziel vollständig erfüllt (Keine Service-Gutschrift erforderlich)', 85, 84);
   } else {
     doc.text(`SLA-Garantie: 99,50% • Erfasste Ausfallzeit: ${downtimeMins} Minuten`, 85, 77);
-    doc.text(`Status: [!] ${serviceCredit}% Service-Credit wird auf der Folgerechnung gutgeschrieben`, 85, 84);
+    doc.text(`Status: [!] ${serviceCreditLabel} wird auf der Folgerechnung gutgeschrieben`, 85, 84);
   }
 
   // Metrics Table
@@ -3057,11 +3069,11 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text('Verbindliche SLA-Störungsklassen & Reaktionszeiten (Mo–Fr 08:00–19:00 Uhr):', 20, currentY);
+  doc.text('Verbindliche SLA-Störungsklassen & Reaktionszeiten (Servicezeiten Mo: 08:00–10:00, Do: 08:30–11:00, Fr: 08:30–11:00 Uhr MEZ):', 20, currentY);
   currentY += 4;
 
   const slaClasses = [
-    { name: 'Klasse 1 (Kritisch / Totalausfall)', time: 'Reaktion: < 2 Std. | Ziel-Lösung: < 8 Std.', desc: 'Vollständiger Ausfall der Plattform oder des zentralen Login-Gateways.' },
+    { name: 'Klasse 1 (Kritisch / Totalausfall)', time: 'Reaktion: < 2 Std. | Ziel-Lösung: < 8 Std.', desc: 'Vollständiger Ausfall der Plattform oder des zentralen Login-Gateways (24/7 Notfall-Monitoring).' },
     { name: 'Klasse 2 (Erheblich / Kernfunktion)', time: 'Reaktion: < 4 Std. | Ziel-Lösung: < 24 Std.', desc: 'Ausfall wesentlicher Module (z. B. Stundenplan-Sync, Raumbelegung); Plattform bedienbar.' },
     { name: 'Klasse 3 (Geringfügig / Kosmetisch)', time: 'Reaktion: < 8 Std. | Reguläres Release', desc: 'Kosmetische UI-Fehler, Textglitches oder nicht-unterrichtsrelevante Verzögerungen.' }
   ];
@@ -3099,7 +3111,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-    doc.text(incidentNotes || `Im Berichtszeitraum kam es zu einer kurzzeitigen Beeinträchtigung von ${downtimeMins} Min. Der Vorfall wurde behoben. Die Service-Gutschrift von ${serviceCredit}% ist hinterlegt.`, 24, currentY + 11);
+    doc.text(incidentNotes || `Im Berichtszeitraum kam es zu einer kurzzeitigen Beeinträchtigung von ${downtimeMins} Min. Der Vorfall wurde behoben. Die Gutschrift (${serviceCreditLabel}) ist hinterlegt.`, 24, currentY + 11);
     currentY += 18;
   }
 
@@ -3126,7 +3138,7 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  const bgbClause = 'Rechtlicher Hinweis (§§ 535 ff. BGB): Reguläre Wartungsfenster (sonntags 02:00-04:00 Uhr UTC) gelten vertragsgemäß nicht als Ausfallzeit. Verbuchte Service-Credits gelten als pauschalierte Anrechnung auf künftige Monatsvergütungen; zwingende gesetzliche Ansprüche bei Vorsatz oder grober Fahrlässigkeit bleiben unberührt (§§ 309 Nr. 7, 535 ff. BGB).';
+  const bgbClause = 'Rechtlicher Hinweis (§§ 535 ff. BGB): Reguläre Wartungsfenster (täglich 02:00–05:00 Uhr MEZ) gelten vertragsgemäß nicht als Ausfallzeit. Verbuchte SLA-Gutschriften (Gratismonate auf die monatliche Hosting-Grundpauschale) gelten als pauschalierte Anrechnung auf künftige Monatsvergütungen; zwingende gesetzliche Ansprüche bei Vorsatz oder grober Fahrlässigkeit bleiben unberührt (§§ 309 Nr. 7, 535 ff. BGB).';
   const splitBgb = doc.splitTextToSize(bgbClause, 170);
   doc.text(splitBgb, 20, currentY + 15);
 
@@ -3753,87 +3765,46 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
 export const generateZugferdXml = (params: InvoicePDFParams): string => {
   const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
   const now = new Date();
-  const dateYmd = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const totalAmount = Number(params.amount || 0).toFixed(2);
-  const opCompany = params.operatorCompany || 'Patrick Huber (Campus-Groovelab)';
-  const opStreet = params.operatorStreet || 'Karl-Fürstenberg-Str. 59';
-  const opZip = params.operatorZip || '79618';
-  const opCity = params.operatorCity || 'Rheinfelden';
-  const opIban = (params.operatorIban || '').replace(/\s+/g, '');
-  const opBic = (params.operatorBic || '').replace(/\s+/g, '');
+  const totalAmount = Number(params.amount || 0);
+  const billingPeriod = params.period || `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  const isStandardVat = params.isStandardVat ?? OPERATOR_BANKING_CONFIG.isVatStandardTaxed;
 
-  const schoolName = params.schoolName || 'Musikschule';
-  const schoolStreet = params.schoolStreet || 'Schulstraße 1';
-  const schoolZip = params.schoolZipCode || '79618';
-  const schoolCity = params.schoolCity || 'Musterstadt';
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<rsm:CrossIndustryInvoice 
-  xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
-  xmlns:ccts="urn:un:unece:uncefact:documentation:standard:CoreComponentsTechnicalSpecification:2"
-  xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
-  xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100"
-  xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100">
-  <rsm:ExchangedDocumentContext>
-    <ram:GuidelineSpecifiedDocumentContextParameter>
-      <ram:ID>urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic</ram:ID>
-    </ram:GuidelineSpecifiedDocumentContextParameter>
-  </rsm:ExchangedDocumentContext>
-  <rsm:ExchangedDocument>
-    <ram:ID>${cleanInvoiceId}</ram:ID>
-    <ram:TypeCode>380</ram:TypeCode>
-    <ram:IssueDateTime>
-      <udt:DateTimeString format="102">${dateYmd}</udt:DateTimeString>
-    </ram:IssueDateTime>
-    <ram:IncludedNote>
-      <ram:Content>Rechnung für Cloud- &amp; Datenbank-Infrastruktur Campus-Groovelab. Keine Software-Lizenzgebühren (0,00 € inklusive).</ram:Content>
-    </ram:IncludedNote>
-  </rsm:ExchangedDocument>
-  <rsm:SupplyChainTradeTransaction>
-    <ram:ApplicableHeaderTradeAgreement>
-      <!-- Verkäufer / Plattformbetrieb -->
-      <ram:SellerTradeParty>
-        <ram:Name>${opCompany}</ram:Name>
-        <ram:PostalTradeAddress>
-          <ram:PostcodeCode>${opZip}</ram:PostcodeCode>
-          <ram:LineOne>${opStreet}</ram:LineOne>
-          <ram:CityName>${opCity}</ram:CityName>
-          <ram:CountryID>DE</ram:CountryID>
-        </ram:PostalTradeAddress>
-      </ram:SellerTradeParty>
-      <!-- Käufer / Musikschule -->
-      <ram:BuyerTradeParty>
-        <ram:Name>${schoolName}</ram:Name>
-        <ram:PostalTradeAddress>
-          <ram:PostcodeCode>${schoolZip}</ram:PostcodeCode>
-          <ram:LineOne>${schoolStreet}</ram:LineOne>
-          <ram:CityName>${schoolCity}</ram:CityName>
-          <ram:CountryID>DE</ram:CountryID>
-        </ram:PostalTradeAddress>
-      </ram:BuyerTradeParty>
-    </ram:ApplicableHeaderTradeAgreement>
-    <ram:ApplicableHeaderTradeDelivery />
-    <ram:ApplicableHeaderTradeSettlement>
-      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
-      <ram:SpecifiedTradeSettlementPaymentMeans>
-        <ram:TypeCode>58</ram:TypeCode>
-        <ram:PayeePartyCreditorFinancialAccount>
-          <ram:IBANID>${opIban}</ram:IBANID>
-        </ram:PayeePartyCreditorFinancialAccount>
-        <ram:PayeeSpecifiedCreditorFinancialInstitution>
-          <ram:BICID>${opBic}</ram:BICID>
-        </ram:PayeeSpecifiedCreditorFinancialInstitution>
-      </ram:SpecifiedTradeSettlementPaymentMeans>
-      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        <ram:LineTotalAmount>${totalAmount}</ram:LineTotalAmount>
-        <ram:TaxBasisTotalAmount>${totalAmount}</ram:TaxBasisTotalAmount>
-        <ram:TaxTotalAmount currencyID="EUR">0.00</ram:TaxTotalAmount>
-        <ram:GrandTotalAmount>${totalAmount}</ram:GrandTotalAmount>
-        <ram:DuePayableAmount>${totalAmount}</ram:DuePayableAmount>
-      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-    </ram:ApplicableHeaderTradeSettlement>
-  </rsm:SupplyChainTradeTransaction>
-</rsm:CrossIndustryInvoice>`;
+  return generateXRechnungXML({
+    invoiceNumber: cleanInvoiceId,
+    issueDate: now.toISOString().slice(0, 10),
+    currency: 'EUR',
+    notes: `Leistungszeitraum ${billingPeriod}`,
+    seller: {
+      name: params.operatorCompany || OPERATOR_BANKING_CONFIG.companyName,
+      street: params.operatorStreet || OPERATOR_BANKING_CONFIG.street,
+      zipCode: params.operatorZip || OPERATOR_BANKING_CONFIG.zipCode,
+      city: params.operatorCity || OPERATOR_BANKING_CONFIG.city,
+      countryCode: 'DE',
+      vatId: params.operatorTaxId || OPERATOR_BANKING_CONFIG.ustIdNr || undefined,
+      taxNumber: OPERATOR_BANKING_CONFIG.taxNumber || undefined,
+      iban: (params.operatorIban || OPERATOR_BANKING_CONFIG.iban).replace(/\s+/g, ''),
+      bic: (params.operatorBic || OPERATOR_BANKING_CONFIG.bic).replace(/\s+/g, ''),
+      email: params.operatorEmail || OPERATOR_BANKING_CONFIG.email
+    },
+    buyer: {
+      name: params.schoolName || 'Musikschule',
+      street: params.schoolStreet || 'Musikschulverwaltung',
+      zipCode: params.schoolZipCode || '79618',
+      city: params.schoolCity || 'Deutschland',
+      countryCode: 'DE'
+    },
+    lineItems: [
+      {
+        id: '1',
+        name: 'Cloud- & Datenbank-Infrastruktur Campus-Groovelab',
+        description: `Leistungszeitraum ${billingPeriod}`,
+        quantity: 1,
+        unitPrice: totalAmount,
+        totalPrice: totalAmount,
+        vatPercent: isStandardVat ? 19 : 0
+      }
+    ]
+  });
 };
 
 export const downloadZugferdXml = (params: InvoicePDFParams): void => {
@@ -3872,6 +3843,8 @@ export interface B2BContractCertificateParams {
     groovelab?: boolean;
   };
   pricingPlan?: string;
+  currency?: 'EUR' | 'CHF';
+  country?: string;
   returnBlob?: boolean;
 }
 
@@ -3887,7 +3860,10 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   const currentYear = now.getFullYear();
   const schoolYearLabel = now.getMonth() >= 8 ? `${currentYear}/${currentYear + 1}` : `${currentYear - 1}/${currentYear}`;
   const contractId = `CG-VTR-${currentYear}-${(params.schoolId || '855992').slice(0, 6).toUpperCase()}`;
-  const signee = params.schoolSigneeName || 'Vertretungsberechtigte Schulleitung';
+  const rawSignee = (params.schoolSigneeName || '').trim();
+  const signee = (!rawSignee || /severin\s+l\./i.test(rawSignee))
+    ? 'Vertretungsberechtigte Schulleitung'
+    : rawSignee;
   const signedDateStr = params.avvSignedAt ? new Date(params.avvSignedAt).toLocaleDateString('de-DE') : now.toLocaleDateString('de-DE');
 
   // Dynamic SHA-256 digest from canonical contract certificate payload
@@ -3902,6 +3878,9 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
     version: ACTIVE_LEGAL_VERSION || '2026.2'
   };
   const contractSha256 = await computeCanonicalPayloadHash(canonicalPayload);
+  if (params.schoolId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.schoolId)) {
+    await supabase.rpc('register_b2b_contract_digest', { p_school_id: params.schoolId, p_school_name: params.schoolName, p_contract_hash: contractSha256, p_legal_version: ACTIVE_LEGAL_VERSION || '2026.2', p_signee_name: signee }).then(undefined, () => undefined);
+  }
 
   doc.setProperties({
     title: `B2B-Infrastrukturvertrag - ${params.schoolName}`,
@@ -3928,7 +3907,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Patrick Huber Softwareentwicklung • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden • Deutschland', 20, 25);
+  doc.text('Patrick Huber Softwareentwicklung • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden) • Deutschland', 20, 25);
 
   doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
   doc.line(20, 28, 190, 28);
@@ -3968,11 +3947,13 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
   doc.text('1. Vertragsparteien & Rechtsnatur (SaaS-Mietvertrag gem. § 535 ff. BGB)', 20, y);
 
+  const isCH = params.currency === 'CHF' || params.country === 'CH' || params.country === 'Schweiz';
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
   y += 5;
-  const p1 = `Zwischen dem Betreiber Patrick Huber (Softwareentwicklung & Cloud-Dienstleistungen, Rheinfelden) und der genannten Musikschule bzw. deren rechtlichem Träger wird ein SaaS-Mietvertrag über die Bereitstellung mandantenisolierter Cloud-Infrastruktur, Rechenzentrums-Hosting und Software-Wartung geschlossen. Die Software selbst wird zu 0,00 € Lizenzkaufgebühren bereitgestellt. Die Plattform ist ein didaktisches Zusatz- und Erleichterungswerkzeug („Convenience-Tool“) und ersetzt kein amtliches Schulverwaltungs-ERP.`;
+  const p1 = `Zwischen dem Betreiber Patrick Huber (Softwareentwicklung & Cloud-Dienstleistungen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden) und der genannten Musikschule bzw. deren rechtlichem Träger wird ein SaaS-Mietvertrag über die Bereitstellung mandantenisolierter Cloud-Infrastruktur, Rechenzentrums-Hosting und Software-Wartung geschlossen. Die Software selbst wird zu ${isCH ? 'CHF 0.00' : '0,00 €'} Lizenzkaufgebühren bereitgestellt. Die Plattform ist ein didaktisches Zusatz- und Erleichterungswerkzeug („Convenience-Tool“) und ersetzt kein amtliches Schulverwaltungs-ERP.`;
   const splitP1 = doc.splitTextToSize(p1, 170);
   doc.text(splitP1, 20, y);
   y += splitP1.length * 4 + 4;
@@ -3983,11 +3964,19 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.text('2. Kanonische Gebührenordnung & Bereitstellungspauschalen', 20, y);
   y += 5;
 
-  const feeItems = [
-    { label: 'Campus-Groovelab Basislizenz', val: '0,00 € (Inklusive)', note: 'Keine Software-Kaufgebühr' },
-    { label: 'Cloud- & Datenbank-Hosting: Modul Campus', val: '14,90 € / Mo.', note: 'Server-Flatrate je Musikschule' },
-    { label: 'Cloud- & Datenbank-Hosting: Modul GrooveLab', val: '9,90 € / Mo.', note: 'Server-Flatrate je Musikschule' },
-    { label: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)', val: '-4,90 € / Mo.', note: 'Bei Buchung beider Module' },
+  const feeItems = isCH ? [
+    { label: 'Campus-Groovelab Software-Bereitstellung', val: 'CHF 0.00 (Inklusive)', note: 'Keine Software-Kaufgebühr (inkl. 10 GB Speicher)' },
+    { label: 'Cloud- & Datenbank-Hosting: Modul Campus', val: 'CHF 25.90 / Mo.', note: 'Server-Flatrate je Musikschule' },
+    { label: 'Cloud- & Datenbank-Hosting: Modul GrooveLab', val: 'CHF 16.80 / Mo.', note: 'Server-Flatrate je Musikschule' },
+    { label: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)', val: '-10.20 CHF / Mo.', note: 'Bei Buchung beider Module (CHF 32.50 / Mo.)' },
+    { label: 'Service- & Administrationspauschale', val: 'CHF 1.00 / Mo.', note: 'Je aktive Lehrkraft (Admin/Sekretariat: CHF 0.00)' },
+    { label: 'Basis-Bereitstellung (QR & DSGVO)', val: 'CHF 0.20 / Mo.', note: 'Je registrierter Schüler / Monat' },
+    { label: 'Cloud- & Modul-Bereitstellung (Interaktiv)', val: 'CHF 1.00 / Mo.', note: 'Je aktiver Schüler / Monat' }
+  ] : [
+    { label: 'Campus-Groovelab Software-Bereitstellung', val: '0,00 € (Inklusive)', note: 'Keine Software-Kaufgebühr (inkl. 10 GB Speicher)' },
+    { label: 'Cloud- & Datenbank-Hosting: Modul Campus', val: '19,90 € / Mo.', note: 'Server-Flatrate je Musikschule' },
+    { label: 'Cloud- & Datenbank-Hosting: Modul GrooveLab', val: '12,90 € / Mo.', note: 'Server-Flatrate je Musikschule' },
+    { label: 'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)', val: '-7,90 € / Mo.', note: 'Bei Buchung beider Module (24,90 € / Mo.)' },
     { label: 'Service- & Administrationspauschale', val: '0,49 € / Mo.', note: 'Je aktive Lehrkraft (Admin/Sekretariat: 0,00 €)' },
     { label: 'Basis-Bereitstellung (QR & DSGVO)', val: '0,09 € / Mo.', note: 'Je registrierter Schüler / Monat' },
     { label: 'Cloud- & Modul-Bereitstellung (Interaktiv)', val: '0,49 € / Mo.', note: 'Je aktiver Schüler / Monat' }
@@ -4019,7 +4008,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  const p3 = `Die Parteien haben die gesetzlich vorgeschriebene Vereinbarung zur Auftragsverarbeitung (AVV) nach Art. 28 DSGVO geschlossen. Die Verarbeitung erfolgt ausschließlich auf ISO 27001-zertifizierten Servern in Deutschland (Hetzner Online GmbH, Falkenstein & Nürnberg). Unterauftragnehmer-Änderungen unterliegen einer 14-tägigen Widerspruchsfrist. Datenschutzverletzungen werden unverzüglich binnen maximal 48 Stunden gemeldet. Löschungen erfolgen nach DIN 66398.`;
+  const p3 = `Die Parteien haben die gesetzlich vorgeschriebene Vereinbarung zur Auftragsverarbeitung (AVV) nach Art. 28 DSGVO geschlossen. Die Verarbeitung erfolgt ausschließlich auf ISO 27001-zertifizierten Servern in Deutschland (IONOS SE, Montabaur & Hetzner Online GmbH, Falkenstein/Nürnberg). Unterauftragnehmer-Änderungen unterliegen einer 14-tägigen Widerspruchsfrist. Datenschutzverletzungen werden unverzüglich binnen maximal 48 Stunden gemeldet. Löschungen erfolgen nach DIN 66398.`;
   const splitP3 = doc.splitTextToSize(p3, 170);
   doc.text(splitP3, 20, y);
   y += splitP3.length * 4 + 4;
@@ -4033,9 +4022,9 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.6);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  const termsSummary = `• Laufzeit & Kündigung: Synchronisiert mit dem Schuljahr; Kündigungsfrist 1 Monat zum Schuljahresende.
-• Haftungsgrenze (Liability Cap): Beschränkt auf die Netto-Jahresvergütung, maximal 10.000,00 € (§ 7 AGB).
-• Versicherungsschutz: Gewerbliche IT-Haftpflicht- & Cyberpolice mit mindestens 1.000.000,00 € Deckungssumme (2-fach maximiert).
+  const termsSummary = `• Laufzeit & Kündigung: Synchronisiert mit dem Schuljahr; Kündigungsfrist 3 Monate zum Schuljahresende (31. Mai). Zahlungsziel: 30 Tage netto (§§ 271a, 286 BGB).
+• Haftungsgrenze (Liability Cap): Beschränkt auf die Netto-Jahresvergütung (min. ${isCH ? "CHF 1'000.00, max. CHF 10'000.00" : '1.000,00 €, max. 10.000,00 €'}; AGB Teil A Ziffer 6).
+• Versicherungsschutz: Gewerbliche IT-Haftpflicht- & Cyberpolice mit mindestens 1.000.000,00 € Deckungssumme je Versicherungsfall.
 • BGH-konformes Aufrechnungsverbot: Aufrechnung nur mit unbestrittenen oder rechtskräftigen Forderungen (Synallagma ausgenommen).
 • IT-Sicherheitsstandard: Einhaltung des Stands der Technik (BSI / OWASP ASVS Level 3); keine Haftung für unvorhersehbare Zero-Day-Attacken bei ordnungsgemäßem Patching.
 • Salvatorische Klausel: Es gelten die gesetzlichen Vorschriften (§ 306 Abs. 2 BGB).`;
@@ -4113,7 +4102,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   const refCode = params.referenceCode || `CAMPUS-${params.studentId.slice(0, 6).toUpperCase()}-${new Date().getFullYear()}`;
   const totalAmount = params.totalAmountStr || (params.isHardship ? '0,00' : params.isDirectBilled ? '5,39' : '0,00');
   const curr = params.currencySuffix || 'EUR';
-  const period = params.periodDescription || `Schuljahr bis 31.07.${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}`;
+  const period = params.periodDescription || `Schuljahr bis 31.08.${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}`;
   const months = params.remainingMonths ?? 11;
   const rate = params.monthlyRate || (params.isHardship ? '0,00 €' : params.isDirectBilled ? '0,49 €' : '0,00 €');
   const iban = params.iban || (params.isDirectBilled ? formatOperatorIban() : '');
@@ -4199,7 +4188,8 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${totalAmount} ${curr} (${rate} • 1. Monat stets kostenfrei • Gem. § 19 UStG steuerbefreit)`, 28, 146);
+  const b2cTaxNote = curr === 'CHF' ? 'Endpreis gem. Art. 8 Abs. 1 MWSTG' : OPERATOR_BANKING_CONFIG.isVatStandardTaxed ? 'Endpreis inkl. 19% MwSt.' : 'Gem. § 19 UStG steuerbefreit';
+  doc.text(`${totalAmount} ${curr} (${rate} • 1. Monat stets kostenfrei • ${b2cTaxNote})`, 28, 146);
 
   // Instructions
   doc.setFont('helvetica', 'bold');
@@ -4211,7 +4201,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.setFontSize(9);
   doc.setTextColor(71, 85, 105);
   doc.text('1. Mit Freischaltung stehen Hausaufgabenheft, Übe-Timer und Stundenplansync vollumfänglich bereit.', 22, 178);
-  doc.text('2. Keine automatische Verlängerung: Der Zugang endet zum Schuljahresende (31.07.) automatisch.', 22, 185);
+  doc.text('2. Keine automatische Verlängerung: Der Zugang endet zum Schuljahresende (31.08.) automatisch.', 22, 185);
   doc.text('3. Datenschutz: Im Schülerprofil werden zu keinem Zeitpunkt Bank- oder private E-Mail-Daten gespeichert.', 22, 192);
   doc.text('4. Dieser Beleg gilt als Nachweis gegenüber Behörden, Bildungs- und Teilhabepaketen sowie der Musikschule.', 22, 199);
 
@@ -4280,7 +4270,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.text(`Laufzeit & Entgelt: ${period} (${months} Monate) • Gesamtpreis: ${totalAmount} ${curr} (inkl. 1 Probemonat kostenfrei)`, 25, p2Y + 26);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(22, 101, 52);
-  doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.07.`, 25, p2Y + 30);
+  doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.08.`, 25, p2Y + 30);
 
   p2Y += 38;
 

@@ -410,7 +410,6 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
       }
 
       fetchPendingBookingsRef.current?.();
-      fetchTariffBookingsRef.current?.();
 
       // 🚀 1% Goldstandard: Attempt authoritative single-roundtrip bootstrap RPC
       let bootstrapData: any = null;
@@ -1062,8 +1061,7 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
           supabase.from('groovelab_tickets').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
           supabase.from('subjects').select('*').eq('school_id', schoolId).order('name'),
           supabase.from('campus_announcements').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
-          Promise.resolve(fetchRoomIssuesRef.current?.()).catch((err: any) => console.warn('Could not fetch room issues:', err)),
-          Promise.resolve(fetchAnnouncementsRef.current?.()).catch((err: any) => console.warn('Could not fetch announcements:', err))
+          Promise.resolve(fetchRoomIssuesRef.current?.()).catch((err: any) => console.warn('Could not fetch room issues:', err))
         ]);
         currUserResult = cuRes;
         roomsResult = rRes;
@@ -1685,8 +1683,6 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
   // Realtime subscription for system alerts, bookings, and user profiles with 500ms settling debounce
   useEffect(() => {
     if (!schoolId) return;
-    
-    fetchPendingBookingsRef.current?.();
 
     const handleRefresh = () => {
       fetchPendingBookingsRef.current?.();

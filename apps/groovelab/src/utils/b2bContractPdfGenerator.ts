@@ -7,6 +7,7 @@
  */
 
 import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
+import { supabase } from '../lib/supabase';
 import { generateLocalQrDataUrl } from './localQrGenerator';
 import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
 
@@ -46,27 +47,60 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   const currency = isCH ? 'CHF' : 'EUR';
   const currencySign = isCH ? 'CHF ' : '€';
 
-  // Pricing calculations
-  const priceCampus = isCH ? '19.90' : '14,90';
-  const priceGroovelab = isCH ? '14.90' : '9,90';
-  const priceKombi = isCH ? '29.90' : '19,90';
+  // Pricing calculations (Kanonischer Katalogtarif Option B; Altverträge genießen Bestandsschutz)
+  const priceCampus = isCH ? '25.90' : '19,90';
+  const priceGroovelab = isCH ? '16.80' : '12,90';
+  const priceKombi = isCH ? '32.50' : '24,90';
   const priceTeacher = isCH ? '1.00' : '0,49';
 
   let selectedModuleLabel = 'Campus & GrooveLab Kombi-Bundle (Vollversion)';
   let selectedBasePrice = `${priceKombi} ${currencySign}`;
   if (options.selectedModule === 'campus') {
-    selectedModuleLabel = 'Campus-Modul (Didaktik, Messenger & Stundenplan)';
+    selectedModuleLabel = 'Campus-Modul (Didaktik, Audio-Engine/Loopstation, Messenger & Stundenplan)';
     selectedBasePrice = `${priceCampus} ${currencySign}`;
   } else if (options.selectedModule === 'groovelab') {
-    selectedModuleLabel = 'GrooveLab-Modul (Audio-Engine, Loopstation & Bands)';
+    selectedModuleLabel = 'GrooveLab-Modul (Bands, Songs, Repertoire, Live-Lab & QR-Stationen)';
     selectedBasePrice = `${priceGroovelab} ${currencySign}`;
   }
 
   const schoolTitle = options.schoolName || 'Städtische Musikschule';
-  const adminTitle = options.adminName || 'Schulleitung / Vertretungsberechtigte Person';
-  const dateStr = options.confirmationDate || new Date().toLocaleDateString(isCH ? 'de-CH' : 'de-DE');
+  const rawAdminName = (options.adminName || '').trim();
+  const adminTitle = (!rawAdminName || /severin\s+l\./i.test(rawAdminName))
+    ? 'Schulleitung / Vertretungsberechtigte Person'
+    : rawAdminName;
+
+  const isOperatorAddressFallback = /karl-f[üu]rstenberg/i.test(options.address || '');
+  const cleanSchoolAddress = (!options.address || isOperatorAddressFallback)
+    ? 'Anschrift gemäß Schulstammdaten'
+    : options.address.trim();
+  const cleanSchoolCity = isOperatorAddressFallback ? '' : (options.city || '').trim();
+  const cleanSchoolPostalCode = isOperatorAddressFallback ? '' : (options.postalCode || '').trim();
+
+  const formatContractDate = (raw?: string): string => {
+    if (!raw) {
+      return new Date().toLocaleDateString(isCH ? 'de-CH' : 'de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw.trim())) {
+      const parsed = new Date(raw.trim());
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString(isCH ? 'de-CH' : 'de-DE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          timeZone: 'Europe/Berlin'
+        });
+      }
+    }
+    return raw.trim();
+  };
+
+  const dateStr = formatContractDate(options.confirmationDate);
   const jurisdictionPlace = options.isMunicipalCarrier 
-    ? (options.city || schoolTitle) 
+    ? (cleanSchoolCity || schoolTitle) 
     : 'Lörrach / Rheinfelden (Baden)';
 
   // Calculate cryptographic verification digest from canonical JSON payload
@@ -84,6 +118,16 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
     country: options.country || 'DE'
   };
   const sha256Digest = await computeCanonicalPayloadHash(canonicalPayload);
+  if (options.schoolId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(options.schoolId)) {
+    await supabase.rpc('register_b2b_contract_digest', {
+      p_school_id: options.schoolId,
+      p_school_name: schoolTitle,
+      p_contract_hash: sha256Digest,
+      p_contract_digest: sha256Digest,
+      p_legal_version: ACTIVE_LEGAL_VERSION,
+      p_signee_name: adminTitle
+    }).then(undefined, () => undefined);
+  }
   const verifyUrl = `https://campus-groovelab.de/verify-contract?hash=${sha256Digest.slice(0, 32)}`;
   const qrDataUrl = await generateLocalQrDataUrl(verifyUrl, 160).catch(() => null);
 
@@ -124,13 +168,8 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
     doc.setFontSize(6.2);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256:${sha256Digest} • Amtliche Ausfertigung für Schulträger`, margin, footY);
-    doc.text(`Patrick Huber • Softwareentwicklung & Cloud-Dienstleistungen • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden`, margin, footY + 4);
-    doc.text(`Stand: ${dateStr}`, pageWidth - margin, footY + 2, { align: 'right' });
-
-    // Mini QR on footer
-    if (qrDataUrl && qrDataUrl.startsWith('data:image/png')) {
-      doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 12, footY - 14, 12, 12);
-    }
+    doc.text(`Patrick Huber • Softwareentwicklung & Cloud-Dienstleistungen • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden)`, margin, footY + 4);
+    doc.text(`Stand: ${dateStr} • Seite ${pageNumber} von 4`, pageWidth - margin, footY + 4, { align: 'right' });
   };
 
   // ==========================================================================
@@ -208,8 +247,9 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   doc.setFontSize(7);
   doc.setTextColor(textGray[0], textGray[1], textGray[2]);
   doc.text(`Vertreten durch: ${adminTitle}`, margin + boxW + 10, y + 14);
-  doc.text(options.address || 'Anschrift der Musikschule vor Ort', margin + boxW + 10, y + 18);
-  doc.text(`${options.postalCode || ''} ${options.city || ''} (${options.country || 'DE'})`, margin + boxW + 10, y + 22);
+  doc.text(cleanSchoolAddress, margin + boxW + 10, y + 18);
+  const cityLine = `${cleanSchoolPostalCode} ${cleanSchoolCity}`.trim();
+  doc.text(cityLine ? `${cityLine} (${options.country || 'DE'})` : `Land: ${options.country || 'DE'}`, margin + boxW + 10, y + 22);
   doc.text(`Mandanten-ID: ${options.schoolId || 'B2B-TENANT'}`, margin + boxW + 10, y + 26);
 
   y += 36;
@@ -223,12 +263,12 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
 
   const tLines = [
     `(1) Der Betreiber stellt dem Schulträger die Softwarelösung Campus-Groovelab als schlüsselfertigen Cloud-Dienst gem. ${isCH ? 'Art. 253 ff. OR' : '§ 535 BGB'} bereit. Die Software wird ohne Lizenzgebühren bereitgestellt (0,00 ${currencySign}). Das Entgelt bemisst sich ausschließlich nach der gemieteten Server-Infrastruktur.`,
-    `(2) Gebuchtes Basishosting: ${selectedModuleLabel} zum monatlichen Netto-Hostingpreis von ${selectedBasePrice} / Monat inklusive 10 GB sicherem Cloud-Audiospeicher.`,
-    `(3) Pädagogen- & Administrationspauschale: ${priceTeacher} ${currencySign} / Monat je aktiver Lehrkraft oder Verwaltungsmitarbeiter.`,
+    `(2) Gebuchtes Basishosting: ${selectedModuleLabel} zum monatlichen Netto-Hostingpreis von ${selectedBasePrice} / Monat inklusive 10 GB sicherem Cloud-Audiospeicher (Altverträge genießen lebenslangen Bestandsschutz).`,
+    `(3) Pädagogen- & Administrationspauschale: ${priceTeacher} ${currencySign} / Monat je aktiver Lehrkraft. Verwaltungs- und Sekretariats-Profile (Rollen admin und secretary) sind dauerhaft zu 100 % kostenfrei (0,00 ${currencySign} inklusive).`,
     `(4) Schüleraktivierungen: ${options.studentDirectBilling 
-      ? `Modell B (Schüler-Direktabrechnung): Schulträger zahlt 0,00 ${currencySign} für Schülerzugänge; Eltern tragen den Jahresbeitrag von maximal ${isCH ? 'CHF 11.00' : '5,39 €'} direkt.` 
-      : `Modell A (Sammelzahler): Schulträger übernimmt alle Schülerzugänge (${priceTeacher} ${currencySign} / aktiver Schüler / Mo. bzw. mit Jahresrabatt).`}`,
-    `(5) Bruttopreisgarantie (§ 19 UStG): Soweit der Betreiber als Kleinunternehmer abrechnet, fällt keine MwSt. an. Bei Übergang zur Regelbesteuerung gilt der Betrag als garantierter Bruttopreis.`
+      ? `Modell B (Schüler-Direktabrechnung): Schulträger zahlt 0,00 ${currencySign} für Campus-Schülerzugänge; Eltern tragen den Jahresbeitrag von maximal ${isCH ? 'CHF 11.00' : '5,39 €'} direkt (GrooveLab-Aktivierungen zu 100 % über Schule).` 
+      : `Modell A (Sammelzahler): Schulträger übernimmt alle Schülerzugänge (${priceTeacher} ${currencySign} / aktiver Schüler / Mo. bzw. mit Jahresrabatt; Basis-Bereitstellung passiv ${isCH ? 'CHF 0.20' : '0,09 €'} / Mo.).`}`,
+    `(5) Steuerliche Behandlung & B2B-Nettopreise: Alle vereinbarten B2B-Vergütungen verstehen sich als Netto-Preise. Soweit der Betreiber die Kleinunternehmerregelung (§ 19 UStG DE / § 6 Abs. 1 Z 27 UStG AT) in Anspruch nimmt, wird keine Umsatzsteuer erhoben; mit Übergang zur Regelbesteuerung wird die gesetzliche Umsatzsteuer zuzüglich berechnet (§ 14 UStG). Für Kunden in der Schweiz gilt Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG (Bezugsteuer). B2C-Elternbeiträge bleiben feste Endpreise.`
   ];
 
   doc.setFont('helvetica', 'normal');
@@ -249,8 +289,8 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   y += 4;
 
   const lLines = [
-    `(1) Laufzeit: Der Vertrag beginnt mit Aktivierung und läuft synchron zum Schuljahr fest bis zum 31. August (Verlängerung um jeweils 12 Monate, Kündigungsfrist: 3 Monate zum 31. Mai). Das Recht zur fristlosen Kündigung aus wichtigem Grund bleibt unberührt.`,
-    `(2) Haftungsdeckel & Cyber-Police: Haftung für einfache Fahrlässigkeit bei Kardinalpflichten ist auf die 12-Monats-Vergütung (max. 10.000 ${currencySign}) begrenzt. Der Betreiber unterhält eine gewerbliche IT- & Cyber-Police über mindestens 1.000.000,00 ${currencySign} (2-fach maximiert). Verschuldensunabhängige Garantiehaftung gem. § 536a Abs. 1 Alt. 1 BGB ist abbedungen.`,
+    `(1) Laufzeit & Fälligkeit: Der Vertrag läuft synchron zum Schuljahr bis zum 31. August (bei Start ab 1. Mai inklusive des folgenden vollen Schuljahres; Verlängerung um je 12 Monate, Kündigungsfrist: 3 Monate zum 31. Mai). Rechnungen sind binnen 30 Tagen ohne Abzug fällig (§§ 271a, 286 BGB). Das Recht zur fristlosen Kündigung aus wichtigem Grund (§ 314 BGB) bleibt unberührt.`,
+    `(2) Haftungsdeckel & Versicherungsschutz: Haftung für einfache Fahrlässigkeit bei Kardinalpflichten ist auf die 12-Monats-Nettovergütung (min. 1.000 ${currencySign}, max. 10.000 ${currencySign}) begrenzt. Der Betreiber unterhält eine gewerbliche IT-Vermögensschaden- und Cyber-Haftpflichtversicherung mit einer Deckungssumme von mindestens 1.000.000,00 ${currencySign} je Versicherungsfall. Verschuldensunabhängige Garantiehaftung gem. § 536a Abs. 1 Alt. 1 BGB ist abbedungen.`,
     `(3) Gerichtsstand: Für alle Streitigkeiten aus diesem Vertrag gilt als Gerichtsstand ${jurisdictionPlace}.`
   ];
 
@@ -281,7 +321,8 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   doc.setFontSize(7);
   doc.text(`Für den Schulträger / die Musikschule:`, margin + 4, y + 12);
   doc.line(margin + 4, y + 25, margin + 4 + sigColW, y + 25);
-  doc.text(`Ort, Datum: ${options.city || ''}, den ${dateStr}`, margin + 4, y + 29);
+  const schoolPlace = cleanSchoolCity || schoolTitle;
+  doc.text(`Ort, Datum: ${schoolPlace}, den ${dateStr}`, margin + 4, y + 29);
   doc.text(`Unterschrift / Dienstsiegel: ${adminTitle}`, margin + 4, y + 32);
 
   // Signee Operator
@@ -388,12 +429,12 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
     '2. Kategorien betroffener Personen: Schülerinnen und Schüler der Musikschule, Erziehungsberechtigte, Lehrkräfte, Schulleitung und Verwaltungspersonal.',
     '3. Arten personenbezogener Daten: Didaktische Notizen, Übe-Protokolle, Stundenplanzeiten, Raumzuteilungen, verschlüsselte Passwörter/PINs, Schulausweis-Tokens. Keine Gesundheitsdaten (Art. 9 DSGVO) und keine Bankdaten von Familien.',
     '4. Technische und organisatorische Maßnahmen (TOMs gem. Art. 32 DSGVO):',
-    '   • Rechenzentrum: Ausschließliches Hosting in ISO/IEC-27001 zertifizierten deutschen Rechenzentren der Hetzner Online GmbH (Falkenstein/Nürnberg). 0 % US-Cloud-Abhängigkeit.',
+    '   • Rechenzentrum: Ausschließliches Hosting in ISO/IEC-27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur, Primärer Produktions-Cluster) und der Hetzner Online GmbH (Falkenstein/Nürnberg, Georedundantes Backup, Failover & Storage Box). 0 % US-Cloud-Abhängigkeit.',
     '   • Verschlüsselung: Durchgehende Transportverschlüsselung via TLS 1.3 mit HSTS; Ruhedatenverschlüsselung (Encryption at Rest) via AES-256.',
     '   • Mandantentrennung: Strikte Trennung über PostgreSQL Row-Level Security (RLS) mit schulspezifischer Schul-ID Isolation (Default-Deny).',
-    '   • Authentifizierung: Passwortloser Zugang über QR-Schulausweis, serverseitige PIN-Prüfung und optionale hardwaregebundene FIDO2/WebAuthn Passkeys.',
+    '   • Authentifizierung: Passwortloser Zugang über QR-Schulausweis, serverseitige PIN-Prüfung (Bcrypt 10 Runden Blowfish gem. BSI TR-02102) und optionale hardwaregebundene FIDO2/WebAuthn Passkeys.',
     '   • Zugriffskontrolle: Fernsupport („Ghost Support“) nur auf ausdrückliche Anforderung und mit lückenloser WORM-Audit-Protokollierung.',
-    '5. Unterauftragsverhältnisse: Ausschließlich Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen (Hosting/Infrastruktur, Standort Deutschland). Keine Übermittlung in unsichere Drittstaaten.',
+    '5. Unterauftragsverhältnisse: Ausschließlich IONOS SE, Elgendorfer Str. 57, 56410 Montabaur (Primärer Produktions-Cluster, Standort Deutschland) sowie Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen (Georedundantes Backup, Failover & Storage Box, Standort Deutschland). Keine Übermittlung in unsichere Drittstaaten.',
     '6. Pflichten bei Datenpannen (Art. 33 DSGVO): Meldung von sicherheitsrelevanten Vorfällen binnen 24 bis maximal 48 Stunden an die Schulleitung zur Wahrung der 72h-Behördenfrist.',
     '7. Löschung & Rückgabe (DIN 66398): Nach Vertragsende werden alle mandantenbezogenen Daten innerhalb von 30 Tagen unwiderruflich physisch gelöscht.'
   ];
@@ -428,7 +469,7 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   y += 5;
 
   const slaIntro = doc.splitTextToSize(
-    'Der Betreiber garantiert für die Cloud-Infrastruktur von Campus-Groovelab eine Verfügbarkeit von mindestens 99,5 % im monatlichen Mittel (24/7), gemessen am Übergabepunkt des Hetzner-Rechenzentrums in Nürnberg/Falkenstein.',
+    'Der Betreiber garantiert für die Cloud-Infrastruktur von Campus-Groovelab eine Verfügbarkeit von mindestens 99,5 % im monatlichen Mittel (24/7), gemessen am Übergabepunkt der deutschen Rechenzentren (IONOS SE / Hetzner Online GmbH in Deutschland).',
     contentWidth
   );
   doc.setFont('helvetica', 'normal');

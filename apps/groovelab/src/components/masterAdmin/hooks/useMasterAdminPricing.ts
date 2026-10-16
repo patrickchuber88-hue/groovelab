@@ -49,13 +49,13 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
   const [pricePassiveStudentEur, setPricePassiveStudentEur] = useState<number | string>(0.09);
   const [priceStorageAddonEur, setPriceStorageAddonEur] = useState<number | string>(2.90);
 
-  // Rates CHF (+30% pauschal, kaufmännisch auf 5 oder 0 Rappen aufgerundet)
+  // Rates CHF (Kanonische Schweizer Tarife gem. BILLING_CANONICAL_LOGIC.md)
   const [priceCampusChf, setPriceCampusChf] = useState<number | string>(25.90);
   const [priceGroovelabChf, setPriceGroovelabChf] = useState<number | string>(16.80);
   const [priceKombiChf, setPriceKombiChf] = useState<number | string>(32.50);
-  const [priceTeacherChf, setPriceTeacherChf] = useState<number | string>(0.65);
-  const [priceStudentChf, setPriceStudentChf] = useState<number | string>(0.65);
-  const [pricePassiveStudentChf, setPricePassiveStudentChf] = useState<number | string>(0.15);
+  const [priceTeacherChf, setPriceTeacherChf] = useState<number | string>(1.00);
+  const [priceStudentChf, setPriceStudentChf] = useState<number | string>(1.00);
+  const [pricePassiveStudentChf, setPricePassiveStudentChf] = useState<number | string>(0.20);
   const [priceStorageAddonChf, setPriceStorageAddonChf] = useState<number | string>(3.80);
 
   // Storage Tiers
@@ -195,11 +195,15 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         let c = rawC !== null && rawC !== undefined ? Number(rawC) : 19.90;
         let g = rawG !== null && rawG !== undefined ? Number(rawG) : 12.90;
         let k = rawK !== null && rawK !== undefined ? Number(rawK) : 24.90;
+        if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.90) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 19.90;
+        if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.90) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 12.90;
+        if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.90) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 24.90;
 
         const t = data.price_user_teacher ?? overrides?.price_user_teacher ?? 0.49;
         const s = data.price_user_student ?? overrides?.price_user_student ?? 0.49;
         const ps = data.price_user_passive_student ?? overrides?.price_user_passive_student ?? 0.09;
-        const sa = data.price_storage_addon ?? overrides?.price_storage_addon ?? 4.90;
+        const rawSa = data.price_storage_addon ?? overrides?.price_storage_addon ?? 2.90;
+        const sa = Math.abs(Number(rawSa) - 4.90) < 0.01 ? 2.90 : Number(rawSa);
 
         setPriceCampusEur(Number(c).toFixed(2));
         setPriceGroovelabEur(Number(g).toFixed(2));
@@ -209,13 +213,19 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         setPricePassiveStudentEur(Number(ps).toFixed(2));
         setPriceStorageAddonEur(Number(sa).toFixed(2));
 
-        // CHF Rates (+30% pauschal, kaufmännisch auf 5 oder 0 Rappen aufgerundet)
-        const cChf = data.price_module_campus_chf ?? overrides?.price_module_campus_chf ?? 25.90;
-        const gChf = data.price_module_groovelab_chf ?? overrides?.price_module_groovelab_chf ?? 16.80;
-        const kChf = data.price_module_kombi_chf ?? overrides?.price_module_kombi_chf ?? 32.50;
-        const tChf = data.price_user_teacher_chf ?? overrides?.price_user_teacher_chf ?? 0.65;
-        const sChf = data.price_user_student_chf ?? overrides?.price_user_student_chf ?? 0.65;
-        const psChf = data.price_user_passive_student_chf ?? overrides?.price_user_passive_student_chf ?? 0.15;
+        // CHF Rates (Kanonische Schweizer Tarife: 1.00 CHF aktiv, 0.20 CHF passiv)
+        const rawCChf = data.price_module_campus_chf ?? overrides?.price_module_campus_chf ?? 25.90;
+        const rawGChf = data.price_module_groovelab_chf ?? overrides?.price_module_groovelab_chf ?? 16.80;
+        const rawKChf = data.price_module_kombi_chf ?? overrides?.price_module_kombi_chf ?? 32.50;
+        const cChf = Math.abs(Number(rawCChf) - 19.90) < 0.01 ? 25.90 : Number(rawCChf);
+        const gChf = Math.abs(Number(rawGChf) - 14.90) < 0.01 ? 16.80 : Number(rawGChf);
+        const kChf = Math.abs(Number(rawKChf) - 29.90) < 0.01 ? 32.50 : Number(rawKChf);
+        const rawTChf = data.price_user_teacher_chf ?? overrides?.price_user_teacher_chf ?? 1.00;
+        const rawSChf = data.price_user_student_chf ?? overrides?.price_user_student_chf ?? 1.00;
+        const rawPsChf = data.price_user_passive_student_chf ?? overrides?.price_user_passive_student_chf ?? 0.20;
+        const tChf = Math.abs(Number(rawTChf) - 0.65) < 0.01 ? 1.00 : Number(rawTChf);
+        const sChf = Math.abs(Number(rawSChf) - 0.65) < 0.01 ? 1.00 : Number(rawSChf);
+        const psChf = Math.abs(Number(rawPsChf) - 0.15) < 0.01 ? 0.20 : Number(rawPsChf);
         const saChf = data.price_storage_addon_chf ?? overrides?.price_storage_addon_chf ?? 3.80;
 
         setPriceCampusChf(Number(cChf).toFixed(2));
@@ -269,8 +279,31 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
     setPricingSaving(true);
     const targetCurrency = newRates.currency || activeCurrency;
     try {
-      const overridesPayload: any = {
+      const isEur = targetCurrency === 'EUR';
+      const overridesPayload: Record<string, unknown> = {
         id: '__cg_master_pricing_overrides__',
+        price_module_campus: isEur ? newRates.campus : Number(priceCampusEur),
+        price_module_groovelab: isEur ? newRates.groovelab : Number(priceGroovelabEur),
+        price_module_kombi: isEur ? newRates.kombi : Number(priceKombiEur),
+        price_user_teacher: isEur ? newRates.teacher : Number(priceTeacherEur),
+        price_per_teacher: isEur ? newRates.teacher : Number(priceTeacherEur),
+        price_user_student: isEur ? newRates.student : Number(priceStudentEur),
+        price_per_student: isEur ? newRates.student : Number(priceStudentEur),
+        price_user_passive_student: isEur ? newRates.passiveStudent : Number(pricePassiveStudentEur),
+        price_per_passive_student: isEur ? newRates.passiveStudent : Number(pricePassiveStudentEur),
+        price_storage_addon: isEur ? newRates.storageAddon : Number(priceStorageAddonEur),
+        storage_tiers_eur: storageTiersEur,
+        price_module_campus_chf: !isEur ? newRates.campus : Number(priceCampusChf),
+        price_module_groovelab_chf: !isEur ? newRates.groovelab : Number(priceGroovelabChf),
+        price_module_kombi_chf: !isEur ? newRates.kombi : Number(priceKombiChf),
+        price_user_teacher_chf: !isEur ? newRates.teacher : Number(priceTeacherChf),
+        price_per_teacher_chf: !isEur ? newRates.teacher : Number(priceTeacherChf),
+        price_user_student_chf: !isEur ? newRates.student : Number(priceStudentChf),
+        price_per_student_chf: !isEur ? newRates.student : Number(priceStudentChf),
+        price_user_passive_student_chf: !isEur ? newRates.passiveStudent : Number(pricePassiveStudentChf),
+        price_per_passive_student_chf: !isEur ? newRates.passiveStudent : Number(pricePassiveStudentChf),
+        price_storage_addon_chf: !isEur ? newRates.storageAddon : Number(priceStorageAddonChf),
+        storage_tiers_chf: storageTiersChf,
         default_trial_days: newRates.trialDays,
         price_change_scope: 'new_only', // 100% Lifetime-Bestandsschutz enforced
         effective_date: newRates.effectiveDate,
@@ -278,12 +311,12 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         updated_at: new Date().toISOString()
       };
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         default_trial_days: newRates.trialDays,
         price_change_scope: 'new_only'
       };
 
-      if (targetCurrency === 'EUR') {
+      if (isEur) {
         updateData.price_module_campus = newRates.campus;
         updateData.price_module_groovelab = newRates.groovelab;
         updateData.price_module_kombi = newRates.kombi;
@@ -292,14 +325,6 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         updateData.price_user_passive_student = newRates.passiveStudent;
         updateData.price_storage_addon = newRates.storageAddon;
         updateData.storage_tiers_eur = storageTiersEur;
-
-        overridesPayload.price_module_campus = newRates.campus;
-        overridesPayload.price_module_groovelab = newRates.groovelab;
-        overridesPayload.price_module_kombi = newRates.kombi;
-        overridesPayload.price_user_teacher = newRates.teacher;
-        overridesPayload.price_user_student = newRates.student;
-        overridesPayload.price_user_passive_student = newRates.passiveStudent;
-        overridesPayload.price_storage_addon = newRates.storageAddon;
       } else {
         updateData.price_module_campus_chf = newRates.campus;
         updateData.price_module_groovelab_chf = newRates.groovelab;
@@ -309,20 +334,17 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         updateData.price_user_passive_student_chf = newRates.passiveStudent;
         updateData.price_storage_addon_chf = newRates.storageAddon;
         updateData.storage_tiers_chf = storageTiersChf;
-
-        overridesPayload.price_module_campus_chf = newRates.campus;
-        overridesPayload.price_module_groovelab_chf = newRates.groovelab;
-        overridesPayload.price_module_kombi_chf = newRates.kombi;
-        overridesPayload.price_user_teacher_chf = newRates.teacher;
-        overridesPayload.price_user_student_chf = newRates.student;
-        overridesPayload.price_user_passive_student_chf = newRates.passiveStudent;
-        overridesPayload.price_storage_addon_chf = newRates.storageAddon;
       }
 
       const updatedSpecialOffers = [
         ...specialOffers.filter(o => o && !String(o.id || '').startsWith('__cg_')),
         overridesPayload,
-        { id: '__cg_storage_tiers__', tiers: targetCurrency === 'EUR' ? storageTiersEur : storageTiersChf }
+        {
+          id: '__cg_storage_tiers__',
+          tiers: isEur ? storageTiersEur : storageTiersChf,
+          storage_tiers_eur: storageTiersEur,
+          storage_tiers_chf: storageTiersChf
+        }
       ];
       updateData.special_offers = updatedSpecialOffers;
 
@@ -340,11 +362,11 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
           reason: newRates.reason || 'Katalogpreis-Aktualisierung für Neukunden',
           old_rates: {
             currency: targetCurrency,
-            campus: targetCurrency === 'EUR' ? priceCampusEur : priceCampusChf,
-            groovelab: targetCurrency === 'EUR' ? priceGroovelabEur : priceGroovelabChf,
-            kombi: targetCurrency === 'EUR' ? priceKombiEur : priceKombiChf,
-            teacher: targetCurrency === 'EUR' ? priceTeacherEur : priceTeacherChf,
-            student: targetCurrency === 'EUR' ? priceStudentEur : priceStudentChf
+            campus: isEur ? priceCampusEur : priceCampusChf,
+            groovelab: isEur ? priceGroovelabEur : priceGroovelabChf,
+            kombi: isEur ? priceKombiEur : priceKombiChf,
+            teacher: isEur ? priceTeacherEur : priceTeacherChf,
+            student: isEur ? priceStudentEur : priceStudentChf
           },
           new_rates: {
             currency: targetCurrency,
@@ -356,7 +378,7 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         console.warn('Audit log write error:', e);
       }
 
-      if (targetCurrency === 'EUR') {
+      if (isEur) {
         setPriceCampusEur(newRates.campus.toFixed(2));
         setPriceGroovelabEur(newRates.groovelab.toFixed(2));
         setPriceKombiEur(newRates.kombi.toFixed(2));
@@ -374,10 +396,11 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         setPriceStorageAddonChf(newRates.storageAddon.toFixed(2));
       }
 
-      notify(`${targetCurrency === 'EUR' ? '🇪🇺 EUR' : '🇨🇭 CHF'} Tarife erfolgreich aktualisiert. Bestandskunden bleiben zu 100% geschützt.`);
+      notify(`${isEur ? 'EUR' : 'CHF'} Tarife erfolgreich aktualisiert. Bestandskunden bleiben zu 100% geschützt.`);
       await fetchPricingAuditLogs();
-    } catch (err: any) {
-      alert('Fehler beim Speichern der Tarife: ' + (err?.message || String(err)));
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert('Fehler beim Speichern der Tarife: ' + errMsg);
     } finally {
       setPricingSaving(false);
     }
@@ -385,7 +408,8 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
     activeCurrency, specialOffers, storageTiersEur, storageTiersChf,
     priceCampusEur, priceCampusChf, priceGroovelabEur, priceGroovelabChf,
     priceKombiEur, priceKombiChf, priceTeacherEur, priceTeacherChf,
-    priceStudentEur, priceStudentChf, notify, fetchPricingAuditLogs
+    priceStudentEur, priceStudentChf, pricePassiveStudentEur, pricePassiveStudentChf,
+    priceStorageAddonEur, priceStorageAddonChf, notify, fetchPricingAuditLogs
   ]);
 
   const handleSaveCampaigns = useCallback(async (campaigns: SpecialOffer[]) => {
@@ -396,9 +420,24 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
         price_module_groovelab: Number(priceGroovelabEur),
         price_module_kombi: Number(priceKombiEur),
         price_user_teacher: Number(priceTeacherEur),
+        price_per_teacher: Number(priceTeacherEur),
         price_user_student: Number(priceStudentEur),
+        price_per_student: Number(priceStudentEur),
         price_user_passive_student: Number(pricePassiveStudentEur),
+        price_per_passive_student: Number(pricePassiveStudentEur),
         price_storage_addon: Number(priceStorageAddonEur),
+        storage_tiers_eur: storageTiersEur,
+        price_module_campus_chf: Number(priceCampusChf),
+        price_module_groovelab_chf: Number(priceGroovelabChf),
+        price_module_kombi_chf: Number(priceKombiChf),
+        price_user_teacher_chf: Number(priceTeacherChf),
+        price_per_teacher_chf: Number(priceTeacherChf),
+        price_user_student_chf: Number(priceStudentChf),
+        price_per_student_chf: Number(priceStudentChf),
+        price_user_passive_student_chf: Number(pricePassiveStudentChf),
+        price_per_passive_student_chf: Number(pricePassiveStudentChf),
+        price_storage_addon_chf: Number(priceStorageAddonChf),
+        storage_tiers_chf: storageTiersChf,
         default_trial_days: defaultTrialDays,
         price_change_scope: 'new_only'
       };
@@ -406,7 +445,12 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
       const payload = [
         ...campaigns,
         overrides,
-        { id: '__cg_storage_tiers__', tiers: storageTiersList }
+        {
+          id: '__cg_storage_tiers__',
+          tiers: storageTiersList,
+          storage_tiers_eur: storageTiersEur,
+          storage_tiers_chf: storageTiersChf
+        }
       ];
 
       await supabase
@@ -417,12 +461,15 @@ export function useMasterAdminPricing({ onNotify, schools = [], schoolStats = {}
       setSpecialOffers(campaigns);
       localStorage.setItem('cg_special_offers', JSON.stringify(campaigns));
       notify('Kampagnen erfolgreich gespeichert.');
-    } catch (err: any) {
-      alert('Fehler beim Speichern der Kampagnen: ' + (err?.message || String(err)));
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert('Fehler beim Speichern der Kampagnen: ' + errMsg);
     }
   }, [
     priceCampusEur, priceGroovelabEur, priceKombiEur, priceTeacherEur, priceStudentEur,
-    pricePassiveStudentEur, priceStorageAddonEur, defaultTrialDays, storageTiersList, notify
+    pricePassiveStudentEur, priceStorageAddonEur, priceCampusChf, priceGroovelabChf,
+    priceKombiChf, priceTeacherChf, priceStudentChf, pricePassiveStudentChf,
+    priceStorageAddonChf, storageTiersEur, storageTiersChf, defaultTrialDays, storageTiersList, notify
   ]);
 
   return {

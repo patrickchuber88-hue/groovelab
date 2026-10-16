@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { 
-  WifiOff, RotateCcw, CheckCircle, HardDrive, ExternalLink, Eye, Shield 
+  WifiOff, RotateCcw, CheckCircle, HardDrive, ExternalLink, Eye, Shield, Menu, X 
 } from 'lucide-react';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
@@ -9,7 +9,7 @@ import { measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 // Re-exports for backwards compatibility
 export { LOAD_TIERS } from './masterAdmin/MasterAdminTypes';
 export type { LoadTier, ServerMetric, MasterAdminPortalTab } from './masterAdmin/MasterAdminTypes';
-import type { MasterAdminPortalTab } from './masterAdmin/MasterAdminTypes';
+import type { MasterAdminPortalTab, School } from './masterAdmin/MasterAdminTypes';
 
 // Sidebar & Layout Components
 import { MasterAdminSidebar } from './masterAdmin/MasterAdminSidebar';
@@ -24,20 +24,20 @@ import { useMasterAdminModalStates } from './masterAdmin/hooks/useMasterAdminMod
 import { useMasterAdminStepUp } from './masterAdmin/hooks/useMasterAdminStepUp';
 import { useMasterAdminSecurityShield } from './masterAdmin/hooks/useMasterAdminSecurityShield';
 
-// Tabs
-import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
-import { SchoolsTab } from './masterAdmin/tabs/SchoolsTab';
-import { ReconciliationTab } from './masterAdmin/tabs/ReconciliationTab';
-import { TelemetryTab } from './masterAdmin/tabs/TelemetryTab';
-import { PricingTab } from './masterAdmin/tabs/PricingTab';
-import { TrustSafetyTab } from './masterAdmin/tabs/TrustSafetyTab';
-import { FeedbackTab } from './masterAdmin/tabs/FeedbackTab';
-import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
-import { BackupResetTab } from './masterAdmin/tabs/BackupResetTab';
-import { OperatorTab } from './masterAdmin/tabs/OperatorTab';
+// Tabs (Lazy-loaded at existing file boundaries)
+const ExecutiveTab = lazy(() => import('./masterAdmin/tabs/ExecutiveTab').then(m => ({ default: m.ExecutiveTab })));
+const SchoolsTab = lazy(() => import('./masterAdmin/tabs/SchoolsTab').then(m => ({ default: m.SchoolsTab })));
+const ReconciliationTab = lazy(() => import('./masterAdmin/tabs/ReconciliationTab').then(m => ({ default: m.ReconciliationTab })));
+const TelemetryTab = lazy(() => import('./masterAdmin/tabs/TelemetryTab').then(m => ({ default: m.TelemetryTab })));
+const PricingTab = lazy(() => import('./masterAdmin/tabs/PricingTab').then(m => ({ default: m.PricingTab })));
+const TrustSafetyTab = lazy(() => import('./masterAdmin/tabs/TrustSafetyTab').then(m => ({ default: m.TrustSafetyTab })));
+const FeedbackTab = lazy(() => import('./masterAdmin/tabs/FeedbackTab').then(m => ({ default: m.FeedbackTab })));
+const MaintenanceTab = lazy(() => import('./masterAdmin/tabs/MaintenanceTab').then(m => ({ default: m.MaintenanceTab })));
+const BackupResetTab = lazy(() => import('./masterAdmin/tabs/BackupResetTab').then(m => ({ default: m.BackupResetTab })));
+const OperatorTab = lazy(() => import('./masterAdmin/tabs/OperatorTab').then(m => ({ default: m.OperatorTab })));
 
 // Consolidated Modals Hub
-import { MasterAdminModalsHub } from './masterAdmin/modals/MasterAdminModalsHub';
+const MasterAdminModalsHub = lazy(() => import('./masterAdmin/modals/MasterAdminModalsHub').then(m => ({ default: m.MasterAdminModalsHub })));
 
 // Lazy Loaded Components
 const BillingDashboard = lazy(() => import('./BillingDashboard').then(m => ({ default: m.BillingDashboard })));
@@ -45,7 +45,17 @@ const SchoolDetailDrawer = lazy(() => import('./masterAdmin/drawers/SchoolDetail
 
 interface MasterAdminDashboardProps {
   onLogout: () => void;
-  currentUser?: any;
+  currentUser?: Record<string, unknown> | null;
+}
+
+interface SpecialOfferItem {
+  id?: string;
+  state?: {
+    isActive?: boolean;
+    type?: string;
+    severity?: string;
+    title?: string;
+  };
 }
 
 export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashboardProps) {
@@ -53,6 +63,22 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const modalStates = useMasterAdminModalStates();
   const [globalFetchError, setGlobalFetchError] = useState<string | null>(null);
   const [dbLatency, setDbLatency] = useState<LatencyMetric>({ rttMs: 18, quality: 'EXCELLENT', timestamp: Date.now() });
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobileViewport(mobile);
+      if (!mobile) {
+        setMobileSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 1. Telemetry Domain Hook
   const telemetry = useMasterAdminTelemetry();
@@ -110,6 +136,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   const setActivePortalTab = useCallback((newTab: MasterAdminPortalTab) => {
     setActivePortalTabRaw(newTab);
+    setMobileSidebarOpen(false);
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.setItem('cg_master_active_portal_tab', newTab);
@@ -134,11 +161,14 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [modalStates]);
 
-  // Periodic Latency Ping
+  // Periodic Latency Ping (only update state when quality changes or RTT delta >= 5ms)
   useEffect(() => {
-    measureDatabasePing().then(setDbLatency).catch(() => {});
+    const applyPing = (next: LatencyMetric) => {
+      setDbLatency(prev => (prev.quality !== next.quality || Math.abs(prev.rttMs - next.rttMs) >= 5) ? next : prev);
+    };
+    measureDatabasePing().then(applyPing).catch(() => {});
     const pingInterval = setInterval(() => {
-      measureDatabasePing().then(setDbLatency).catch(() => {});
+      measureDatabasePing().then(applyPing).catch(() => {});
     }, 15000);
     return () => clearInterval(pingInterval);
   }, []);
@@ -167,9 +197,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       }
     }
     if (pricing.specialOffers && Array.isArray(pricing.specialOffers)) {
-      const m = pricing.specialOffers.find((o: any) => o?.id === '__cg_master_maintenance_state__') as any;
+      const offers = pricing.specialOffers as unknown as SpecialOfferItem[];
+      const m = offers.find((o) => o?.id === '__cg_master_maintenance_state__');
       if (m?.state?.isActive) return true;
-      const a = pricing.specialOffers.find((o: any) => o?.id === '__cg_master_broadcast_announcement__') as any;
+      const a = offers.find((o) => o?.id === '__cg_master_broadcast_announcement__');
       if (a?.state?.isActive && (a?.state?.type === 'maintenance' || a?.state?.severity === 'emergency' || a?.state?.title?.toLowerCase().includes('wartung'))) {
         return true;
       }
@@ -177,8 +208,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     return false;
   }, [pricing.specialOffers]);
 
-  const pendingStorageSchools = useMemo(() => (schools.schools || []).filter((s: any) => 
-    s && 
+  const pendingStorageSchools = useMemo(() => (schools.schools || []).filter((s: School) => 
+    Boolean(s) && 
     !s.is_demo_tenant && s.status !== 'archived' && 
     (s.storage_addon_status === 'pending_activation' || 
      s.storage_addon_status === 'pending_provisioning' || 
@@ -191,7 +222,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       minHeight: '100vh',
       background: 'radial-gradient(circle at 50% 0%, #fcfdfe 0%, #f3f6fa 50%, #e9edf5 100%)',
       color: '#1e293b',
-      fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
+      fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
       padding: '0',
       transition: 'all 0.3s ease',
       position: 'relative',
@@ -219,30 +250,96 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         zIndex: 0
       }} />
 
-      {/* Main Container Layout */}
+      {/* Mobile Header Bar (<= 768px only, Desktop untouched) */}
+      {isMobileViewport && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '14px 18px',
+          background: 'rgba(255, 255, 255, 0.92)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid #e2e8f0',
+          position: 'sticky',
+          top: 0,
+          zIndex: 50
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
+              width: '32px',
+              height: '32px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Shield size={16} color="#ffffff" />
+            </div>
+            <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
+              Admin Leitstand
+            </strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(prev => !prev)}
+            aria-label={mobileSidebarOpen ? 'Navigation schließen' : 'Navigation öffnen'}
+            style={{
+              padding: '8px 12px',
+              borderRadius: '10px',
+              background: '#f1f5f9',
+              border: 'none',
+              color: '#0f172a',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 800,
+              fontSize: '0.82rem'
+            }}
+          >
+            {mobileSidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            <span>Menü</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main Container Layout (Desktop 290px 1fr strictly preserved) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '290px 1fr',
+        gridTemplateColumns: isMobileViewport ? '1fr' : '290px 1fr',
         minHeight: '100vh',
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Left Premium Sidebar */}
-        <MasterAdminSidebar
-          activePortalTab={activePortalTab}
-          setActivePortalTab={setActivePortalTab}
-          onOpenCommandPalette={() => modalStates.setCommandPaletteOpen(true)}
-          onOpenAkademie={() => modalStates.setIsAkademieOpen(true)}
-          onLogout={onLogout}
-          adminUsername={operator.adminUsername}
-          pendingUsersCount={schools.pendingUsers.length}
-          isGlobalMaintenanceActive={isGlobalMaintenanceActive}
-          pendingStorageCount={pendingStorageSchools.length}
-        />
+        {/* Left Premium Sidebar (Desktop sticky column or Mobile Drawer) */}
+        {(!isMobileViewport || mobileSidebarOpen) && (
+          <div style={isMobileViewport ? {
+            position: 'fixed',
+            inset: 0,
+            zIndex: 45,
+            background: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex'
+          } : undefined}>
+            <div style={isMobileViewport ? { width: '290px', maxWidth: '85vw', height: '100vh', overflowY: 'auto', background: '#ffffff' } : undefined}>
+              <MasterAdminSidebar
+                activePortalTab={activePortalTab}
+                setActivePortalTab={setActivePortalTab}
+                onOpenCommandPalette={() => modalStates.setCommandPaletteOpen(true)}
+                onOpenAkademie={() => modalStates.setIsAkademieOpen(true)}
+                onLogout={onLogout}
+                adminUsername={operator.adminUsername}
+                pendingUsersCount={schools.pendingUsers.length}
+                isGlobalMaintenanceActive={isGlobalMaintenanceActive}
+                pendingStorageCount={pendingStorageSchools.length}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Right Workspace Area */}
         <div style={{
-          padding: '44px 54px',
+          padding: isMobileViewport ? '20px 16px' : '44px 54px',
           overflowY: 'auto',
           height: '100vh',
           boxSizing: 'border-box',
@@ -252,7 +349,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {securityShield.integrityCompromised && (
             <div style={{
               background: '#fef2f2',
-              border: '2px solid #ef4444',
+              border: 'none',
               borderRadius: '16px',
               padding: '16px 20px',
               color: '#b91c1c',
@@ -265,7 +362,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             }}>
               <Shield size={24} color="#dc2626" />
               <div>
-                <div style={{ fontSize: '0.90rem' }}>⚠️ SICHERHEITS-INTEGRITÄTSWARNUNG</div>
+                <div style={{ fontSize: '0.90rem' }}>SICHERHEITS-INTEGRITÄTSWARNUNG</div>
                 <div style={{ fontSize: '0.78rem', fontWeight: 600, marginTop: '2px' }}>{securityShield.integrityReason}</div>
               </div>
             </div>
@@ -307,7 +404,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               {globalFetchError && (
                 <div style={{
                   background: '#fffbeb',
-                  border: '1.5px solid #fde68a',
+                  border: 'none',
                   borderRadius: '20px',
                   padding: '16px 22px',
                   display: 'flex',
@@ -324,7 +421,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   height: '40px',
                   borderRadius: '13px',
                   background: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -337,7 +434,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                     Server-Verbindung eingeschränkt ({globalFetchError})
                   </strong>
                   <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                    Die Verbindung zum Hetzner Server / Supabase Cluster ist temporär unterbrochen.
+                    Die Verbindung zum IONOS / Hetzner EU Cluster ist temporär unterbrochen.
                   </span>
                 </div>
               </div>
@@ -367,7 +464,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {/* Maintenance Status Pill & DB Ping */}
           {activePortalTab !== 'executive' && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
               <button
                 type="button"
                 onClick={() => setActivePortalTab('maintenance')}
@@ -376,7 +473,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   alignItems: 'center',
                   gap: '8px',
                   background: isGlobalMaintenanceActive ? '#fee2e2' : '#ecfdf5',
-                  border: `1.5px solid ${isGlobalMaintenanceActive ? '#fca5a5' : '#10b981'}`,
+                  border: 'none',
                   color: isGlobalMaintenanceActive ? '#dc2626' : '#059669',
                   padding: '6px 14px',
                   borderRadius: '100px',
@@ -412,7 +509,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   borderRadius: '50%',
                   background: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#16a34a')
                 }} />
-                <span>DB-Ping: {dbLatency.rttMs} ms (Hetzner EU)</span>
+                <span>DB-Ping: {dbLatency.rttMs} ms (IONOS / Hetzner EU)</span>
               </div>
 
               <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
@@ -453,7 +550,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   style={{
                     background: 'rgba(255, 255, 255, 0.12)',
                     color: '#ffffff',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    border: 'none',
                     padding: '8px 14px',
                     borderRadius: '10px',
                     fontWeight: 700,
@@ -509,11 +606,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </div>
           )}
 
-          {/* Pending Hetzner Storage Provisioning Banner */}
+          {/* Pending Storage Provisioning Banner */}
           {pendingStorageSchools.length > 0 && activePortalTab !== 'executive' && (
             <div style={{
               background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: '1.5px solid #f59e0b',
+              border: 'none',
               borderRadius: '16px',
               padding: '14px 20px',
               marginBottom: '24px',
@@ -527,7 +624,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <HardDrive size={18} color="#0f172a" />
                 <div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#78350f' }}>
-                    {pendingStorageSchools.length} Hetzner Audio-Tresor Bereitstellung{pendingStorageSchools.length > 1 ? 'en' : ''} ausstehend
+                    {pendingStorageSchools.length} Audio-Tresor Bereitstellung{pendingStorageSchools.length > 1 ? 'en' : ''} (IONOS / Hetzner EU) ausstehend
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#92400e', fontWeight: 600 }}>
                     {pendingStorageSchools.map(s => `${s.name} (+${s.storage_addon_pending_gb || 10} GB)`).join(', ')}
@@ -559,6 +656,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* ═══════════════════════════════════════════════════════════════════ */}
           {/* TAB CONTENT PANELS                                                  */}
           {/* ═══════════════════════════════════════════════════════════════════ */}
+          <Suspense fallback={<div className="p-8 text-center text-slate-400 font-medium">Lade Leitstand-Modul...</div>}>
           {activePortalTab === 'executive' && (
             <div role="tabpanel" id="master-panel-executive" aria-labelledby="master-tab-executive" tabIndex={0}>
               <ExecutiveTab
@@ -605,6 +703,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onRefresh={schools.fetchPendingUsers}
                 onBatchActivate={schools.handleBatchActivateUsers}
                 onSingleActivate={schools.handleActivateUser}
+                taxMode={operator.taxMode}
+                vatRatePercent={operator.vatRatePercent}
+                onNavigateBilling={() => setActivePortalTab('billing')}
               />
             </div>
           )}
@@ -680,7 +781,20 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {activePortalTab === 'feedback' && (
             <div role="tabpanel" id="master-panel-feedback" aria-labelledby="master-tab-feedback" tabIndex={0}>
-              <FeedbackTab />
+              <FeedbackTab
+                onStartGhostMode={(schoolId, schoolName, reason) => {
+                  const matched: School = schools.schools.find((s) => s.id === schoolId) || {
+                    id: schoolId,
+                    name: schoolName,
+                    logo_url: null,
+                    primary_color: '#34a853'
+                  };
+                  if (reason) {
+                    schools.setGhostGateTicketRef(reason);
+                  }
+                  schools.setGhostGateSchool(matched);
+                }}
+              />
             </div>
           )}
 
@@ -690,6 +804,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 schools={schools.schools}
                 saveSuccessToast={modalStates.saveSuccessToast}
                 setSaveSuccessToast={modalStates.setSaveSuccessToast}
+                onRequestStepUp={(actionLabel, onVerified) => stepUp.requestStepUp(actionLabel, onVerified)}
               />
             </div>
           )}
@@ -699,6 +814,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               <BackupResetTab
                 schools={schools.schools}
                 onRefreshSchools={schools.fetchSchoolsAndStats}
+                onRequestStepUp={(actionLabel, onVerified) => stepUp.requestStepUp(actionLabel, onVerified)}
               />
             </div>
           )}
@@ -760,6 +876,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               />
             </div>
           )}
+          </Suspense>
           </>
         )}
 
@@ -785,17 +902,19 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {/* Consolidated Modals Hub with JIT Step-Up Verification */}
-          <MasterAdminModalsHub
-            schools={schools}
-            pricing={pricing}
-            operator={operator}
-            idleLock={idleLock}
-            modalStates={modalStates}
-            stepUp={stepUp}
-            activePortalTab={activePortalTab}
-            setActivePortalTab={setActivePortalTab}
-            onLogout={onLogout}
-          />
+          <Suspense fallback={null}>
+            <MasterAdminModalsHub
+              schools={schools}
+              pricing={pricing}
+              operator={operator}
+              idleLock={idleLock}
+              modalStates={modalStates}
+              stepUp={stepUp}
+              activePortalTab={activePortalTab}
+              setActivePortalTab={setActivePortalTab}
+              onLogout={onLogout}
+            />
+          </Suspense>
         </div>
       </div>
     </div>

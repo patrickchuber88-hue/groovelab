@@ -33,12 +33,12 @@
 - **`Jahres-Check` / `Annual Audit`**: Führt die jährliche Governance- & Resilienz-Engine (`npm run operator:annual` bzw. `scripts/export_annual_governance_dossier.ts`) über alle 10 Säulen aus: Schuljahres-Zyklus & DIN 66398 Purge (Migration 454), 12-Monats-GFS-Cold-Storage & Hetzner Storage Box Sync, GoBD 10-Jahres-Archivierung (§ 147 AO), Multi-Tenant RLS, WORM-Audit-Trail, Audio-Edge Streaming, Legacy Ingestion & 360° Legal Forensics mit SHA-256 Siegel (`reports/forensics/annual/`).
 - **`Full Audit` / `verify enterprise`**: Führt die maximale Enterprise-Prüfung (`npm run verify:enterprise`) aus (Gate + Pyramide + Forensik-All + Bundle/Heap-Budget).
 - **`commit`**: Führt `npm run gate`, `npm run verify:invariants`, `npm run build:groovelab` aus und setzt nach erfolgreicher Integrität den Git-Commit & Push um.
-- **`commit und deploy` / `commit and deploy`**: Führt die vollständige 0,1% Enterprise Closed-Loop Deployment Pipeline aus:
+- **`commit und deploy` / `commit and deploy`**: Führt die vollständige 0,1% Enterprise Closed-Loop Deployment Pipeline **ausschließlich auf dem IONOS-Produktionsserver (`deployuser@85.215.73.216`)** aus (der Hetzner-Server bleibt im aktuellen Zustand als Backup-System zu 100 % unberührt):
   1. Pre-Flight Gate (`npm run gate`, `npm run verify:invariants`, `npm run typecheck`)
-  2. Autoritativer DB-Migrations-Runner (`npm run deploy:db` via `scripts/apply_pending_migrations.sh` auf Hetzner + PostgREST Schema-Reload)
+  2. Autoritativer DB-Migrations-Runner (`npm run deploy:db` via `scripts/apply_pending_migrations.sh` ausschließlich auf IONOS `85.215.73.216` + PostgREST Schema-Reload)
   3. Produktions-Build (`npm run build:groovelab` inkl. SRI-Hashes, Precompression & SW-Cache-Buster)
   4. Git Commit & Git Push
-  5. Hetzner Server Deploy (`bash deploy.sh` mit atomarem Symlink-Switch, Container-Sync & BFF-Reload)
+  5. IONOS Server Deploy (`bash deploy.sh` auf `deployuser@85.215.73.216` mit atomarem Symlink-Switch, Container-Sync & BFF-Reload; **Hetzner wird NIEMALS beschrieben oder verändert**)
   6. Kryptografische Live-Paritäts-Verifikation (SHA-256 Abgleich des Live-Assets mit dem lokalen Build + Mozilla Observatory A+ Perimeter Smoke Test). Der Agent darf eine Erfolgsmeldung im Chat erst nach bestätigter 100% Live-Parität ausgeben.
 - **On-Demand Antigravity Skills (`.agents/skills/`)**:
   - `/campus-disaster-recovery`: 7-Phasen Hetzner Notfall-Runbook (RTO $\le$ 45 Min, RPO $\le$ 60 Min, Age X25519, WORM Tombstones).
@@ -70,8 +70,17 @@
   - **Inhaltliche Leitplanken**: Reine Software-Architektur, Bounded Contexts, System-Invarianten, deterministischer 4-Phasen-Ablauf (1. Exploration -> 2. Planung -> 3. Implementierung -> 4. Verifikation) und strukturiertes Status-Reporting. Keine domänenspezifischen Vorab-Festlegungen.
 
 ## ⚡ Hermetisches Vibe Coding & Enterprise Quality Gate
-- **Hermetischer Master-Prompt & Core Architect**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/CAMPUS_GROOVELAB_CORE_ARCHITECT.md` bzw. `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
-- Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen außerhalb des Codeworts „commit“ NIEMALS ungefragt aus. Keine automatischen Test-Schleifen am Ende von regulären Antworten.
+- **Autoritativer Haupt-System-Prompt für zukünftige Entwicklung**: Für sämtliche KI-gestützten Feature-Erweiterungen, Refactorings, Fehlerbehebungen und Architektur-Aufgaben gilt ausnahmslos und verbindlich die Spezifikation aus `.agents/prompts/SYSTEM_PROMPT_FUTURE_DEVELOPMENT.md` (sowie `.agents/prompts/CAMPUS_GROOVELAB_CORE_ARCHITECT.md`). Dieser System-Prompt bindet den KI-Agenten an:
+  1. *0% US-Cloud-Doktrin*: Reine EU/DE-Rechenzentren (IONOS Ingress `85.215.73.216`, Hetzner DR `nbg1`/`fsn1`, Storage Box via Age X25519). Zero US CLOUD Act, Zero FISA 702.
+  2. *Klare Bounded Context Trennung*: Campus (didaktische Audio-DSP Engine wie `CampusLoopstation`, `CampusTuner`, `EarLabStudioModal`, Messenger, VDM-Kataloge) vs. GrooveLab (Band-, Song- und Station-Management via QR; **KEINE DSP-Engine**).
+  3. *Herrenberg-Schutz & Zero-Payroll (§ 7 SGB IV, § 266a StGB)*: Keine Erfassung von Honoraren, Stundensätzen oder Lehrer-Bankdaten; keine Weisungsstrukturen im Code.
+  4. *Zero-Trust Frontend & Autoritative Auth-RPCs*: Autorisierung und PIN-Verifikation laufen zu 100 % serverseitig über Postgres-RPCs. Keine Sicherheitsentscheidungen im Client.
+  5. *Zero-Secret-Leakage*: PINs, Passwörter und Tokens sind aus allen lesbaren Views verbannt; der Client empfängt nur vorberechnete Flags.
+  6. *PostgreSQL Multi-Tenancy & RLS-First*: Default-Deny mit `school_id = get_current_user_school_id()`.
+  7. *Kinderschutz & Sammelzahler-Garantie*: KUG § 22 Zero-Photo Doktrin mit 3D-Avataren, keine Pflicht-E-Mails/Telefonnummern, 0 € für Schüler.
+  8. *Monolith Ceiling & Zero-Inline-Feature Doktrin*: Absolutes Zersäge-Verbot für Bestandsmonolithen; neue Features entstehen in autarken Satelliten-Dateien (300–1.000 Zeilen); Bestandsmonolithen dienen ausschließlich als schlanke Host-Orchestratoren (Mounting per Einzeiler, maximal 15 Zeilen technischer Puffer).
+- **Deterministisches 4-Phasen-Anti-Regressionsprotokoll**: Der Agent arbeitet ausnahmslos in 4 Phasen: 1. Reconnaissance (Codebase-Traversierung vor dem Coden) -> 2. Planung (`implementation_plan.md` mit striktem Stopp-Punkt) -> 3. Minimal-invasive Implementierung (nur nach Freigabe) -> 4. Forensische Verifikation.
+- **Verifikations-Doktrin**: Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen außerhalb des Codeworts „commit“ NIEMALS ungefragt aus. Keine automatischen Test-Schleifen am Ende von regulären Antworten.
 - Beim Codewort „commit“ (oder „commit and deploy“) führt der Agent `npm run gate` sowie alle Build- und Integritätsprüfungen eigenständig aus.
 - Die finale Sicherheitsprüfung beim Commit erfolgt zusätzlich über den Git-Pre-Commit-Hook.
 - #no-Bypass gilt unverändert für den Code-Standard selbst (keine Verletzung der Invarianten).
@@ -361,7 +370,7 @@
 - **PWA Auto-Update Mechanism**: Ensure the automatic Service Worker update checker (`reg.update()`) remains active in `App.tsx` and checks every 5 minutes.
 - **Cache-Busting on Deploy**: During deployments, the `CACHE_NAME` version in `sw.js` must be bumped (e.g. from `groovelab-static-v2` to `groovelab-static-v3`) to force client PWA cache invalidation.
 - **No Automatic Commits and Deploys**: Do NOT automatically perform git commits, git pushes, or run `./deploy.sh` (or any other deployment script) after making modifications. Changes must only be committed and deployed when explicitly requested by the user, or left for the user to handle manually.
-- **Sandboxed Deployments Bypass**: When compiling the production bundle and running `./deploy.sh` (upon explicit user request), run it with `BypassSandbox: true` so the files are successfully copied to the remote Hetzner Server (`178.105.10.2`).
+- **Exclusive IONOS Deployment & Frozen Hetzner Backup**: When compiling the production bundle and running `./deploy.sh` or `scripts/apply_pending_migrations.sh` (upon explicit user request), deploy **exclusively** to the remote IONOS Server (`deployuser@85.215.73.216`). The Hetzner Server (`178.105.10.2`) must remain 100 % untouched in its current state as our frozen backup server in case anything goes wrong.
 - **Kiosk Map Coupling Token Integrity**: Device coupling directly from the interactive map in `LoginScreen.tsx` must always fetch or create a kiosk record in the `kiosks` table and save its unique `secret_token` in `localStorage`, never the school's general onboarding token. To bypass Row-Level Security (RLS) policies on `kiosks` during this unauthenticated insert/select operation, temporarily set `groovelab_kiosk_token` in `localStorage` to the school's general onboarding token (`schoolData.groovelab_kiosk_token`) right before executing the Supabase query, and overwrite it with the kiosk's unique `secret_token` upon success.
 
 ## Active Module & User Profile State Protection Rule

@@ -1019,7 +1019,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 border: '1px solid #cbd5e1',
                 borderRadius: '14px',
                 padding: '16px',
-                maxHeight: '200px',
+                maxHeight: '220px',
                 overflowY: 'auto',
                 fontSize: '0.78rem',
                 color: '#334155',
@@ -1027,6 +1027,13 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 whiteSpace: 'pre-line'
               }}>
                 {primaryDoc.fullTextMarkdown}
+                {isStudent && audioDoc && (
+                  <>
+                    {'\n\n──────────────────────────────────────────────────\n'}
+                    {`### ${audioDoc.title} (${audioDoc.subtitle})\n\n`}
+                    {audioDoc.fullTextMarkdown}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1079,7 +1086,11 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <div style={{ flex: 1, fontSize: isMobile ? '0.80rem' : '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.35 }}>
               <span style={{ color: themeColor, fontWeight: 800 }}>[Pflicht] </span>
               {isMajorUpdateFlow ? (
-                `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht personell bei der Lehrkraft verbleibt.`
+                isAdmin
+                  ? `Ich bestätige, dass ich berechtigt bin, die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) des B2B-Infrastrukturvertrags (AGB Teil A) sowie der Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO inkl. TOMs) im Namen der Musikschule bzw. des Trägers verbindlich abzuschließen.`
+                  : isTeacher
+                  ? `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht (§ 1631 BGB) personell bei der Lehrkraft vor Ort verbleibt.`
+                  : `Ich akzeptiere die aktualisierten Plattform-Nutzungsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) für Campus-Groovelab (bei Minderjährigen unter 18 Jahren durch die Erziehungsberechtigten bzw. mit deren ausdrücklicher Einwilligung).`
               ) : (
                 primaryDoc.checkboxLabel
               )}

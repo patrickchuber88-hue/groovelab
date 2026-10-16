@@ -20,17 +20,16 @@ import { useTeacherModalStates } from './teacher/hooks/useTeacherModalStates';
 
 // Tabs & Modals
 import { TeacherBriefingTab } from './teacher/tabs/TeacherBriefingTab';
-import { TeacherCoachesTab } from './teacher/tabs/TeacherCoachesTab';
 import { TeacherModalsHub } from './teacher/modals/TeacherModalsHub';
-import { TeacherUnifiedMediaLibraryModal } from './teacher/mediathek/TeacherUnifiedMediaLibraryModal';
 import { AbsenceGracePeriodBanner } from './teacher/absence/AbsenceGracePeriodBanner';
-import { TeacherRoomCollisionDecisionModal } from './teacher/modals/TeacherRoomCollisionDecisionModal';
 import { SmartRoomSwappingService, RoomCollisionRecord } from '../services/room/smartRoomSwappingService';
 import { supabase } from '../lib/supabase';
 
-// Lazy Loaded Tabs (⚡ 0ms Instant Chunk Preload)
-const teacherLiveViewChunk = import('./teacher/TeacherLiveView');
-const TeacherLiveView = lazy(() => teacherLiveViewChunk.then(m => ({ default: m.TeacherLiveView })));
+// Lazy Loaded Tabs & Modals
+const TeacherCoachesTab = lazy(() => import('./teacher/tabs/TeacherCoachesTab').then(m => ({ default: m.TeacherCoachesTab })));
+const TeacherUnifiedMediaLibraryModal = lazy(() => import('./teacher/mediathek/TeacherUnifiedMediaLibraryModal').then(m => ({ default: m.TeacherUnifiedMediaLibraryModal })));
+const TeacherRoomCollisionDecisionModal = lazy(() => import('./teacher/modals/TeacherRoomCollisionDecisionModal').then(m => ({ default: m.TeacherRoomCollisionDecisionModal })));
+const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
 const TeacherBandWorkspace = lazy(() => import('./teacher/TeacherBandWorkspace').then(m => ({ default: m.TeacherBandWorkspace })));
 const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardView').then(m => ({ default: m.TeacherStudioBoardView })));
 const TeacherStudentsView = lazy(() => import('./teacher/TeacherStudentsView').then(m => ({ default: m.TeacherStudentsView })));
@@ -749,7 +748,9 @@ export function TeacherDashboard({
             />
           </Suspense>
         ) : activeTab === 'coaches' ? (
-          <TeacherCoachesTab coaches={data.coaches} activePlatform={activePlatform} />
+          <Suspense fallback={null}>
+            <TeacherCoachesTab coaches={data.coaches} activePlatform={activePlatform} />
+          </Suspense>
         ) : activeTab === 'rooms' ? (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Räume werden geladen...</div>}>
             <AdminDashboard
@@ -924,26 +925,30 @@ export function TeacherDashboard({
       />
 
       {showMediaLibraryModal && (
-        <TeacherUnifiedMediaLibraryModal
-          isOpen={showMediaLibraryModal}
-          onClose={() => setShowMediaLibraryModal(false)}
-          teacher={data.teacher}
-          allStudents={students.allStudents}
-          schoolId={data.schoolData?.id}
-          showRealNames={students.showRealNames}
-        />
+        <Suspense fallback={null}>
+          <TeacherUnifiedMediaLibraryModal
+            isOpen={showMediaLibraryModal}
+            onClose={() => setShowMediaLibraryModal(false)}
+            teacher={data.teacher}
+            allStudents={students.allStudents}
+            schoolId={data.schoolData?.id}
+            showRealNames={students.showRealNames}
+          />
+        </Suspense>
       )}
 
       {/* 🚪 0,1% Goldstandard: Kollisions-Auswahl-Modal für Kollege B */}
       {activeTeacherBCollision && (
-        <TeacherRoomCollisionDecisionModal
-          isOpen={!!activeTeacherBCollision}
-          collision={activeTeacherBCollision}
-          availableRooms={data.rooms || []}
-          onAcceptSuggestedRoom={handleAcceptCollisionRoom}
-          onSelectAlternativeRoom={handleSelectAlternativeCollisionRoom}
-          onClose={() => setActiveTeacherBCollision(null)}
-        />
+        <Suspense fallback={null}>
+          <TeacherRoomCollisionDecisionModal
+            isOpen={!!activeTeacherBCollision}
+            collision={activeTeacherBCollision}
+            availableRooms={data.rooms || []}
+            onAcceptSuggestedRoom={handleAcceptCollisionRoom}
+            onSelectAlternativeRoom={handleSelectAlternativeCollisionRoom}
+            onClose={() => setActiveTeacherBCollision(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

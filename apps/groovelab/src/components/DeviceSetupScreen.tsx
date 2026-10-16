@@ -34,7 +34,7 @@ export function DeviceSetupScreen({
 
   // Target school ID for terminal pairing
   const [targetSchoolIdState, setTargetSchoolIdState] = useState<string>(
-    school?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || '11111111-1111-1111-1111-111111111111'
+    school?.id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null) || ''
   );
 
   // GrooveLab Terminal-Setup PIN Gatekeeper State
@@ -147,7 +147,12 @@ export function DeviceSetupScreen({
       setPinVerifying(true);
       setPinError(null);
 
-      const schoolIdToUse = targetSchoolIdState || localStorage.getItem('groovelab_school_id') || '11111111-1111-1111-1111-111111111111';
+      const schoolIdToUse = targetSchoolIdState || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_school_id') : null);
+      if (!schoolIdToUse) {
+        setPinError('Keine Schule ausgewählt.');
+        setPinVerifying(false);
+        return;
+      }
 
       const { data: isValid, error: rpcErr } = await supabase.rpc('verify_kiosk_setup_pin', {
         p_school_id: schoolIdToUse,
@@ -259,14 +264,10 @@ export function DeviceSetupScreen({
         targetSchoolId = localStorage.getItem('groovelab_school_id');
       }
 
-      // Default fallback to the primary school ID
-      if (!targetSchoolId) {
-        targetSchoolId = '11111111-1111-1111-1111-111111111111';
+      if (targetSchoolId) {
+        localStorage.setItem('groovelab_school_id', targetSchoolId);
+        setTargetSchoolIdState(targetSchoolId);
       }
-
-      // Persist the resolved school ID to localStorage for stability
-      localStorage.setItem('groovelab_school_id', targetSchoolId);
-      setTargetSchoolIdState(targetSchoolId);
 
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       let roomsQuery = supabase.from('rooms').select('*').order('sort_order', { ascending: true });
@@ -297,12 +298,7 @@ export function DeviceSetupScreen({
 
       let finalRooms = roomsRes.data || [];
       if (finalRooms.length === 0) {
-        console.warn('[Setup] No rooms found in DB. Using stable fallback room.');
-        finalRooms = [{
-          id: '22222222-2222-2222-2222-222222222222',
-          school_id: '11111111-1111-1111-1111-111111111111',
-          name: 'Groovelab'
-        }];
+        console.warn('[Setup] No rooms found in DB for selected school.');
       }
 
       setRooms(finalRooms);
@@ -375,7 +371,7 @@ export function DeviceSetupScreen({
         const { data: insertedRows } = await supabase
           .from('kiosks')
           .insert({
-            school_id: targetSchoolIdState || '11111111-1111-1111-1111-111111111111',
+            school_id: targetSchoolIdState,
             name: targetStation?.name || 'iPad Kiosk',
             secret_token: generatedSecretToken,
             room_id: isUUID(targetRoomId) ? targetRoomId : null,

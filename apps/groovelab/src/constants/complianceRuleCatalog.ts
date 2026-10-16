@@ -9,7 +9,6 @@
  */
 
 export type ComplianceSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-
 export type ComplianceCheckCategory = 
   | 'AST_NEGATIVE_PATTERN'  // Verbotene Code-Muster (z. B. Foto-Uploads bei Schülern, unverschlüsselte PINs)
   | 'AST_POSITIVE_PATTERN'  // Erforderliche Code-Muster (z. B. allowLeaderboard: false, role="dialog")
@@ -404,7 +403,7 @@ export const COMPLIANCE_RULES_180: ComplianceRuleDefinition[] = [
     description: 'Datenschutzerklärung in kindgerechter, leichter Sprache für Minderjährige',
     severity: 'HIGH',
     category: 'AST_POSITIVE_PATTERN',
-    invariantTarget: 'apps/groovelab/src/constants/legalContent.ts',
+    invariantTarget: 'apps/groovelab/src/legal/legalContent.ts',
     enforcementMechanism: 'Junior Privacy Text in verständlicher Sprache'
   },
   {

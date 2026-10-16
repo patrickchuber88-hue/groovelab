@@ -1,9 +1,17 @@
 import React from 'react';
 import { TrendingUp, Check, ShieldCheck, AlertCircle } from 'lucide-react';
 
+interface PricingImpactSummaryData {
+  currentMrr: number;
+  projectedMrr: number;
+  deltaMrr: number;
+  affectedSchoolsCount: number;
+  affectedSchools?: { name: string; oldCost: number; newCost: number }[];
+}
+
 interface PricingImpactSimulationModalProps {
   isOpen: boolean;
-  pricingImpactData: any;
+  pricingImpactData: PricingImpactSummaryData | null;
   priceChangeScope: string;
   priceEffectiveDate?: string;
   currency?: 'EUR' | 'CHF';
@@ -61,6 +69,7 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
             borderRadius: '14px',
             background: isLifetimeProtected ? '#f0fdf4' : '#e0e7ff',
             color: isLifetimeProtected ? '#16a34a' : '#4338ca',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -111,7 +120,7 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
           padding: '14px 18px',
           borderRadius: '14px',
           background: isLifetimeProtected ? '#ecfdf5' : '#fffbeb',
-          border: `1.5px solid ${isLifetimeProtected ? '#10b981' : '#fde68a'}`,
+          border: 'none',
           fontSize: '0.82rem',
           color: isLifetimeProtected ? '#065f46' : '#92400e',
           lineHeight: 1.5,
@@ -121,14 +130,14 @@ export const PricingImpactSimulationModal: React.FC<PricingImpactSimulationModal
         }}>
           {isLifetimeProtected ? (
             <>
-              <ShieldCheck size={20} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <ShieldCheck size={20} color="#065f46" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>
                 <strong>100% Lifetime-Bestandsschutz gewahrt:</strong> Die geänderten Tarife gelten ausschließlich als neuer Katalogpreis für zukünftige Neuregistrierungen. Sämtliche bestehenden Musikschulen behalten ihre vertraglichen Sockelpreise und Profilgebühren dauerhaft bei 0,00 {sym} Mehrkosten.
               </div>
             </>
           ) : (
             <>
-              <AlertCircle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <AlertCircle size={20} color="#92400e" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>
                 <strong>Achtung: Mandantenweite Anpassung ({pricingImpactData.affectedSchoolsCount} Schulen betroffen):</strong> Erfordert nach AGB Ziffer 4 eine Frist von mindestens zwei Monaten zum neuen Schuljahr ({priceEffectiveDate ? new Date(priceEffectiveDate).toLocaleDateString('de-DE') : 'Stichtag'}) sowie eine formelle Belehrung über das Sonderkündigungsrecht.
               </div>

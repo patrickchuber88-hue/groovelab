@@ -302,20 +302,21 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                         }}
                         className="google-card virtual-card-lg"
                         style={{ 
-                          padding: windowWidth < 768 ? '14px 12px' : '24px', 
-                          borderRadius: windowWidth < 768 ? '16px' : '24px', 
+                          padding: windowWidth < 768 ? '14px 12px' : '20px', 
+                          borderRadius: windowWidth < 768 ? '16px' : '20px', 
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '12px',
                           border: isSessionActive ? `2px solid ${isGrooveLab ? '#eab308' : '#34a853'}` : '1px solid #e2e8f0',
-                          borderLeft: `5px solid ${studentRainbowColor}`,
+                          borderLeft: `4px solid ${studentRainbowColor}`,
                           boxShadow: `0 4px 16px rgba(0, 0, 0, 0.02), -2px 0 10px ${studentRainbowColor}25`,
                           cursor: 'pointer',
                           width: '100%',
                           maxWidth: '100%',
+                          minHeight: windowWidth < 768 ? 'auto' : '88px',
                           boxSizing: 'border-box',
                           contentVisibility: 'auto',
-                          containIntrinsicSize: '0 90px'
+                          containIntrinsicSize: 'auto 140px'
                         }}
                         onClick={() => setSelectedStudentProfile(student)}
                       >

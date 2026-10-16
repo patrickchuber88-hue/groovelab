@@ -85,7 +85,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.4);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256:${sha256Digest} • Amtliches Konformitätsattest`, margin, pageHeight - 8);
+      doc.text(`Urkunden-Prüfhash (§ 371a ZPO): SHA256:${sha256Digest} • Technisches Hersteller-Konformitätsattest`, margin, pageHeight - 8);
       doc.text(`Seite ${pageNum} von 2`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     };
 
@@ -128,7 +128,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Leitbild & Schutzprinzip: Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Schulmanagement- und Übe-Plattform wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle didaktische Freiheit vor Scheinselbstständigkeitsrisiken.';
+    const summaryText = 'Leitbild & Schutzprinzip: Campus-Groovelab dient den Lehrkräften zur Erleichterung des Unterrichtsalltags (nicht umgekehrt). Die Schulmanagement- und Übe-Plattform wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle didaktische Freiheit vor Scheinselbstständigkeitsrisiken.';
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
     doc.text(splitSummary, margin + 5, 55);
 
@@ -234,12 +234,12 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    doc.text('4. Datensouveränität & 100% Deutsches Cloud-Hosting (Hetzner)', margin, curY);
+    doc.text('4. Datensouveränität & 100% Deutsches Cloud-Hosting (IONOS SE & Hetzner)', margin, curY);
 
     const section3Points = [
       {
         title: 'A. Ausschluss von US-Cloudservern & US-Behördenzugriff (Schrems II)',
-        desc: 'Der gesamte Plattformbetrieb (Datenbanken, Programmcode, Audio-Memos, Backups) erfolgt ausschließlich in ISO 27001 zertifizierten deutschen Rechenzentren der Hetzner Online GmbH (Falkenstein/Vogtland und Nürnberg). Ein Datentransfer in Drittländer (USA) oder die Unterwerfung unter den US CLOUD Act / FISA 702 ist vollständig ausgeschlossen.'
+        desc: 'Der gesamte Plattformbetrieb (Datenbanken, Programmcode, Audio-Memos, Backups) erfolgt ausschließlich in ISO 27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur) sowie der Hetzner Online GmbH (Falkenstein/Vogtland und Nürnberg). Ein Datentransfer in Drittländer (USA) oder die Unterwerfung unter den US CLOUD Act / FISA 702 ist vollständig ausgeschlossen.'
       },
       {
         title: 'B. Schutz der Privatsphäre von Lehrkräften & Zero-Mail IAM',
@@ -284,12 +284,12 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(accentRed[0], accentRed[1], accentRed[2]);
-    doc.text('5. Rechtsverbindliche Konformitätserklärung & Betreiber-Garantie', margin + 6, curY + 8);
+    doc.text('5. Technische Systemerklärung & Betreiber-Zusicherung (Hinweis gem. § 3 RDG)', margin + 6, curY + 8);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const sealText = 'Der Betreiber bestätigt hiermit ausdrücklich, dass der Einsatz von Campus-Groovelab den Erfordernissen des Personalvertretungsrechts (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie den Anforderungen der DSGVO (Art. 5, 28, 32) und des § 26 BDSG vollumfänglich entspricht. Nach dem Leitbild des didaktischen Assistenz-Prinzips dient die Plattform den Lehrkräften für den optimalen Unterrichtsalltag, nicht die Lehrkräfte dem Schulalltag. Als weisungsfreies Beschleunigungswerkzeug wahrt die Plattform die pädagogische Autonomie von Honorarkräften (BSG B 12 R 3/20 R). Das vorliegende Attest kann von der Schulleitung direkt der Personalvertretung (Personalrat, Betriebsrat, Lehrerrat) zur Genehmigung bzw. Kenntnisnahme vorgelegt werden.';
+    const sealText = 'Der Betreiber dokumentiert hiermit verbindlich die technischen Eigenschaften von Campus-Groovelab zur Vorlage bei der Personalvertretung (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie zur Einhaltung von DSGVO (Art. 5, 28, 32) und § 26 BDSG. Nach dem Leitbild des didaktischen Assistenz-Prinzips enthält die Plattform keinerlei Funktionen zur Leistungs- oder Verhaltenskontrolle von Lehrkräften und wahrt die technische Dispositionsfreiheit freier Honorarkräfte (BSG B 12 R 3/20 R). Hinweis gem. § 3 RDG: Diese technische Architektur-Dokumentation stellt keine individuelle Rechtsberatung im Sinne des Rechtsdienstleistungsgesetzes dar.';
     const splitSeal = doc.splitTextToSize(sealText, contentWidth - 12);
     doc.text(splitSeal, margin + 6, curY + 15);
 
@@ -306,8 +306,8 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    doc.text('Campus-Groovelab SaaS Operator • Sicherheits- & Betriebsleitung', margin + 6, curY + 45);
-    doc.text(`Rheinfelden (Baden) • Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256:${sha256Digest}`, margin + 6, curY + 49);
+    doc.text('Campus-Groovelab SaaS Operator • Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden)', margin + 6, curY + 45);
+    doc.text(`Gültig ab Schuljahr 2026/2027 • Prüfsumme: SHA256:${sha256Digest}`, margin + 6, curY + 49);
 
     // Section 6: Audit Proofs & Invariants for Staff Council (harmonizes page 2 whitespace)
     curY += 57;
@@ -329,7 +329,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       },
       {
         title: 'Schulische Datenhoheit (Art. 28 DSGVO) & ISO 27001 Hosting',
-        desc: 'Ausschließliches Hosting im ISO 27001-zertifizierten deutschen Hetzner-Cluster (Falkenstein/Nürnberg). Keine US-Cloud-Abhängigkeit, kein Drittstaatentransfer (Schrems II konform).'
+        desc: 'Ausschließliches Hosting im ISO 27001-zertifizierten deutschen Cluster (IONOS SE & Hetzner Falkenstein/Nürnberg). Keine US-Cloud-Abhängigkeit, kein Drittstaatentransfer (Schrems II konform).'
       },
       {
         title: 'BSG Herrenberg-Schutzschild für Honorarkräfte',

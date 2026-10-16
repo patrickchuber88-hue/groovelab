@@ -203,11 +203,14 @@ export function useCampusMessagingData({
     }
     
     try {
-      // 1. Hole alle Planungs-Einträge der Schule
-      const { data: planningData, error: planningError } = await supabase
-        .from('lab_planning')
-        .select('*')
-        .eq('school_id', schoolId);
+      // 1. Hole alle Planungs-Einträge und Profile der Schule parallel in 1 Roundtrip
+      const [
+        { data: planningData, error: planningError },
+        { data: profilesData, error: profilesError }
+      ] = await Promise.all([
+        supabase.from('lab_planning').select('*').eq('school_id', schoolId),
+        supabase.from('users').select('id, first_name, role').eq('school_id', schoolId)
+      ]);
       
       console.log(`[Planning] DB Result:`, { count: planningData?.length, error: planningError });
         
@@ -215,12 +218,6 @@ export function useCampusMessagingData({
         console.error('[Planning] Fetch Error:', planningError);
         return;
       }
-
-      // 2. Hole alle Profile der Schule für den in-memory Join
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('users')
-        .select('id, first_name, role')
-        .eq('school_id', schoolId);
 
       if (profilesError) {
         console.error('[Planning] Profiles Fetch Error:', profilesError);
@@ -256,7 +253,7 @@ export function useCampusMessagingData({
     if (schoolId && loggedInUserId) {
       fetchPlanningData(schoolId, loggedInUserId);
     }
-  }, [activeStudentTab, loggedInUserId, user, fetchPlanningData]);
+  }, [loggedInUserId, user, fetchPlanningData]);
 
   const toggleSlot = useCallback(async (day: string, time: string) => {
     if (!loggedInUserId) {

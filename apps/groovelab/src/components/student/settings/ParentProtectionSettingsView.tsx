@@ -498,12 +498,16 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
                 checked={Boolean((studentUser as any)?.adult_allow_parent_access)}
                 onChange={async (e) => {
                   const nextVal = e.target.checked;
-                  try {
-                    if (studentUser?.id || studentId) {
-                      await supabase.from('users').update({ adult_allow_parent_access: nextVal }).eq('id', studentUser?.id || studentId);
-                      if (studentUser) (studentUser as any).adult_allow_parent_access = nextVal;
-                    }
-                  } catch (err) {}
+                  const targetId = studentUser?.id || studentId;
+                  if (!targetId) return;
+                  const { data, error } = await supabase.rpc('save_parent_controls', {
+                    p_target_user_id: targetId,
+                    p_controls: { adult_allow_parent_access: nextVal }
+                  });
+                  if (error || (data && typeof data === 'object' && 'success' in data && !(data as { success?: boolean }).success)) {
+                    return;
+                  }
+                  if (studentUser) (studentUser as any).adult_allow_parent_access = nextVal;
                 }}
                 style={{ width: '16px', height: '16px', accentColor: '#16a34a' }}
               />
@@ -796,7 +800,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
               {hlAudio.badge}
             </div>
             <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-              Erlaubt deinem Kind, eigene Übe-Aufnahmen, Loopstation-Spuren und Memos mit dem Mikrofon aufzuzeichnen. Standardmäßig deaktiviert (Privacy by Default) zum Schutz Minderjähriger. Inkl. 30-Tage-Speicherfrist.
+              Erlaubt deinem Kind, eigene Übe-Aufnahmen, Loopstation-Spuren und Memos mit dem Mikrofon aufzuzeichnen. Standardmäßig deaktiviert (Privacy by Default) zum Schutz Minderjähriger. Reguläre Aufnahmen werden zum Schuljahreswechsel bereinigt (kuratierte Audio-Biografie-Meilensteine bis Vertragsende) sowie jederzeit per 1-Klick-Sofortlöschung.
             </div>
           </div>
           <input

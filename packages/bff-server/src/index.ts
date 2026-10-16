@@ -18,9 +18,18 @@ const PORT = process.env.BFF_PORT || 4000;
 // Trust proxy for Coolify / Traefik / Nginx reverse proxy headers (X-Forwarded-For)
 app.set('trust proxy', 1);
 
-// CORS setup to allow the Vite SPA to communicate with credentials (cookies)
+// CORS setup to allow Vite SPA on apex domain or any tenant subdomain
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      /^https:\/\/([a-zA-Z0-9_-]+\.)*campus-groovelab\.de$/.test(origin) ||
+      origin === 'http://localhost:5173'
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS policy: origin not allowed'), false);
+  },
   credentials: true,
 }));
 
@@ -94,17 +103,25 @@ interface TenantTokenBucket {
 }
 const tenantBuckets = new Map<string, TenantTokenBucket>();
 const MAX_TENANT_TOKENS = 2400; // 2.400 Anfragen / Minute pro Schule
+const MAX_TENANT_BUCKETS = 2000; // Hard cap against unauthenticated Map OOM (SEC-AUDIT-03)
+const TENANT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 const REFILL_RATE_PER_MS = MAX_TENANT_TOKENS / (60 * 1000); // 0.04 tokens/ms
 
 export const tenantRateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const schoolId = (req.headers['x-school-id'] as string) || (req.query.school_id as string);
-  if (!schoolId) return next();
+  const rawSchoolId = (req.headers['x-school-id'] as string) || (req.query.school_id as string);
+  if (!rawSchoolId || !TENANT_ID_PATTERN.test(rawSchoolId)) return next();
 
+  const clientIp = req.ip || req.socket.remoteAddress || '0.0.0.0';
+  const bucketKey = `${rawSchoolId}:${clientIp}`;
   const now = Date.now();
-  let bucket = tenantBuckets.get(schoolId);
+  let bucket = tenantBuckets.get(bucketKey);
   if (!bucket) {
+    if (tenantBuckets.size >= MAX_TENANT_BUCKETS) {
+      const oldestKey = tenantBuckets.keys().next().value;
+      if (oldestKey) tenantBuckets.delete(oldestKey);
+    }
     bucket = { tokens: MAX_TENANT_TOKENS, lastRefill: now };
-    tenantBuckets.set(schoolId, bucket);
+    tenantBuckets.set(bucketKey, bucket);
   } else {
     const elapsed = now - bucket.lastRefill;
     bucket.tokens = Math.min(MAX_TENANT_TOKENS, bucket.tokens + elapsed * REFILL_RATE_PER_MS);
@@ -112,7 +129,7 @@ export const tenantRateLimiter = (req: express.Request, res: express.Response, n
   }
 
   if (bucket.tokens < 1) {
-    dispatchSecurityAlert('TENANT_RATE_LIMIT_EXCEEDED', req, { schoolId, threshold: MAX_TENANT_TOKENS });
+    dispatchSecurityAlert('TENANT_RATE_LIMIT_EXCEEDED', req, { schoolId: rawSchoolId, threshold: MAX_TENANT_TOKENS });
     return res.status(429).json({ error: 'TENANT_RATE_LIMIT_EXCEEDED', message: 'Schul-Kontingent vorübergehend erschöpft.' });
   }
 
@@ -209,10 +226,10 @@ app.use((req, res, next) => {
     }
   }
   
-  // 5. Inject Security Headers
+  // 5. Inject Security Headers (OWASP ASVS L3: X-XSS-Protection=0 with strict CSP)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('X-XSS-Protection', '0');
   
   next();
 });

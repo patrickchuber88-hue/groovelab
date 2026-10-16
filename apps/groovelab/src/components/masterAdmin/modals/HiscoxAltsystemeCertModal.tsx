@@ -26,7 +26,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
       id: 1,
       question: 'Vollständige Inventarliste aller Hard- und Softwaresysteme',
       status: '100% Erfüllt',
-      desc: 'Lückenlose Erfassung aller Cloud-Cluster (Hetzner Bare Metal Falkenstein/Nürnberg, Docker-Container) sowie Client-Telemetrie aller aktiven Schul-Endgeräte via errorTelemetry.ts.'
+      desc: 'Lückenlose Erfassung aller Cloud-Cluster (IONOS Enterprise Cloud Deutschland 85.215.73.216, Primärer Produktiv-Cluster + Hetzner Cloud Deutschland Falkenstein/Nürnberg, Georedundantes Backup & Failover) sowie Client-Telemetrie aller aktiven Schul-Endgeräte via errorTelemetry.ts.'
     },
     {
       id: 2,
@@ -62,7 +62,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
       id: 7,
       question: 'Kompensierende Schutzmaßnahmen (Defense-in-Depth)',
       status: '100% Aktiv',
-      desc: 'Zero-Trust Frontend-Doktrin, WebAuthn Passkeys, TOTP 2FA für Master-Admins, 45-Minuten Privacy-Screen Lock, automatische Privilege Downgrades (Least Privilege).'
+      desc: 'Zero-Trust Frontend-Doktrin, WebAuthn Passkeys, TOTP 2FA für Master-Admins, 15-Minuten Idle-Lock, automatische Privilege Downgrades (Least Privilege).'
     },
     {
       id: 8,
@@ -118,7 +118,10 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
         }
       `}</style>
 
-      <div role="dialog" aria-modal="true"
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hiscox CyberSafe Altsysteme-Audit-Zertifikat"
         id="hiscox-altsysteme-cert-print"
         style={{
           background: '#ffffff',
@@ -152,6 +155,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
                 height: '46px',
                 borderRadius: '14px',
                 background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -198,6 +202,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
             <button
               type="button"
               onClick={onClose}
+              aria-label="Schließen"
               style={{
                 width: '38px',
                 height: '38px',
@@ -301,6 +306,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
                       borderRadius: '50%',
                       background: '#ecfdf5',
                       color: '#059669',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -324,7 +330,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
                           borderRadius: '100px',
                           background: '#ecfdf5',
                           color: '#047857',
-                          border: '1px solid #a7f3d0',
+                          border: 'none',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -346,7 +352,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
               padding: '14px 18px',
               borderRadius: '14px',
               background: 'linear-gradient(135deg, #f0fdf4 0%, #e8f5e9 100%)',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               marginBottom: '24px'
             }}
           >

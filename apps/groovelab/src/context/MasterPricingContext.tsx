@@ -5,7 +5,9 @@ import {
   EffectiveSchoolRates, 
   SchoolPricingProfile, 
   StorageTier, 
-  DEFAULT_STORAGE_TIERS, 
+  DEFAULT_STORAGE_TIERS,
+  DEFAULT_STORAGE_TIERS_EUR,
+  DEFAULT_STORAGE_TIERS_CHF,
   getStorageTierByGb,
   CurrencyCode,
   CurrencyPricingRates,
@@ -54,43 +56,97 @@ const defaultPricing: MasterPricingData = {
   formatPrice: (amount, curr) => formatCurrency(amount, curr || 'EUR'),
   ratesEUR: MASTER_CURRENCY_RATES.EUR,
   ratesCHF: MASTER_CURRENCY_RATES.CHF,
-  priceCampus: 14.90,
-  priceGroovelab: 9.90,
-  priceKombi: 19.90,
+  priceCampus: 19.90,
+  priceGroovelab: 12.90,
+  priceKombi: 24.90,
   priceTeacher: 0.49,
   priceStudent: 0.49,
   pricePassiveStudent: 0.09,
-  priceStorageAddon: 1.99,
+  priceStorageAddon: 2.90,
   storageTiers: DEFAULT_STORAGE_TIERS,
-  campus: 14.90,
-  groovelab: 9.90,
-  kombi: 19.90,
+  campus: 19.90,
+  groovelab: 12.90,
+  kombi: 24.90,
   teacher: 0.49,
   student: 0.49,
   passiveStudent: 0.09,
-  storageAddon: 1.99,
+  storageAddon: 2.90,
   freeMonthsPerYear: 0,
   billingMonthsPerYear: 12,
-  singleModulesTotal: 24.80,
-  kombiSavings: 4.90,
-  kombiSavingsPercent: 20,
+  singleModulesTotal: 32.80,
+  kombiSavings: 7.90,
+  kombiSavingsPercent: 24,
   priceChangeScope: 'new_only',
   priceChangeAnnouncedAt: null,
   specialOffers: [],
   isLoading: true,
   refetchPricing: async () => {},
   getSchoolRates: (school) => calculateEffectiveSchoolRates(school, {
-    priceCampus: 14.90,
-    priceGroovelab: 9.90,
-    priceKombi: 19.90,
+    priceCampus: 19.90,
+    priceGroovelab: 12.90,
+    priceKombi: 24.90,
     priceTeacher: 0.49,
     priceStudent: 0.49,
     pricePassiveStudent: 0.09,
-    priceStorageAddon: 1.99,
+    priceStorageAddon: 2.90,
     priceChangeScope: 'new_only',
     currency: 'EUR'
   }),
   getStorageTier: (gb, curr) => getStorageTierByGb(gb, DEFAULT_STORAGE_TIERS, curr || 'EUR'),
+};
+
+const buildDefaultPricingForCurrency = (
+  curr: CurrencyCode,
+  setCurr: (c: CurrencyCode) => void,
+  fmtPrice: (amount: number, currencyOverride?: CurrencyCode) => string,
+  refetch: () => Promise<void>,
+  loading = true
+): MasterPricingData => {
+  const activeRates = MASTER_CURRENCY_RATES[curr] || MASTER_CURRENCY_RATES.EUR;
+  const activeTiers = curr === 'CHF' ? DEFAULT_STORAGE_TIERS_CHF : DEFAULT_STORAGE_TIERS_EUR;
+  const singleTotal = Number((activeRates.priceCampus + activeRates.priceGroovelab).toFixed(2));
+  const savings = Number(Math.max(0, singleTotal - activeRates.priceKombi).toFixed(2));
+  const savingsPct = singleTotal > 0 ? Math.round((savings / singleTotal) * 100) : 0;
+
+  return {
+    ...defaultPricing,
+    currency: curr,
+    setCurrency: setCurr,
+    formatPrice: fmtPrice,
+    priceCampus: activeRates.priceCampus,
+    priceGroovelab: activeRates.priceGroovelab,
+    priceKombi: activeRates.priceKombi,
+    priceTeacher: activeRates.priceTeacher,
+    priceStudent: activeRates.priceStudent,
+    pricePassiveStudent: activeRates.pricePassiveStudent,
+    priceStorageAddon: activeRates.priceStorageAddon,
+    storageTiers: activeTiers,
+    campus: activeRates.priceCampus,
+    groovelab: activeRates.priceGroovelab,
+    kombi: activeRates.priceKombi,
+    teacher: activeRates.priceTeacher,
+    student: activeRates.priceStudent,
+    passiveStudent: activeRates.pricePassiveStudent,
+    storageAddon: activeRates.priceStorageAddon,
+    singleModulesTotal: singleTotal,
+    kombiSavings: savings,
+    kombiSavingsPercent: savingsPct,
+    isLoading: loading,
+    refetchPricing: refetch,
+    getSchoolRates: (school) => calculateEffectiveSchoolRates(school, {
+      priceCampus: activeRates.priceCampus,
+      priceGroovelab: activeRates.priceGroovelab,
+      priceKombi: activeRates.priceKombi,
+      priceTeacher: activeRates.priceTeacher,
+      priceStudent: activeRates.priceStudent,
+      pricePassiveStudent: activeRates.pricePassiveStudent,
+      priceStorageAddon: activeRates.priceStorageAddon,
+      storageTiers: activeTiers,
+      priceChangeScope: 'new_only',
+      currency: curr
+    }),
+    getStorageTier: (gb, customCurrency) => getStorageTierByGb(gb, activeTiers, customCurrency || curr),
+  };
 };
 
 const MasterPricingContext = createContext<MasterPricingData>(defaultPricing);
@@ -130,16 +186,13 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
     return formatCurrency(amount, currencyOverride || currency);
   };
 
-  const [pricing, setPricing] = useState<MasterPricingData>({
-    ...defaultPricing,
-    currency,
-    setCurrency,
-    formatPrice
-  });
+  const [pricing, setPricing] = useState<MasterPricingData>(() =>
+    buildDefaultPricingForCurrency(currency, setCurrency, formatPrice, async () => {}, true)
+  );
 
   const fetchMasterPricing = async () => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('master_billing_settings')
         .select('*')
         .eq('id', 1)
@@ -167,13 +220,31 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
           if (rawC !== null && rawC !== undefined) c = Number(rawC);
           if (rawG !== null && rawG !== undefined) g = Number(rawG);
           if (rawK !== null && rawK !== undefined) k = Number(rawK);
-          if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 14.90;
-          if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 9.90;
-          if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 19.90;
+          if (Math.abs(c - 7.99) < 0.01 || Math.abs(c - 14.90) < 0.01 || Math.abs(c - 14.99) < 0.01) c = 19.90;
+          if (Math.abs(g - 4.99) < 0.01 || Math.abs(g - 9.90) < 0.01 || Math.abs(g - 9.99) < 0.01) g = 12.90;
+          if (Math.abs(k - 9.99) < 0.01 || Math.abs(k - 19.90) < 0.01 || Math.abs(k - 19.99) < 0.01) k = 24.90;
           if (data.price_user_teacher !== null && data.price_user_teacher !== undefined) t = Number(data.price_user_teacher);
           if (data.price_user_student !== null && data.price_user_student !== undefined) s = Number(data.price_user_student);
           if (data.price_user_passive_student !== null && data.price_user_passive_student !== undefined) ps = Number(data.price_user_passive_student);
-          if (data.price_storage_addon !== null && data.price_storage_addon !== undefined) sa = Number(data.price_storage_addon);
+          if (data.price_storage_addon !== null && data.price_storage_addon !== undefined) {
+            const parsedSa = Number(data.price_storage_addon);
+            sa = Math.abs(parsedSa - 4.90) < 0.01 ? 2.90 : parsedSa;
+          }
+        } else if (currency === 'CHF') {
+          const rawC = data.price_module_campus_chf ?? overrides?.price_module_campus_chf;
+          const rawG = data.price_module_groovelab_chf ?? overrides?.price_module_groovelab_chf;
+          const rawK = data.price_module_kombi_chf ?? overrides?.price_module_kombi_chf;
+          const rawT = data.price_user_teacher_chf ?? overrides?.price_user_teacher_chf;
+          const rawS = data.price_user_student_chf ?? overrides?.price_user_student_chf;
+          const rawPs = data.price_user_passive_student_chf ?? overrides?.price_user_passive_student_chf;
+          const rawSa = data.price_storage_addon_chf ?? overrides?.price_storage_addon_chf;
+          if (rawC !== null && rawC !== undefined) c = Math.abs(Number(rawC) - 19.90) < 0.01 ? 25.90 : Number(rawC);
+          if (rawG !== null && rawG !== undefined) g = Math.abs(Number(rawG) - 14.90) < 0.01 ? 16.80 : Number(rawG);
+          if (rawK !== null && rawK !== undefined) k = Math.abs(Number(rawK) - 29.90) < 0.01 ? 32.50 : Number(rawK);
+          if (rawT !== null && rawT !== undefined) t = Math.abs(Number(rawT) - 0.65) < 0.01 ? 1.00 : Number(rawT);
+          if (rawS !== null && rawS !== undefined) s = Math.abs(Number(rawS) - 0.65) < 0.01 ? 1.00 : Number(rawS);
+          if (rawPs !== null && rawPs !== undefined) ps = Math.abs(Number(rawPs) - 0.15) < 0.01 ? 0.20 : Number(rawPs);
+          if (rawSa !== null && rawSa !== undefined) sa = Number(rawSa);
         }
 
         const freeMonths = (data.free_months_per_year !== null && data.free_months_per_year !== undefined) ? Number(data.free_months_per_year) : 0;
@@ -185,9 +256,11 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
         const storageTiersOverride = Array.isArray(data.special_offers)
           ? data.special_offers.find((o: any) => o?.id === '__cg_storage_tiers__')?.tiers
           : null;
+        const dbCurrencyTiers = currency === 'CHF' ? data.storage_tiers_chf : (data.storage_tiers_eur || data.storage_tiers);
+        const defaultCurrencyTiers = currency === 'CHF' ? DEFAULT_STORAGE_TIERS_CHF : DEFAULT_STORAGE_TIERS_EUR;
         const tiers: StorageTier[] = (Array.isArray(storageTiersOverride) && storageTiersOverride.length > 0 && storageTiersOverride.some((t: any) => t.gb === 25))
           ? storageTiersOverride
-          : (data.storage_tiers && Array.isArray(data.storage_tiers) && data.storage_tiers.some((t: any) => t.gb === 25) ? data.storage_tiers : DEFAULT_STORAGE_TIERS);
+          : (dbCurrencyTiers && Array.isArray(dbCurrencyTiers) && dbCurrencyTiers.some((t: any) => t.gb === 25) ? dbCurrencyTiers : defaultCurrencyTiers);
 
         const singleTotal = c + g;
         const savings = Math.max(0, singleTotal - k);
@@ -242,29 +315,11 @@ export const MasterPricingProvider: React.FC<{ children: React.ReactNode }> = ({
           getStorageTier: (gb: number, customCurrency?: CurrencyCode) => getStorageTierByGb(gb, tiers, customCurrency || currency),
         });
       } else {
-        setPricing((prev: MasterPricingData) => ({ 
-          ...prev, 
-          currency,
-          setCurrency,
-          formatPrice,
-          ratesEUR: MASTER_CURRENCY_RATES.EUR,
-          ratesCHF: MASTER_CURRENCY_RATES.CHF,
-          isLoading: false, 
-          refetchPricing: fetchMasterPricing 
-        }));
+        setPricing(buildDefaultPricingForCurrency(currency, setCurrency, formatPrice, fetchMasterPricing, false));
       }
     } catch (err) {
       console.warn('MasterPricingProvider fetch error:', err);
-      setPricing((prev: MasterPricingData) => ({ 
-        ...prev, 
-        currency,
-        setCurrency,
-        formatPrice,
-        ratesEUR: MASTER_CURRENCY_RATES.EUR,
-        ratesCHF: MASTER_CURRENCY_RATES.CHF,
-        isLoading: false, 
-        refetchPricing: fetchMasterPricing 
-      }));
+      setPricing(buildDefaultPricingForCurrency(currency, setCurrency, formatPrice, fetchMasterPricing, false));
     }
   };
 

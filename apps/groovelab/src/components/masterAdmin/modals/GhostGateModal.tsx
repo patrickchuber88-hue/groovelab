@@ -93,6 +93,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Schließen"
             style={{
               background: '#f1f5f9',
               border: 'none',
@@ -132,7 +133,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
                   borderRadius: '12px',
                   textAlign: 'left',
                   background: ghostGateReason === cat.id ? '#f0f9ff' : '#f8fafc',
-                  border: ghostGateReason === cat.id ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
+                  border: ghostGateReason === cat.id ? 'none' : '1px solid #e2e8f0',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -152,10 +153,11 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
           </div>
 
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
+            <label htmlFor="ghost-gate-ticket-ref" style={{ display: 'block', fontSize: '0.76rem', fontWeight: 800, color: '#334155', marginBottom: '6px' }}>
               Ticket-ID oder dokumentierte Weisung (optional):
             </label>
             <input
+              id="ghost-gate-ticket-ref"
               type="text"
               value={ghostGateTicketRef}
               onChange={(e) => setGhostGateTicketRef(e.target.value)}
@@ -173,7 +175,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
             />
           </div>
 
-          {/* DSGVO Compliance Banner */}
+          {/* Compliance Banner */}
           <div style={{
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
@@ -185,7 +187,7 @@ export const GhostGateModal: React.FC<GhostGateModalProps> = ({
           }}>
             <ShieldCheck size={16} color="#0284c7" style={{ marginTop: '2px', flexShrink: 0 }} />
             <div style={{ fontSize: '0.70rem', color: '#475569', lineHeight: '1.45' }}>
-              <strong>DSGVO Art. 28 &amp; AVV Goldstandard:</strong> Diese Support-Sitzung wird mit Ihrem Operator-Account und Zweck revisionssicher protokolliert. Das Token erlischt nach maximal 2 Stunden oder per 1-Klick (⌥+Q). Nach Sitzungsende wird die Dauer automatisch im Datenschutz-Logbuch der Musikschule hinterlegt.
+              <strong>Auftragsverarbeitungs-Schutz &amp; AVV Goldstandard:</strong> Diese Support-Sitzung wird mit Ihrem Operator-Account und Zweck revisionssicher protokolliert. Das Token erlischt nach maximal 2 Stunden oder per 1-Klick (⌥+Q). Nach Sitzungsende wird die Dauer automatisch im Datenschutz-Logbuch der Musikschule hinterlegt.
             </div>
           </div>
         </div>

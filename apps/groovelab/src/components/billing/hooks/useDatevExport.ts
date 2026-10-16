@@ -8,11 +8,11 @@ import {
 import { logSecurityEvent } from '../../../services/auditLogService';
 import { Invoice, DatevTaxMode, formatSchoolNumericId } from '../types';
 
-export function useDatevExport(showActionToast: (msg: string) => void) {
+export function useDatevExport(showActionToast: (msg: string) => void, externalTaxMode: DatevTaxMode = 'small_business') {
   const [selectedChartOfAccounts, setSelectedChartOfAccounts] = useState<ChartOfAccounts>('SKR03');
   const [datevPeriodMonth, setDatevPeriodMonth] = useState<number>(new Date().getMonth() + 1);
   const [datevPeriodYear, setDatevPeriodYear] = useState<number>(new Date().getFullYear());
-  const [datevTaxMode, setDatevTaxMode] = useState<DatevTaxMode>('small_business');
+  const datevTaxMode: DatevTaxMode = externalTaxMode;
 
   const handleDatevExport = (
     chart: ChartOfAccounts,
@@ -96,7 +96,7 @@ export function useDatevExport(showActionToast: (msg: string) => void) {
         periodEnd
       });
 
-      showActionToast(`📁 DATEV-Buchungsstapel (${chart}) für ${String(datevPeriodMonth).padStart(2, '0')}/${datevPeriodYear} erfolgreich exportiert!`);
+      showActionToast(`DATEV-Buchungsstapel (${chart}) für ${String(datevPeriodMonth).padStart(2, '0')}/${datevPeriodYear} erfolgreich exportiert!`);
       logSecurityEvent({
         action: 'EXPORT_DATEV_CSV',
         metadata: { chart, recordCount: records.length, period: `${datevPeriodYear}-${datevPeriodMonth}` }
@@ -114,7 +114,6 @@ export function useDatevExport(showActionToast: (msg: string) => void) {
     datevPeriodYear,
     setDatevPeriodYear,
     datevTaxMode,
-    setDatevTaxMode,
     handleDatevExport
   };
 }

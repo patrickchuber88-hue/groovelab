@@ -693,7 +693,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     Auftragsverarbeitungsvertrag (AVV) & Mandanten-Status
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b', fontWeight: 500 }}>
-                    Vertrag digital unterzeichnet • ISO 27001 zertifizierte Rechenzentren (Hetzner Deutschland)
+                    Vertrag digital unterzeichnet • ISO 27001 zertifizierte Rechenzentren (IONOS SE &amp; Hetzner Deutschland)
                   </p>
                 </div>
 
@@ -740,7 +740,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   {[
                     {
                       title: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
-                      desc: 'TLS 1.3 Transportverschlüsselung mit HSTS Preload, Backend-for-Frontend (BFF) Gateway mit JWE AES-256-GCM verschlüsselten __Host-session HttpOnly-Cookies (Zero Tokens im Browser-Speicher), proaktiver Silent Refresh, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP- und BSI-konformes PBKDF2 Hashing (100.000 SHA-512 / SHA-256 Runden), DSGVO-Nachnamensmaskierung als Privacy-Default.'
+                      desc: 'TLS 1.3 Transportverschlüsselung mit HSTS Preload, Backend-for-Frontend (BFF) Gateway mit JWE AES-256-GCM verschlüsselten __Host-session HttpOnly-Cookies (Zero Tokens im Browser-Speicher), proaktiver Silent Refresh, clientseitige AES-256-GCM Hardware-Vaults (Web Crypto API), OWASP- und BSI-konformes Bcrypt Hashing (10 Runden Blowfish gem. BSI TR-02102 im isolierten Schema private_auth), DSGVO-Nachnamensmaskierung als Privacy-Default.'
                     },
                     {
                       title: 'II. Art. 32 Abs. 1 lit. b DSGVO – Vertraulichkeit & Integrität',
@@ -748,7 +748,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     },
                     {
                       title: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
-                      desc: 'Automatisierte stündliche verschlüsselte Datenbank-Dumps im RZ Falkenstein (Hetzner Deutschland), 99.9% Uptime SLA, Disaster Recovery Notfallplan (RTO < 15 Min), lokaler IndexedDB Audio-Tresor für unterbrechungsfreien Offline-Betrieb in Proberäumen.'
+                      desc: 'Automatisierte stündliche Age X25519 verschlüsselte Datenbank-Dumps in deutschen ISO 27001 Rechenzentren (IONOS SE Montabaur & Hetzner Falkenstein/Nürnberg), 99,5% Uptime SLA, Disaster Recovery Notfallplan (RTO <= 45 Min., RPO <= 60 Min.), lokaler IndexedDB Audio-Tresor für unterbrechungsfreien Offline-Betrieb in Proberäumen.'
                     },
                     {
                       title: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',

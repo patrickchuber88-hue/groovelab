@@ -81,21 +81,22 @@ services:
       options:
         max-size: "20m"
         max-file: "3"
+    shm_size: 4g
     deploy:
       resources:
         limits:
-          cpus: '1.50'
-          memory: 1800M       # Hard boundary: guarantees host never OOM crashes
+          cpus: '3.00'
+          memory: 8192M       # 16 GB Node Calibration: 8 GB limit for 4 GB shared_buffers + work_mem
         reservations:
-          memory: 1024M       # Guaranteed baseline allocation
+          memory: 4096M       # Guaranteed baseline allocation
     ports:
       # Zero-Trust: Strictly local loopback binding (never 0.0.0.0)
       - 127.0.0.1:5432:5432
     volumes:
       # High-IOPS Local NVMe persistence (replaces Ceph network volume)
       - /var/lib/supabase_nvme/data:/var/lib/postgresql/data:Z
-      # Production Hardened Configuration
-      - ./deploy/postgres/postgresql.production.conf:/etc/postgresql/postgresql.conf:ro,z
+      # Production Hardened Configuration (16 GB Calibration)
+      - ./deploy/postgres/postgresql.16gb.production.conf:/etc/postgresql-custom/custom-overrides.conf:ro,z
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z

@@ -34,6 +34,13 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
   const effectivePlatform = activePlatform || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'campus') || 'campus';
   const effectiveWorkspace = activeWorkspace || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null);
 
+  // 0,1% Goldstandard Bounded Context Brand Tokens (Campus Green / GrooveLab Yellow / Admin Obsidian)
+  const isGrooveLab = effectivePlatform === 'groovelab';
+  const isAdminWorkspace = effectiveWorkspace === 'admin';
+  const accentPrimary = isGrooveLab ? '#ca8a04' : '#16a34a';
+  const accentDark = isGrooveLab ? '#a16207' : '#15803d';
+  const accentGlow = isGrooveLab ? 'rgba(202, 138, 4, 0.4)' : 'rgba(22, 163, 74, 0.4)';
+
   const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' || user?.role === 'master_admin' || effectiveWorkspace === 'admin' || effectiveWorkspace === 'secretary';
   const webAuthnAvailable = isWebAuthnSupported();
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -255,7 +262,16 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
         zIndex: 999999,
         backdropFilter: 'blur(28px)',
         WebkitBackdropFilter: 'blur(28px)',
-        backgroundColor: 'rgba(15, 23, 42, 0.78)',
+        background: isGrooveLab
+          ? '#ca8a04'
+          : isAdminWorkspace
+          ? '#0f172a'
+          : '#0a361c',
+        backgroundImage: isGrooveLab
+          ? 'radial-gradient(circle at 50% 50%, #fef08a 0%, #ca8a04 100%)'
+          : isAdminWorkspace
+          ? 'radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%)'
+          : 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -263,6 +279,19 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
         overflowY: 'auto'
       }}
     >
+      {/* ─── MIKROFEINE KREIDESTAUB-TEXTUR (ATMOSPHÄRISCHES TAFELGRÜN / TAFELGELB) ─── */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0.028,
+          pointerEvents: 'none',
+          backgroundImage:
+            'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")'
+        }}
+      />
+
       <div
         style={{
           background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
@@ -275,7 +304,8 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center'
+          alignItems: 'center',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
         }}
       >
         {/* User Avatar with Status Badge */}
@@ -299,7 +329,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                 ...user,
                 role: (effectiveWorkspace === 'teacher' || (!effectiveWorkspace && user?.role === 'teacher')) ? 'teacher' : (effectiveWorkspace || user?.role),
                 isTeacherContext: (effectiveWorkspace === 'teacher' || (!effectiveWorkspace && user?.role === 'teacher')),
-                resolved_instrument: user?.resolved_instrument || user?.instrument || 'Gitarre'
+                resolved_instrument: user?.resolved_instrument || user?.instrument || ''
               }}
               activePlatform={effectivePlatform}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -313,7 +343,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
               width: '24px',
               height: '24px',
               borderRadius: '50%',
-              background: '#0284c7',
+              background: accentDark,
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
@@ -433,9 +463,9 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      background: isFilled ? '#0284c7' : '#e2e8f0',
+                      background: isFilled ? accentPrimary : '#e2e8f0',
                       transform: isFilled ? 'scale(1.15)' : 'scale(1)',
-                      boxShadow: isFilled ? '0 0 10px rgba(2, 132, 199, 0.4)' : 'none',
+                      boxShadow: isFilled ? `0 0 10px ${accentGlow}` : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   />
@@ -443,7 +473,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
               })}
             </div>
 
-            <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '14px' }}>
+            <div style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600, marginBottom: '14px' }}>
               4-stellige PIN oder 6-stellige Eltern-Master-PIN
             </div>
 
@@ -474,7 +504,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                       borderRadius: '16px',
                       border: 'none',
                       background: isAction ? '#f1f5f9' : '#ffffff',
-                      color: isAction ? '#64748b' : '#0f172a',
+                      color: isAction ? '#334155' : '#0f172a',
                       fontSize: isAction ? '0.85rem' : '1.25rem',
                       fontWeight: 800,
                       cursor: loading ? 'not-allowed' : 'pointer',
@@ -486,7 +516,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                       outline: 'none'
                     }}
                     onFocus={(e) => {
-                      e.currentTarget.style.boxShadow = '0 0 0 2px #0284c7';
+                      e.currentTarget.style.boxShadow = `0 0 0 2px ${accentPrimary}`;
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
@@ -539,7 +569,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#0284c7',
+                  color: accentDark,
                   fontSize: '0.82rem',
                   fontWeight: 750,
                   cursor: 'pointer',
@@ -606,7 +636,9 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                 width: '100%',
                 padding: '12px 18px',
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                background: isGrooveLab
+                  ? 'linear-gradient(135deg, #ca8a04 0%, #a16207 100%)'
+                  : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                 color: '#ffffff',
                 border: 'none',
                 fontSize: '0.94rem',
@@ -672,8 +704,8 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
             transition: 'all 0.15s ease'
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = '#0284c7';
-            e.currentTarget.style.color = '#0284c7';
+            e.currentTarget.style.borderColor = accentDark;
+            e.currentTarget.style.color = accentDark;
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = '#cbd5e1';

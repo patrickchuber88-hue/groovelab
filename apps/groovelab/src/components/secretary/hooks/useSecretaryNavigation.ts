@@ -7,7 +7,7 @@ export type CampusSubTab = 'briefing' | 'subjects' | 'onboarding' | 'students' |
 export type GroovelabSubTab = 'live' | 'students' | 'coaches' | 'kiosk' | 'settings';
 
 export interface UseSecretaryNavigationProps {
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
 }
 
 export function useSecretaryNavigation({ onLogout }: UseSecretaryNavigationProps = {}) {
@@ -167,12 +167,18 @@ export function useSecretaryNavigation({ onLogout }: UseSecretaryNavigationProps
         localStorage.removeItem('campus_school_overrides');
         localStorage.removeItem('groovelab_school_profile');
       }
-      await scrubSharedDeviceCache();
+      if (onLogout) {
+        await onLogout();
+      } else {
+        await scrubSharedDeviceCache();
+        window.location.replace('/login');
+      }
     } catch (e) {
-      console.warn('[useSecretaryNavigation] Logout scrubber note:', e);
-    }
-    if (onLogout) {
-      onLogout();
+      console.warn('[useSecretaryNavigation] Logout error:', e);
+      try {
+        await scrubSharedDeviceCache();
+      } catch {}
+      window.location.replace('/login');
     }
   }, [onLogout]);
 

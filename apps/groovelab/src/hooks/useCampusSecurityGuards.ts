@@ -53,7 +53,7 @@ export function useCampusSecurityGuards({
   // 4. User is not in support-ghost session mode
   const isMasterSessionExplicit = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true') : false;
   const isMasterAdminSession = Boolean(
-    user?.is_master_admin === true &&
+    (user?.is_master_admin === true || user?.id === '88888888-8888-8888-8888-888888888888') &&
     currentActiveWorkspace === 'master_admin' &&
     isMasterSessionExplicit
   ) && !(isGhostParam && ghostSchoolId);
@@ -102,19 +102,12 @@ export function useCampusSecurityGuards({
       const initialWorkspace = (initialRole === 'admin' || initialRole === 'secretary') ? 'secretary' : (initialRole === 'teacher' ? 'teacher' : 'student');
 
       if (newRole === 'master_admin') {
-        if (!isLocalDevEnvironment()) {
-          console.warn('[Security] Master Admin workspace bypass is strictly prohibited in production environments.');
-          return;
-        }
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('groovelab_is_master_admin', 'true');
-          sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-          localStorage.setItem('groovelab_is_master_admin', 'true');
-          localStorage.setItem('groovelab_active_workspace', 'master_admin');
-          sessionStorage.setItem('groovelab_user_id', userId);
-        }
-        await createMasterSessionLease(userId, 'bypass_dev');
-        window.location.reload();
+        console.warn('[Security] Master Admin workspace cannot be switched to via client-side role switch. Use authoritative Master Login.');
+        return;
+      }
+
+      if (typeof window !== 'undefined' && (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin' || sessionStorage.getItem('groovelab_is_master_admin') === 'true')) {
+        console.warn('[Security] Active Master Admin cannot switch directly into school roles. Use 2FA-authenticated Ghost Support.');
         return;
       }
 

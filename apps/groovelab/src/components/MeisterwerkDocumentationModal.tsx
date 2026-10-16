@@ -49,12 +49,12 @@ import {
   isDummyOrTestSong,
   isWeeklySnapshotContainer
 } from './student/meisterwerk/utils/meisterwerkSongHelpers';
-import { MeisterwerkRecordingsTab } from './student/meisterwerk/MeisterwerkRecordingsTab';
-import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchTab';
-import { MeisterwerkStickerAlbumTab } from './student/meisterwerk/MeisterwerkStickerAlbumTab';
-import { MeisterwerkSkillRadarTab } from './student/meisterwerk/MeisterwerkSkillRadarTab';
-import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
-import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
+const MeisterwerkRecordingsTab = lazy(() => import('./student/meisterwerk/MeisterwerkRecordingsTab').then(m => ({ default: m.MeisterwerkRecordingsTab })));
+const MeisterwerkLogbuchTab = lazy(() => import('./student/meisterwerk/MeisterwerkLogbuchTab').then(m => ({ default: m.MeisterwerkLogbuchTab })));
+const MeisterwerkStickerAlbumTab = lazy(() => import('./student/meisterwerk/MeisterwerkStickerAlbumTab').then(m => ({ default: m.MeisterwerkStickerAlbumTab })));
+const MeisterwerkSkillRadarTab = lazy(() => import('./student/meisterwerk/MeisterwerkSkillRadarTab').then(m => ({ default: m.MeisterwerkSkillRadarTab })));
+const GrooveTrainerStudioView = lazy(() => import('./campus/GrooveTrainerStudioView').then(m => ({ default: m.GrooveTrainerStudioView })));
+const GroovePracticeCompanion = lazy(() => import('./groovelab/GroovePracticeCompanion').then(m => ({ default: m.GroovePracticeCompanion })));
 import { resolveCampusStudentAvatar, getEffectiveInstrument } from '../utils/avatarResolutionEngine';
 import { formatTeacherFullName, copyTextToClipboard, capitalizeFirstLetter, formatSongTitleCase } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
@@ -69,10 +69,10 @@ import { useMeisterwerkTts } from './student/meisterwerk/hooks/useMeisterwerkTts
 import { useMeisterwerkHomework, getCanonicalSongKey, getNormalizedSongTitle } from './student/meisterwerk/hooks/useMeisterwerkHomework';
 import { MeisterwerkHeader } from './student/meisterwerk/views/MeisterwerkHeader';
 import { MeisterwerkSkillRadarDrawer } from './student/meisterwerk/views/MeisterwerkSkillRadarDrawer';
-import { MeisterwerkModalsHub } from './student/meisterwerk/modals/MeisterwerkModalsHub';
 import { MeisterwerkMobileBottomBar } from './student/meisterwerk/components/MeisterwerkMobileBottomBar';
 
-const GrooveLoopstation = lazy(() => import('./groovelab/GrooveLoopstation').then(m => ({ default: m.GrooveLoopstation })));
+const MeisterwerkModalsHub = lazy(() => import('./student/meisterwerk/modals/MeisterwerkModalsHub').then(m => ({ default: m.MeisterwerkModalsHub })));
+const CampusLoopstation = lazy(() => import('./campus/CampusLoopstation').then(m => ({ default: m.CampusLoopstation })));
 const CampusTuner = lazy(() => import('./campus/CampusTuner').then(m => ({ default: m.CampusTuner })));
 const EarLabStudioModal = lazy(() => import('./campus/EarLabStudioModal').then(m => ({ default: m.EarLabStudioModal })));
 const AudioBiographyView = lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
@@ -433,14 +433,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return CANONICAL_LEHRWERK_COLOR;
   }, []);
 
+  const progressMatrixInFlightRef = useRef<{ studentId: string; ts: number; promise: Promise<any[]> } | null>(null);
+  const fetchProgressMatrixRows = useCallback(async (forceRefresh = false): Promise<any[]> => {
+    if (!student.id) return [];
+    const now = Date.now();
+    if (!forceRefresh && progressMatrixInFlightRef.current && progressMatrixInFlightRef.current.studentId === student.id && (now - progressMatrixInFlightRef.current.ts) < 2000) {
+      return progressMatrixInFlightRef.current.promise;
+    }
+    const promise = Promise.resolve(
+      supabase.from('progress_matrix').select('*').eq('student_id', student.id).order('updated_at', { ascending: false })
+    ).then(({ data }) => data || []);
+    progressMatrixInFlightRef.current = { studentId: student.id, ts: now, promise };
+    return promise;
+  }, [student.id]);
+
   const fetchProgress = useCallback(async () => {
     if (!student.id) return;
     try {
-      const { data } = await supabase
-        .from('progress_matrix')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('updated_at', { ascending: false });
+      const data = await fetchProgressMatrixRows(true);
       if (data) {
         const uniqueItemsMap = new Map<string, any>();
         (data || []).forEach((item: any) => {
@@ -514,7 +524,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (err) {
       console.warn('[Meisterwerk] fetchProgress notice:', err);
     }
-  }, [student.id]);
+  }, [student.id, fetchProgressMatrixRows]);
 
   const loadLehrwerke = useCallback(async () => {
     try {
@@ -539,11 +549,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       // 🛡️ Auto-healing: Merge any Lehrwerk found in progress_matrix into assignedLehrwerke (Server Sync Parity)
       try {
-        const { data: pmData } = await supabase
-          .from('progress_matrix')
-          .select('*')
-          .eq('student_id', student.id)
-          .order('created_at', { ascending: false });
+        const pmData = await fetchProgressMatrixRows(false);
         
         if (pmData && pmData.length > 0) {
           const healed = [...localAssigned].map((a: any) => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
@@ -3177,7 +3183,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             overflow: isMobileOrSim ? 'auto' : 'hidden',
             minHeight: 0
           }}>
-            <GrooveTrainerStudioView
+            <Suspense fallback={null}><GrooveTrainerStudioView
               student={student}
               onClose={() => { setActiveViewMode('document'); setHubTab('modules'); }}
               onExitToBriefing={() => {
@@ -3192,7 +3198,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               useNotebookLayout={true}
               homeworkNotesList={homeworkNotesList}
               onRewardXp={() => {}}
-            />
+            /></Suspense>
           </div>
         ) : activeViewMode === 'loopstation' ? (
           <div style={{
@@ -3201,7 +3207,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '20px 24px 80px 24px'
           }}>
             <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Loopstation...</div>}>
-              <GrooveLoopstation
+              <CampusLoopstation
                 student={student}
                 homeworkNotesList={homeworkNotesList}
                 setHomeworkNotesList={setHomeworkNotesList}
@@ -3225,7 +3231,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             boxSizing: 'border-box',
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
-            <GroovePracticeCompanion
+            <Suspense fallback={null}><GroovePracticeCompanion
               useNotebookLayout={useNotebookLayout}
               isCampusModule={true}
               studentId={student.id}
@@ -3237,7 +3243,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 broadcastPracticeUpdate(student.id, { durationMinutes: minutes, durationSeconds: minutes * 60 });
               }}
               onRhythmScoreUpdate={() => {}}
-            />
+            /></Suspense>
           </div>
         ) : activeViewMode === 'tuner' ? (
           <div style={{
@@ -3381,7 +3387,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             boxSizing: 'border-box',
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
-            <MeisterwerkRecordingsTab
+            <Suspense fallback={null}><MeisterwerkRecordingsTab
               uiLevel={uiLevel}
               isTeacherTools={isTeacherTools}
               readOnly={readOnly}
@@ -3486,10 +3492,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               toggleTeacherAudioWeek={toggleTeacherAudioWeek}
               topicName={topicName}
               useNotebookLayout={useNotebookLayout}
-            />
+            /></Suspense>
           </div>
         ) : activeModalTab === 'stickeralbum' ? (
-          <MeisterwerkStickerAlbumTab
+          <Suspense fallback={null}><MeisterwerkStickerAlbumTab
             isMobileOrSim={isMobileOrSim} readOnly={readOnly}
             isDevSimulationActive={false} setIsDevSimulationActive={() => {}}
             simulateMultiYearProgress={() => {}} resetStickerAlbum={() => {}}
@@ -3509,7 +3515,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             actualStudentName={displayedStudentName} studentInstrument={(student as any)?.instrument}
             shareCard={undefined} selectedSchoolYear={getSchoolYearString()} currentSchoolYear={getSchoolYearString()}
             student={student} schoolName={propSchoolName || ''}
-          />
+          /></Suspense>
         ) : activeModalTab === 'audiobiography' ? (
           <Suspense fallback={<div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
             <AudioBiographyView
@@ -3527,7 +3533,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             />
           </Suspense>
         ) : activeModalTab === 'logbook' ? (
-          <MeisterwerkLogbuchTab
+          <Suspense fallback={null}><MeisterwerkLogbuchTab
             isMobileOrSim={isMobileOrSim}
             useNotebookLayout={useNotebookLayout}
             student={student}
@@ -3554,7 +3560,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             getLehrwerkColor={getLehrwerkColor}
             setCertModalSong={setCertModalSong}
             resolvedSchoolName={propSchoolName || ''}
-          />
+          /></Suspense>
         ) : (
           <MeisterwerkDocumentTab
             DIDACTIC_QUICK_TAGS={DIDACTIC_QUICK_TAGS}
@@ -3843,75 +3849,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           {content}
         </div>
 
-        <MeisterwerkSkillRadarDrawer
-          isOpen={showSkillRadar}
-          onClose={() => setShowSkillRadar(false)}
-        >
-          <MeisterwerkSkillRadarTab
-            progressItems={progressItems}
-            generalHomeworkNotes={generalHomeworkNotes}
-            latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef}
-            homeworkNotes={generalHomeworkNotes}
-            homeworkNotesList={homeworkNotesList}
-            skillOverrides={skillOverrides}
-            pendingTargetFocusTags={[]}
-            readOnly={readOnly}
-            isTeacherTools={isTeacherTools}
-            isMobileView={isMobileView}
-            useNotebookLayout={useNotebookLayout}
-            uiLevel={uiLevel}
-            teacherName={effectiveTeacherFullName}
-            studentName={studentFirstName}
-            instrumentName={(student as any)?.instrument || ''}
-            handleMasterAllSkills={handleMasterAllSkills}
-            handleTriggerSkillQuest={handleTriggerSkillQuest}
-            handleSetSkillLevel={handleSetSkillLevel}
-            renderTextWithDidacticBadges={(t) => t}
-          />
+        <MeisterwerkSkillRadarDrawer isOpen={showSkillRadar} onClose={() => setShowSkillRadar(false)}>
+          {showSkillRadar && (
+            <Suspense fallback={null}>
+              <MeisterwerkSkillRadarTab
+                progressItems={progressItems} generalHomeworkNotes={generalHomeworkNotes}
+                latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef} homeworkNotes={generalHomeworkNotes}
+                homeworkNotesList={homeworkNotesList} skillOverrides={skillOverrides} pendingTargetFocusTags={[]}
+                readOnly={readOnly} isTeacherTools={isTeacherTools} isMobileView={isMobileView}
+                useNotebookLayout={useNotebookLayout} uiLevel={uiLevel} teacherName={effectiveTeacherFullName}
+                studentName={studentFirstName} instrumentName={(student as any)?.instrument || ''}
+                handleMasterAllSkills={handleMasterAllSkills} handleTriggerSkillQuest={handleTriggerSkillQuest}
+                handleSetSkillLevel={handleSetSkillLevel} renderTextWithDidacticBadges={(t) => t}
+              />
+            </Suspense>
+          )}
         </MeisterwerkSkillRadarDrawer>
 
-        <MeisterwerkModalsHub
-          certModalSong={certModalSong}
-          onCloseCert={() => setCertModalSong(null)}
-          isTransferModalOpen={isTransferModalOpen}
-          onCloseTransfer={() => setIsTransferModalOpen(false)}
-          targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''}
-          targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
-          targetDateSpan=""
-          sourceWeekNum={(() => {
-            const prevTarget = getSimulatedNow();
-            prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
-            return getISOWeek(prevTarget).split('-W')[1] || '';
-          })()}
-          sourceLehrwerke={sourceTransferData.sourceLW}
-          sourceSongs={sourceTransferData.sourceS}
-          sourceAudios={sourceTransferData.sourceA}
-          onExecuteTransfer={handleExecuteBatchTransfer}
-          showAgeUiInfoModal={showAgeUiInfoModal}
-          onCloseAgeUiInfoModal={() => setShowAgeUiInfoModal(false)}
-          isTeacherSandbox={isTeacherSandbox}
-          isTeacherTools={isTeacherTools}
-          isTeacherSelf={isTeacherSelf}
-          isTeacherMode={isTeacherTools}
-          uiLevel={uiLevel}
-          studentFirstName={studentFirstName}
-          recSuccess={false}
-          recTargetLevel="teen"
-          setRecTargetLevel={() => {}}
-          recNote=""
-          setRecNote={() => {}}
-          isSavingRec={false}
-          handleSendTeacherRecommendation={async () => {}}
-          showProtokollOnboarding={showProtokollOnboarding}
-          onCloseProtokollOnboarding={() => {
-            try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch {}
-            setShowProtokollOnboarding(false);
-          }}
-          onboardingStep={onboardingStep}
-          setOnboardingStep={setOnboardingStep}
-          recordingSavedToast={recordingSavedToast}
-          studentNotesSavedToast={studentNotesSavedToast}
-        />
+        <Suspense fallback={null}>
+          <MeisterwerkModalsHub
+            certModalSong={certModalSong} onCloseCert={() => setCertModalSong(null)}
+            isTransferModalOpen={isTransferModalOpen} onCloseTransfer={() => setIsTransferModalOpen(false)}
+            targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''} targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
+            targetDateSpan=""
+            sourceWeekNum={(() => {
+              const prevTarget = getSimulatedNow();
+              prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
+              return getISOWeek(prevTarget).split('-W')[1] || '';
+            })()}
+            sourceLehrwerke={sourceTransferData.sourceLW} sourceSongs={sourceTransferData.sourceS} sourceAudios={sourceTransferData.sourceA}
+            onExecuteTransfer={handleExecuteBatchTransfer} showAgeUiInfoModal={showAgeUiInfoModal}
+            onCloseAgeUiInfoModal={() => setShowAgeUiInfoModal(false)} isTeacherSandbox={isTeacherSandbox}
+            isTeacherTools={isTeacherTools} isTeacherSelf={isTeacherSelf} isTeacherMode={isTeacherTools}
+            uiLevel={uiLevel} studentFirstName={studentFirstName} recSuccess={false} recTargetLevel="teen"
+            setRecTargetLevel={() => {}} recNote="" setRecNote={() => {}} isSavingRec={false}
+            handleSendTeacherRecommendation={async () => {}} showProtokollOnboarding={showProtokollOnboarding}
+            onCloseProtokollOnboarding={() => {
+              try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch {}
+              setShowProtokollOnboarding(false);
+            }}
+            onboardingStep={onboardingStep} setOnboardingStep={setOnboardingStep}
+            recordingSavedToast={recordingSavedToast} studentNotesSavedToast={studentNotesSavedToast}
+          />
+        </Suspense>
       </>
     );
   }
@@ -3925,17 +3905,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           <div
             className="meisterwerk-modal-portal-overlay"
             style={{
-              position: isInsideSim ? 'absolute' : 'fixed',
-              inset: 0,
-              zIndex: 99999,
+              position: isInsideSim ? 'absolute' : 'fixed', inset: 0, zIndex: 99999,
               background: isFullscreen ? 'transparent' : (isMobileOrSim ? '#ffffff' : 'rgba(9, 9, 11, 0.85)'),
-              backdropFilter: isFullscreen ? 'none' : 'blur(20px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              backdropFilter: isFullscreen ? 'none' : 'blur(20px)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
               padding: (isFullscreen || isInsideSim || isMobileView) ? '0' : '20px',
-              fontFamily: '"Inter", sans-serif',
-              overflow: 'hidden'
+              fontFamily: '"Inter", sans-serif', overflow: 'hidden'
             }}
           >
             {content}
@@ -3944,75 +3919,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         )
       ) : content}
 
-      <MeisterwerkSkillRadarDrawer
-        isOpen={showSkillRadar}
-        onClose={() => setShowSkillRadar(false)}
-      >
-        <MeisterwerkSkillRadarTab
-          progressItems={progressItems}
-          generalHomeworkNotes={generalHomeworkNotes}
-          latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef}
-          homeworkNotes={generalHomeworkNotes}
-          homeworkNotesList={homeworkNotesList}
-          skillOverrides={skillOverrides}
-          pendingTargetFocusTags={[]}
-          readOnly={readOnly}
-          isTeacherTools={isTeacherTools}
-          isMobileView={isMobileView}
-          useNotebookLayout={useNotebookLayout}
-          uiLevel={uiLevel}
-          teacherName={effectiveTeacherFullName}
-          studentName={studentFirstName}
-          instrumentName={(student as any)?.instrument || ''}
-          handleMasterAllSkills={handleMasterAllSkills}
-          handleTriggerSkillQuest={handleTriggerSkillQuest}
-          handleSetSkillLevel={handleSetSkillLevel}
-          renderTextWithDidacticBadges={(t) => t}
-        />
+      <MeisterwerkSkillRadarDrawer isOpen={showSkillRadar} onClose={() => setShowSkillRadar(false)}>
+        {showSkillRadar && (
+          <Suspense fallback={null}>
+            <MeisterwerkSkillRadarTab
+              progressItems={progressItems} generalHomeworkNotes={generalHomeworkNotes}
+              latestGeneralHomeworkNotesRef={latestGeneralHomeworkNotesRef} homeworkNotes={generalHomeworkNotes}
+              homeworkNotesList={homeworkNotesList} skillOverrides={skillOverrides} pendingTargetFocusTags={[]}
+              readOnly={readOnly} isTeacherTools={isTeacherTools} isMobileView={isMobileView}
+              useNotebookLayout={useNotebookLayout} uiLevel={uiLevel} teacherName={effectiveTeacherFullName}
+              studentName={studentFirstName} instrumentName={(student as any)?.instrument || ''}
+              handleMasterAllSkills={handleMasterAllSkills} handleTriggerSkillQuest={handleTriggerSkillQuest}
+              handleSetSkillLevel={handleSetSkillLevel} renderTextWithDidacticBadges={(t) => t}
+            />
+          </Suspense>
+        )}
       </MeisterwerkSkillRadarDrawer>
 
-      <MeisterwerkModalsHub
-        certModalSong={certModalSong}
-        onCloseCert={() => setCertModalSong(null)}
-        isTransferModalOpen={isTransferModalOpen}
-        onCloseTransfer={() => setIsTransferModalOpen(false)}
-        targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''}
-        targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
-        targetDateSpan=""
-        sourceWeekNum={(() => {
-          const prevTarget = getSimulatedNow();
-          prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
-          return getISOWeek(prevTarget).split('-W')[1] || '';
-        })()}
-        sourceLehrwerke={sourceTransferData.sourceLW}
-        sourceSongs={sourceTransferData.sourceS}
-        sourceAudios={sourceTransferData.sourceA}
-        onExecuteTransfer={handleExecuteBatchTransfer}
-        showAgeUiInfoModal={showAgeUiInfoModal}
-        onCloseAgeUiInfoModal={() => setShowAgeUiInfoModal(false)}
-        isTeacherSandbox={isTeacherSandbox}
-        isTeacherTools={isTeacherTools}
-        isTeacherSelf={isTeacherSelf}
-        isTeacherMode={isTeacherTools}
-        uiLevel={uiLevel}
-        studentFirstName={studentFirstName}
-        recSuccess={false}
-        recTargetLevel="teen"
-        setRecTargetLevel={() => {}}
-        recNote=""
-        setRecNote={() => {}}
-        isSavingRec={false}
-        handleSendTeacherRecommendation={async () => {}}
-        showProtokollOnboarding={showProtokollOnboarding}
-        onCloseProtokollOnboarding={() => {
-          try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch {}
-          setShowProtokollOnboarding(false);
-        }}
-        onboardingStep={onboardingStep}
-        setOnboardingStep={setOnboardingStep}
-        recordingSavedToast={recordingSavedToast}
-        studentNotesSavedToast={studentNotesSavedToast}
-      />
+      <Suspense fallback={null}>
+        <MeisterwerkModalsHub
+          certModalSong={certModalSong} onCloseCert={() => setCertModalSong(null)}
+          isTransferModalOpen={isTransferModalOpen} onCloseTransfer={() => setIsTransferModalOpen(false)}
+          targetWeekNum={getTargetWeekIso(viewingWeekOffset).split('-W')[1] || ''} targetWeekIso={getTargetWeekIso(viewingWeekOffset)}
+          targetDateSpan=""
+          sourceWeekNum={(() => {
+            const prevTarget = getSimulatedNow();
+            prevTarget.setDate(prevTarget.getDate() + ((viewingWeekOffset - 1) * 7));
+            return getISOWeek(prevTarget).split('-W')[1] || '';
+          })()}
+          sourceLehrwerke={sourceTransferData.sourceLW} sourceSongs={sourceTransferData.sourceS} sourceAudios={sourceTransferData.sourceA}
+          onExecuteTransfer={handleExecuteBatchTransfer} showAgeUiInfoModal={showAgeUiInfoModal}
+          onCloseAgeUiInfoModal={() => setShowAgeUiInfoModal(false)} isTeacherSandbox={isTeacherSandbox}
+          isTeacherTools={isTeacherTools} isTeacherSelf={isTeacherSelf} isTeacherMode={isTeacherTools}
+          uiLevel={uiLevel} studentFirstName={studentFirstName} recSuccess={false} recTargetLevel="teen"
+          setRecTargetLevel={() => {}} recNote="" setRecNote={() => {}} isSavingRec={false}
+          handleSendTeacherRecommendation={async () => {}} showProtokollOnboarding={showProtokollOnboarding}
+          onCloseProtokollOnboarding={() => {
+            try { localStorage.setItem('groovelab_protokoll_onboarding_seen', 'true'); } catch {}
+            setShowProtokollOnboarding(false);
+          }}
+          onboardingStep={onboardingStep} setOnboardingStep={setOnboardingStep}
+          recordingSavedToast={recordingSavedToast} studentNotesSavedToast={studentNotesSavedToast}
+        />
+      </Suspense>
     </>
   );
 };

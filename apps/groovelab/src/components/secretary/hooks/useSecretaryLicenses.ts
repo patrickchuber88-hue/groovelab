@@ -618,7 +618,7 @@ export const useSecretaryLicenses = ({
     (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now())
   );
 
-  // Dynamic School Year End Calculation (German/Austrian Standard: Sept 1 to Aug 31)
+  // Dynamic School Year End Calculation (German/Austrian Standard: Sept 1 to Aug 31, 3 months notice -> May 31)
   const getSchoolYearEndInfo = useCallback((simDate?: string | Date | null, existingEndIso?: string | null) => {
     if (existingEndIso) {
       const d = new Date(existingEndIso);
@@ -638,7 +638,7 @@ export const useSecretaryLicenses = ({
       : new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-12
-    const targetEndYear = currentMonth >= 8 ? currentYear + 1 : currentYear;
+    const targetEndYear = currentMonth >= 6 ? currentYear + 1 : currentYear;
     const schoolYearStartYear = targetEndYear - 1;
     const endDate = new Date(Date.UTC(targetEndYear, 7, 31, 21, 59, 59, 999));
     return {

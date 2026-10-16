@@ -141,9 +141,9 @@ export function calculateSchoolEffectiveRates(
     : (masterPricing.currency || 'EUR');
   const currencyMaster = MASTER_CURRENCY_RATES[schoolCurrency] || MASTER_CURRENCY_RATES.EUR;
 
-  const baseCampus = (schoolCurrency === 'CHF' && masterPricing.priceCampus === 14.90) ? currencyMaster.priceCampus : masterPricing.priceCampus;
-  const baseGroovelab = (schoolCurrency === 'CHF' && masterPricing.priceGroovelab === 9.90) ? currencyMaster.priceGroovelab : masterPricing.priceGroovelab;
-  const baseKombi = (schoolCurrency === 'CHF' && masterPricing.priceKombi === 19.90) ? currencyMaster.priceKombi : masterPricing.priceKombi;
+  const baseCampus = (schoolCurrency === 'CHF' && (masterPricing.priceCampus === 19.90 || masterPricing.priceCampus === 14.90)) ? currencyMaster.priceCampus : masterPricing.priceCampus;
+  const baseGroovelab = (schoolCurrency === 'CHF' && (masterPricing.priceGroovelab === 12.90 || masterPricing.priceGroovelab === 9.90)) ? currencyMaster.priceGroovelab : masterPricing.priceGroovelab;
+  const baseKombi = (schoolCurrency === 'CHF' && (masterPricing.priceKombi === 24.90 || masterPricing.priceKombi === 19.90)) ? currencyMaster.priceKombi : masterPricing.priceKombi;
   const baseTeacher = (schoolCurrency === 'CHF' && masterPricing.priceTeacher === 0.49) ? currencyMaster.priceTeacher : masterPricing.priceTeacher;
   const baseStudent = (schoolCurrency === 'CHF' && masterPricing.priceStudent === 0.49) ? currencyMaster.priceStudent : masterPricing.priceStudent;
   const basePassive = (schoolCurrency === 'CHF' && (masterPricing.pricePassiveStudent ?? 0.09) === 0.09) ? currencyMaster.pricePassiveStudent : (masterPricing.pricePassiveStudent ?? 0.09);
@@ -264,30 +264,30 @@ export function calculateSchoolEffectiveRates(
     return masterVal;
   };
 
-  const finalStudent = getFinalRate(effectiveStudent, school.grandfathered_student_price, masterPricing.priceStudent);
-  const studentSavings = Math.max(0, masterPricing.priceStudent - finalStudent);
-  const studentSavingsPercent = masterPricing.priceStudent > 0 && studentSavings > 0
-    ? Math.round((studentSavings / masterPricing.priceStudent) * 100)
+  const finalStudent = getFinalRate(effectiveStudent, school.grandfathered_student_price, baseStudent);
+  const studentSavings = Math.max(0, baseStudent - finalStudent);
+  const studentSavingsPercent = baseStudent > 0 && studentSavings > 0
+    ? Math.round((studentSavings / baseStudent) * 100)
     : 0;
 
   const effectivePassiveStudent = school.custom_price_passive_student !== null && school.custom_price_passive_student !== undefined
     ? ((isCustom = true), Number(school.custom_price_passive_student))
     : null;
 
-  const finalPassiveStudent = getFinalRate(effectivePassiveStudent, school.grandfathered_passive_student_price, masterPricing.pricePassiveStudent ?? 0.09);
+  const finalPassiveStudent = getFinalRate(effectivePassiveStudent, school.grandfathered_passive_student_price, basePassive);
 
   const addonMonthlyFee = school.storage_addon_monthly_fee !== null && school.storage_addon_monthly_fee !== undefined
     ? Number(school.storage_addon_monthly_fee)
-    : (masterPricing.priceStorageAddon ?? 2.90);
+    : baseStorage;
 
   const storageGb = Number(school.storage_addon_gb || 0);
   const storageUsed = Number(school.storage_used_bytes || 0);
 
   return {
-    priceCampus: getFinalRate(effectiveCampus, school.grandfathered_campus_price, masterPricing.priceCampus),
-    priceGroovelab: getFinalRate(effectiveGroovelab, school.grandfathered_groovelab_price, masterPricing.priceGroovelab),
-    priceKombi: getFinalRate(effectiveKombi, school.grandfathered_kombi_price, masterPricing.priceKombi),
-    priceTeacher: getFinalRate(effectiveTeacher, school.grandfathered_teacher_price, masterPricing.priceTeacher),
+    priceCampus: getFinalRate(effectiveCampus, school.grandfathered_campus_price, baseCampus),
+    priceGroovelab: getFinalRate(effectiveGroovelab, school.grandfathered_groovelab_price, baseGroovelab),
+    priceKombi: getFinalRate(effectiveKombi, school.grandfathered_kombi_price, baseKombi),
+    priceTeacher: getFinalRate(effectiveTeacher, school.grandfathered_teacher_price, baseTeacher),
     priceStudent: finalStudent,
     pricePassiveStudent: finalPassiveStudent,
     priceStorageAddon: addonMonthlyFee,

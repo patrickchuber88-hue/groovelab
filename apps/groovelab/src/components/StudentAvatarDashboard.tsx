@@ -4,7 +4,6 @@ import { Sparkles, Shield } from 'lucide-react';
 import { formatTeacherFullName } from '../utils/nameHelper';
 import { CampusUiLevel } from './campus/CampusLevelSwitcher';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
-import { StudentModalsHub } from './student/modals/StudentModalsHub';
 import { useStudentProfile } from './student/hooks/useStudentProfile';
 import { useStudentPracticeSession } from './student/hooks/useStudentPracticeSession';
 import { useStudentStreaks } from './student/hooks/useStudentStreaks';
@@ -25,8 +24,11 @@ import {
 } from './student/meisterwerk/HomeworkBookErrorBoundary';
 import { getEngineTargetMinutes } from '../utils/studentProgressEngine';
 
-// 🚀 High-Performance Lazy Loaded Tabs
-const StudentBriefingTab = lazy(() => import('./student/tabs/StudentBriefingTab').then(m => ({ default: m.StudentBriefingTab })));
+// 🚀 High-Performance Lazy Loaded Tabs & Modals Hub
+const StudentModalsHub = lazy(() => import('./student/modals/StudentModalsHub').then(m => ({ default: m.StudentModalsHub })));
+const StudentBriefingTab = lazy(() => import('./student/tabs/StudentBriefingTab').then(m => ({
+  default: React.memo(m.StudentBriefingTab, (prev, next) => prev.activeTab !== 'briefing' && next.activeTab !== 'briefing')
+})));
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
 const StudentProfileTab = lazy(() => import('./student/tabs/StudentProfileTab').then(m => ({ default: m.StudentProfileTab })));
 const StudentSettingsTab = lazy(() => import('./student/tabs/StudentSettingsTab').then(m => ({ default: m.StudentSettingsTab })));
@@ -86,13 +88,13 @@ export function StudentAvatarDashboard({
     progressLoading
   } = songsData;
 
-  // 4. Streaks & Flame Engine Domain Hook
+  // 4. Streaks & Flame Engine Domain Hook (Minute-Granularity prevents 1Hz full recalculations)
   const streaks = useStudentStreaks({
     studentId,
     studentUser: profile.studentUser,
     fokusLogs: practice.fokusLogs,
     sessionActive: practice.sessionActive,
-    secondsElapsed: practice.secondsElapsed,
+    secondsElapsed: Math.floor(practice.secondsElapsed / 60) * 60,
     songSkills: activeSongSkills,
     progressItems
   });
@@ -143,18 +145,12 @@ export function StudentAvatarDashboard({
     return () => window.removeEventListener('campus_reset_homework_board', handleReset);
   }, []);
 
-  // 🏛️ Tier-1 SWR Preload: Pre-warm CampusEventsBoard chunk in browser cache during idle
+  // 🏛️ Tier-1 SWR Preload: Pre-warm CampusEventsBoard chunk in browser cache after initial boot settles
   useEffect(() => {
-    const preloadEvents = () => {
+    const timer = setTimeout(() => {
       import('./CampusEventsBoard');
-    };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const handle = (window as any).requestIdleCallback(preloadEvents);
-      return () => (window as any).cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(preloadEvents, 1800);
-      return () => clearTimeout(timer);
-    }
+    }, 5000);
+    return () => clearTimeout(timer);
   }, []);
 
   // 🚀 Junior Space Mission & Sticker Engine Hook (Isomorphic Extraction)
@@ -611,130 +607,132 @@ export function StudentAvatarDashboard({
       )}
 
       {/* 10. Modals & Overlays Hub */}
-      <StudentModalsHub
-        showLevelModal={profile.showLevelModal}
-        setShowLevelModal={profile.setShowLevelModal}
-        studentUiLevel={profile.studentUiLevel}
-        handleLevelChange={handleLevelChange}
-        showGlobalParentPinModal={schedule.showGlobalParentPinModal}
-        setShowGlobalParentPinModal={schedule.setShowGlobalParentPinModal}
-        globalPinInput={schedule.globalPinInput}
-        setGlobalPinInput={schedule.setGlobalPinInput}
-        globalPinError={schedule.globalPinError}
-        setGlobalPinError={schedule.setGlobalPinError}
-        handleVerifyGlobalParentPin={schedule.handleVerifyGlobalParentPin}
-        handleBiometricUnlockForGlobalPin={schedule.handleBiometricUnlockForGlobalPin}
-        pendingSiblingUnlock={parent.pendingSiblingUnlock}
-        setPendingSiblingUnlock={parent.setPendingSiblingUnlock}
-        executeSwitchFamilyStudent={parent.executeSwitchFamilyStudent}
-        isAddSiblingModalOpen={parent.isAddSiblingModalOpen}
-        setIsAddSiblingModalOpen={parent.setIsAddSiblingModalOpen}
-        familyProfiles={parent.familyProfiles}
-        setFamilyProfiles={parent.setFamilyProfiles}
-        showJuniorPreFlightModal={showJuniorPreFlightModal}
-        setShowJuniorPreFlightModal={setShowJuniorPreFlightModal}
-        juniorMissionDetails={getJuniorMissionDetails()}
-        targetMins={streaks.getTargetMinutes(streaks.streakFlamesCount)}
-        juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-        setJuniorSelectedTrackIndex={setJuniorSelectedTrackIndex}
-        onStartJuniorMission={() => {
-          profile.handleTabChangeLocal('practice_board');
-          startJuniorMissionImmediately();
-        }}
-        showJuniorStickerModal={showJuniorStickerModal}
-        setShowJuniorStickerModal={setShowJuniorStickerModal}
-        unifiedStickersMap={unifiedStickersMap}
-        juniorStickerCategory={juniorStickerCategory}
-        setJuniorStickerCategory={setJuniorStickerCategory}
-        juniorSelectedPreviewSticker={juniorSelectedPreviewSticker}
-        setJuniorSelectedPreviewSticker={setJuniorSelectedPreviewSticker}
-        onStartJuniorInstrument={() => {
-          profile.handleTabChangeLocal('practice_board');
-          startJuniorMissionImmediately();
-        }}
-        assignedCampusSongs={assignedCampusSongs}
-        progressItems={progressItems}
-        isSongMastered={isSongMastered}
-        onStartRocket={() => {
-          setJuniorSelectedPreviewSticker(null);
-          setShowJuniorStickerModal(false);
-          profile.handleTabChangeLocal('practice_board');
-          startJuniorMissionImmediately();
-        }}
-        juniorAwardedStickerToCelebrate={juniorAwardedStickerToCelebrate}
-        setJuniorAwardedStickerToCelebrate={setJuniorAwardedStickerToCelebrate}
-        showCelebration={profile.studentUiLevel !== 'junior' && practice.showCelebration}
-        setShowCelebration={practice.setShowCelebration}
-        celebrationDetails={practice.celebrationDetails}
-        celebrationRingProgress={practice.celebrationRingProgress}
-        matchCelebrationData={matchCelebrationData}
-        setMatchCelebrationData={setMatchCelebrationData}
-        showAppointmentChat={schedule.showAppointmentChat}
-        setShowAppointmentChat={schedule.setShowAppointmentChat}
-        appointmentChatData={schedule.appointmentChatData}
-        setAppointmentChatData={schedule.setAppointmentChatData}
-        rescheduleChatDraft={schedule.rescheduleChatDraft}
-        studentId={studentId}
-        studentUser={profile.studentUser}
-        isParentUnlocked={parent.isParentUnlocked}
-        onRefreshData={schedule.fetchSchedule}
-        isRescheduleSheetOpen={schedule.isRescheduleSheetOpen}
-        closeRescheduleBottomSheet={() => schedule.setIsRescheduleSheetOpen(false)}
-        activeRescheduleBottomSheetOcc={schedule.activeRescheduleBottomSheetOcc}
-        isRescheduleLoading={schedule.isRescheduleLoading}
-        isStudentRescheduleAllowed={true}
-        handleConfirmReschedule={schedule.handleConfirmReschedule}
-        handleVerifyGlobalParentPinAsync={schedule.handleVerifyGlobalParentPinAsync}
-        showDetox={false}
-        setShowDetox={() => {}}
-        detoxCompleted={false}
-        setDetoxCompleted={() => {}}
-        detoxMinutes={15}
-        detoxSecondsLeft={0}
-        isFaceDown={false}
-        setIsDetoxActive={() => {}}
-        xpActive={true}
-        contributionsModalData={contributionsModalData}
-        setContributionsModalData={setContributionsModalData}
-        loadingContributions={false}
-        showRulesModal={showRulesModal}
-        setShowRulesModal={setShowRulesModal}
-        avatar={streaks.avatar}
-        unreadCrisisNotifs={schedule.unreadCrisisNotifs}
-        setUnreadCrisisNotifs={schedule.setUnreadCrisisNotifs}
-        showPushSoftPrompt={showPushSoftPrompt}
-        setShowPushSoftPrompt={setShowPushSoftPrompt}
-        pushNotifScheduleChanges={true}
-        pushNotifHomework={true}
-        pushNotifAllFeatures={true}
-        setPushEnabled={() => {}}
-        showStudentToolbox={showStudentToolbox}
-        setShowStudentToolbox={setShowStudentToolbox}
-        showParentActivationModal={parent.showParentActivationModal}
-        setShowParentActivationModal={parent.setShowParentActivationModal}
-        showSoftLockModal={parent.showSoftLockModal}
-        setShowSoftLockModal={parent.setShowSoftLockModal}
-        isHelpCenterOpen={isHelpCenterOpen}
-        setIsHelpCenterOpen={setIsHelpCenterOpen}
-        currentPlatform={profile.currentPlatform}
-        resolvedSchoolName={profile.resolvedSchoolName}
-        activeTab={profile.activeTab}
-        setActiveTab={profile.setActiveTab}
-        isFeedbackModalOpen={isFeedbackModalOpen}
-        setIsFeedbackModalOpen={setIsFeedbackModalOpen}
-        certificateSong={profile.certificateSong}
-        setCertificateSong={profile.setCertificateSong}
-        briefingData={schedule.briefingData}
-        selectedSongForDetail={selectedSongForDetail}
-        setSelectedSongForDetail={setSelectedSongForDetail}
-        selectedLehrwerkForDetail={selectedLehrwerkForDetail}
-        setSelectedLehrwerkForDetail={setSelectedLehrwerkForDetail}
-        lehrwerke={lehrwerke}
-        localProgress={localProgress}
-        isMobile={profile.isMobile}
-        handleTabChangeLocal={profile.handleTabChangeLocal}
-        setSelectedTopic={setSelectedTopic}
-      />
+      <Suspense fallback={null}>
+        <StudentModalsHub
+          showLevelModal={profile.showLevelModal}
+          setShowLevelModal={profile.setShowLevelModal}
+          studentUiLevel={profile.studentUiLevel}
+          handleLevelChange={handleLevelChange}
+          showGlobalParentPinModal={schedule.showGlobalParentPinModal}
+          setShowGlobalParentPinModal={schedule.setShowGlobalParentPinModal}
+          globalPinInput={schedule.globalPinInput}
+          setGlobalPinInput={schedule.setGlobalPinInput}
+          globalPinError={schedule.globalPinError}
+          setGlobalPinError={schedule.setGlobalPinError}
+          handleVerifyGlobalParentPin={schedule.handleVerifyGlobalParentPin}
+          handleBiometricUnlockForGlobalPin={schedule.handleBiometricUnlockForGlobalPin}
+          pendingSiblingUnlock={parent.pendingSiblingUnlock}
+          setPendingSiblingUnlock={parent.setPendingSiblingUnlock}
+          executeSwitchFamilyStudent={parent.executeSwitchFamilyStudent}
+          isAddSiblingModalOpen={parent.isAddSiblingModalOpen}
+          setIsAddSiblingModalOpen={parent.setIsAddSiblingModalOpen}
+          familyProfiles={parent.familyProfiles}
+          setFamilyProfiles={parent.setFamilyProfiles}
+          showJuniorPreFlightModal={showJuniorPreFlightModal}
+          setShowJuniorPreFlightModal={setShowJuniorPreFlightModal}
+          juniorMissionDetails={getJuniorMissionDetails()}
+          targetMins={streaks.getTargetMinutes(streaks.streakFlamesCount)}
+          juniorSelectedTrackIndex={juniorSelectedTrackIndex}
+          setJuniorSelectedTrackIndex={setJuniorSelectedTrackIndex}
+          onStartJuniorMission={() => {
+            profile.handleTabChangeLocal('practice_board');
+            startJuniorMissionImmediately();
+          }}
+          showJuniorStickerModal={showJuniorStickerModal}
+          setShowJuniorStickerModal={setShowJuniorStickerModal}
+          unifiedStickersMap={unifiedStickersMap}
+          juniorStickerCategory={juniorStickerCategory}
+          setJuniorStickerCategory={setJuniorStickerCategory}
+          juniorSelectedPreviewSticker={juniorSelectedPreviewSticker}
+          setJuniorSelectedPreviewSticker={setJuniorSelectedPreviewSticker}
+          onStartJuniorInstrument={() => {
+            profile.handleTabChangeLocal('practice_board');
+            startJuniorMissionImmediately();
+          }}
+          assignedCampusSongs={assignedCampusSongs}
+          progressItems={progressItems}
+          isSongMastered={isSongMastered}
+          onStartRocket={() => {
+            setJuniorSelectedPreviewSticker(null);
+            setShowJuniorStickerModal(false);
+            profile.handleTabChangeLocal('practice_board');
+            startJuniorMissionImmediately();
+          }}
+          juniorAwardedStickerToCelebrate={juniorAwardedStickerToCelebrate}
+          setJuniorAwardedStickerToCelebrate={setJuniorAwardedStickerToCelebrate}
+          showCelebration={profile.studentUiLevel !== 'junior' && practice.showCelebration}
+          setShowCelebration={practice.setShowCelebration}
+          celebrationDetails={practice.celebrationDetails}
+          celebrationRingProgress={practice.celebrationRingProgress}
+          matchCelebrationData={matchCelebrationData}
+          setMatchCelebrationData={setMatchCelebrationData}
+          showAppointmentChat={schedule.showAppointmentChat}
+          setShowAppointmentChat={schedule.setShowAppointmentChat}
+          appointmentChatData={schedule.appointmentChatData}
+          setAppointmentChatData={schedule.setAppointmentChatData}
+          rescheduleChatDraft={schedule.rescheduleChatDraft}
+          studentId={studentId}
+          studentUser={profile.studentUser}
+          isParentUnlocked={parent.isParentUnlocked}
+          onRefreshData={schedule.fetchSchedule}
+          isRescheduleSheetOpen={schedule.isRescheduleSheetOpen}
+          closeRescheduleBottomSheet={() => schedule.setIsRescheduleSheetOpen(false)}
+          activeRescheduleBottomSheetOcc={schedule.activeRescheduleBottomSheetOcc}
+          isRescheduleLoading={schedule.isRescheduleLoading}
+          isStudentRescheduleAllowed={true}
+          handleConfirmReschedule={schedule.handleConfirmReschedule}
+          handleVerifyGlobalParentPinAsync={schedule.handleVerifyGlobalParentPinAsync}
+          showDetox={false}
+          setShowDetox={() => {}}
+          detoxCompleted={false}
+          setDetoxCompleted={() => {}}
+          detoxMinutes={15}
+          detoxSecondsLeft={0}
+          isFaceDown={false}
+          setIsDetoxActive={() => {}}
+          xpActive={true}
+          contributionsModalData={contributionsModalData}
+          setContributionsModalData={setContributionsModalData}
+          loadingContributions={false}
+          showRulesModal={showRulesModal}
+          setShowRulesModal={setShowRulesModal}
+          avatar={streaks.avatar}
+          unreadCrisisNotifs={schedule.unreadCrisisNotifs}
+          setUnreadCrisisNotifs={schedule.setUnreadCrisisNotifs}
+          showPushSoftPrompt={showPushSoftPrompt}
+          setShowPushSoftPrompt={setShowPushSoftPrompt}
+          pushNotifScheduleChanges={true}
+          pushNotifHomework={true}
+          pushNotifAllFeatures={true}
+          setPushEnabled={() => {}}
+          showStudentToolbox={showStudentToolbox}
+          setShowStudentToolbox={setShowStudentToolbox}
+          showParentActivationModal={parent.showParentActivationModal}
+          setShowParentActivationModal={parent.setShowParentActivationModal}
+          showSoftLockModal={parent.showSoftLockModal}
+          setShowSoftLockModal={parent.setShowSoftLockModal}
+          isHelpCenterOpen={isHelpCenterOpen}
+          setIsHelpCenterOpen={setIsHelpCenterOpen}
+          currentPlatform={profile.currentPlatform}
+          resolvedSchoolName={profile.resolvedSchoolName}
+          activeTab={profile.activeTab}
+          setActiveTab={profile.setActiveTab}
+          isFeedbackModalOpen={isFeedbackModalOpen}
+          setIsFeedbackModalOpen={setIsFeedbackModalOpen}
+          certificateSong={profile.certificateSong}
+          setCertificateSong={profile.setCertificateSong}
+          briefingData={schedule.briefingData}
+          selectedSongForDetail={selectedSongForDetail}
+          setSelectedSongForDetail={setSelectedSongForDetail}
+          selectedLehrwerkForDetail={selectedLehrwerkForDetail}
+          setSelectedLehrwerkForDetail={setSelectedLehrwerkForDetail}
+          lehrwerke={lehrwerke}
+          localProgress={localProgress}
+          isMobile={profile.isMobile}
+          handleTabChangeLocal={profile.handleTabChangeLocal}
+          setSelectedTopic={setSelectedTopic}
+        />
+      </Suspense>
 
       {/* 11. Toast Notifications */}
       {profile.welcomeToast && (

@@ -143,17 +143,205 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   useEffect(() => {
     // Wenn Übung aktiv ist, Countdown abgeschlossen ist und das Handy nicht flach liegt -> nach 5s Hinweis einblenden
     if (sessionActive && !isPhoneFlat && (preStartCountdown === null || preStartCountdown <= 0)) {
-      const timer = setTimeout(() => {
-        setShowFlatReminder(true);
-      }, 5000);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShowFlatReminder(false);
+      const timer = setTimeout(() => setShowFlatReminder(true), 5000);
+      return () => clearTimeout(timer);
     }
+    setShowFlatReminder(false);
   }, [sessionActive, isPhoneFlat, preStartCountdown]);
+
+  const archiveData = useMemo(() => {
+    const now = getSimulatedNow();
+    const todayDd = String(now.getDate()).padStart(2, '0');
+    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
+    const todayYy = String(now.getFullYear()).substring(2);
+    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+    const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+    const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+
+    const formatFriendlyDate = (dateStr: string) => {
+      const parts = dateStr.split('.');
+      if (parts.length < 3) return dateStr;
+      const day = parseInt(parts[0], 10);
+      const monthIndex = parseInt(parts[1], 10) - 1;
+      const year = 2000 + parseInt(parts[2], 10);
+      const d = new Date(year, monthIndex, day);
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const targetStart = new Date(year, monthIndex, day);
+      const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
+      if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
+      if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
+      return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
+    };
+
+    const shieldedDaysMap = new Map<string, number>();
+    const shieldDatesArr: string[] = [];
+    if (studentUiLevel === 'junior') {
+      return { sortedMonths: [], totalActivePracticeDays: 0, totalShieldedDaysCount: 0, shieldedDaysMap, shieldDatesSet: new Set<string>(), shieldDatesArr, formatFriendlyDate };
+    }
+
+    const { weekDays } = getDeterministicWeekMetrics();
+    weekDays.forEach((d: any) => {
+      if (d.isJoker) {
+        shieldedDaysMap.set(d.dateStr, d.shieldNumber || 1);
+        if (!shieldDatesArr.includes(d.dateStr)) shieldDatesArr.push(d.dateStr);
+      }
+    });
+
+    if (studentUser?.joker_used_at) {
+      const jokerIso = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
+      if (!shieldedDaysMap.has(jokerIso)) {
+        shieldedDaysMap.set(jokerIso, studentUser.weekly_jokers_used || 1);
+        shieldDatesArr.push(jokerIso);
+      }
+    }
+
+    const shieldDatesSet = new Set(shieldDatesArr);
+    const groupedByDate: Record<string, {
+      date: string; focusSeconds: number; extraSeconds: number; hasMasteredSession: boolean;
+      flameLevel: string; isPlaceholder?: boolean; isToday?: boolean; dayState?: string;
+      isShielded?: boolean; shieldNumber?: number; xp_earned?: number;
+    }> = {};
+
+    (fokusLogs || []).forEach((log: any) => {
+      if (!log.created_at) return;
+      const d = new Date(log.created_at);
+      const ddMmYy = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).substring(2)}`;
+      const secs = log.duration_seconds || ((log.duration_minutes || 0) * 60) || 0;
+      const isMastered = !log.is_extra && (secs >= 180 || (log.duration_minutes || 0) >= 3);
+
+      if (!groupedByDate[ddMmYy]) {
+        groupedByDate[ddMmYy] = {
+          date: ddMmYy, focusSeconds: log.is_extra ? 0 : secs, extraSeconds: log.is_extra ? secs : 0,
+          hasMasteredSession: isMastered, flameLevel: log.flame_level || (isMastered ? 'Kleine Flamme' : 'Keine Flamme'),
+          isPlaceholder: false, isToday: ddMmYy === todayDateStr
+        };
+      } else {
+        if (log.is_extra) groupedByDate[ddMmYy].extraSeconds += secs;
+        else groupedByDate[ddMmYy].focusSeconds += secs;
+        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
+          groupedByDate[ddMmYy].hasMasteredSession = true;
+          groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
+        }
+      }
+    });
+
+    weekDays.forEach((d: any) => {
+      if (d.isFuture) return;
+      const isoParts = (d.dateStr || '').split('-');
+      if (isoParts.length !== 3) return;
+      const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
+      const isMastered = Boolean(d.hasMastered || d.dayState === 'mastered');
+      const isShielded = Boolean(d.isJoker || d.dayState === 'shielded');
+
+      if (!groupedByDate[ddMmYy]) {
+        groupedByDate[ddMmYy] = {
+          date: ddMmYy, focusSeconds: d.totalDaySecs || 0, extraSeconds: 0,
+          hasMasteredSession: isMastered || (d.totalDaySecs || 0) >= 180,
+          flameLevel: (isMastered || (d.totalDaySecs || 0) >= 180) ? 'Kleine Flamme' : 'Keine Flamme',
+          isPlaceholder: false, isToday: Boolean(d.isToday), dayState: d.dayState, isShielded, shieldNumber: d.shieldNumber || 0
+        };
+      } else {
+        if ((d.totalDaySecs || 0) > groupedByDate[ddMmYy].focusSeconds) groupedByDate[ddMmYy].focusSeconds = d.totalDaySecs;
+        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
+          groupedByDate[ddMmYy].hasMasteredSession = true;
+          groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
+        }
+        if (isShielded) {
+          groupedByDate[ddMmYy].isShielded = true;
+          groupedByDate[ddMmYy].shieldNumber = d.shieldNumber || 1;
+        }
+        groupedByDate[ddMmYy].dayState = d.dayState;
+      }
+    });
+
+    shieldDatesArr.forEach(isoStr => {
+      const isoParts = isoStr.split('-');
+      if (isoParts.length === 3) {
+        const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
+        if (!groupedByDate[ddMmYy]) {
+          groupedByDate[ddMmYy] = {
+            date: ddMmYy, focusSeconds: 0, extraSeconds: 0, hasMasteredSession: false, flameLevel: 'Keine Flamme',
+            isPlaceholder: false, isToday: ddMmYy === todayDateStr, isShielded: true,
+            shieldNumber: shieldedDaysMap.get(isoStr) || 1, dayState: 'shielded'
+          };
+        } else {
+          groupedByDate[ddMmYy].isShielded = true;
+          if (!groupedByDate[ddMmYy].shieldNumber) groupedByDate[ddMmYy].shieldNumber = shieldedDaysMap.get(isoStr) || 1;
+        }
+      }
+    });
+
+    const allMeaningfulLogs = Object.values(groupedByDate).filter(g => {
+      const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
+      const parts = g.date.split('.');
+      const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+      const isJoker = Boolean(g.isShielded || shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+      const isPause = Boolean(g.dayState === 'pause' && totalSecs === 0 && !isJoker);
+      if (g.isToday && totalSecs === 0 && !isJoker) return false;
+      return totalSecs > 0 || isJoker || isPause;
+    });
+
+    allMeaningfulLogs.sort((a, b) => {
+      const parseDateStr = (s: string) => {
+        const parts = s.split('.');
+        return new Date(2000 + parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      };
+      return parseDateStr(b.date) - parseDateStr(a.date);
+    });
+
+    interface MonthArchive {
+      label: string; key: string; entries: typeof allMeaningfulLogs;
+      totalMins: number; totalSecs: number; activePracticeDays: number; shieldedDays: number;
+    }
+
+    const monthsMap: Record<string, MonthArchive> = {};
+    const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
+    monthsMap[currentMonthKey] = {
+      label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`, key: currentMonthKey,
+      entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0
+    };
+
+    allMeaningfulLogs.forEach(entry => {
+      const parts = entry.date.split('.');
+      if (parts.length < 3) return;
+      const monthIndex = parseInt(parts[1], 10) - 1;
+      const yearFull = 2000 + parseInt(parts[2], 10);
+      const key = `${monthIndex}-${yearFull}`;
+      if (!monthsMap[key]) {
+        monthsMap[key] = {
+          label: `${monthNamesFull[monthIndex]} ${yearFull}`, key,
+          entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0
+        };
+      }
+      monthsMap[key].entries.push(entry);
+      const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
+      const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+      const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+      if (totalSecs > 0) {
+        monthsMap[key].totalSecs += totalSecs;
+        monthsMap[key].totalMins += Math.floor(totalSecs / 60);
+        monthsMap[key].activePracticeDays += 1;
+      }
+      if (isShielded) monthsMap[key].shieldedDays += 1;
+    });
+
+    const sortedMonths = Object.values(monthsMap).sort((a, b) => {
+      const [aMonth, aYear] = a.key.split('-').map(Number);
+      const [bMonth, bYear] = b.key.split('-').map(Number);
+      return aYear !== bYear ? bYear - aYear : bMonth - aMonth;
+    });
+
+    const totalActivePracticeDays = allMeaningfulLogs.filter(e => ((e.focusSeconds || 0) + (e.extraSeconds || 0)) > 0).length;
+    const totalShieldedDaysCount = allMeaningfulLogs.filter(e => {
+      const parts = e.date.split('.');
+      const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
+      return Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
+    }).length;
+
+    return { sortedMonths, totalActivePracticeDays, totalShieldedDaysCount, shieldedDaysMap, shieldDatesSet, shieldDatesArr, formatFriendlyDate };
+  }, [studentUiLevel, fokusLogs, studentUser?.joker_used_at, studentUser?.weekly_jokers_used, effectivePracticeMinutes]);
 
   return (
     <div 
@@ -4741,272 +4929,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
           {/* ========================================================================= */}
           {studentUiLevel !== 'junior' && (() => {
             const isTeen = studentUiLevel === 'teen';
-            const now = getSimulatedNow();
-            const todayDd = String(now.getDate()).padStart(2, '0');
-            const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-            const todayYy = String(now.getFullYear()).substring(2);
-            const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
-
-            const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-            const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
-            const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-
-            const formatFriendlyDate = (dateStr: string) => {
-              const parts = dateStr.split('.');
-              if (parts.length < 3) return dateStr;
-              const day = parseInt(parts[0], 10);
-              const monthIndex = parseInt(parts[1], 10) - 1;
-              const year = 2000 + parseInt(parts[2], 10);
-              const d = new Date(year, monthIndex, day);
-
-              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-              const targetStart = new Date(year, monthIndex, day);
-              const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
-
-              if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
-              if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
-              if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
-              return `${dayNamesFull[d.getDay()]}, ${day}. ${monthNamesShort[monthIndex]}`;
-            };
-
-            const weekMetrics = getDeterministicWeekMetrics();
-            const { weekDays } = weekMetrics;
-
-            // 🛡️ 100% Harmonisierung & Nur echte Fakten (keine Dummy-Daten aus veraltetem localStorage)
-            const shieldedDaysMap = new Map<string, number>();
-            const shieldDatesArr: string[] = [];
-
-            // 1. Autoritativ eingesetzte Schilde der aktuellen Woche aus der Streak-Engine (SSOT)
-            weekDays.forEach((d: any) => {
-              if (d.isJoker) {
-                shieldedDaysMap.set(d.dateStr, d.shieldNumber || 1);
-                if (!shieldDatesArr.includes(d.dateStr)) {
-                  shieldDatesArr.push(d.dateStr);
-                }
-              }
-            });
-
-            // 2. Datenbank-verifizierter Joker aus users.joker_used_at
-            if (studentUser?.joker_used_at) {
-              const jokerIso = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
-              if (!shieldedDaysMap.has(jokerIso)) {
-                shieldedDaysMap.set(jokerIso, studentUser.weekly_jokers_used || 1);
-                shieldDatesArr.push(jokerIso);
-              }
-            }
-
-            const shieldDatesSet = new Set(shieldDatesArr);
-
-            const groupedByDate: Record<string, {
-              date: string;
-              focusSeconds: number;
-              extraSeconds: number;
-              hasMasteredSession: boolean;
-              flameLevel: string;
-              isPlaceholder?: boolean;
-              isToday?: boolean;
-              dayState?: string;
-              isShielded?: boolean;
-              shieldNumber?: number;
-              xp_earned?: number;
-            }> = {};
-
-            // 1. SSOT: Reale Fokus-Logs genau einmal direkt aggregieren (Zero Double-Counting)
-            (fokusLogs || []).forEach((log: any) => {
-              if (!log.created_at) return;
-              const d = new Date(log.created_at);
-              const dd = String(d.getDate()).padStart(2, '0');
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const yy = String(d.getFullYear()).substring(2);
-              const ddMmYy = `${dd}.${mm}.${yy}`;
-
-              const secs = log.duration_seconds || ((log.duration_minutes || 0) * 60) || 0;
-              const isMastered = !log.is_extra && (secs >= 180 || (log.duration_minutes || 0) >= 3);
-
-              if (!groupedByDate[ddMmYy]) {
-                groupedByDate[ddMmYy] = {
-                  date: ddMmYy,
-                  focusSeconds: log.is_extra ? 0 : secs,
-                  extraSeconds: log.is_extra ? secs : 0,
-                  hasMasteredSession: isMastered,
-                  flameLevel: log.flame_level || (isMastered ? 'Kleine Flamme' : 'Keine Flamme'),
-                  isPlaceholder: false,
-                  isToday: ddMmYy === todayDateStr
-                };
-              } else {
-                if (log.is_extra) {
-                  groupedByDate[ddMmYy].extraSeconds += secs;
-                } else {
-                  groupedByDate[ddMmYy].focusSeconds += secs;
-                }
-                if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
-                  groupedByDate[ddMmYy].hasMasteredSession = true;
-                  groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
-                }
-              }
-            });
-
-            // 1c. 🛡️ 100% SSOT-Parität mit Wochen-Konsistenz: Alle vergangenen Tage der aktuellen Woche synchronisieren
-            weekDays.forEach((d: any) => {
-              if (d.isFuture) return; // Zukünftige Tage nicht in Chronik
-              const isoParts = (d.dateStr || '').split('-');
-              if (isoParts.length !== 3) return;
-              const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
-
-              const isMastered = Boolean(d.hasMastered || d.dayState === 'mastered');
-              const isShielded = Boolean(d.isJoker || d.dayState === 'shielded');
-
-              if (!groupedByDate[ddMmYy]) {
-                groupedByDate[ddMmYy] = {
-                  date: ddMmYy,
-                  focusSeconds: d.totalDaySecs || 0,
-                  extraSeconds: 0,
-                  hasMasteredSession: isMastered || (d.totalDaySecs || 0) >= 180,
-                  flameLevel: (isMastered || (d.totalDaySecs || 0) >= 180) ? 'Kleine Flamme' : 'Keine Flamme',
-                  isPlaceholder: false,
-                  isToday: Boolean(d.isToday),
-                  dayState: d.dayState,
-                  isShielded,
-                  shieldNumber: d.shieldNumber || 0
-                };
-              } else {
-                if ((d.totalDaySecs || 0) > groupedByDate[ddMmYy].focusSeconds) {
-                  groupedByDate[ddMmYy].focusSeconds = d.totalDaySecs;
-                }
-                if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
-                  groupedByDate[ddMmYy].hasMasteredSession = true;
-                  groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
-                }
-                if (isShielded) {
-                  groupedByDate[ddMmYy].isShielded = true;
-                  groupedByDate[ddMmYy].shieldNumber = d.shieldNumber || 1;
-                }
-                groupedByDate[ddMmYy].dayState = d.dayState;
-              }
-            });
-
-            // 2. Garantiere lückenlose Ruhetag-Historie: Jeder jemals eingesetzte Schild / Ruhetag wird im Archiv abgebildet
-            shieldDatesArr.forEach(isoStr => {
-              const isoParts = isoStr.split('-');
-              if (isoParts.length === 3) {
-                const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
-                if (!groupedByDate[ddMmYy]) {
-                  groupedByDate[ddMmYy] = {
-                    date: ddMmYy,
-                    focusSeconds: 0,
-                    extraSeconds: 0,
-                    hasMasteredSession: false,
-                    flameLevel: 'Keine Flamme',
-                    isPlaceholder: false,
-                    isToday: ddMmYy === todayDateStr,
-                    isShielded: true,
-                    shieldNumber: shieldedDaysMap.get(isoStr) || 1,
-                    dayState: 'shielded'
-                  };
-                } else {
-                  groupedByDate[ddMmYy].isShielded = true;
-                  if (!groupedByDate[ddMmYy].shieldNumber) {
-                    groupedByDate[ddMmYy].shieldNumber = shieldedDaysMap.get(isoStr) || 1;
-                  }
-                }
-              }
-            });
-
-            // 3. Relevante Tage: Geübt (> 0) ODER geschützt (Schild) ODER Pause in der aktuellen Woche
-            // Auch der heutige Tag wird in Echtzeit erfasst, sobald geübt oder geschützt wurde
-            const allMeaningfulLogs = Object.values(groupedByDate).filter(g => {
-              const totalSecs = (g.focusSeconds || 0) + (g.extraSeconds || 0);
-              const parts = g.date.split('.');
-              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
-              const isJoker = Boolean(g.isShielded || shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-              const isPause = Boolean(g.dayState === 'pause' && totalSecs === 0 && !isJoker);
-              // Heute nur anzeigen, wenn schon geübt oder geschützt wurde
-              if (g.isToday && totalSecs === 0 && !isJoker) return false;
-              return totalSecs > 0 || isJoker || isPause;
-            });
-
-            allMeaningfulLogs.sort((a, b) => {
-              const parseDateStr = (s: string) => {
-                const parts = s.split('.');
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1;
-                const year = 2000 + parseInt(parts[2], 10);
-                return new Date(year, month, day).getTime();
-              };
-              return parseDateStr(b.date) - parseDateStr(a.date);
-            });
-
-            // 4. Mathematisch saubere Monats-Akkumulation
-            interface MonthArchive {
-              label: string;
-              key: string;
-              entries: typeof allMeaningfulLogs;
-              totalMins: number;
-              totalSecs: number;
-              activePracticeDays: number;
-              shieldedDays: number;
-            }
-
-            const monthsMap: Record<string, MonthArchive> = {};
-            const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
-            monthsMap[currentMonthKey] = {
-              label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`,
-              key: currentMonthKey,
-              entries: [],
-              totalMins: 0,
-              totalSecs: 0,
-              activePracticeDays: 0,
-              shieldedDays: 0
-            };
-
-            allMeaningfulLogs.forEach(entry => {
-              const parts = entry.date.split('.');
-              if (parts.length < 3) return;
-              const monthIndex = parseInt(parts[1], 10) - 1;
-              const yearFull = 2000 + parseInt(parts[2], 10);
-              const key = `${monthIndex}-${yearFull}`;
-
-              if (!monthsMap[key]) {
-                monthsMap[key] = {
-                  label: `${monthNamesFull[monthIndex]} ${yearFull}`,
-                  key,
-                  entries: [],
-                  totalMins: 0,
-                  totalSecs: 0,
-                  activePracticeDays: 0,
-                  shieldedDays: 0
-                };
-              }
-              monthsMap[key].entries.push(entry);
-
-              const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
-              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
-              const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-
-              if (totalSecs > 0) {
-                monthsMap[key].totalSecs += totalSecs;
-                monthsMap[key].totalMins += Math.floor(totalSecs / 60);
-                monthsMap[key].activePracticeDays += 1;
-              }
-              if (isShielded) {
-                monthsMap[key].shieldedDays += 1;
-              }
-            });
-
-            const sortedMonths = Object.values(monthsMap).sort((a, b) => {
-              const [aMonth, aYear] = a.key.split('-').map(Number);
-              const [bMonth, bYear] = b.key.split('-').map(Number);
-              if (aYear !== bYear) return bYear - aYear;
-              return bMonth - aMonth;
-            });
-
-            // Globale Kennzahlen für den Header
-            const totalActivePracticeDays = allMeaningfulLogs.filter(e => ((e.focusSeconds || 0) + (e.extraSeconds || 0)) > 0).length;
-            const totalShieldedDaysCount = allMeaningfulLogs.filter(e => {
-              const parts = e.date.split('.');
-              const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
-              return Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-            }).length;
+            const { sortedMonths, totalActivePracticeDays, totalShieldedDaysCount, shieldedDaysMap, shieldDatesSet, shieldDatesArr, formatFriendlyDate } = archiveData;
 
             // Level-spezifische Design-Tokens
             const containerBg = isTeen ? 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)' : '#ffffff';

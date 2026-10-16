@@ -76,6 +76,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   onClose
 }) => {
   const masterPricing = useMasterPricing();
+  const isChf = masterPricing.currency === 'CHF';
   const effectiveLeitwegId = (leitwegId || invoice.leitwegId || '').trim();
   const isInf = invoice.type === 'INF' || !invoice.type;
   const isAkt = invoice.type === 'AKT';
@@ -120,8 +121,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   };
 
   const formatDisplayIban = (rawIban?: string) => {
-    const clean = (rawIban || OPERATOR_BANKING_CONFIG.iban || '').replace(/\s+/g, '');
-    return clean.replace(/(.{4})/g, '$1 ').trim();
+    const trimmed = (rawIban || OPERATOR_BANKING_CONFIG.iban || '').trim();
+    const clean = trimmed.replace(/\s+/g, '').toUpperCase();
+    if (/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(clean)) {
+      return clean.replace(/(.{4})/g, '$1 ').trim();
+    }
+    return trimmed;
   };
 
   const formatDisplayDate = (dStr?: string) => {
@@ -195,8 +200,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       if (invoice.totalTeachersCount > 0) {
         lineItems.push({
           id: 5,
-          name: 'Service- & Administrationspauschale',
-          description: `${invoice.totalTeachersCount} aktive Profile (Lehrkräfte & Verwaltung)`,
+          name: 'Service- & Administrationspauschale (Lehrkräfte)',
+          description: `${invoice.totalTeachersCount} aktive Lehrkraft-Profile (Schulleitung & Sekretariat 0,00 € inkl.)`,
           quantity: invoice.totalTeachersCount,
           unitPrice: isFree ? 0 : masterPricing.priceTeacher,
           totalPrice: isFree ? 0 : (invoice.totalTeachersCount * masterPricing.priceTeacher),
@@ -204,13 +209,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         });
       }
       if ((invoice.passiveStudentsCount ?? 0) > 0) {
+        const passiveUnitFee = masterPricing.pricePassiveStudent ?? 0.09;
         lineItems.push({
           id: 6,
           name: 'Basis-Bereitstellung',
           description: `${invoice.passiveStudentsCount} Schülerdatenbank-Datensätze & DSGVO-Hosting`,
           quantity: invoice.passiveStudentsCount || 1,
-          unitPrice: isFree ? 0 : 0.09,
-          totalPrice: isFree ? 0 : ((invoice.passiveStudentsCount || 0) * 0.09),
+          unitPrice: isFree ? 0 : passiveUnitFee,
+          totalPrice: isFree ? 0 : ((invoice.passiveStudentsCount || 0) * passiveUnitFee),
           vatPercent: 0
         });
       }
@@ -264,29 +270,36 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       }
     }
 
+    const cleanSellerIban = (operatorIban || '').replace(/\s+/g, '').toUpperCase();
+    const isValidSellerIban = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(cleanSellerIban);
+
     downloadXRechnungXML({
       invoiceNumber: displayInvoiceId,
       issueDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       seller: {
         name: operatorCompany || 'Campus-Groovelab',
         street: operatorStreet || 'Karl-Fürstenberg-Str. 59',
         zipCode: operatorZip || '79618',
         city: operatorCity || 'Rheinfelden',
-        iban: operatorIban,
-        bic: (operatorBic && !operatorBic.includes('XXX')) ? operatorBic : undefined,
-        vatId: 'DE364892110'
+        iban: isValidSellerIban ? cleanSellerIban : undefined,
+        bic: (isValidSellerIban && operatorBic && !operatorBic.includes('XXX') && !operatorBic.includes('Einrichtung')) ? operatorBic : undefined,
+        vatId: OPERATOR_BANKING_CONFIG.ustIdNr || undefined,
+        taxNumber: OPERATOR_BANKING_CONFIG.taxNumber || undefined
       },
       buyer: {
         name: schoolName || 'Musikschule',
         street: schoolStreet || 'Schuladresse',
         zipCode: schoolZipCode || '70000',
-        city: schoolCity || 'Schulort'
+        city: schoolCity || 'Schulort',
+        countryCode: isChf ? 'CH' : 'DE'
       },
       buyerReference: effectiveLeitwegId || undefined,
       lineItems,
       paymentReference: displayInvoiceId,
-      notes: 'Campus-Groovelab Cloud- und Schul-Infrastruktur. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'
+      notes: isChf
+        ? 'Campus-Groovelab Cloud- und Schul-Infrastruktur. Nicht steuerbare Leistung gem. § 3a Abs. 2 UStG (Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG — Bezugsteuerpflicht durch Leistungsempfänger).'
+        : 'Campus-Groovelab Cloud- und Schul-Infrastruktur. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.'
     });
   };
 
@@ -496,7 +509,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               {operatorContact && operatorContact !== operatorCompany && <span style={{ display: 'block' }}>{operatorContact}</span>}
               <span style={{ display: 'block' }}>{operatorStreet || OPERATOR_BANKING_CONFIG.street}</span>
               <span style={{ display: 'block' }}>{operatorZip || OPERATOR_BANKING_CONFIG.zipCode} {operatorCity || OPERATOR_BANKING_CONFIG.city}</span>
-              <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '3px' }}>USt-IdNr.: {OPERATOR_BANKING_CONFIG.ustIdNr}</span>
+              <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '3px' }}>
+                {OPERATOR_BANKING_CONFIG.ustIdNr
+                  ? `USt-IdNr.: ${OPERATOR_BANKING_CONFIG.ustIdNr}`
+                  : OPERATOR_BANKING_CONFIG.taxNumber
+                    ? `Steuernummer: ${OPERATOR_BANKING_CONFIG.taxNumber}`
+                    : 'Kleinunternehmer gem. § 19 UStG (Steuernummer in Zuteilung)'}
+              </span>
             </div>
           </div>
 
@@ -611,9 +630,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       {invoice.totalTeachersCount > 0 && (
                         <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '8px 0' }}>
-                            <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale: Lehrkräfte &amp; Verwaltung</strong>
+                            <strong style={{ display: 'block', color: '#0f172a' }}>Service- &amp; Administrationspauschale (Lehrkräfte)</strong>
                             <span style={{ fontSize: '0.68rem', color: isFree ? '#ea4335' : '#64748b', fontWeight: isFree ? 700 : 500 }}>
-                              {invoice.totalTeachersCount} aktive Profile ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro Profil)
+                              {invoice.totalTeachersCount} aktive Lehrkraft-Profile ({masterPricing.priceTeacher.toFixed(2).replace('.', ',')} € / Mo. pro Lehrkraft; Schulleitung &amp; Sekretariat 0,00 € inkl.)
                               {freeLabel}
                             </span>
                           </td>
@@ -806,7 +825,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               )}
               
               <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '12px', textAlign: 'right', fontStyle: 'italic', fontWeight: 600 }}>
-                Die Software-Bereitstellung ist im Cloud-Infrastruktur-Paket inklusive (0,00 €). Das Entgelt wird ausschließlich für die Miete, Bereitstellung und Wartung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).
+                {isChf
+                  ? 'Die Software-Bereitstellung ist im Cloud-Infrastruktur-Paket inklusive (0,00 CHF). Das Entgelt wird ausschließlich für die Miete, Bereitstellung und Wartung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Nicht steuerbare Leistung gem. § 3a Abs. 2 UStG (Leistungsort Schweiz gem. Art. 8 Abs. 1 MWSTG — Bezugsteuerpflicht durch Leistungsempfänger).'
+                  : 'Die Software-Bereitstellung ist im Cloud-Infrastruktur-Paket inklusive (0,00 €). Das Entgelt wird ausschließlich für die Miete, Bereitstellung und Wartung der Cloud-, Server- und Datenbank-Infrastruktur erhoben. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).'}
               </div>
               
               {/* Payment or Payout notice */}
@@ -915,15 +936,28 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     padding: '12px',
                     borderRadius: '12px',
                     border: '1px solid #e2e8f0',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    minWidth: '120px',
+                    justifyContent: 'center',
+                    textAlign: 'center'
                   }}>
-                    <QRCode 
-                      value={`BCD\n002\n1\nSCT\n${operatorBic && !operatorBic.includes('XXX') ? operatorBic.replace(/\s+/g, '') : ''}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${displayInvoiceId}\n`} 
-                      size={96} 
-                    />
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Girocode scannen
-                    </span>
+                    {/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test((operatorIban || '').replace(/\s+/g, '').toUpperCase()) ? (
+                      <>
+                        <QRCode 
+                          value={`BCD\n002\n1\nSCT\n${operatorBic && !operatorBic.includes('XXX') && !operatorBic.includes('Einrichtung') ? operatorBic.replace(/\s+/g, '') : ''}\n${operatorCompany}\n${operatorIban.replace(/\s+/g, '')}\nEUR${invoice.amount.toFixed(2)}\n\n\n${displayInvoiceId}\n`} 
+                          size={96} 
+                        />
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Girocode scannen
+                        </span>
+                      </>
+                    ) : (
+                      <div style={{ width: '96px', height: '96px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', padding: '8px', boxSizing: 'border-box' }}>
+                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#475569', lineHeight: 1.3 }}>
+                          EPC-GiroCode aktiv ab IBAN-Hinterlegung
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

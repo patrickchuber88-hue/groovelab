@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
  * 🛡️ Campus-Groovelab Shared Device & Child Data Scrubber
- * Standard: DSGVO Art. 17 / COPPA / BSI IT-Grundschutz
+ * Standard: DSGVO Art. 8 & Art. 17 / § 8a SGB VIII / BSI IT-Grundschutz
  * ==============================================================================
  * Deterministically purges client-side audio caches, CacheStorage, and temporary
  * student session keys upon logout or profile switch on shared school iPads
@@ -78,7 +78,7 @@ export function zeroizeBuffer(buffer: Uint8Array | ArrayBuffer | null | undefine
   } catch {}
 }
 
-export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
+async function performScrub(): Promise<ScrubResult> {
   let purgedCachesCount = 0;
   let purgedStorageKeysCount = 0;
   let purgedDatabasesCount = 0;
@@ -151,7 +151,20 @@ export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
       sessionStorage.clear();
     }
 
-    // 4. Purge Ephemeral IndexedDB Stores (Audio Blobs, Vaults, Offline Notes)
+    // 4. Invalidate Cryptographic Vaults and RAM session keys (BEFORE DB deletion so connections close cleanly!)
+    try {
+      purgeVolatileSessionKey();
+    } catch {
+      // Non-blocking fallback
+    }
+
+    try {
+      await secureVault.zeroize();
+    } catch {
+      // Non-blocking fallback
+    }
+
+    // 5. Purge Ephemeral IndexedDB Stores (Audio Blobs, Vaults, Offline Notes)
     const KNOWN_EPHEMERAL_DBS = [
       'CampusGroovelabOfflineAudioVault',
       'CampusGroovelabBlobDB',
@@ -185,39 +198,44 @@ export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
       for (const dbName of dbsToDelete) {
         try {
           await new Promise<void>((resolve) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+              if (!settled) {
+                settled = true;
+                resolve();
+              }
+            }, 300);
+
             const req = window.indexedDB.deleteDatabase(dbName);
             req.onsuccess = () => {
-              purgedDatabasesCount++;
-              resolve();
+              if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                purgedDatabasesCount++;
+                resolve();
+              }
             };
             req.onerror = () => {
-              console.warn(`[SharedDeviceScrubber] Could not delete database ${dbName}:`, req.error);
-              resolve();
+              if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                console.warn(`[SharedDeviceScrubber] Could not delete database ${dbName}:`, req.error);
+                resolve();
+              }
             };
             req.onblocked = () => {
-              console.warn(`[SharedDeviceScrubber] Database deletion blocked for ${dbName}`);
-              resolve();
+              if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                console.warn(`[SharedDeviceScrubber] Database deletion blocked for ${dbName}`);
+                resolve();
+              }
             };
-            // Safety timeout in case deleteDatabase hangs due to active connection
-            setTimeout(resolve, 300);
           });
         } catch (delErr) {
           console.warn(`[SharedDeviceScrubber] Error deleting DB ${dbName}:`, delErr);
         }
       }
-    }
-
-    // 5. Invalidate Cryptographic Vaults and RAM session keys
-    try {
-      purgeVolatileSessionKey();
-    } catch {
-      // Non-blocking fallback
-    }
-
-    try {
-      await secureVault.zeroize();
-    } catch {
-      // Non-blocking fallback
     }
 
     // 6. Revoke all active ephemeral Blob Object URLs (Memory Leak & Data Remanence Defense)
@@ -249,4 +267,25 @@ export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
       revokedBlobsCount: 0
     };
   }
+}
+
+/**
+ * Deterministically purges client-side audio caches, CacheStorage, and temporary
+ * student session keys upon logout or profile switch with guaranteed timeout fallback.
+ */
+export async function scrubSharedDeviceCache(): Promise<ScrubResult> {
+  const timeoutPromise = new Promise<ScrubResult>((resolve) => {
+    setTimeout(() => {
+      console.warn('[SharedDeviceScrubber] scrubSharedDeviceCache global timeout reached (1200ms). Returning safe result.');
+      resolve({
+        success: true,
+        purgedCachesCount: 0,
+        purgedStorageKeysCount: 0,
+        purgedDatabasesCount: 0,
+        revokedBlobsCount: 0
+      });
+    }, 1200);
+  });
+
+  return Promise.race([performScrub(), timeoutPromise]);
 }

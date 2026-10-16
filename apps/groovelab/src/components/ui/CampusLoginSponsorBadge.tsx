@@ -198,26 +198,38 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          maxWidth: '460px',
+          boxSizing: 'border-box',
           gap: '8px',
-          padding: '6px 14px',
+          padding: '7px 16px',
           borderRadius: '9999px',
           background: isGroovelabKiosk
-            ? (isHovered ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.82)')
-            : (isHovered ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.09)'),
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
+            ? (isHovered 
+                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.92) 100%)' 
+                : 'linear-gradient(135deg, rgba(30, 41, 59, 0.90) 0%, rgba(15, 23, 42, 0.85) 100%)')
+            : (isHovered 
+                ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.10) 100%)' 
+                : 'linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.06) 100%)'),
+          backdropFilter: isGroovelabKiosk ? 'blur(24px) saturate(180%) contrast(105%)' : 'blur(20px)',
+          WebkitBackdropFilter: isGroovelabKiosk ? 'blur(24px) saturate(180%) contrast(105%)' : 'blur(20px)',
           border: isGroovelabKiosk
-            ? (isHovered ? '1px solid rgba(217, 119, 6, 0.45)' : '1px solid rgba(217, 119, 6, 0.25)')
-            : (isHovered ? '1px solid rgba(255, 255, 255, 0.32)' : '1px solid rgba(255, 255, 255, 0.16)'),
+            ? (isHovered ? '1px solid rgba(250, 204, 21, 0.65)' : '1px solid rgba(250, 204, 21, 0.40)')
+            : (isHovered ? '1px solid rgba(255, 255, 255, 0.22)' : '1px solid rgba(255, 255, 255, 0.14)'),
           boxShadow: isHovered
-            ? '0 6px 16px rgba(0, 0, 0, 0.18)'
-            : '0 2px 8px rgba(0, 0, 0, 0.08)',
+            ? (isGroovelabKiosk 
+                ? 'inset 0 1px 1px 0 rgba(250, 204, 21, 0.6), inset 0 -0.5px 1px 0 rgba(0, 0, 0, 0.3), 0 10px 24px rgba(0, 0, 0, 0.35)' 
+                : 'inset 0 1px 0 rgba(255, 255, 255, 0.20), 0 6px 18px rgba(0, 0, 0, 0.18)')
+            : (isGroovelabKiosk 
+                ? 'inset 0 1px 1px 0 rgba(250, 204, 21, 0.45), inset 0 -0.5px 1px 0 rgba(0, 0, 0, 0.25), 0 6px 16px rgba(0, 0, 0, 0.22)' 
+                : 'inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.12)'),
           cursor: 'pointer',
           userSelect: 'none',
-          marginBottom: '20px',
-          transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
+          marginBottom: '10px',
+          transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
           transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
           outline: 'none',
           ...style
@@ -227,25 +239,25 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: '18px',
-          height: '18px',
+          width: '20px',
+          height: '20px',
           borderRadius: '50%',
-          background: isGroovelabKiosk ? 'rgba(217, 119, 6, 0.15)' : 'rgba(250, 204, 21, 0.22)',
-          color: isGroovelabKiosk ? '#d97706' : '#facc15'
+          background: 'rgba(250, 204, 21, 0.22)',
+          color: '#facc15'
         }}>
-          <Award size={11} strokeWidth={2.4} />
+          <Award size={13} strokeWidth={2.4} />
         </div>
 
         <span style={{
           fontFamily: "'Plus Jakarta Sans', sans-serif",
-          fontSize: '12px',
+          fontSize: '13.5px',
           fontWeight: 600,
           letterSpacing: '-0.01em',
-          color: isGroovelabKiosk ? '#78350f' : '#ffffff',
+          color: '#ffffff',
           whiteSpace: 'nowrap'
         }}>
           Bildungsförderung:{' '}
-          <strong style={{ fontWeight: 800, color: isGroovelabKiosk ? '#92400e' : '#fde047' }}>
+          <strong style={{ fontWeight: 800, color: '#facc15' }}>
             {primarySponsor.companyName || (primarySponsor as any).name}
           </strong>
           {(primarySponsor.city || (primarySponsor as any).location) && (
@@ -271,7 +283,7 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
             padding: '16px',
@@ -283,12 +295,12 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
             style={{
               width: '100%',
               maxWidth: '460px',
-              backgroundColor: '#0f172a',
+              backgroundColor: '#ffffff',
               borderRadius: '24px',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              border: '1px solid #e2e8f0',
               padding: '24px',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-              color: '#ffffff',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+              color: '#0f172a',
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               position: 'relative'
             }}
@@ -300,19 +312,20 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                   width: '36px',
                   height: '36px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, rgba(250, 204, 21, 0.25), rgba(234, 179, 8, 0.1))',
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#facc15'
+                  color: '#d97706',
+                  boxShadow: '0 2px 6px rgba(217, 119, 6, 0.15)'
                 }}>
                   <Award size={20} strokeWidth={2.2} />
                 </div>
                 <div>
-                  <h3 id="sponsor-modal-title" style={{ margin: 0, fontSize: '17px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  <h3 id="sponsor-modal-title" style={{ margin: 0, fontSize: '17px', fontWeight: 800, letterSpacing: '-0.02em', color: '#0f172a' }}>
                     Offizielle Bildungsförderung
                   </h3>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
                     Transparenz & gesellschaftliches Engagement
                   </p>
                 </div>
@@ -323,17 +336,25 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                 onClick={() => setIsModalOpen(false)}
                 aria-label="Dialog schließen"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: '#f1f5f9',
                   border: 'none',
                   borderRadius: '50%',
-                  width: '30px',
-                  height: '30px',
+                  width: '32px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#cbd5e1',
+                  color: '#64748b',
                   cursor: 'pointer',
-                  transition: 'background 0.15s ease'
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e2e8f0';
+                  e.currentTarget.style.color = '#0f172a';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f1f5f9';
+                  e.currentTarget.style.color = '#64748b';
                 }}
               >
                 <X size={16} />
@@ -351,8 +372,9 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                     justifyContent: 'space-between',
                     padding: '12px 14px',
                     borderRadius: '14px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)'
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -360,15 +382,16 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                       <img
                         src={sp.logoUrl}
                         alt={sp.companyName || (sp as any).name}
-                        style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'contain', backgroundColor: '#ffffff', padding: '2px' }}
+                        style={{ width: '38px', height: '38px', borderRadius: '10px', objectFit: 'contain', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '2px' }}
                       />
                     ) : (
                       <div style={{
                         width: '38px',
                         height: '38px',
                         borderRadius: '10px',
-                        backgroundColor: 'rgba(250, 204, 21, 0.15)',
-                        color: '#facc15',
+                        backgroundColor: '#fef3c7',
+                        border: '1px solid #fde68a',
+                        color: '#b45309',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -379,10 +402,10 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                       </div>
                     )}
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
                         {sp.companyName || (sp as any).name}
                       </div>
-                      <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 500 }}>
+                      <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>
                         {sp.industrySubline || (sp as any).category || 'Bildungsförderer'}
                         {(sp.city || (sp as any).location) ? ` • ${sp.city || (sp as any).location}` : ''}
                       </div>
@@ -395,11 +418,22 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        color: '#38bdf8',
+                        color: '#0284c7',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
                         padding: '6px',
                         borderRadius: '8px',
                         display: 'flex',
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f0f9ff';
+                        e.currentTarget.style.borderColor = '#bae6fd';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
                       }}
                       aria-label={`Website von ${sp.companyName || (sp as any).name} aufrufen`}
                     >
@@ -414,14 +448,14 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
             <div style={{
               padding: '12px 14px',
               borderRadius: '12px',
-              backgroundColor: 'rgba(56, 189, 248, 0.08)',
-              border: '1px solid rgba(56, 189, 248, 0.2)',
+              backgroundColor: '#f0f9ff',
+              border: '1px solid #bae6fd',
               fontSize: '12px',
-              color: '#bae6fd',
+              color: '#0369a1',
               lineHeight: 1.5,
               fontWeight: 500
             }}>
-              💡 <strong>Warum fördern Unternehmen unsere Musikschule?</strong> Förderer ermöglichen moderne digitale Musikinstrumente, interaktive Übungswerkzeuge und Chancengleichheit für alle Musikschülerinnen und -schüler.
+              💡 <strong style={{ color: '#0c4a6e', fontWeight: 700 }}>Warum fördern Unternehmen unsere Musikschule?</strong> Förderer ermöglichen moderne digitale Musikinstrumente, interaktive Übungswerkzeuge und Chancengleichheit für alle Musikschülerinnen und -schüler.
             </div>
 
             {/* Footer action */}
@@ -430,16 +464,19 @@ export const CampusLoginSponsorBadge: React.FC<CampusLoginSponsorBadgeProps> = (
                 type="button"
                 onClick={() => setIsModalOpen(false)}
                 style={{
-                  padding: '9px 18px',
+                  padding: '10px 22px',
                   borderRadius: '10px',
-                  backgroundColor: '#ffffff',
-                  color: '#0f172a',
+                  backgroundColor: '#0f172a',
+                  color: '#ffffff',
                   border: 'none',
                   fontWeight: 700,
                   fontSize: '13px',
                   cursor: 'pointer',
-                  transition: 'background 0.15s ease'
+                  transition: 'background-color 0.15s ease',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0f172a'}
               >
                 Verstanden
               </button>

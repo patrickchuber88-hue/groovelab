@@ -418,7 +418,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       if (selectedActiveSongId) {
         triggerDirectSongSave(selectedActiveSongId, status as any, isHw, val, teacherNotes);
       }
-    }, 350);
+    }, 900);
   };
 
   const triggerDebouncedTeacherNoteSave = (val: string) => {
@@ -433,10 +433,10 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       } else {
         triggerImmediateAutoSave();
       }
-    }, 450);
+    }, 900);
   };
 
-  const triggerDebouncedAutoSave = (delayMs: number = 350) => {
+  const triggerDebouncedAutoSave = (delayMs: number = 900) => {
     if (readOnly) return;
     setHasChanges(true);
     if (autoSaveDebounceTimerRef.current) {
@@ -828,19 +828,12 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         }
       }
 
-      if (!isLehrwerkPage && !isSong) {
-        await syncHomeworkNotes(finalNotesList);
-      }
-
-      if (targetHomework && !isCurrentHomework) {
-        setIsCurrentHomework(true);
-      }
-
-      await fetchProgress();
+      if (!isLehrwerkPage && !isSong) await syncHomeworkNotes(finalNotesList);
+      if (targetHomework && !isCurrentHomework) setIsCurrentHomework(true);
+      if (!keepOpen) await fetchProgress();
       notifyHomeworkChange();
       setStudentNotesSavedToast(true);
       setTimeout(() => setStudentNotesSavedToast(false), 2500);
-
       setHomeworkNotesList(finalNotesList);
       setHasChanges(false);
     } catch (err: any) {

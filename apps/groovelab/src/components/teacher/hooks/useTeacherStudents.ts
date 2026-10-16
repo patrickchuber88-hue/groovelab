@@ -55,12 +55,13 @@ export function useTeacherStudents({
     if (!effectiveSchoolId || !effectiveTeacherId) return;
 
     try {
-      // 1. Fetch assigned student IDs across schedules, schedule_occurrences and bands in parallel
+      // 1. Fetch assigned student IDs and authoritative school roster in parallel
       let assignedStudentIds: string[] = [];
-      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
+      const [{ data: schedData }, { data: occData }, { data: groupData }, schoolRoster] = await Promise.all([
         supabase.from('schedules').select('student_id').eq('teacher_id', effectiveTeacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', effectiveTeacherId),
-        supabase.from('bands').select('id').eq('coach_id', effectiveTeacherId)
+        supabase.from('bands').select('id').eq('coach_id', effectiveTeacherId),
+        fetchSchoolRoster(effectiveSchoolId, supabase, false, { includePending: false })
       ]);
 
       const schedStudentIds = (schedData || []).map((s: any) => s.student_id).filter(Boolean);
@@ -75,8 +76,6 @@ export function useTeacherStudents({
 
       assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));
 
-      // 2. Fetch authoritative school roster without expensive PGP decryption
-      const schoolRoster = await fetchSchoolRoster(effectiveSchoolId, supabase, false, { includePending: false });
       const rawTeacherInst = teacher?.instrument || '';
       const teacherInstruments = rawTeacherInst
         ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)

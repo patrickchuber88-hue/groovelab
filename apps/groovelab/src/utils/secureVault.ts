@@ -242,9 +242,24 @@ class CryptographicClientVault {
   }
 
   /**
+   * Explicitly closes any active IndexedDB connection and clears the promise handle.
+   * Prevents blocking subsequent deleteDatabase calls during device scrubbing.
+   */
+  public async close(): Promise<void> {
+    if (this.dbPromise) {
+      try {
+        const db = await this.dbPromise;
+        db.close();
+      } catch {}
+      this.dbPromise = null;
+    }
+  }
+
+  /**
    * Performs complete cryptographic zeroization:
    * 1. Shreds the AES-GCM session key in memory & sessionStorage.
    * 2. Clears all encrypted objects in IndexedDB.
+   * 3. Reliably closes the IndexedDB handle (preventing deleteDatabase deadlocks).
    */
   public async zeroize(): Promise<void> {
     try {
@@ -258,19 +273,42 @@ class CryptographicClientVault {
         sessionStorage.removeItem(KEY_STORAGE_NAME);
       }
 
-      // 3. Purge all records from IndexedDB
+      // 3. Purge all records from IndexedDB with strict timeout protection
       if (typeof window !== 'undefined' && window.indexedDB) {
         try {
-          const db = await this.getDb();
-          await new Promise<void>((resolve, reject) => {
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const req = store.clear();
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
-          });
+          const db = await Promise.race([
+            this.getDb(),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('IndexedDB open timeout')), 400))
+          ]);
+          if (db) {
+            await new Promise<void>((resolve, reject) => {
+              const timeoutId = setTimeout(() => {
+                resolve(); // resolve gracefully on timeout instead of deadlocking
+              }, 400);
+
+              try {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const req = store.clear();
+                req.onsuccess = () => {
+                  clearTimeout(timeoutId);
+                  resolve();
+                };
+                req.onerror = () => {
+                  clearTimeout(timeoutId);
+                  reject(req.error);
+                };
+              } catch {
+                clearTimeout(timeoutId);
+                resolve();
+              }
+            });
+          }
         } catch (e) {
           console.warn('[SecureVault] Could not clear IndexedDB store:', e);
+        } finally {
+          // Always close connection after zeroize to allow clean deleteDatabase
+          await this.close();
         }
       }
 

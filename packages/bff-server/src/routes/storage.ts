@@ -330,6 +330,12 @@ export function setCachedStreamUrl(
 
 export function invalidateStreamLease(cacheKey: string): void {
   streamLeaseCache.delete(cacheKey);
+  const prefix = `${cacheKey}:`;
+  for (const key of streamLeaseCache.keys()) {
+    if (key.startsWith(prefix)) {
+      streamLeaseCache.delete(key);
+    }
+  }
 }
 
 export function invalidateUserStreamLeases(userId: string): void {
@@ -471,11 +477,29 @@ router.post('/presign-upload', validateBody(presignUploadSchema), idempotencyBar
 
     const cleanExt = sanitizePathSegment(extension, 'webm');
     const cleanUniqueId = sanitizePathSegment(uniqueId, `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
-    const cleanSchoolId = sanitizePathSegment(schoolId, '');
+    const requestedSchoolId = sanitizePathSegment(schoolId, '');
+    const authoritativeSchoolId = authData.schoolId ? sanitizePathSegment(authData.schoolId, '') : '';
+    const cleanSchoolId = authData.role === 'master_admin' ? (requestedSchoolId || authoritativeSchoolId) : authoritativeSchoolId;
     const cleanStudentId = sanitizePathSegment(studentId, '');
 
+    // 🛡️ Fail-Closed Multi-Tenant Guard (L-09): Non-master_admin users MUST possess an authoritative schoolId
+    if (authData.role !== 'master_admin' && !authoritativeSchoolId) {
+      return res.status(403).json({
+        error: 'MISSING_AUTHORITATIVE_TENANT_CONTEXT',
+        message: 'Zugriff verweigert: Kein autoritativer Mandanten-Kontext für den Datei-Upload vorhanden (Fail-Closed).'
+      });
+    }
+
+    // 🛡️ Multi-Tenant Isolation Guard (SEC-AUDIT-01): Reject cross-tenant upload requests
+    if (authData.role !== 'master_admin' && requestedSchoolId && requestedSchoolId !== authoritativeSchoolId) {
+      return res.status(403).json({
+        error: 'TENANT_ISOLATION_VIOLATION',
+        message: 'Zugriff verweigert: Mandanten-Isolation beim Datei-Upload verletzt.'
+      });
+    }
+
     // 🛡️ BOLA / IDOR Protection: Non-staff users cannot write into another user's folder
-    const userRole = authUser.user_metadata?.role || authUser.app_metadata?.role;
+    const userRole = authData.role || authUser.user_metadata?.role || authUser.app_metadata?.role || 'student';
     if (cleanStudentId && userRole === 'student' && authUser.id !== cleanStudentId) {
       return res.status(403).json({
         error: 'FORBIDDEN',
@@ -492,6 +516,16 @@ router.post('/presign-upload', validateBody(presignUploadSchema), idempotencyBar
       storagePath = `schools/${cleanSchoolId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
     } else {
       storagePath = `${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    }
+
+    // 🛡️ Authoritative Write Path Validation (unconditional Fail-Closed check on every upload path)
+    const writeAccess = validatePathAccess(storagePath, authData, 'write');
+    if (!writeAccess.allowed) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        reason: writeAccess.reason,
+        message: 'Zugriff auf diesen Zielpfad beim Upload verweigert.'
+      });
     }
 
     // 5. Ephemeral upload signing client scoped to authenticated caller
@@ -541,32 +575,47 @@ router.post('/presign-upload', validateBody(presignUploadSchema), idempotencyBar
  * POST /api/storage/verify-upload-buffer
  * 
  * Inspects uploaded file buffer for genuine magic bytes and scrubs identifiable metadata (EXIF/ID3/GPS).
+ * Protected by pre-stream authentication guard (SEC-AUDIT-02) to block anonymous 25MB heap exhaustion.
  */
-router.post('/verify-upload-buffer', express.raw({ type: '*/*', limit: '25mb' }), (req: Request, res: Response) => {
-  const buffer = req.body as Buffer;
-  if (!buffer || buffer.length === 0) {
-    return res.status(400).json({ error: 'EMPTY_FILE', message: 'Keine Dateidaten empfangen.' });
-  }
+router.post(
+  '/verify-upload-buffer',
+  async (req: Request, res: Response, next) => {
+    const authData = await resolveAuthUser(req);
+    if (!authData) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authentifizierung erforderlich für Binärpuffer-Verifikation.'
+      });
+    }
+    next();
+  },
+  express.raw({ type: '*/*', limit: '25mb' }),
+  (req: Request, res: Response) => {
+    const buffer = req.body as Buffer;
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ error: 'EMPTY_FILE', message: 'Keine Dateidaten empfangen.' });
+    }
 
-  const validation = validateMagicBytes(buffer);
-  if (!validation.isValid) {
-    return res.status(415).json({
-      error: 'INVALID_MAGIC_BYTES',
-      message: 'Echte Magic-Byte-Prüfung fehlgeschlagen: Die Datei entspricht nicht dem autorisierten Binärformat.',
-      details: validation.error
+    const validation = validateMagicBytes(buffer);
+    if (!validation.isValid) {
+      return res.status(415).json({
+        error: 'INVALID_MAGIC_BYTES',
+        message: 'Echte Magic-Byte-Prüfung fehlgeschlagen: Die Datei entspricht nicht dem autorisierten Binärformat.',
+        details: validation.error
+      });
+    }
+
+    const { scrubbedItemsCount } = scrubMediaMetadata(buffer);
+
+    return res.status(200).json({
+      success: true,
+      detectedFormat: validation.detectedFormat,
+      mimeType: validation.mimeType,
+      metadataScrubbed: scrubbedItemsCount > 0,
+      scrubbedItemsCount
     });
   }
-
-  const { scrubbedItemsCount } = scrubMediaMetadata(buffer);
-
-  return res.status(200).json({
-    success: true,
-    detectedFormat: validation.detectedFormat,
-    mimeType: validation.mimeType,
-    metadataScrubbed: scrubbedItemsCount > 0,
-    scrubbedItemsCount
-  });
-});
+);
 
 /**
  * Authoritatively verifies whether a teacher has active ReBAC share access to a student's recording.
@@ -715,9 +764,10 @@ router.post('/presign-stream', validateBody(presignStreamSchema), async (req: Re
       recordAudioAccessAudit(authData, filePath, targetStudentId).catch(() => {});
     }
 
-    // Sub-millisecond In-Memory LRU Cache lookup
-    const cacheKey = `${bucket}:${filePath}`;
-    const cachedUrl = getCachedStreamUrl(cacheKey);
+    // Sub-millisecond In-Memory LRU Cache lookup (caller-scoped; cross-user ReBAC streams bypass cache for instant revocation)
+    const isCrossUserStudentStream = Boolean(targetStudentId && targetStudentId !== authData.user.id);
+    const cacheKey = `${bucket}:${filePath}:${authData.user.id}`;
+    const cachedUrl = isCrossUserStudentStream ? null : getCachedStreamUrl(cacheKey);
     if (cachedUrl) {
       return res.status(200).json({
         success: true,
@@ -749,7 +799,9 @@ router.post('/presign-stream', validateBody(presignStreamSchema), async (req: Re
       });
     }
 
-    setCachedStreamUrl(cacheKey, signedData.signedUrl, expiresInSeconds, authData.user.id, authData.schoolId || undefined);
+    if (!isCrossUserStudentStream) {
+      setCachedStreamUrl(cacheKey, signedData.signedUrl, expiresInSeconds, authData.user.id, authData.schoolId || undefined);
+    }
 
     return res.status(200).json({
       success: true,

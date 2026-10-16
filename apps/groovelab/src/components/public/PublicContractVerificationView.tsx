@@ -6,6 +6,7 @@ import {
   Clock, ArrowLeft, RefreshCw, Copy, Check
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { LegalTextModal, type LegalTabType } from '../LegalTextModal';
 
 interface VerifiedContractData {
   success: boolean;
@@ -35,6 +36,7 @@ export const PublicContractVerificationView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
   const [verificationResult, setVerificationResult] = useState<VerifiedContractData | null>(null);
+  const [activeLegalTab, setActiveLegalTab] = useState<LegalTabType | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -52,10 +54,11 @@ export const PublicContractVerificationView: React.FC = () => {
       try {
         // 1. Authoritative RPC Verification via Supabase
         const { data, error } = await supabase.rpc('verify_b2b_contract_digest', {
+          p_digest: cleanHash,
           p_hash: cleanHash
         });
 
-        if (!error && data && data.success && isMounted) {
+        if (!error && data && (data.success || data.verified) && isMounted) {
           setVerificationResult({
             success: true,
             isValid: true,
@@ -71,7 +74,7 @@ export const PublicContractVerificationView: React.FC = () => {
             legalBasis: data.legal_basis || '§ 535 ff. BGB / Art. 253 OR i. V. m. Art. 28 DSGVO & Art. 9 CH-nDSG',
             herrenbergStatus: data.herrenberg_status || 'BSG B 12 R 3/20 R Konformität (Zweistufiges Dispositionsmodell)',
             slaTarget: data.sla_target || '99,5 % Verfügbarkeit (24/7/365)',
-            datacenterLocation: data.datacenter_location || 'Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland)',
+            datacenterLocation: data.datacenter_location || data.hosting_location || 'IONOS SE & Hetzner Online GmbH (Deutschland • ISO/IEC 27001)',
             isoCertifications: data.iso_certifications || 'ISO/IEC 27001:2022, ISO/IEC 27701 (PIMS), BSI IT-Grundschutz',
             usCloudTransfer: data.us_cloud_transfer || '0,00 % (Vollständige Immunität gegen US FISA 702 & CLOUD Act)'
           });
@@ -79,38 +82,7 @@ export const PublicContractVerificationView: React.FC = () => {
           return;
         }
 
-        // 2. Canonical Sample Verification Fallback (Musäk Bad Säckingen)
-        // Guarantees zero-failure for the printed sample certificate in production
-        const isSampleMatch = 
-          cleanHash === '20ebec20c62b885432099aab0e94e0ec56b612d655aca7a3d5085402b89aab52' ||
-          cleanHash === '20ebec20c62b885432099aab0e94e0ec' ||
-          cleanHash.startsWith('20ebec20c62b885432099aab0e94e0ec');
-
-        if (isSampleMatch && isMounted) {
-          setVerificationResult({
-            success: true,
-            isValid: true,
-            status: 'VERIFIED_ACTIVE',
-            fullHash: '20ebec20c62b885432099aab0e94e0ec56b612d655aca7a3d5085402b89aab52',
-            hashMatched: cleanHash,
-            schoolId: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c',
-            schoolName: 'Musäk Bad Säckingen',
-            signeeName: 'Severin L. (Schulleitung)',
-            signedAt: '2026-08-31T08:34:46.935Z',
-            legalVersion: '2026.5',
-            contractType: 'B2B-SaaS-Infrastrukturvertrag & AVV',
-            legalBasis: '§ 535 ff. BGB / Art. 253 OR i. V. m. Art. 28 DSGVO & Art. 9 CH-nDSG',
-            herrenbergStatus: 'BSG B 12 R 3/20 R Konformität (Zweistufiges Dispositionsmodell / 0 Weisungen)',
-            slaTarget: '99,5 % Verfügbarkeit (24/7/365)',
-            datacenterLocation: 'Hetzner Online GmbH (Falkenstein/Vogtland & Nürnberg, Deutschland)',
-            isoCertifications: 'ISO/IEC 27001:2022, ISO/IEC 27701 (PIMS), BSI IT-Grundschutz',
-            usCloudTransfer: '0,00 % (Vollständige Immunität gegen US FISA 702 & CLOUD Act)'
-          });
-          setLoading(false);
-          return;
-        }
-
-        // 3. Fail-Closed: Unknown or tampered hash
+        // 2. Fail-Closed: Unknown or tampered hash
         if (isMounted) {
           setVerificationResult({
             success: false,
@@ -681,6 +653,8 @@ export const PublicContractVerificationView: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
             paddingTop: '16px',
             borderTop: '1px solid #e2e8f0',
             fontSize: '0.74rem',
@@ -700,8 +674,19 @@ export const PublicContractVerificationView: React.FC = () => {
               <ArrowLeft size={14} />
               <span>Zurück zur Plattform</span>
             </a>
-            <span>Campus-Groovelab • Betreiber: Patrick Huber • Rheinfelden (Baden)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <button type="button" onClick={() => setActiveLegalTab('impressum')} style={{ background: 'none', border: 'none', padding: 0, color: '#475569', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Impressum</button>
+              <button type="button" onClick={() => setActiveLegalTab('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#475569', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Datenschutz</button>
+              <button type="button" onClick={() => setActiveLegalTab('accessibility')} style={{ background: 'none', border: 'none', padding: 0, color: '#475569', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Barrierefreiheit</button>
+              <span>Campus-Groovelab • Betreiber: Patrick Huber • Rheinfelden (Baden)</span>
+            </div>
           </div>
+
+          <LegalTextModal
+            isOpen={activeLegalTab !== null}
+            onClose={() => setActiveLegalTab(null)}
+            initialTab={activeLegalTab || 'impressum'}
+          />
 
         </div>
       </div>

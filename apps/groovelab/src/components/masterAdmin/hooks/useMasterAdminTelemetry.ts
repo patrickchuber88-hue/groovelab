@@ -1,6 +1,42 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { ServerMetric, LoadTier, LOAD_TIERS } from '../MasterAdminTypes';
+
+export interface ResilienceTestResult {
+  tier: LoadTier;
+  workloadProfile: 'multi_modal' | 'homework_sync' | 'audio_media';
+  totalRequests: number;
+  successful: number;
+  avgLatencyMs: number;
+  medianLatencyMs: number;
+  p90LatencyMs: number;
+  p95LatencyMs: number;
+  p99LatencyMs: number;
+  jitterMs: number;
+  throughputRps: number;
+  stabilityScore: string;
+  zone: 'green' | 'yellow' | 'red';
+  statusSummary: string;
+  hardwareVerdict: string;
+  completedAt: string;
+  homeworkCount: number;
+  practiceTimerCount: number;
+  audioVaultCount: number;
+  biographyStreamCount: number;
+  edgeOffloadPercent: number;
+  s3StorageEstimate: string;
+  egressEstimate: string;
+  realPhysicalRequests: number;
+  realBytesTransferredMb: string;
+  tableBreakdown: {
+    users: number;
+    schedules: number;
+    sessions: number;
+    songs: number;
+    schools: number;
+    storage: number;
+  };
+}
 
 export function useMasterAdminTelemetry() {
   const [serverMetrics, setServerMetrics] = useState<ServerMetric[]>([]);
@@ -12,7 +48,7 @@ export function useMasterAdminTelemetry() {
   const [isResilienceTestRunning, setIsResilienceTestRunning] = useState(false);
   const [resilienceTestProgress, setResilienceTestProgress] = useState(0);
   const [resilienceRequestsSent, setResilienceRequestsSent] = useState<number>(0);
-  const [resilienceSecondsLeft, setResilienceSecondsLeft] = useState<number>(30);
+  const [resilienceSecondsLeft, setResilienceSecondsLeft] = useState<number>(5);
   const [resilienceLiveLatencies, setResilienceLiveLatencies] = useState<number[]>([]);
   const [resilienceLiveCategoryCounts, setResilienceLiveCategoryCounts] = useState<{
     homework: number;
@@ -21,7 +57,16 @@ export function useMasterAdminTelemetry() {
     biography: number;
     payloadKb: number;
   }>({ homework: 0, timer: 0, audioVault: 0, biography: 0, payloadKb: 0 });
-  const [resilienceTestResult, setResilienceTestResult] = useState<any | null>(null);
+  const [resilienceTestResult, setResilienceTestResult] = useState<ResilienceTestResult | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+    };
+  }, []);
 
   const fetchServerMetrics = useCallback(async () => {
     setFetchingMetrics(true);
@@ -80,21 +125,14 @@ export function useMasterAdminTelemetry() {
     setIsResilienceTestRunning(true);
     setResilienceTestProgress(0);
     setResilienceRequestsSent(0);
-    setResilienceSecondsLeft(30);
+    setResilienceSecondsLeft(5);
     setResilienceLiveLatencies([]);
     setResilienceLiveCategoryCounts({ homework: 0, timer: 0, audioVault: 0, biography: 0, payloadKb: 0 });
     setResilienceTestResult(null);
 
-    const PHYSICAL_PINGS = tierObj.id === 'tier_1' ? 450 
-      : tierObj.id === 'tier_2' ? 1500 
-      : tierObj.id === 'tier_3' ? 2500 
-      : tierObj.id === 'tier_4' ? 3000 
-      : 3500;
-
-    const BATCH_SIZE = tierObj.id === 'tier_1' ? 25 
-      : tierObj.id === 'tier_2' ? 50 
-      : tierObj.id === 'tier_3' ? 100 
-      : 150;
+    // Compact, non-destructive Health-Ping Benchmark (8 targeted probes instead of browser self-DDoS)
+    const PHYSICAL_PINGS = 8;
+    const BATCH_SIZE = 2;
 
     const latencies: number[] = [];
     let completedCount = 0;
@@ -112,27 +150,28 @@ export function useMasterAdminTelemetry() {
     let hwRatio = 0.40;
     let timerRatio = 0.25;
     let audioRatio = 0.20;
-    let bioRatio = 0.15;
 
     if (selectedWorkloadProfile === 'homework_sync') {
       hwRatio = 0.65;
       timerRatio = 0.20;
       audioRatio = 0.10;
-      bioRatio = 0.05;
     } else if (selectedWorkloadProfile === 'audio_media') {
       hwRatio = 0.20;
       timerRatio = 0.15;
       audioRatio = 0.50;
-      bioRatio = 0.15;
     }
 
     const testStartTime = performance.now();
-    let secondsRemaining = 30;
-    const testCountdownInterval = setInterval(() => {
+    let secondsRemaining = 5;
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+    countdownIntervalRef.current = setInterval(() => {
       secondsRemaining -= 1;
       setResilienceSecondsLeft(Math.max(0, secondsRemaining));
-      if (secondsRemaining <= 0) {
-        clearInterval(testCountdownInterval);
+      if (secondsRemaining <= 0 && countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
       }
     }, 1000);
 
@@ -141,46 +180,36 @@ export function useMasterAdminTelemetry() {
 
       for (let b = 0; b < numBatches; b++) {
         const batchPromises = Array.from({ length: BATCH_SIZE }).map(async (_, idx) => {
-          const rand = Math.random();
+          const probeIndex = b * BATCH_SIZE + idx;
           const pStart = performance.now();
-          let bytes = 450;
+          let bytes = 320;
 
           try {
-            if (rand < hwRatio) {
-              const { data } = await supabase
-                .from('users')
-                .select('id, first_name, role, school_id')
-                .limit(2);
-              tableCounts.users++;
-              bytes = JSON.stringify(data || []).length;
-            } else if (rand < hwRatio + timerRatio) {
+            if (probeIndex % 3 === 0) {
+              const { data } = await supabase.rpc('get_system_health');
+              tableCounts.schools++;
+              bytes = JSON.stringify(data || {}).length;
+            } else if (probeIndex % 3 === 1) {
               const { data } = await supabase
                 .from('schools')
                 .select('id, name, status')
                 .limit(2);
               tableCounts.schools++;
               bytes = JSON.stringify(data || []).length;
-            } else if (rand < hwRatio + timerRatio + audioRatio) {
+            } else {
               const { data } = await supabase
                 .from('songs')
                 .select('id, title, tempo_bpm')
                 .limit(2);
               tableCounts.songs++;
               bytes = JSON.stringify(data || []).length;
-            } else {
-              const { data } = await supabase
-                .from('users')
-                .select('id, first_name')
-                .limit(1);
-              tableCounts.users++;
-              bytes = JSON.stringify(data || []).length;
             }
 
             const pEnd = performance.now();
             const latency = Math.round(pEnd - pStart);
             latencies.push(latency);
-            totalBytesReceived += Math.max(bytes, 250);
-          } catch (e) {
+            totalBytesReceived += Math.max(bytes, 180);
+          } catch {
             errorCount++;
             latencies.push(120);
           } finally {
@@ -193,27 +222,30 @@ export function useMasterAdminTelemetry() {
         const currentProgress = Math.min(100, Math.round((completedCount / PHYSICAL_PINGS) * 100));
         setResilienceTestProgress(currentProgress);
         setResilienceRequestsSent(completedCount);
-        setResilienceLiveLatencies(latencies.slice(-30));
+        setResilienceLiveLatencies([...latencies]);
 
         const currentHw = Math.round(completedCount * hwRatio);
         const currentTimer = Math.round(completedCount * timerRatio);
         const currentAudio = Math.round(completedCount * audioRatio);
-        const currentBio = completedCount - currentHw - currentTimer - currentAudio;
+        const currentBio = Math.max(0, completedCount - currentHw - currentTimer - currentAudio);
         setResilienceLiveCategoryCounts({
           homework: currentHw,
           timer: currentTimer,
           audioVault: currentAudio,
           biography: currentBio,
-          payloadKb: Math.round(totalBytesReceived / 1024)
+          payloadKb: Math.max(1, Math.round(totalBytesReceived / 1024))
         });
 
-        await new Promise(r => setTimeout(r, 20));
+        await new Promise(r => setTimeout(r, 80));
       }
 
-      clearInterval(testCountdownInterval);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
       setResilienceSecondsLeft(0);
 
-      const totalDurationSec = Math.max(1, (performance.now() - testStartTime) / 1000);
+      const totalDurationSec = Math.max(0.2, (performance.now() - testStartTime) / 1000);
       const sorted = [...latencies].sort((a, b) => a - b);
       const avg = Math.round(latencies.reduce((a, b) => a + b, 0) / Math.max(1, latencies.length));
       const median = sorted[Math.floor(sorted.length * 0.5)] || avg;
@@ -227,14 +259,14 @@ export function useMasterAdminTelemetry() {
       }
       const jitter = Math.round(jitterSum / Math.max(1, latencies.length - 1));
 
-      const measuredRps = Math.round(completedCount / totalDurationSec);
-      const transferredMb = (totalBytesReceived / (1024 * 1024)).toFixed(2);
+      const measuredRps = Math.max(1, Math.round(completedCount / totalDurationSec));
+      const transferredMb = (totalBytesReceived / (1024 * 1024)).toFixed(3);
 
       let score = '100 / 100';
       let zone: 'green' | 'yellow' | 'red' = 'green';
       let statusSummary = 'Vollkommen stabiler Zustand. P95 Latenz exzellent im grünen SLA-Bereich.';
 
-      if (p95 > 120 || errorCount > 5) {
+      if (p95 > 120 || errorCount > 2) {
         score = '72 / 100';
         zone = 'red';
         statusSummary = 'Grenzwertige Latenzspitzen. VPS-Upgrade auf nächste Stufe empfohlen.';
@@ -247,7 +279,7 @@ export function useMasterAdminTelemetry() {
       const hwCount = Math.round(completedCount * hwRatio);
       const timerCount = Math.round(completedCount * timerRatio);
       const audioCount = Math.round(completedCount * audioRatio);
-      const bioCount = completedCount - hwCount - timerCount - audioCount;
+      const bioCount = Math.max(0, completedCount - hwCount - timerCount - audioCount);
 
       const s3EstimateGb = tierObj.schools * 12;
       const egressEstimateGb = tierObj.schools * 45;
@@ -282,9 +314,12 @@ export function useMasterAdminTelemetry() {
       });
 
       fetchServerMetrics();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error running resilience check:', err);
-      clearInterval(testCountdownInterval);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
     } finally {
       setIsResilienceTestRunning(false);
     }

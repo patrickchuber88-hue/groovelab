@@ -17,6 +17,7 @@ interface DatevSubTabProps {
   setDatevPeriodMonth: (m: number) => void;
   datevPeriodYear: number;
   invoices: Invoice[];
+  taxMode?: 'small_business' | 'standard_vat';
   onDatevExport: (chart: ChartOfAccounts) => void;
 }
 
@@ -27,6 +28,7 @@ export const DatevSubTab: React.FC<DatevSubTabProps> = ({
   setDatevPeriodMonth,
   datevPeriodYear,
   invoices,
+  taxMode = 'small_business',
   onDatevExport
 }) => {
   return (
@@ -197,12 +199,13 @@ export const DatevSubTab: React.FC<DatevSubTabProps> = ({
                 const yy = String(datevPeriodYear).slice(-2);
                 const mm = String(datevPeriodMonth).padStart(2, '0');
                 const invId = `RE-${numId}-${yy}${mm}-01`;
+                const activeRevAccount = taxMode === 'standard_vat' ? map.revenue19 : map.revenueExempt;
 
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '10px 14px', fontFamily: 'monospace' }}>28.{mm}.{datevPeriodYear}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{invId}</td>
-                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{map.revenueExempt}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{activeRevAccount}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 700, color: '#7c3aed', fontFamily: 'monospace' }}>{map.debtorsCollective}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>{inv.total.toFixed(2).replace('.', ',')} €</td>
                     <td style={{ padding: '10px 14px', fontWeight: 800, color: '#059669' }}>H</td>

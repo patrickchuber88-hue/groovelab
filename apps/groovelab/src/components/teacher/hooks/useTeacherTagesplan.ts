@@ -727,11 +727,16 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
   }, [effectiveTeacherId, teacher, allStudents, rooms, viewMode, activeTab, hideHeader]);
 
   useEffect(() => {
-    loadBriefingTimeline();
-    if (typeof window === 'undefined') return;
+    let syncTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      loadBriefingTimeline();
+    }, 80);
+    if (typeof window === 'undefined') return () => { if (syncTimer) clearTimeout(syncTimer); };
 
     const handleSync = () => {
-      loadBriefingTimeline();
+      if (syncTimer) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        loadBriefingTimeline();
+      }, 150);
     };
 
     window.addEventListener('groovelab_simulated_date_changed', handleSync);
@@ -747,19 +752,16 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         schema: 'public',
         event: '*',
         table: 'campus_direct_messages'
-      }, () => {
-        loadBriefingTimeline();
-      })
+      }, handleSync)
       .on('postgres_changes', {
         schema: 'public',
         event: '*',
         table: 'schedule_occurrences'
-      }, () => {
-        loadBriefingTimeline();
-      })
+      }, handleSync)
       .subscribe() : null;
 
     return () => {
+      if (syncTimer) clearTimeout(syncTimer);
       window.removeEventListener('groovelab_simulated_date_changed', handleSync);
       window.removeEventListener('groovelab_schedule_changed', handleSync);
       window.removeEventListener('campus_schedule_sync', handleSync);

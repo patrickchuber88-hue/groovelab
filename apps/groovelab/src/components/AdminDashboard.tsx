@@ -177,13 +177,14 @@ export function AdminDashboard({
     const preloadEvents = () => {
       import('./CampusEventsBoard');
     };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const handle = (window as any).requestIdleCallback(preloadEvents);
-      return () => (window as any).cancelIdleCallback(handle);
-    } else {
-      const timer = setTimeout(preloadEvents, 1200);
-      return () => clearTimeout(timer);
-    }
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(preloadEvents);
+      } else {
+        preloadEvents();
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
   }, []);
 
   const resolveUserAvatarBound = (u: any, platform?: string): string => {

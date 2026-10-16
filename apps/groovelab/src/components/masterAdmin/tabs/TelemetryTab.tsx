@@ -26,8 +26,13 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
     const fetchHealth = async () => {
       try {
         const { data } = await supabase.rpc('get_system_health');
-        if (!isCancelled && data && typeof data === 'object') {
-          setLiveHealth(data as any);
+        if (!isCancelled && data && typeof data === 'object' && 'status' in data) {
+          const raw = data as Record<string, unknown>;
+          setLiveHealth({
+            status: typeof raw.status === 'string' ? raw.status : 'healthy',
+            latency_ms: typeof raw.latency_ms === 'number' ? raw.latency_ms : apiLatencyMs,
+            active_connections: typeof raw.active_connections === 'number' ? raw.active_connections : 4
+          });
         }
       } catch (e) {
         console.warn('Could not probe get_system_health:', e);
@@ -36,7 +41,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
 
     fetchHealth();
     return () => { isCancelled = true; };
-  }, [telemetryCountdown]);
+  }, [serverMetrics, apiLatencyMs]);
 
   const latestMetric = serverMetrics[0] || null;
   const cpuVal = latestMetric ? latestMetric.cpu_load : 0.12;
@@ -51,6 +56,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
   const volumeTotal = latestMetric?.volume_total_gb ?? 14.0;
   const volumePct = volumeTotal > 0 ? (volumeUsed / volumeTotal) * 100 : 15;
   const effectiveLatency = liveHealth?.latency_ms ?? apiLatencyMs;
+  const isElevatedLoad = cpuVal > 1.4 || effectiveLatency > 80;
 
   return (
     <div
@@ -64,11 +70,11 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
       {/* Header with Live Signal Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: '"Outfit", sans-serif' }}>
+          <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.03em', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
             Telemetrie &amp; System Health
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: '0.95rem', color: '#64748b', fontWeight: 550 }}>
-            Echtzeit-Hardwareüberwachung des Hetzner CX23 VPS (`178.105.10.2`) und Supabase Datenbank-Cluster.
+            Echtzeit-Hardwareüberwachung: IONOS Enterprise Cloud Deutschland (85.215.73.216, Produktiv-Cluster) + Hetzner Cloud Deutschland (Georedundantes Backup &amp; Failover).
           </p>
         </div>
 
@@ -100,6 +106,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
 
           {/* Manual Refresh Button */}
           <button
+            type="button"
             onClick={onRefresh}
             style={{
               padding: '10px 18px',
@@ -138,7 +145,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
         gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '16px'
       }}>
-        {/* Karte 1: Hetzner Cloud VPS & Latenz */}
+        {/* Karte 1: IONOS Enterprise Cloud & Latenz */}
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
@@ -155,19 +162,29 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
                 <Activity size={18} />
               </div>
               <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Hetzner VPS
+                IONOS / Hetzner Cluster
               </span>
             </div>
-            <span style={{ fontSize: '0.70rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', background: '#d1fae5', color: '#065f46', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Check size={11} strokeWidth={3} /> Optimal
+            <span style={{
+              fontSize: '0.70rem',
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: '10px',
+              background: isElevatedLoad ? '#fef3c7' : '#d1fae5',
+              color: isElevatedLoad ? '#b45309' : '#065f46',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <Check size={11} strokeWidth={3} /> {isElevatedLoad ? 'Erhöhte Last' : 'Optimal'}
             </span>
           </div>
           <div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
+            <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif" }}>
               {effectiveLatency} ms <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>P95 Latenz</span>
             </div>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 550 }}>
-              Falkenstein (178.105.10.2) • CX23
+              IONOS DE (85.215.73.216) + Hetzner Backup
             </p>
           </div>
         </div>

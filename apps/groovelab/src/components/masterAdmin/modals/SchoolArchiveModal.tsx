@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, PauseCircle } from 'lucide-react';
 import type { School } from '../MasterAdminTypes';
 
 interface SchoolArchiveModalProps {
@@ -61,6 +61,7 @@ export const SchoolArchiveModal: React.FC<SchoolArchiveModalProps> = ({
             borderRadius: '14px',
             background: '#fef2f2',
             color: '#dc2626',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -80,7 +81,7 @@ export const SchoolArchiveModal: React.FC<SchoolArchiveModalProps> = ({
 
         <div style={{
           background: '#fffbeb',
-          border: '1px solid #fde68a',
+          border: 'none',
           borderRadius: '14px',
           padding: '14px 16px',
           fontSize: '0.82rem',
@@ -111,7 +112,7 @@ export const SchoolArchiveModal: React.FC<SchoolArchiveModalProps> = ({
             }}
             className="hover-scale-mini"
           >
-            <span>⏸️ Schule pausieren / archivieren</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><PauseCircle size={16} /> Schule pausieren / archivieren</span>
             <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Zugang sperren</span>
           </button>
 
@@ -140,7 +141,7 @@ export const SchoolArchiveModal: React.FC<SchoolArchiveModalProps> = ({
             }}
             className="hover-scale-mini"
           >
-            <span>🗑️ Schule &amp; alle Daten endgültig löschen</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}><Trash2 size={16} /> Schule &amp; alle Daten endgültig löschen</span>
             <span style={{ fontSize: '0.74rem', color: '#fecaca', fontWeight: 600 }}>Unwiderruflich</span>
           </button>
         </div>

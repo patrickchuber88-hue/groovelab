@@ -1,5 +1,6 @@
-const CACHE_NAME = 'groovelab-static-v1791787190511';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1791787190511';
+const CACHE_NAME = 'groovelab-static-v1792171399014';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1792171399014';
+const IMMUTABLE_CACHE = DYNAMIC_CACHE + '-immutable';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -8,13 +9,13 @@ const ASSETS_TO_CACHE = [
   '/campus_login_hero.png'
 ];
 
-// Security Hardening: Allowed origins for background sync & push notifications
+// Security Hardening: Allowed origins for background sync & push notifications (Zero Hardcoded Legacy IPs)
 const ALLOWED_PUSH_HOSTS = [
   'campus-groovelab.de',
+  'app.campus-groovelab.de',
   'supabase.campus-groovelab.de',
   'localhost',
-  '127.0.0.1',
-  '178.105.10.2'
+  '127.0.0.1'
 ];
 
 function isValidPushHost(urlStr) {
@@ -65,7 +66,7 @@ self.addEventListener('activate', function(event) {
     caches.keys().then(function(cacheNames) {
       return Promise.all(
         cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME && cacheName !== DYNAMIC_CACHE) {
+          if (cacheName !== CACHE_NAME && cacheName !== DYNAMIC_CACHE && cacheName !== IMMUTABLE_CACHE) {
             return caches.delete(cacheName);
           }
         })
@@ -312,7 +313,7 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // 1. Immutable Vite chunks with content-hash (/assets/*-[hash].*) -> Cache-First
+  // 1. Immutable Vite chunks with content-hash (/assets/*-[hash].*) -> Cache-First in isolated IMMUTABLE_CACHE
   const isImmutableViteAsset = url.pathname.startsWith('/assets/') && /\-[a-zA-Z0-9_-]{8,}\.(js|css|woff2)$/.test(url.pathname);
   if (isImmutableViteAsset) {
     event.respondWith(
@@ -323,9 +324,9 @@ self.addEventListener('fetch', function(event) {
         return fetch(event.request).then(function(networkResponse) {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
-            caches.open(DYNAMIC_CACHE).then(function(cache) {
+            caches.open(IMMUTABLE_CACHE).then(function(cache) {
               cache.put(event.request, responseClone);
-              limitCacheSize(DYNAMIC_CACHE, 150);
+              limitCacheSize(IMMUTABLE_CACHE, 200);
             });
           }
           return networkResponse;

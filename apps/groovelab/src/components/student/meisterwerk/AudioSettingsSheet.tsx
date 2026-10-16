@@ -102,7 +102,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
 
   if (!isOpen) return null;
 
-  const currentMs = routeInfo?.effectiveLatencyMs ?? 45;
+  const currentMs = routeInfo?.effectiveLatencyMs ?? 42;
   const isBluetooth = routeInfo?.isBluetooth;
 
   return (
@@ -116,7 +116,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
         backgroundColor: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
-        zIndex: 9999,
+        zIndex: 100010,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -446,8 +446,8 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
             {/* 3 ONE-TAP PRESET PILLS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
               {[
-                { label: 'Kabel / Intern', value: 35, icon: <Zap size={12} color="#0f172a" /> },
-                { label: 'AirPods / BT', value: 260, icon: <Bluetooth size={12} color="#0284c7" /> },
+                { label: 'Kabel / Intern', value: routeInfo && !routeInfo.isBluetooth ? routeInfo.baselineLatencyMs : 42, icon: <Zap size={12} color="#0f172a" /> },
+                { label: 'AirPods / BT', value: 210, icon: <Bluetooth size={12} color="#0284c7" /> },
                 { label: 'HiFi / AirPlay', value: 420, icon: <Radio size={12} color="#64748b" /> }
               ].map((p) => {
                 const isSelected = Math.abs(currentMs - p.value) <= 15;
@@ -491,7 +491,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
                 type="range"
                 min="-100"
                 max="450"
-                step="5"
+                step="1"
                 value={currentMs}
                 onChange={handleSliderChange}
                 aria-label="Latenz-Feinjustierung in Millisekunden"

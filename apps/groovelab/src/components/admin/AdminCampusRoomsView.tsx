@@ -11,6 +11,11 @@ import { CampusMyBookingsList } from "./rooms/CampusMyBookingsList";
 import { isInsideRegularWindow, isLessonBooking, purgeSpuriousLessonBookings } from "./rooms/roomBookingHelpers";
 import { useRoomSidebarState } from "./rooms/useRoomSidebarState";
 import { RoomSidebarToggleBtn } from "./rooms/RoomSidebarToggleBtn";
+import { useRoomTopCatalogState } from "./rooms/useRoomTopCatalogState";
+import { RoomTopCatalogToggleBtn } from "./rooms/RoomTopCatalogToggleBtn";
+import { RoomHeaderDropdownSelector } from "./rooms/RoomHeaderDropdownSelector";
+import { RoomBookingActionDock } from "./rooms/RoomBookingActionDock";
+import { RoomBookingSidebarHeader } from "./rooms/RoomBookingSidebarHeader";
 
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return "";
@@ -243,6 +248,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 }) => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const { isRightSidebarOpen, setIsRightSidebarOpen, toggleSidebar } = useRoomSidebarState();
+    const { isTopCatalogCollapsed, toggleTopCatalog } = useRoomTopCatalogState();
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     const storedWorkspace = typeof window !== 'undefined'
       ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
@@ -1843,6 +1849,31 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       setRecurringInterval(1);
     };
 
+    const handleCancelBookingDraft = () => {
+      setShowMobileRoomSlider(false);
+      setSelectedBooking(null);
+      setShowPreviewField(false);
+      setBookingPurpose('');
+      setBookingStudentId('');
+      setStudentSearchTerm('');
+      setIsDateFilterActive(false);
+      setRecurringInterval(1);
+      setDraftBooking?.(null);
+      setBookingStartTime('10:00');
+      setBookingEndTime('11:00');
+    };
+
+    // CAM-154: Global Escape key listener to abort room booking drafts (Nielsen-Norman Heuristic #3)
+    useEffect(() => {
+      const handleEscapeKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && (showPreviewField || selectedBooking || bookingPurpose)) {
+          handleCancelBookingDraft();
+        }
+      };
+      window.addEventListener('keydown', handleEscapeKey);
+      return () => window.removeEventListener('keydown', handleEscapeKey);
+    }, [showPreviewField, selectedBooking, bookingPurpose]);
+
     const handleDeleteBooking = async () => {
       if (!selectedBooking || selectedBooking.isSchedule || selectedBooking.isPreview || selectedBooking.id === 'preview_draft_booking') return;
       
@@ -2401,8 +2432,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       { label: 'Sonntag', value: 'Sunday', short: 'So' }
     ];
 
-    const TIME_SLOTS = Array.from({ length: 14 }, (_, i) => {
-      const hour = 8 + i;
+    const TIME_SLOTS = Array.from({ length: 12 }, (_, i) => {
+      const hour = 10 + i;
       return `${String(hour).padStart(2, '0')}:00`;
     });
 
@@ -2461,7 +2492,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           .room-picker-card {
             min-width: 190px;
             padding: 14px;
-            border-radius: 16px;
+            border-radius: 20px;
             cursor: pointer;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
@@ -2472,9 +2503,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             transform: translateY(-2px);
             box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
           }
-          @media (max-width: 800px) {
+          @media (max-width: 1080px) {
             .calendar-header-flex { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
-            .calendar-controls-wrapper { width: 100% !important; justify-content: space-between !important; gap: 8px !important; }
+            .calendar-controls-wrapper { width: 100% !important; justify-content: space-between !important; gap: 8px !important; flex-wrap: wrap !important; }
             .calendar-today-btn { padding: 8px 14px !important; font-size: 0.78rem !important; height: 40px !important; border-radius: 12px !important; min-width: 72px !important; flex-shrink: 0 !important; }
             .calendar-week-pagination { padding: 4px 8px !important; border-radius: 14px !important; height: 40px !important; flex-grow: 1 !important; min-width: 0 !important; justify-content: space-between !important; gap: 4px !important; }
             .calendar-week-chevron-btn { padding: 6px !important; border-radius: 10px !important; min-width: 36px !important; height: 36px !important; flex-shrink: 0 !important; }
@@ -2803,13 +2834,13 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 }
 
                 const timelineSegments: TimelineSegment[] = [];
-                let currentPointerMin = 8 * 60; // 08:00
+                let currentPointerMin = 10 * 60; // 10:00 standardmäßig
                 const dayEndMin = 21 * 60; // 21:00
 
                 dayBookingsList.forEach((b) => {
-                  const [sh, sm] = (b.startTime || '08:00').split(':').map(Number);
-                  const [eh, em] = (b.endTime || '09:00').split(':').map(Number);
-                  const bStartMin = Math.max(8 * 60, (sh || 0) * 60 + (sm || 0));
+                  const [sh, sm] = (b.startTime || '10:00').split(':').map(Number);
+                  const [eh, em] = (b.endTime || '11:00').split(':').map(Number);
+                  const bStartMin = Math.max(10 * 60, (sh || 0) * 60 + (sm || 0));
                   const bEndMin = Math.min(dayEndMin, (eh || 0) * 60 + (em || 0));
 
                   // If there is a free gap before this booking
@@ -3209,17 +3240,20 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             </div>
           ) : (
             /* 🖥️ Desktop Left Column: Room catalog and weekly calendar */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, paddingBottom: '0px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isTopCatalogCollapsed ? '0px' : '20px', minWidth: 0, paddingBottom: '24px' }}>
               
               {/* Room Horizontal Picker & Filter Bar */}
               <div 
                 className="glass-panel" 
                 style={{ 
-                  background: 'white', 
-                  borderRadius: '24px', 
-                  border: '1px solid rgba(0, 0, 0, 0.04)', 
-                  padding: '18px 24px', 
-                  boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
+                  background: 'white', borderRadius: '24px', 
+                  border: isTopCatalogCollapsed ? 'none' : '1px solid rgba(0, 0, 0, 0.04)', 
+                  padding: isTopCatalogCollapsed ? '0 24px' : '18px 24px', 
+                  maxHeight: isTopCatalogCollapsed ? '0px' : '480px',
+                  opacity: isTopCatalogCollapsed ? 0 : 1, overflow: 'hidden',
+                  pointerEvents: isTopCatalogCollapsed ? 'none' : 'auto',
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  boxShadow: isTopCatalogCollapsed ? 'none' : '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
                 }}
               >
                 {/* Apple Unified High-Density 1-Row Toolbar */}
@@ -3228,7 +3262,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '10px',
-                  flexWrap: 'nowrap',
+                  rowGap: '10px',
+                  flexWrap: 'wrap',
                   position: 'relative',
                   marginBottom: '18px'
                 }}>
@@ -3514,7 +3549,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
 
                   {/* 4. Filter Controls Cluster */}
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ 
                       background: '#f2f2f7', 
                       borderRadius: '11px', 
@@ -3593,6 +3628,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                         );
                       })}
                     </div>
+                    <RoomTopCatalogToggleBtn isCollapsed={isTopCatalogCollapsed} onToggle={toggleTopCatalog} variant="catalog-toolbar" brandColor={brandColor} />
                   </div>
                 </div>
 
@@ -3624,25 +3660,18 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           background: isSelected ? `${brandColor}06` : 'white',
                           border: isSelected ? `2px solid ${brandColor}` : '1.5px solid #e5e5ea',
                           boxShadow: isSelected ? `0 8px 24px ${brandColor}12` : 'none',
-                          opacity: 1,
-                          padding: '12px 14px',
-                          borderRadius: '16px',
-                          minWidth: '160px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px',
+                          opacity: 1, padding: '10px 14px', borderRadius: '20px',
+                          minWidth: '165px', minHeight: '94px', boxSizing: 'border-box',
+                          cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '6px',
                           transition: 'all 0.2s'
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', width: '100%' }}>
                           <div style={{ 
-                            fontWeight: 800, 
-                            fontSize: '0.85rem', 
-                            color: isSelected ? brandColor : '#1c1c1e',
-                            lineHeight: 1.25,
-                            wordBreak: 'break-word',
-                            flex: 1
+                            fontWeight: 800, fontSize: '0.85rem', color: isSelected ? brandColor : '#1c1c1e',
+                            lineHeight: 1.25, wordBreak: 'break-word', minHeight: '32px', maxHeight: '34px',
+                            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                            flex: 1, minWidth: 0
                           }}>
                             {room.name}
                           </div>
@@ -3709,7 +3738,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
               {/* Weekly / Daily Availability Calendar Grid */}
               <div 
                 className="calendar-grid-card glass-panel" 
-                onClick={() => setDraftBooking(null)}
+                onClick={() => {
+                  setDraftBooking?.(null);
+                  if (showPreviewField && !selectedBooking) {
+                    setShowPreviewField(false);
+                  }
+                }}
                 style={{ 
                   position: 'relative',
                   background: 'white', 
@@ -3719,29 +3753,30 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   boxShadow: '0 4px 24px -4px rgba(0, 0, 0, 0.02), 0 2px 12px -2px rgba(0, 0, 0, 0.01)'
                 }}
               >
-                <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px' }}>
+                <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span>Wochenübersicht: {selectedRoom?.name || 'Wähle einen Raum'}</span>
+                      <span>Wochenübersicht</span>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600 }}>·</span>
+                      {isTopCatalogCollapsed ? (
+                        <RoomHeaderDropdownSelector selectedRoomId={selectedCampusRoomId} rooms={roomsToRender} onSelectRoom={(id) => setSelectedCampusRoomId(id)} brandColor={brandColor} isRoomOccupiedNow={isRoomOccupiedNow} />
+                      ) : (
+                        <span>{selectedRoom?.name || 'Wähle einen Raum'}</span>
+                      )}
                     </h3>
                     {/* Visual Status Legend */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.69rem', fontWeight: 700, color: '#64748b', marginTop: '6px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#34a853' }} />
-                        <span>Regulärer Unterricht</span>
-                      </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#8b5cf6' }} />
-                        <span>Buchung bestätigt (unifarben)</span>
-                      </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 2px, #f5f3ff 2px, #f5f3ff 4px)', border: '1.5px dashed #8b5cf6' }} />
-                        <span>Unter Vorbehalt (lila gestrichelt)</span>
-                      </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: '#eab308' }} />
-                        <span>GrooveLab</span>
-                      </span>
+                      {[
+                        { label: 'Regulärer Unterricht', bg: '#34a853', border: 'none' },
+                        { label: 'Buchung bestätigt (unifarben)', bg: '#8b5cf6', border: 'none' },
+                        { label: 'Unter Vorbehalt (lila gestrichelt)', bg: 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 2px, #f5f3ff 2px, #f5f3ff 4px)', border: '1.5px dashed #8b5cf6' },
+                        { label: 'GrooveLab', bg: '#eab308', border: 'none' },
+                      ].map(leg => (
+                        <span key={leg.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: 9, height: 9, borderRadius: '3px', background: leg.bg, border: leg.border }} />
+                          <span>{leg.label}</span>
+                        </span>
+                      ))}
                     </div>
                   </div>
 
@@ -3792,11 +3827,10 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       </div>
 
                       {!isMobile && (
-                        <RoomSidebarToggleBtn
-                          isOpen={isRightSidebarOpen}
-                          onToggle={toggleSidebar}
-                          brandColor={brandColor}
-                        />
+                        <>
+                          <RoomTopCatalogToggleBtn isCollapsed={isTopCatalogCollapsed} onToggle={toggleTopCatalog} brandColor={brandColor} roomCount={rooms.length} variant="calendar-header" />
+                          <RoomSidebarToggleBtn isOpen={isRightSidebarOpen} onToggle={toggleSidebar} brandColor={brandColor} showDivider={false} />
+                        </>
                       )}
                     </div>
                   </div>
@@ -3823,18 +3857,11 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           <div 
                             key={day.value} 
                             style={{ 
-                              padding: activeHoliday ? '6px 4px' : '12px 4px', 
-                              fontSize: '0.74rem', 
-                              fontWeight: 800, 
-                              color: isToday ? brandColor : '#1c1c1e', 
-                              textAlign: 'center', 
-                              borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none',
-                              position: 'relative',
+                              padding: activeHoliday ? '6px 4px' : '12px 4px', fontSize: '0.74rem', fontWeight: 800, 
+                              color: isToday ? brandColor : '#1c1c1e', textAlign: 'center', 
+                              borderRight: dayIdx < 6 ? '1px solid #e5e5ea' : 'none', position: 'relative',
                               background: isToday ? `${brandColor}04` : '#ffffff',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center'
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
                             }}
                           >
                             {isToday && (
@@ -3868,7 +3895,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     </div>
 
                     {/* Hourly Rows */}
-                    <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: '420px', overflowY: 'auto', position: 'relative', paddingTop: '1px' }}>
+                    <div ref={calendarScrollRef} className="custom-calendar-scrollbar" style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 340px)', minHeight: '480px', overflowY: 'auto', position: 'relative', paddingTop: '1px', paddingBottom: '32px' }}>
                       {TIME_SLOTS.map((hour) => {
                         const slotHourInt = parseInt(hour.split(':')[0]);
                         
@@ -4305,8 +4332,14 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
               /* Booking Form (Shown when showMyBookingsOnly is false) */
               <div 
                 className="glass-panel" 
-                onClickCapture={() => setShowPreviewField(true)}
-                onFocusCapture={() => setShowPreviewField(true)}
+                onClickCapture={(e) => {
+                  if ((e.target as HTMLElement)?.closest('[data-abort-action="true"]')) return;
+                  setShowPreviewField(true);
+                }}
+                onFocusCapture={(e) => {
+                  if ((e.target as HTMLElement)?.closest('[data-abort-action="true"]')) return;
+                  setShowPreviewField(true);
+                }}
                 style={{ 
                   background: isEditing ? '#f6f0ff' : 'white', 
                   borderRadius: '18px', 
@@ -4322,47 +4355,15 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 }}
               >
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: 0, gap: '10px' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1c1c1e', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                    <div style={{ background: `${brandColor}15`, color: brandColor, padding: '4px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-                      <Zap size={13} strokeWidth={2.5} />
-                    </div>
-                    <span>Raumanfrage</span>
-                  </h3>
-                  <select
-                    value={selectedCampusRoomId || ''}
-                    onChange={(e) => {
-                      setSelectedCampusRoomId(e.target.value);
-                    }}
-                    className="premium-input"
-                    style={{ 
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      background: '#f2f2f7', 
-                      color: '#1c1c1e', 
-                      height: '28px', 
-                      padding: '2px 24px 2px 10px', 
-                      fontSize: '0.74rem', 
-                      fontWeight: 700,
-                      width: 'auto', 
-                      minWidth: '100px', 
-                      flexShrink: 1,
-                      border: '1px solid rgba(0, 0, 0, 0.04)',
-                      borderRadius: '8px',
-                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 8px center',
-                      backgroundSize: '10px',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    {rooms.map((r: any) => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <RoomBookingSidebarHeader
+                  brandColor={brandColor}
+                  isEditing={isEditing}
+                  selectedCampusRoomId={selectedCampusRoomId || ''}
+                  rooms={rooms}
+                  onSelectRoom={(roomId) => setSelectedCampusRoomId(roomId)}
+                  hasActiveDraftOrEdit={Boolean(showPreviewField || isEditing || bookingPurpose)}
+                  onCancel={handleCancelBookingDraft}
+                />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Datum</label>
@@ -4728,50 +4729,17 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
                 )}
 
-                <button
-                  onClick={() => selectedRoom && !isRoomOccupied(selectedRoom.id) && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
-                  disabled={!selectedRoom || isRoomOccupied(selectedRoom.id)}
-                  style={{
-                    background: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? '#94a3b8' : brandColor,
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    cursor: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 'not-allowed' : 'pointer',
-                    opacity: (!selectedRoom || isRoomOccupied(selectedRoom.id)) ? 0.55 : 1,
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    marginTop: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    height: '38px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedRoom) {
-                      e.currentTarget.style.opacity = '0.9';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedRoom) {
-                      e.currentTarget.style.opacity = '1';
-                      e.currentTarget.style.transform = 'none';
-                    }
-                  }}
-                >
-                  {!selectedRoom 
-                    ? 'Wähle einen Raum' 
-                    : isEditing 
-                      ? (selectedBooking?.isSchedule ? 'Als Einzeltermin übernehmen' : 'Änderung speichern')
-                      : bookingTargetType === 'external'
-                        ? 'Externe Blockierung speichern'
-                        : `${selectedRoom.name} unter Vorbehalt anfragen`}
-
-                </button>
+                <RoomBookingActionDock
+                  selectedRoom={selectedRoom}
+                  isRoomOccupied={Boolean(selectedRoom && isRoomOccupied(selectedRoom.id))}
+                  isEditing={isEditing}
+                  selectedBooking={selectedBooking}
+                  bookingTargetType={bookingTargetType}
+                  brandColor={brandColor}
+                  hasActiveDraftOrEdit={Boolean(showPreviewField || isEditing || bookingPurpose)}
+                  onSubmit={() => selectedRoom && !isRoomOccupied(selectedRoom.id) && (isEditing ? handleUpdateBooking() : handleAddBooking(selectedRoom.id))}
+                  onCancel={handleCancelBookingDraft}
+                />
 
                 {/* ℹ️ Subsidiaritäts- & Vorbehalts-Hinweis */}
                 <div style={{

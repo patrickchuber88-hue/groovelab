@@ -90,7 +90,7 @@ export const MasterAdminModalsHub: React.FC<MasterAdminModalsHubProps> = ({
         onClose={() => modalStates.setShowMonthlyReportModal(false)}
         selectedReportMonth={modalStates.selectedReportMonth}
         schools={schools.schools}
-        pendingUsers={[]}
+        pendingUsers={schools.pendingUsers || []}
         priceCampus={pricing.priceCampus}
         priceGroovelab={pricing.priceGroovelab}
         priceKombi={pricing.priceKombi}

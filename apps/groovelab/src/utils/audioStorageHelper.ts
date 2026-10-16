@@ -275,7 +275,7 @@ export async function resolvePlayableAudioSource(
 /**
  * Enterprise+ Audio Storage Helper
  * Provides a secure mechanism to retrieve streaming URLs for user audio files
- * with HMAC-signed URL generation (15 min TTL) and seamless fallback to public storage.
+ * with HMAC-signed URL generation (30 min TTL / 1,800s) and seamless fallback to public storage.
  */
 
 // In-memory cache for generated signed URLs to avoid redundant signing requests during playback

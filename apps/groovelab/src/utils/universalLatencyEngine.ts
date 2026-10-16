@@ -42,13 +42,32 @@ export class UniversalLatencyEngine {
    * 3. Falls back to zero-touch hardware & Bluetooth heuristic (detectDeviceLatencyInfo).
    */
   public static getLatencyMs(audioCtx?: AudioContext | null): number {
-    if (typeof window === 'undefined') return 70;
+    if (typeof window === 'undefined') return 42;
 
     if (this.cachedLatencyMs !== null) {
       return this.cachedLatencyMs;
     }
 
     try {
+      // 🛡️ One-time self-healing migration (v2): Purge uncompensated v1 ScriptProcessor(4096) artifacts (96..180ms, e.g. 134ms on Mac)
+      if (localStorage.getItem('campus_latency_cal_v2_engine') !== '1') {
+        const detectedInit = detectDeviceLatencyInfo(audioCtx);
+        const masterInit = parseInt(localStorage.getItem(MASTER_LATENCY_STORAGE_KEY) || '', 10);
+        const loopInit = parseInt(localStorage.getItem('groovelab_sync_offset_ms') || '', 10);
+        if (!detectedInit.isBluetoothSuspected && ((masterInit > 95 && masterInit < 180) || (loopInit > 95 && loopInit < 180))) {
+          localStorage.removeItem(MASTER_LATENCY_STORAGE_KEY);
+          localStorage.removeItem('groovelab_sync_offset_ms');
+          localStorage.removeItem('campus_timing_latency_offset');
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('groovelab_latency_dev_') || k.startsWith('campus_audio_latency_speaker_'))) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+        localStorage.setItem('campus_latency_cal_v2_engine', '1');
+      }
+
       // 1. Primary SSOT key
       const masterSaved = localStorage.getItem(MASTER_LATENCY_STORAGE_KEY);
       if (masterSaved !== null) {
