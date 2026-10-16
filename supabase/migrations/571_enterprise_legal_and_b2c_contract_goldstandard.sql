@@ -52,6 +52,8 @@ CREATE POLICY "school_license_contracts_tenant_isolation"
 -- ------------------------------------------------------------------------------
 -- 2. HARDENED RPC: public.record_user_legal_consent (P0-01)
 -- ------------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.record_user_legal_consent(UUID, UUID, TEXT, TEXT[], TEXT, JSONB, TEXT, TEXT, JSONB);
+
 CREATE OR REPLACE FUNCTION public.record_user_legal_consent(
     p_user_id UUID,
     p_school_id UUID,
