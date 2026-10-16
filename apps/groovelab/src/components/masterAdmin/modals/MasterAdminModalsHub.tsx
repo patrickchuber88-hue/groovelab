@@ -1,5 +1,11 @@
 import React, { Suspense, lazy } from 'react';
 import type { School, MasterAdminPortalTab } from '../MasterAdminTypes';
+import type { useMasterAdminSchools } from '../hooks/useMasterAdminSchools';
+import type { useMasterAdminPricing } from '../hooks/useMasterAdminPricing';
+import type { useMasterAdminOperator } from '../hooks/useMasterAdminOperator';
+import type { useMasterAdminIdleLock } from '../hooks/useMasterAdminIdleLock';
+import type { useMasterAdminModalStates } from '../hooks/useMasterAdminModalStates';
+import type { useMasterAdminStepUp } from '../hooks/useMasterAdminStepUp';
 import { GhostGateModal } from './GhostGateModal';
 import { SchoolArchiveModal } from './SchoolArchiveModal';
 import { MasterCommandPaletteModal } from './MasterCommandPaletteModal';
@@ -11,12 +17,12 @@ import { MasterStepUpChallengeModal } from './MasterStepUpChallengeModal';
 const HelpCenterModal = lazy(() => import('../../help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 
 export interface MasterAdminModalsHubProps {
-  schools: any;
-  pricing: any;
-  operator: any;
-  idleLock: any;
-  modalStates: any;
-  stepUp: any;
+  schools: ReturnType<typeof useMasterAdminSchools>;
+  pricing: ReturnType<typeof useMasterAdminPricing>;
+  operator: ReturnType<typeof useMasterAdminOperator>;
+  idleLock: ReturnType<typeof useMasterAdminIdleLock>;
+  modalStates: ReturnType<typeof useMasterAdminModalStates>;
+  stepUp: ReturnType<typeof useMasterAdminStepUp>;
   activePortalTab: MasterAdminPortalTab;
   setActivePortalTab: (tab: MasterAdminPortalTab) => void;
   onLogout: () => void;
@@ -60,10 +66,15 @@ export const MasterAdminModalsHub: React.FC<MasterAdminModalsHubProps> = ({
         archiveModalSchool={schools.archiveModalSchool}
         onClose={() => schools.setArchiveModalSchool(null)}
         onPauseSchool={(s: School) => schools.handleToggleSchoolStatus(s, 'suspended')}
-        onDeleteSchool={(id: string, name: string) => {
-          stepUp.requestStepUp(`Schule „${name}“ unwiderruflich löschen`, () => {
-            schools.handleDeleteSchool(id, name);
-          });
+        onDeleteSchool={(id: string, name: string, hasInvoices?: boolean) => {
+          stepUp.requestStepUp(
+            hasInvoices
+              ? `Schule „${name}“ DSGVO-bereinigen & GoBD-archivieren`
+              : `Schule „${name}“ unwiderruflich löschen`,
+            () => {
+              schools.handleDeleteSchool(id, name, hasInvoices);
+            }
+          );
         }}
       />
 

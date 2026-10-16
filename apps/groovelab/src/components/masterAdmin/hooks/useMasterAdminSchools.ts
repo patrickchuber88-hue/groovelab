@@ -414,9 +414,19 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     }
   }, [fetchSchoolsAndStats, notify]);
 
-  const handleDeleteSchool = useCallback(async (id: string, name: string) => {
+  const handleDeleteSchool = useCallback(async (id: string, name: string, hasInvoices: boolean = false) => {
     try {
       setLoading(true);
+
+      // 1. Serverseitiger DSGVO Art. 17 Daten-Purge via autoritative Postgres RPC
+      // (Löscht Schüler, Räume, Kioske, Bands, Schedules, Chats & Session-Leases atomar und transaktionssicher)
+      try {
+        await supabase.rpc('purge_school_test_data', { p_school_id: id });
+      } catch (rpcErr) {
+        console.warn('[useMasterAdminSchools] purge_school_test_data notice:', rpcErr);
+      }
+
+      // 2. Bereinigung verbleibender schulbezogener Tabellen
       await Promise.allSettled([
         supabase.from('schedules').delete().eq('school_id', id),
         supabase.from('rooms').delete().eq('school_id', id),
@@ -430,8 +440,25 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         supabase.from('users').delete().eq('school_id', id)
       ]);
 
+      if (hasInvoices) {
+        // GoBD-Fall: Rechnungen existieren (§ 147 AO) -> Status wird auf 'archived' gesetzt, Rechnungen bleiben 10 Jahre WORM-geschützt
+        await supabase.from('schools').update({
+          status: 'archived',
+          is_paused: true,
+          deleted_at: new Date().toISOString()
+        }).eq('id', id);
+
+        setArchiveModalSchool(null);
+        setSelectedSchool(null);
+        notify(`Schule „${name}“ wurde DSGVO-bereinigt und GoBD-konform archiviert (Rechnungsbelege bleiben 10 Jahre gesetzlich geschützt).`);
+        await fetchSchoolsAndStats();
+        return;
+      }
+
+      // Testschul-Fall: Keine Rechnungen vorhanden -> Vollständiges Hard-Delete der Schule
       const { error } = await supabase.from('schools').delete().eq('id', id);
       if (error) {
+        // Falls unerwartete Foreign Keys existieren, sauberes GoBD-Fallback
         await supabase.from('schools').update({
           status: 'archived',
           is_paused: true,
@@ -439,7 +466,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         }).eq('id', id);
         setArchiveModalSchool(null);
         setSelectedSchool(null);
-        notify('Schule wurde GoBD-konform archiviert (Rechnungsbelege bleiben gesetzlich geschützt).');
+        notify(`Schule „${name}“ wurde archiviert (Verknüpfte Referenzen bleiben geschützt).`);
         await fetchSchoolsAndStats();
         return;
       }
@@ -447,10 +474,10 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       setSchools(prev => prev.filter(s => s.id !== id));
       setArchiveModalSchool(null);
       setSelectedSchool(null);
-      notify(`Schule „${name}“ wurde erfolgreich gelöscht.`);
+      notify(`Schule „${name}“ wurde erfolgreich vollständig gelöscht.`);
       await fetchSchoolsAndStats();
     } catch (err: unknown) {
-      alert('Fehler beim Löschen: ' + (err instanceof Error ? err.message : String(err)));
+      alert('Fehler beim Ausführen der Aktion: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
