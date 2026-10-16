@@ -1,16 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Music, ArrowLeft, Fingerprint, KeyRound, RotateCw, 
-  Camera, CameraOff, X, Check, Pencil, QrCode, Tablet, GraduationCap, Lock, Delete, Users, ShieldCheck, Upload 
+  Camera, CameraOff, X, Check, Pencil, QrCode, Tablet, GraduationCap, Lock, Delete, Users, ShieldCheck, Upload,
+  Compass
 } from 'lucide-react';
 import { CampusLoginSponsorBadge } from '../ui/CampusLoginSponsorBadge';
 import { TriAuthMethod } from './TriAuthGatewayBar';
 import { stopAllCameras } from '../../utils/cameraKillSwitch';
+import { resetTenantAndNavigateToSelection } from '../../utils/tenantUrlHelper';
 
 export interface SchoolLoginStudioLayoutProps {
   isGroovelabKiosk: boolean;
   onTogglePlatform?: (isGroovelab: boolean) => void;
   onFileUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onResetToSchoolSelection?: () => void;
   schoolData: any;
   schoolName: string;
   logoError: boolean;
@@ -141,8 +144,17 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
   setLoginConsentAccepted,
   setLegalModalTab,
   effectiveStationId,
-  devBypassSlot
+  devBypassSlot,
+  onResetToSchoolSelection
 }) => {
+  const handleSchoolSelectionClick = () => {
+    if (onResetToSchoolSelection) {
+      onResetToSchoolSelection();
+    } else {
+      resetTenantAndNavigateToSelection();
+    }
+  };
+
   // 🏛️ Sovereign Brand Tokens (Axiom 1 & 9: Campus 100% Emerald Green, GrooveLab 100% Warm Amber)
   const brandPrimaryColor = isGroovelabKiosk ? '#facc15' : '#16a34a';
   const brandAccentColor = isGroovelabKiosk ? '#facc15' : '#4ade80';
@@ -308,6 +320,48 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
         >
           {isGroovelabKiosk ? 'Groovelab-Login' : 'Campus-Login'}
         </div>
+
+        {/* 🧭 Schulauswahl-Shortcut (Subdomain-Trapping Schutz & Apex-Return) */}
+        <button
+          type="button"
+          onClick={handleSchoolSelectionClick}
+          role="button"
+          tabIndex={0}
+          aria-label="Andere Musikschule auswählen"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleSchoolSelectionClick();
+            }
+          }}
+          style={{
+            marginTop: '8px',
+            background: isGroovelabKiosk ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.10)',
+            border: isGroovelabKiosk ? '1px solid rgba(113, 63, 18, 0.25)' : '1px solid rgba(255, 255, 255, 0.20)',
+            borderRadius: '9999px',
+            padding: '5px 14px',
+            color: isGroovelabKiosk ? '#713f12' : '#ffffff',
+            fontSize: '11.5px',
+            fontWeight: 800,
+            letterSpacing: '0.01em',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            transition: 'all 0.2s ease',
+            minHeight: '30px',
+            userSelect: 'none'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(255, 255, 255, 0.70)' : 'rgba(255, 255, 255, 0.20)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = isGroovelabKiosk ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.10)';
+          }}
+        >
+          <Compass size={13} strokeWidth={2.4} aria-hidden="true" />
+          <span>Andere Musikschule auswählen</span>
+        </button>
       </div>
 
       {/* ─── NETFLIX-STYLE MULTI-PROFIL SCHNELL-LOGIN ("WER ÜBT HEUTE?") ─── */}
@@ -1286,6 +1340,18 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           onMouseLeave={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#94a3b8'; }}
         >
           Barrierefreiheit
+        </span>
+        <span style={{ opacity: isGroovelabKiosk ? 0.6 : 0.4, color: isGroovelabKiosk ? '#713f12' : '#94a3b8' }}>•</span>
+        <span 
+          role="button"
+          tabIndex={0}
+          onClick={handleSchoolSelectionClick} 
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSchoolSelectionClick(); } }}
+          style={{ cursor: 'pointer', outline: 'none', borderRadius: '4px', padding: '2px 4px', transition: 'color 0.2s' }} 
+          onMouseEnter={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#0f172a' : '#ffffff'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = isGroovelabKiosk ? '#713f12' : '#94a3b8'; }}
+        >
+          Schule wechseln
         </span>
       </footer>
 

@@ -559,8 +559,9 @@ export const authenticateMasterBiometricPasskey = async (
 export const registerMasterPasskeyAuthoritative = async (
   supabase: any,
   masterUserId: string,
-  deviceName: string = 'Master TouchID / YubiKey'
-): Promise<{ success: boolean; error?: string }> => {
+  deviceName: string = 'Master TouchID / YubiKey',
+  totpCode?: string
+): Promise<{ success: boolean; error?: string; leaseToken?: string }> => {
   if (!isWebAuthnSupported()) {
     return { success: false, error: 'WebAuthn / Biometrie wird von diesem Gerät nicht unterstützt.' };
   }
@@ -615,11 +616,29 @@ export const registerMasterPasskeyAuthoritative = async (
       p_credential_id: credential.id,
       p_public_key: rawId,
       p_device_name: deviceName,
-      p_challenge: chalData.challenge
+      p_challenge: chalData.challenge,
+      p_totp_code: totpCode ? totpCode.trim() : null
     });
 
     if (regErr || !regResult?.success) {
       return { success: false, error: regResult?.error || regErr?.message || 'Passkey-Registrierung in der Datenbank fehlgeschlagen.' };
+    }
+
+    // 🛡️ NIST SP 800-63B AAL3: Persist newly minted lease token if returned by authoritative DB RPC
+    if (regResult?.lease_token) {
+      const leaseToken = String(regResult.lease_token);
+      try {
+        sessionStorage.setItem('gl_active_session_lease_id', leaseToken);
+        localStorage.setItem('gl_active_session_lease_id', leaseToken);
+        sessionStorage.setItem('groovelab_user_id', masterUserId);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('groovelab_user_id', masterUserId);
+        }
+        sessionStorage.setItem('groovelab_is_master_admin', 'true');
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('groovelab_is_master_admin', 'true');
+        }
+      } catch {}
     }
 
     // Save local hint so UI knows a passkey is registered locally
@@ -629,7 +648,10 @@ export const registerMasterPasskeyAuthoritative = async (
       createdAt: new Date().toISOString()
     }));
 
-    return { success: true };
+    return { 
+      success: true,
+      leaseToken: regResult?.lease_token ? String(regResult.lease_token) : undefined
+    };
   } catch (err: any) {
     if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
       return { success: false, error: 'Passkey-Erstellung abgebrochen.' };

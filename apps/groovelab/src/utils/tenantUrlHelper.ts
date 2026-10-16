@@ -38,7 +38,7 @@ export function getTenantSubdomain(schoolName: string, explicitSubdomain?: strin
 /**
  * Resolves the base root domain of the current environment.
  */
-function getBasePlatformDomain(): string {
+export function getBasePlatformDomain(): string {
   if (typeof window === 'undefined') return 'campus-groovelab.de';
   let cleanHost = window.location.host;
   if (cleanHost.startsWith('www.')) {
@@ -51,6 +51,36 @@ function getBasePlatformDomain(): string {
     }
   }
   return 'campus-groovelab.de';
+}
+
+/**
+ * Resolves the canonical apex URL of the platform root (Schulauswahl / Startseite).
+ */
+export function getPlatformApexUrl(): string {
+  if (typeof window === 'undefined') return 'https://campus-groovelab.de/';
+  const host = window.location.host;
+  const protocol = window.location.protocol;
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    const port = host.split(':')[1] || '5173';
+    return `${protocol}//localhost:${port}/`;
+  }
+  const baseDomain = getBasePlatformDomain();
+  return `${protocol}//${baseDomain}/`;
+}
+
+/**
+ * Resets tenant-specific caches and safely navigates to the global school selection.
+ */
+export function resetTenantAndNavigateToSelection(): void {
+  try {
+    localStorage.removeItem('groovelab_last_school_id');
+    localStorage.removeItem('groovelab_school_id');
+    localStorage.removeItem('groovelab_last_subdomain');
+    localStorage.removeItem('groovelab_cached_schools');
+  } catch (_) {}
+  if (typeof window !== 'undefined') {
+    window.location.href = getPlatformApexUrl();
+  }
 }
 
 /**

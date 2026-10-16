@@ -398,17 +398,31 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
   const handleArchiveSchool = useCallback(async (school: School) => {
     try {
       setArchivingSchool(true);
-      await supabase.from('schools').update({
-        is_paused: true,
-        status: 'archived'
-      }).eq('id', school.id);
+      await ensureMasterAdminSessionLease();
 
-      notify(`Schule "${school.name}" DSGVO-konform archiviert.`);
+      const { data, error } = await supabase.rpc('delete_school_cascade', {
+        p_school_id: school.id,
+        p_archive_only: true
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const result = data as { success?: boolean; message?: string; error?: string } | null;
+      if (result && result.success === false) {
+        throw new Error(result.message || result.error || 'Server verweigerte die Archivierung.');
+      }
+
+      notify(result?.message || `Schule „${school.name}“ wurde DSGVO-bereinigt und GoBD-konform archiviert.`);
       setArchiveModalSchool(null);
       setArchiveConfirmName('');
       await fetchSchoolsAndStats();
     } catch (err: unknown) {
-      alert('Fehler beim Archivieren: ' + (err instanceof Error ? err.message : String(err)));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[useMasterAdminSchools] handleArchiveSchool error:', err);
+      alert('Fehler beim Archivieren: ' + msg);
+      notify(`Fehler beim Archivieren: ${msg}`);
     } finally {
       setArchivingSchool(false);
     }
@@ -418,70 +432,51 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     try {
       setLoading(true);
 
-      // 1. Serverseitiger DSGVO Art. 17 Daten-Purge via autoritative Postgres RPC
-      // (Löscht Schüler, Räume, Kioske, Bands, Schedules, Chats & Session-Leases atomar und transaktionssicher)
-      try {
-        await supabase.rpc('purge_school_test_data', { p_school_id: id });
-      } catch (rpcErr) {
-        console.warn('[useMasterAdminSchools] purge_school_test_data notice:', rpcErr);
-      }
+      // 🛡️ Zero-Trust Lease Assurance
+      await ensureMasterAdminSessionLease();
 
-      // 2. Bereinigung verbleibender schulbezogener Tabellen
-      await Promise.allSettled([
-        supabase.from('schedules').delete().eq('school_id', id),
-        supabase.from('rooms').delete().eq('school_id', id),
-        supabase.from('kiosks').delete().eq('school_id', id),
-        supabase.from('bands').delete().eq('school_id', id),
-        supabase.from('shouts').delete().eq('school_id', id),
-        supabase.from('campus_events').delete().eq('school_id', id),
-        supabase.from('school_billing_accounts').delete().eq('school_id', id),
-        supabase.from('school_user_statistics').delete().eq('school_id', id),
-        supabase.from('pending_students_decrypted').delete().eq('school_id', id),
-        supabase.from('users').delete().eq('school_id', id)
-      ]);
+      // 🛡️ Authoritative Server-Side Cascade RPC (OWASP ASVS L3 / GoBD § 147 AO / DSGVO Art. 17)
+      const { data, error } = await supabase.rpc('delete_school_cascade', {
+        p_school_id: id,
+        p_archive_only: hasInvoices
+      });
 
-      if (hasInvoices) {
-        // GoBD-Fall: Rechnungen existieren (§ 147 AO) -> Status wird auf 'archived' gesetzt, Rechnungen bleiben 10 Jahre WORM-geschützt
-        await supabase.from('schools').update({
-          status: 'archived',
-          is_paused: true,
-          deleted_at: new Date().toISOString()
-        }).eq('id', id);
-
-        setArchiveModalSchool(null);
-        setSelectedSchool(null);
-        notify(`Schule „${name}“ wurde DSGVO-bereinigt und GoBD-konform archiviert (Rechnungsbelege bleiben 10 Jahre gesetzlich geschützt).`);
-        await fetchSchoolsAndStats();
-        return;
-      }
-
-      // Testschul-Fall: Keine Rechnungen vorhanden -> Vollständiges Hard-Delete der Schule
-      const { error } = await supabase.from('schools').delete().eq('id', id);
       if (error) {
-        // Falls unerwartete Foreign Keys existieren, sauberes GoBD-Fallback
-        await supabase.from('schools').update({
-          status: 'archived',
-          is_paused: true,
-          deleted_at: new Date().toISOString()
-        }).eq('id', id);
-        setArchiveModalSchool(null);
-        setSelectedSchool(null);
-        notify(`Schule „${name}“ wurde archiviert (Verknüpfte Referenzen bleiben geschützt).`);
-        await fetchSchoolsAndStats();
-        return;
+        throw error;
       }
 
-      setSchools(prev => prev.filter(s => s.id !== id));
-      setArchiveModalSchool(null);
-      setSelectedSchool(null);
-      notify(`Schule „${name}“ wurde erfolgreich vollständig gelöscht.`);
+      const result = data as { success?: boolean; action?: string; message?: string; error?: string } | null;
+      if (result && result.success === false) {
+        throw new Error(result.message || result.error || 'Server verweigerte das Löschen/Archivieren.');
+      }
+
+      if (result?.action === 'deleted') {
+        setSchools(prev => prev.filter(s => s.id !== id));
+        if (selectedSchool?.id === id) {
+          selectSchool(null);
+        }
+        setArchiveModalSchool(null);
+        notify(result.message || `Schule „${name}“ wurde erfolgreich vollständig gelöscht.`);
+      } else {
+        // 'archived'
+        setSchools(prev => prev.map(s => s.id === id ? { ...s, status: 'archived', is_paused: true, is_active: false } : s));
+        if (selectedSchool?.id === id) {
+          selectSchool({ ...selectedSchool, status: 'archived', is_paused: true, is_active: false });
+        }
+        setArchiveModalSchool(null);
+        notify(result?.message || `Schule „${name}“ wurde DSGVO-bereinigt und GoBD-konform archiviert.`);
+      }
+
       await fetchSchoolsAndStats();
     } catch (err: unknown) {
-      alert('Fehler beim Ausführen der Aktion: ' + (err instanceof Error ? err.message : String(err)));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[useMasterAdminSchools] handleDeleteSchool error:', err);
+      alert('Fehler beim Ausführen der Aktion: ' + msg);
+      notify(`Fehler: ${msg}`);
     } finally {
       setLoading(false);
     }
-  }, [fetchSchoolsAndStats, notify]);
+  }, [fetchSchoolsAndStats, notify, selectSchool, selectedSchool]);
 
   const handleStartGhostMode = useCallback(async (school: School, reasonStr: string = 'Support & Diagnostik') => {
     try {

@@ -55,8 +55,11 @@
   window.addEventListener('error', function(e) {
     try {
       if (!isReactMounted()) {
-        console.warn('[PWA Self-Healing] Pre-mount error intercepted:', e.message || e);
-        purgeCachesAndReload();
+        var msg = (e && e.message) ? String(e.message) : '';
+        if (msg && (msg.indexOf('dynamically imported module') !== -1 || msg.indexOf('Loading chunk') !== -1 || msg.indexOf('ChunkLoadError') !== -1)) {
+          console.warn('[PWA Self-Healing] Script chunk load error intercepted:', msg);
+          purgeCachesAndReload();
+        }
       }
     } catch (_) {}
   });
@@ -65,8 +68,11 @@
   window.addEventListener('unhandledrejection', function(e) {
     try {
       if (!isReactMounted()) {
-        console.warn('[PWA Self-Healing] Pre-mount unhandled rejection intercepted:', e.reason);
-        purgeCachesAndReload();
+        var reason = (e && e.reason) ? (e.reason.message || String(e.reason)) : '';
+        if (reason && (reason.indexOf('dynamically imported module') !== -1 || reason.indexOf('Loading chunk') !== -1 || reason.indexOf('ChunkLoadError') !== -1)) {
+          console.warn('[PWA Self-Healing] Pre-mount dynamic chunk rejection intercepted:', reason);
+          purgeCachesAndReload();
+        }
       }
     } catch (_) {}
   });

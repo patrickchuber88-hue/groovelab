@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Building2, Search, Plus, RefreshCw, Eye, Trash2, Download, Check, Copy,
-  ShieldCheck, Clock, Zap, CheckCircle2, ShieldAlert, Phone, Edit3, X, AlertCircle
+  ShieldCheck, Clock, ShieldAlert, Phone, X, AlertCircle
 } from 'lucide-react';
 import { isSchoolBypassActive } from '../../../domain/pricingEngine';
 import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
@@ -40,7 +40,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   onDeleteSchool,
   onToggleSchoolStatus,
   onProvisionSchool,
-  onUpdateOperatorNotes,
   onExtendTrial,
   onRegenerateInvite,
   onSuspendWithAudit
@@ -58,11 +57,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   const [suspendTargetSchool, setSuspendTargetSchool] = useState<School | null>(null);
   const [suspendReason, setSuspendReason] = useState('');
   const [suspending, setSuspending] = useState(false);
-
-  // Inline Note Editing State
-  const [editingNoteSchoolId, setEditingNoteSchoolId] = useState<string | null>(null);
-  const [noteDraft, setNoteDraft] = useState('');
-  const [savingNote, setSavingNote] = useState(false);
 
   // Quick Action Feedback states
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
@@ -111,7 +105,12 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       passiveStudentsCnt += m.passiveStudentsCount;
       if (s.avv_signed_at) signedAvvCnt += 1;
 
-      if (!m.isTrialOrBypass && !m.isSuspendedOrArchived && s.status === 'active') {
+      const isSuspendedOrArchived = m.isSuspendedOrArchived || s.status === 'archived' || s.status === 'suspended' || Boolean(s.is_paused);
+      const isPending = s.is_approved === false || s.status === 'pending';
+      const isTrial = isSchoolTrialActive(s) && !isPending;
+      const isPaying = !isTrial && !m.isTrialOrBypass && !isSuspendedOrArchived && !isPending;
+
+      if (isPaying && m.totalMonthlyNet > 0) {
         paying += 1;
         combinedMrr += m.totalMonthlyNet;
       }
@@ -210,9 +209,14 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
       }
 
       if (statusTab === 'active') {
-        if (s.status !== 'active' || isSchoolTrialActive(s) || s.is_approved === false || s.is_paused) return false;
+        const isPending = s.is_approved === false || s.status === 'pending';
+        const isPaused = Boolean(s.is_paused) || s.status === 'suspended' || s.status === 'archived';
+        const isTrial = isSchoolTrialActive(s);
+        if (isPending || isPaused || isTrial) return false;
       } else if (statusTab === 'trial') {
-        if (!isSchoolTrialActive(s) || s.is_approved === false) return false;
+        const isPending = s.is_approved === false || s.status === 'pending';
+        const isPaused = Boolean(s.is_paused) || s.status === 'suspended' || s.status === 'archived';
+        if (!isSchoolTrialActive(s) || isPending || isPaused) return false;
       } else if (statusTab === 'pending') {
         if (s.is_approved !== false && s.status !== 'pending') return false;
       } else if (statusTab === 'archived') {
@@ -257,8 +261,8 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
   }, [sanitizedSchools, searchQuery, moduleFilter, statusTab, actionFilter, sortOption, schoolStats, schoolMetricsMap]);
 
   const pendingCount = nonArchivedSchools.filter(s => s.is_approved === false || s.status === 'pending').length;
-  const trialCount = nonArchivedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false).length;
-  const activeCount = nonArchivedSchools.filter(s => s.status === 'active' && !isSchoolTrialActive(s) && s.is_approved !== false && !s.is_paused).length;
+  const trialCount = nonArchivedSchools.filter(s => isSchoolTrialActive(s) && s.is_approved !== false && s.status !== 'pending' && !s.is_paused && s.status !== 'suspended').length;
+  const activeCount = nonArchivedSchools.filter(s => !isSchoolTrialActive(s) && s.is_approved !== false && s.status !== 'pending' && !s.is_paused && s.status !== 'suspended').length;
   const archivedCount = sanitizedSchools.filter(s => s.status === 'archived' || s.is_paused || s.status === 'suspended').length;
 
   // 1-Click CSV Export using SSOT computeSchoolBillingMetrics
@@ -339,20 +343,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
     } catch (err: unknown) {
       alert('Fehler beim Kopieren: ' + (err instanceof Error ? err.message : String(err)));
       setCopiedInviteId(null);
-    }
-  };
-
-  const handleSaveNote = async (schoolId: string) => {
-    try {
-      setSavingNote(true);
-      if (onUpdateOperatorNotes) {
-        await onUpdateOperatorNotes(schoolId, noteDraft.trim());
-      }
-      setEditingNoteSchoolId(null);
-    } catch (e: unknown) {
-      alert('Fehler beim Speichern der Notiz: ' + (e instanceof Error ? e.message : String(e)));
-    } finally {
-      setSavingNote(false);
     }
   };
 
@@ -582,7 +572,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           </div>
         </div>
 
-        {/* Merged Operator Action Center Card */}
+        {/* Card 4: Ø ARPU / Mandant */}
         <div style={{
           background: '#ffffff',
           borderRadius: '20px',
@@ -593,117 +583,18 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
           flexDirection: 'column',
           justifyContent: 'space-between'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-              <Zap size={12} color="#0f172a" /> Action Center Filter
+          <div>
+            <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Ø ARPU / B2B Mandant
             </span>
-            {actionFilter !== 'all' && (
-              <button
-                type="button"
-                onClick={() => setActionFilter('all')}
-                style={{
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  background: '#f1f5f9',
-                  border: 'none',
-                  color: '#475569',
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                Reset
-              </button>
-            )}
+            <h3 style={{ fontSize: '2.0rem', fontWeight: 900, margin: '5px 0 0 0', color: '#0f172a', letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
+              {totalPayingSchools > 0 ? (totalCombinedMrr / totalPayingSchools).toFixed(2).replace('.', ',') : '0,00'} €
+            </h3>
           </div>
-
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginTop: '8px' }}>
-            {expiringTrialSchools.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActionFilter(actionFilter === 'expiring_trial' ? 'all' : 'expiring_trial')}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '100px',
-                  border: actionFilter === 'expiring_trial' ? 'none' : '1px solid #fde68a',
-                  background: actionFilter === 'expiring_trial' ? '#fef3c7' : '#ffffff',
-                  color: '#b45309',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Clock size={11} />
-                <span>{expiringTrialSchools.length} Test &lt;7d</span>
-              </button>
-            )}
-
-            {missingAvvSchools.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActionFilter(actionFilter === 'missing_avv' ? 'all' : 'missing_avv')}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '100px',
-                  border: actionFilter === 'missing_avv' ? 'none' : '1px solid #ffedd5',
-                  background: actionFilter === 'missing_avv' ? '#ffedd5' : '#ffffff',
-                  color: '#c2410c',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <ShieldAlert size={11} />
-                <span>{missingAvvSchools.length} AVV offen</span>
-              </button>
-            )}
-
-            {inactiveSchools.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setActionFilter(actionFilter === 'inactive' ? 'all' : 'inactive')}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: '100px',
-                  border: actionFilter === 'inactive' ? 'none' : '1px solid #fee2e2',
-                  background: actionFilter === 'inactive' ? '#fee2e2' : '#ffffff',
-                  color: '#b91c1c',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <AlertCircle size={11} />
-                <span>{inactiveSchools.length} Inaktiv (&gt;14d)</span>
-              </button>
-            )}
-
-            {expiringTrialSchools.length === 0 && missingAvvSchools.length === 0 && inactiveSchools.length === 0 && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '5px 10px',
-                borderRadius: '100px',
-                background: '#ecfdf5',
-                border: 'none',
-                color: '#059669',
-                fontSize: '0.72rem',
-                fontWeight: 800
-              }}>
-                <CheckCircle2 size={12} />
-                <span>0 offene Aufgaben</span>
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
+            <span style={{ background: '#f8fafc', border: '1px solid #e2e8f0', color: '#0f172a', padding: '2px 8px', borderRadius: '8px' }}>
+              {totalPayingSchools} von {nonArchivedSchools.length} konvertiert
+            </span>
           </div>
         </div>
       </div>
@@ -767,7 +658,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
             })}
           </div>
 
-          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
             {[
               { id: 'all', label: 'Alle Module' },
               { id: 'kombi', label: 'Kombi' },
@@ -796,6 +687,97 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                 </button>
               );
             })}
+
+            {missingAvvSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'missing_avv' ? 'all' : 'missing_avv')}
+                style={{
+                  padding: '6px 11px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'missing_avv' ? 'none' : '1px solid #fed7aa',
+                  background: actionFilter === 'missing_avv' ? '#ffedd5' : '#ffffff',
+                  color: '#c2410c',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <ShieldAlert size={12} />
+                <span>{missingAvvSchools.length} AVVs offen</span>
+              </button>
+            )}
+
+            {expiringTrialSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'expiring_trial' ? 'all' : 'expiring_trial')}
+                style={{
+                  padding: '6px 11px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'expiring_trial' ? 'none' : '1px solid #fde68a',
+                  background: actionFilter === 'expiring_trial' ? '#fef3c7' : '#ffffff',
+                  color: '#b45309',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Clock size={12} />
+                <span>{expiringTrialSchools.length} Test &lt;7d</span>
+              </button>
+            )}
+
+            {inactiveSchools.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActionFilter(actionFilter === 'inactive' ? 'all' : 'inactive')}
+                style={{
+                  padding: '6px 11px',
+                  borderRadius: '100px',
+                  border: actionFilter === 'inactive' ? 'none' : '1px solid #fecaca',
+                  background: actionFilter === 'inactive' ? '#fee2e2' : '#ffffff',
+                  color: '#b91c1c',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <AlertCircle size={12} />
+                <span>{inactiveSchools.length} Inaktiv (&gt;14d)</span>
+              </button>
+            )}
+
+            {actionFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setActionFilter('all')}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '100px',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  color: '#475569',
+                  fontSize: '0.70rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                Filter zurücksetzen
+              </button>
+            )}
           </div>
         </div>
 
@@ -806,7 +788,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Suche nach Schulname, Schulleitung, PLZ, Ort, Notiz..."
+              placeholder="Suche nach Schulname, Schulleitung, PLZ, Ort, E-Mail..."
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
@@ -910,14 +892,13 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase'
                 }}>
-                  <th style={{ padding: '9px 12px', width: '20%' }}>Mandant &amp; Standort</th>
-                  <th style={{ padding: '9px 10px', width: '14%' }}>Schulleitung &amp; Kontakt</th>
-                  <th style={{ padding: '9px 10px', width: '14%' }}>Vertrag &amp; Aktivität</th>
-                  <th style={{ padding: '9px 10px', width: '8%' }}>DSGVO</th>
-                  <th style={{ padding: '9px 10px', width: '13%' }}>Nutzer (L / S)</th>
+                  <th style={{ padding: '9px 12px', width: '22%' }}>Mandant &amp; Standort</th>
+                  <th style={{ padding: '9px 10px', width: '18%' }}>Schulleitung &amp; Kontakt</th>
+                  <th style={{ padding: '9px 10px', width: '16%' }}>Vertrag &amp; Aktivität</th>
+                  <th style={{ padding: '9px 10px', width: '9%' }}>DSGVO</th>
+                  <th style={{ padding: '9px 10px', width: '12%' }}>Nutzer (L / S)</th>
                   <th style={{ padding: '9px 10px', width: '10%' }}>MRR Rate</th>
-                  <th style={{ padding: '9px 10px', width: '7%' }}>Notiz</th>
-                  <th style={{ padding: '9px 12px', width: '14%', textAlign: 'left' }}>Schnellaktionen</th>
+                  <th style={{ padding: '9px 12px', width: '13%', textAlign: 'left' }}>Schnellaktionen</th>
                 </tr>
               </thead>
               <tbody>
@@ -937,7 +918,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                   const act = getSchoolActivityStatus(school);
 
                   const mrr = metrics.totalMonthlyNet;
-                  const isEditingNote = editingNoteSchoolId === school.id;
 
                   return (
                     <tr
@@ -984,7 +964,7 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                       {/* Schulleitung & Kontakt */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.76rem' }}>
+                          <span style={{ fontWeight: 700, color: school.billing_contact_person ? '#1e293b' : '#64748b', fontSize: '0.76rem' }}>
                             {school.billing_contact_person || 'Schulleitung'}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', color: '#64748b' }}>
@@ -995,10 +975,12 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                               >
                                 <Phone size={9} /> {school.phone_number}
                               </a>
-                            ) : (
-                              <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {school.billing_email || school.email || 'Keine E-Mail'}
+                            ) : school.billing_email || school.email ? (
+                              <span style={{ maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#475569' }}>
+                                {school.billing_email || school.email}
                               </span>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Kein Direktkontakt</span>
                             )}
                           </div>
                         </div>
@@ -1119,16 +1101,18 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
 
                       {/* Nutzer Quoten */}
                       <td style={{ padding: '9px 10px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: '0.74rem', color: '#334155', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                          {teachers} Lehrer · {activeStudents} Schüler aktiv
+                        <div style={{ fontSize: '0.74rem', color: activeStudents > 0 || teachers > 0 ? '#1e293b' : '#64748b', fontWeight: 750, whiteSpace: 'nowrap' }}>
+                          {teachers} L · {activeStudents} S aktiv
                         </div>
-                        <div style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
-                          <span style={{ color: '#059669', fontWeight: 700 }}>{campusActive} Campus</span>
-                          <span>·</span>
-                          <span style={{ color: '#d97706', fontWeight: 700 }}>{groovelabActive} GL</span>
-                          <span>·</span>
-                          <span style={{ color: '#94a3b8' }}>{passiveStudents} passiv</span>
-                        </div>
+                        {(campusActive > 0 || groovelabActive > 0 || passiveStudents > 0) ? (
+                          <div style={{ fontSize: '0.66rem', color: '#64748b', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
+                            {campusActive > 0 && <span style={{ color: '#059669', fontWeight: 700 }}>{campusActive} Campus</span>}
+                            {groovelabActive > 0 && <span style={{ color: '#d97706', fontWeight: 700 }}>{groovelabActive} GL</span>}
+                            {passiveStudents > 0 && <span style={{ color: '#94a3b8' }}>{passiveStudents} passiv</span>}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.66rem', color: '#94a3b8' }}>0 Provisioniert</span>
+                        )}
                       </td>
 
                       {/* MRR Rate */}
@@ -1199,85 +1183,6 @@ export const SchoolsTab: React.FC<SchoolsTabProps> = ({
                             </div>
                           )}
                         </div>
-                      </td>
-
-                      {/* Betreiber-Notiz */}
-                      <td style={{ padding: '9px 10px', verticalAlign: 'middle', maxWidth: '100px' }}>
-                        {isEditingNote ? (
-                          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-                            <input
-                              type="text"
-                              value={noteDraft}
-                              onChange={(e) => setNoteDraft(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveNote(school.id);
-                                if (e.key === 'Escape') setEditingNoteSchoolId(null);
-                              }}
-                              placeholder="Notiz..."
-                              autoFocus
-                              style={{
-                                width: '100%',
-                                padding: '4px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #059669',
-                                fontSize: '0.70rem',
-                                outline: 'none'
-                              }}
-                            />
-                            <button
-                              type="button"
-                              aria-label="Notiz speichern"
-                              onClick={() => handleSaveNote(school.id)}
-                              disabled={savingNote}
-                              style={{
-                                padding: '4px 6px',
-                                borderRadius: '6px',
-                                background: '#059669',
-                                color: '#ffffff',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.68rem'
-                              }}
-                            >
-                              <Check size={10} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              setEditingNoteSchoolId(school.id);
-                              setNoteDraft(school.operator_notes || '');
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setEditingNoteSchoolId(school.id);
-                                setNoteDraft(school.operator_notes || '');
-                              }
-                            }}
-                            style={{
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              color: school.operator_notes ? '#334155' : '#94a3b8',
-                              fontSize: '0.70rem'
-                            }}
-                            title="Klick zum Bearbeiten der internen Notiz"
-                          >
-                            <span style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: '85px'
-                            }}>
-                              {school.operator_notes || '+ Notiz...'}
-                            </span>
-                            <Edit3 size={10} color="#94a3b8" />
-                          </div>
-                        )}
                       </td>
 
                       {/* Schnellaktionen Toolbar */}

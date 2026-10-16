@@ -10,6 +10,7 @@ import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 import { generateB2BSchoolInvoicePDF } from '../../../utils/pdfGenerator';
 import { computeSchoolBillingMetrics, resolveCanonicalStorageFee, CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
 import type { School, SchoolStat } from '../MasterAdminTypes';
+import { SchoolDetailSidebarWidgets } from '../components/SchoolDetailSidebarWidgets';
 
 interface SchoolDetailDrawerProps {
   school: School | null;
@@ -38,6 +39,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDpoPortal, setShowDpoPortal] = useState(false);
   const [revokingSessions, setRevokingSessions] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState(school?.name || '');
@@ -118,28 +120,12 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       });
     }
   }, [
-    school?.id,
-    school?.name,
-    school?.legal_name,
-    school?.phone_number,
-    school?.leitweg_id,
-    school?.status,
-    school?.is_trial,
-    school?.trial_ends_at,
-    school?.created_at,
-    school?.has_campus_subscription,
-    school?.has_groovelab_subscription,
-    school?.subscription_bypass,
-    school?.mfa_enforced_for_admins,
-    school?.storage_addon_gb,
-    school?.extra_storage_gb,
-    school?.extra_billing_option,
-    school?.billing_email,
-    school?.billing_contact_person,
-    school?.zip_code,
-    school?.city,
-    school?.street,
-    school?.house_number
+    school?.id, school?.name, school?.legal_name, school?.phone_number, school?.leitweg_id,
+    school?.status, school?.is_trial, school?.trial_ends_at, school?.created_at,
+    school?.has_campus_subscription, school?.has_groovelab_subscription, school?.subscription_bypass,
+    school?.mfa_enforced_for_admins, school?.storage_addon_gb, school?.extra_storage_gb,
+    school?.extra_billing_option, school?.billing_email, school?.billing_contact_person,
+    school?.zip_code, school?.city, school?.street, school?.house_number
   ]);
 
   if (!school) return null;
@@ -173,11 +159,6 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
     masterPricing
   );
 
-  const teachers = metrics.teachersCount;
-  const totalStudents = metrics.totalStudentsCount;
-  const activeStudents = Math.max(metrics.activeCampusStudentsCount, metrics.activeGroovelabStudentsCount);
-  const passiveStudents = metrics.passiveStudentsCount;
-
   // Canonical 10 GB Base Storage + Booked Add-on
   const STORAGE_PACKAGES: StorageTier[] = masterPricing?.storageTiers || DEFAULT_STORAGE_TIERS;
   const baseStorageGb = 10;
@@ -209,21 +190,42 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    setFormError(null);
+
+    // Preflight Validierung (OWASP ASVS Level 3 / Fail-Closed)
+    if (!name.trim()) {
+      setFormError('Name der Musikschule ist ein Pflichtfeld.');
+      return;
+    }
+    if (!street.trim() || !houseNumber.trim()) {
+      setFormError('Vollständige Anschrift (Straße und Hausnummer) ist zwingend erforderlich.');
+      return;
+    }
+    if (!zipCode.trim() || !city.trim()) {
+      setFormError('Postleitzahl und Ort sind zwingend erforderlich.');
+      return;
+    }
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!billingEmail.trim() || !emailRegex.test(billingEmail.trim())) {
+      setFormError('Bitte eine gültige Rechnungs-E-Mail-Adresse nach RFC 5322 angeben.');
+      return;
+    }
+
     setSaving(true);
     try {
       const addonFee = resolvedStorage.fee;
       const finalStatus = isTrial ? 'trial' : status === 'trial' ? 'active' : status;
       await onUpdateSchool({
-        name,
+        name: name.trim(),
         legal_name: legalName.trim() || null,
-        zip_code: zipCode,
-        city,
-        street,
-        house_number: houseNumber,
+        zip_code: zipCode.trim(),
+        city: city.trim(),
+        street: street.trim(),
+        house_number: houseNumber.trim(),
         phone_number: phoneNumber.trim() || null,
         leitweg_id: leitwegId.trim() || null,
-        billing_email: billingEmail,
-        billing_contact_person: billingContact,
+        billing_email: billingEmail.trim(),
+        billing_contact_person: billingContact.trim() || null,
         status: finalStatus,
         is_trial: isTrial,
         trial_ends_at: isTrial && trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
@@ -241,7 +243,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err: unknown) {
       console.error('Error saving school details:', err);
-      alert('Fehler beim Speichern der Änderungen: ' + (err instanceof Error ? err.message : String(err)));
+      setFormError('Fehler beim Speichern: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setSaving(false);
     }
@@ -366,14 +368,19 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         </div>
 
         {/* Center: 4 Tabs */}
-        <div style={{
-          display: 'inline-flex',
-          background: '#f8fafc',
-          padding: '4px',
-          borderRadius: '14px',
-          gap: '2px',
-          border: '1px solid #e2e8f0'
-        }}>
+        <div
+          role="tablist"
+          aria-label="Mandanten-Bereiche"
+          style={{
+            display: 'inline-flex',
+            background: '#f8fafc',
+            padding: '4px',
+            borderRadius: '14px',
+            gap: '2px',
+            border: '1px solid #e2e8f0',
+            flexShrink: 0
+          }}
+        >
           {[
             { id: 'overview', label: 'Stammdaten', icon: Building },
             { id: 'licenses', label: 'Module & Tarife', icon: Sliders },
@@ -386,6 +393,10 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                id={`tab-${tab.id}`}
+                aria-selected={isSel}
+                aria-controls={`panel-${tab.id}`}
                 onClick={() => setActiveTab(tab.id as 'overview' | 'licenses' | 'quotas' | 'avv')}
                 style={{
                   padding: '7px 16px',
@@ -401,11 +412,13 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   alignItems: 'center',
                   gap: '6px',
                   boxShadow: isSel ? '0 2px 8px rgba(5, 150, 105, 0.08)' : 'none',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}
               >
                 <Icon size={14} color={isSel ? '#047857' : '#64748b'} />
-                <span>{tab.label}</span>
+                <span style={{ whiteSpace: 'nowrap' }}>{tab.label}</span>
               </button>
             );
           })}
@@ -652,49 +665,12 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
               </div>
             </div>
 
-            {/* Right Card: Quick Tenant Metrics */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '24px',
-                padding: '28px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-              }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
-                  Mandanten-Überblick &amp; Status
-                </h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Lehrkräfte</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>{teachers}</div>
-                  </div>
-                  <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Gesamtschüler</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>{totalStudents}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#ecfdf5', borderRadius: '16px', border: 'none' }}>
-                  <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>Aktivierte Profile</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#065f46' }}>
-                      {activeStudents} Schüler aktiv
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 700 }}>Passiv im Register</div>
-                    <div style={{ fontSize: '0.90rem', fontWeight: 800, color: '#065f46' }}>
-                      {passiveStudents} Schüler ({metrics.step6PassiveStudentBaseFee.toFixed(2).replace('.', ',')} {metrics.currencySymbol})
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Right Column: Autarkes Satelliten-Modul (Monolith Ceiling Goldstandard) */}
+            <SchoolDetailSidebarWidgets
+              school={school}
+              metrics={metrics}
+              schoolStats={schoolStats}
+            />
           </div>
         )}
 
@@ -1304,6 +1280,37 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
 
       </main>
 
+      {/* Form Error Notification Toast */}
+      {formError && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          right: '120px',
+          background: '#fef2f2',
+          border: '1px solid #fca5a5',
+          borderRadius: '12px',
+          padding: '10px 18px',
+          color: '#dc2626',
+          fontSize: '0.82rem',
+          fontWeight: 800,
+          boxShadow: '0 4px 14px rgba(220, 38, 38, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          zIndex: 100000
+        }}>
+          <ShieldAlert size={16} />
+          <span>{formError}</span>
+          <button
+            type="button"
+            onClick={() => setFormError(null)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626', marginLeft: '6px' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* FOOTER BAR */}
       <footer style={{
         height: '68px',
@@ -1311,7 +1318,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
         backdropFilter: 'blur(20px) saturate(190%)',
         WebkitBackdropFilter: 'blur(20px) saturate(190%)',
         borderTop: '1px solid rgba(15, 23, 42, 0.08)',
-        padding: '0 32px',
+        padding: '0 120px 0 32px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

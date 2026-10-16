@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mail, CheckCircle2, AlertTriangle, Send, Download, Copy, ShieldCheck, RefreshCw, Clock } from 'lucide-react';
+import { Mail, CheckCircle2, AlertTriangle, Send, Download, Copy, ShieldCheck, RefreshCw, Clock, Edit3, Save } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { generateInvoicePDF, generateInvoicePDFBinary } from '../../../utils/pdfGenerator';
 import { OperatorSettings } from '../types';
@@ -13,6 +13,10 @@ export interface InvoiceDispatchModalProps {
   onDispatchSuccess?: (result: any) => void;
   showActionToast: (msg: string) => void;
 }
+
+// 🏛️ RFC 5322 Strict Email Regex (Zero-Whitespace, Valid TLD)
+const RFC5322_EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+const isValidRecipientEmail = (email: string): boolean => RFC5322_EMAIL_REGEX.test((email || '').trim());
 
 export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
   invoice,
@@ -32,11 +36,16 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastSuccessResult, setLastSuccessResult] = useState<any | null>(null);
 
+  // 0,1% Goldstandard: Inline Email State & Sanitization
+  const [emailInput, setEmailInput] = useState<string>('');
+  const [isEditingEmail, setIsEditingEmail] = useState<boolean>(false);
+  const [isSavingEmail, setIsSavingEmail] = useState<boolean>(false);
+
   const cleanInvoiceId = invoice
     ? (invoice.amount < 0 ? (invoice.id || '').replace('INV-', 'GS-') : (invoice.id || '').replace('INV-', 'RE-'))
     : '';
 
-  const recipientEmail = (inv?.billingEmail || inv?.schoolEmail || '').trim();
+  const fallbackEmail = (inv?.billingEmail || inv?.schoolEmail || '').trim();
   const schoolName = inv?.schoolName || 'Musikschule';
   const formattedAmount = Number(invoice?.amount || 0).toLocaleString('de-DE', {
     style: 'currency',
@@ -69,6 +78,10 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
     let isMounted = true;
     setErrorMsg(null);
     setLastSuccessResult(null);
+
+    const initialEmail = (inv?.billingEmail || inv?.schoolEmail || '').trim();
+    setEmailInput(initialEmail);
+    setIsEditingEmail(!isValidRecipientEmail(initialEmail));
 
     const preparePdf = async () => {
       setIsPreparingPdf(true);
@@ -135,10 +148,65 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
 
   if (!isOpen || !invoice || !inv) return null;
 
+  // 🏛️ Save B2B Billing Email into School Profile (SSOT) & Record WORM Audit Log
+  const handleSaveEmail = async () => {
+    const clean = emailInput.trim();
+    if (!isValidRecipientEmail(clean)) {
+      setErrorMsg('Ungültiges E-Mail-Format. Bitte eine vollständige E-Mail-Adresse wie buchhaltung@musikschule.de eingeben.');
+      return;
+    }
+    const targetSchoolId = invoice?.school_id || inv?.schoolId;
+    if (!targetSchoolId) {
+      setErrorMsg('Keine Schul-ID für die Adress-Aktualisierung gefunden.');
+      return;
+    }
+
+    setIsSavingEmail(true);
+    setErrorMsg(null);
+    try {
+      const { error: updateErr } = await supabase
+        .from('schools')
+        .update({ billing_email: clean })
+        .eq('id', targetSchoolId);
+
+      if (updateErr) throw updateErr;
+
+      // Revisionssicherer Audit-Log Eintrag gem. GoBD / DSGVO Art. 5 Abs. 2
+      try {
+        await supabase.from('audit_logs').insert({
+          action: 'UPDATE_SCHOOL_BILLING_EMAIL',
+          entity_name: 'schools',
+          entity_id: targetSchoolId,
+          details: {
+            previous_email: inv?.billingEmail || null,
+            new_billing_email: clean,
+            school_name: schoolName,
+            reason: 'B2B Rechnungszustellung Adress-Korrektur'
+          }
+        });
+      } catch (auditNotice) {
+        console.warn('[InvoiceDispatchModal] Audit log warning (non-fatal):', auditNotice);
+      }
+
+      if (inv) {
+        inv.billingEmail = clean;
+      }
+      setIsEditingEmail(false);
+      showActionToast(`✅ Offizielle Rechnungs-E-Mail auf ${clean} aktualisiert.`);
+    } catch (err: any) {
+      console.error('[InvoiceDispatchModal] Update billing_email error:', err);
+      setErrorMsg(err.message || 'Fehler beim Speichern der Rechnungs-E-Mail.');
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
   // Execute official Server-Side dispatch
   const handleServerDispatch = async () => {
-    if (!recipientEmail) {
-      setErrorMsg('Es ist keine gültige Rechnungs-E-Mail (billing_email) für diese Schule hinterlegt.');
+    const activeRecipient = emailInput.trim();
+    if (!isValidRecipientEmail(activeRecipient)) {
+      setErrorMsg('Es ist keine gültige Rechnungs-E-Mail (billing_email) für diese Schule hinterlegt. Bitte korrigieren.');
+      setIsEditingEmail(true);
       return;
     }
 
@@ -151,21 +219,54 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
     setErrorMsg(null);
 
     try {
-      // Retrieve current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
+      // 1. Authoritative Master-Admin Session Lease Token
+      const leaseToken = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
+        || (typeof localStorage !== 'undefined' ? localStorage.getItem('gl_active_session_lease_id') : null)
+        || '';
+
+      // 2. Fallback GoTrue access token if present
+      const { data: sessionData } = await supabase.auth.getSession();
+      const goTrueToken = sessionData?.session?.access_token || '';
+
+      const headers: Record<string, string> = {};
+      if (leaseToken) {
+        headers['x-session-lease'] = leaseToken;
+        headers['Authorization'] = `Bearer ${leaseToken}`;
+      } else if (goTrueToken) {
+        headers['Authorization'] = `Bearer ${goTrueToken}`;
+      }
 
       const { data, error } = await supabase.functions.invoke('dispatch-school-invoice', {
         body: {
           invoice_id: invoice.id,
           pdf_base64: pdfBase64,
+          recipient_email: activeRecipient,
           dry_run: false,
         },
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers,
       });
 
+      // 🏛️ Deep Error Extraction: Unmask Edge Function HTTP Errors
       if (error) {
-        throw new Error(error.message || 'Fehler beim Serverversand.');
+        let detailedMsg = error.message;
+        try {
+          if ((error as any).context) {
+            const errJson = await (error as any).context.json();
+            if (errJson?.error) {
+              detailedMsg = errJson.error;
+            } else if (errJson?.message) {
+              detailedMsg = errJson.message;
+            }
+          }
+        } catch {
+          try {
+            const errText = await (error as any).context?.text();
+            if (errText) detailedMsg = errText;
+          } catch {
+            // ignore
+          }
+        }
+        throw new Error(detailedMsg || 'Fehler beim Serverversand.');
       }
 
       if (!data?.success) {
@@ -196,6 +297,7 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
   // Fallback: Traditional Mailto + Local PDF Download
   const handleMailtoFallback = async () => {
     try {
+      const activeMail = emailInput.trim() || fallbackEmail;
       generateInvoicePDF({
         invoiceId: invoice.id,
         invoiceDate: invoice.billing_date || new Date().toLocaleDateString('de-DE'),
@@ -230,7 +332,7 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
         console.warn('Clipboard write skipped:', clipErr);
       }
 
-      const mailtoUrl = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoUrl = `mailto:${encodeURIComponent(activeMail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.location.href = mailtoUrl;
 
       showActionToast(`📄 Rechnungs-PDF heruntergeladen & E-Mail-Programm geöffnet.`);
@@ -366,34 +468,117 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
           </div>
         </div>
 
-        {/* Recipient Address Box */}
+        {/* Recipient Address Box with 0,1% Inline Correction */}
         <div
           style={{
             padding: '12px 14px',
             borderRadius: '12px',
-            background: recipientEmail ? '#f0fdf4' : '#fffbeb',
-            border: `1px solid ${recipientEmail ? '#bbf7d0' : '#fef3c7'}`,
+            background: isValidRecipientEmail(emailInput) ? '#f0fdf4' : '#fffbeb',
+            border: `1px solid ${isValidRecipientEmail(emailInput) ? '#bbf7d0' : '#fde68a'}`,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '10px',
+            flexDirection: 'column',
+            gap: '8px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-            {recipientEmail ? (
-              <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
-            ) : (
-              <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
-            )}
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: '0.70rem', textTransform: 'uppercase', fontWeight: 800, color: recipientEmail ? '#15803d' : '#b45309' }}>
-                {recipientEmail ? 'Offizielle Buchhaltungs-Adresse' : 'Keine E-Mail hinterlegt'}
-              </div>
-              <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {recipientEmail || 'Bitte in den Musikschul-Stammdaten ergänzen'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              {isValidRecipientEmail(emailInput) ? (
+                <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
+              ) : (
+                <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.70rem', textTransform: 'uppercase', fontWeight: 800, color: isValidRecipientEmail(emailInput) ? '#15803d' : '#b45309' }}>
+                  {isValidRecipientEmail(emailInput) ? 'Offizielle Buchhaltungs-Adresse' : 'Ungültige oder fehlende Rechnungs-E-Mail'}
+                </div>
+                {!isEditingEmail && (
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {emailInput || 'Keine Adresse hinterlegt'}
+                  </div>
+                )}
               </div>
             </div>
+
+            {!isEditingEmail && (
+              <button
+                type="button"
+                onClick={() => setIsEditingEmail(true)}
+                disabled={isSending || isSavingEmail}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '3px 8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Edit3 size={11} />
+                <span>Ändern</span>
+              </button>
+            )}
           </div>
+
+          {isEditingEmail && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="z. B. buchhaltung@musikschule.de"
+                  style={{
+                    flex: 1,
+                    fontSize: '0.82rem',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${isValidRecipientEmail(emailInput) ? '#86efac' : '#fca5a5'}`,
+                    outline: 'none',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 600,
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveEmail}
+                  disabled={isSavingEmail || !isValidRecipientEmail(emailInput)}
+                  style={{
+                    background: isValidRecipientEmail(emailInput) ? '#16a34a' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    cursor: isValidRecipientEmail(emailInput) ? 'pointer' : 'not-allowed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {isSavingEmail ? (
+                    <RefreshCw size={12} className="animate-spin" />
+                  ) : (
+                    <Save size={12} />
+                  )}
+                  <span>Speichern</span>
+                </button>
+              </div>
+              <div style={{ fontSize: '0.70rem', color: isValidRecipientEmail(emailInput) ? '#15803d' : '#dc2626' }}>
+                {isValidRecipientEmail(emailInput)
+                  ? '✓ Gültiges RFC 5322 E-Mail-Format. Speichern aktualisiert die Schulstammdaten.'
+                  : '⚠️ Bitte eine gültige institutionelle E-Mail-Adresse mit @ und Domain eingeben.'}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* GoBD SHA-256 Seal Info */}
@@ -609,20 +794,20 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
             <button
               type="button"
               onClick={handleServerDispatch}
-              disabled={isSending || isPreparingPdf || !recipientEmail}
+              disabled={isSending || isPreparingPdf || !isValidRecipientEmail(emailInput)}
               style={{
-                background: recipientEmail ? '#16a34a' : '#94a3b8',
+                background: isValidRecipientEmail(emailInput) ? '#16a34a' : '#94a3b8',
                 border: 'none',
                 borderRadius: '12px',
                 padding: '10px 18px',
                 fontSize: '0.82rem',
                 fontWeight: 800,
                 color: '#ffffff',
-                cursor: isSending || isPreparingPdf || !recipientEmail ? 'not-allowed' : 'pointer',
+                cursor: isSending || isPreparingPdf || !isValidRecipientEmail(emailInput) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: recipientEmail ? '0 4px 12px rgba(22, 163, 74, 0.25)' : 'none',
+                boxShadow: isValidRecipientEmail(emailInput) ? '0 4px 12px rgba(22, 163, 74, 0.25)' : 'none',
                 transition: 'all 0.15s ease-in-out',
               }}
             >

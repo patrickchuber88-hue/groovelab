@@ -115,7 +115,21 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
         setAdminUsername(localStorage.getItem('cg_master_admin_username') || 'admin');
       }
 
-      setMasterPasskeyActive(isMasterPasskeyRegistered());
+      if (data?.id) {
+        try {
+          const { data: creds } = await supabase
+            .from('user_credentials')
+            .select('id')
+            .eq('user_id', data.id)
+            .eq('credential_type', 'webauthn')
+            .limit(1);
+          setMasterPasskeyActive(Boolean(creds && creds.length > 0) || isMasterPasskeyRegistered());
+        } catch {
+          setMasterPasskeyActive(isMasterPasskeyRegistered());
+        }
+      } else {
+        setMasterPasskeyActive(isMasterPasskeyRegistered());
+      }
     } catch (err) {
       console.error('Error fetching admin:', err);
       setAdminUsername(localStorage.getItem('cg_master_admin_username') || 'admin');
@@ -373,6 +387,9 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
   const handleRegisterPasskey = useCallback(async () => {
     try {
+      // 1. Authoritative Master Admin Session Lease Bootstrap
+      await ensureMasterAdminSessionLease();
+
       let resolvedAdmin = adminUser;
       if (!resolvedAdmin) {
         const columns = 'id, school_id, first_name, last_name, role, master_admin_username, username, is_master_admin, is_2fa_enabled, email';
@@ -389,7 +406,8 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
       // OWASP ASVS L3 Fail-Closed: Require authoritative database-verified user ID, no static fallback UUID
       const targetUserId = resolvedAdmin?.id 
         || (currentUser?.id && currentUser.id !== 'master_admin' ? currentUser.id : null)
-        || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+        || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null)
+        || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null);
 
       if (!targetUserId || targetUserId === 'master_admin') {
         throw new Error('Keine verifizierte Master-Admin-Identität geladen (Fail-Closed). Bitte Seite neu laden.');
@@ -398,12 +416,13 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
       if (typeof window !== 'undefined') {
         try {
           sessionStorage.setItem('groovelab_user_id', targetUserId);
-          localStorage.setItem('groovelab_user_id', targetUserId);
-          const targetSchoolId = resolvedAdmin?.school_id
-            || sessionStorage.getItem('groovelab_school_id')
-            || localStorage.getItem('groovelab_school_id')
-            || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-          await registerClientSessionLease({ id: targetUserId, role: resolvedAdmin?.role || 'admin' }, targetSchoolId);
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('groovelab_user_id', targetUserId);
+          }
+          sessionStorage.setItem('groovelab_is_master_admin', 'true');
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('groovelab_is_master_admin', 'true');
+          }
         } catch {
           // Ignore storage errors
         }

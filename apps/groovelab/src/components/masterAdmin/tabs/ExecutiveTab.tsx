@@ -11,6 +11,7 @@ import { MasterPricingRates, isSchoolBypassActive } from '../../../domain/pricin
 import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 import { computeSchoolBillingMetrics } from '../utils/computeSchoolBillingMetrics';
 import { SlaGovernanceModal, AuditRecordItem } from '../modals/SlaGovernanceModal';
+import { MasterTenantRadar } from '../components/MasterTenantRadar';
 
 const generateExecutiveSummaryPDF = async (...args: Parameters<typeof import('../../../utils/pdfGenerator').generateExecutiveSummaryPDF>) =>
   (await import('../../../utils/pdfGenerator')).generateExecutiveSummaryPDF(...args);
@@ -45,7 +46,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   pendingUsers,
   masterPricing,
   onRefresh,
-  onNavigateTab
+  onNavigateTab,
+  onSelectSchool
 }) => {
   const [showSlaModal, setShowSlaModal] = useState(false);
   const [slaUptime, setSlaUptime] = useState(99.98);
@@ -55,6 +57,12 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
   const [cfoExportToast, setCfoExportToast] = useState<string | null>(null);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [liveDbLatency, setLiveDbLatency] = useState<number>(24);
+  const [invoiceStats, setInvoiceStats] = useState<{
+    totalInvoices: number;
+    paidInvoices: number;
+    openInvoices: number;
+    overdueInvoices: number;
+  }>({ totalInvoices: 0, paidInvoices: 0, openInvoices: 0, overdueInvoices: 0 });
   const [activeGlobalBroadcast, setActiveGlobalBroadcast] = useState<{
     title: string;
     message: string;
@@ -158,6 +166,27 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     fetchHeartbeat();
     const heartbeatInterval = setInterval(fetchHeartbeat, 30000);
 
+    const fetchInvoices = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('id, status, due_date, amount');
+        if (!error && data) {
+          const now = new Date();
+          let paid = 0, open = 0, overdue = 0;
+          data.forEach((inv) => {
+            if (inv.status === 'paid') paid++;
+            else if (inv.status === 'overdue' || (inv.status === 'open' && inv.due_date && new Date(inv.due_date) < now)) overdue++;
+            else if (inv.status === 'open') open++;
+          });
+          setInvoiceStats({ totalInvoices: data.length, paidInvoices: paid, openInvoices: open, overdueInvoices: overdue });
+        }
+      } catch (e) {
+        console.warn('[ExecutiveTab] Error fetching forensic invoices:', e);
+      }
+    };
+    fetchInvoices();
+
     const start = performance.now();
     Promise.resolve(supabase.from('schools').select('id').limit(1))
       .then(() => {
@@ -172,13 +201,16 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
       rtTimer = setTimeout(() => {
         if (includeRefresh) onRefresh();
         fetchHeartbeat();
+        fetchInvoices();
       }, 2000);
     };
 
-    const channel = supabase.channel('master_cockpit_realtime')
+    const channelId = `master_cockpit_realtime_${Math.random().toString(36).substring(2, 9)}`;
+    const channel = supabase.channel(channelId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'server_telemetry' }, () => scheduleRealtimeSync(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'schools' }, () => scheduleRealtimeSync(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_users' }, () => scheduleRealtimeSync(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => scheduleRealtimeSync(true))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions' }, () => scheduleRealtimeSync(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => scheduleRealtimeSync(false))
       .subscribe();
@@ -197,6 +229,10 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
     const hasNonDemo = schools.some(s => !s.is_demo_tenant);
     return schools.filter(s => (!hasNonDemo || !s.is_demo_tenant) && s.status !== 'archived');
   }, [schools]);
+
+  const trialSchoolsCount = useMemo(() => {
+    return validSchools.filter(s => isSchoolTrialActive(s)).length;
+  }, [validSchools]);
 
   // 1. Canonical Multi-Tenant MRR Aggregation via SSOT computeSchoolBillingMetrics
   const {
@@ -315,6 +351,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
         storageAddonMrr,
         activeSchoolsCount: validSchools.length,
         bypassedSchoolsCount: bypassedCount,
+        payingSchoolsCount,
+        trialSchoolsCount,
         pendingUsersCount: pendingUsers.length,
         cpuPercent,
         ramPercent,
@@ -690,7 +728,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             </h3>
           </div>
           <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '12px', display: 'block', fontVariantNumeric: 'tabular-nums' }}>
-            {payingSchoolsCount} zahlend • {bypassedCount} Bypass
+            {payingSchoolsCount} zahlend • {trialSchoolsCount} Testphase{bypassedCount > 0 ? ` • ${bypassedCount} Bypass` : ''}
           </span>
         </div>
 
@@ -759,31 +797,29 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             <div style={{ minWidth: '240px', flex: 1, maxWidth: '360px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 750, marginBottom: '4px' }}>
                 <span style={{ color: '#059669' }}>
-                  Campus: {measuredCampusActive24h} von {campusActiveStudents} aktiv
+                  Campus: {measuredCampusActive24h} aktiv
                 </span>
                 <span style={{ color: '#ca8a04' }}>
-                  GrooveLab: {measuredGroovelabActive24h} von {groovelabActiveStudents} aktiv
+                  GrooveLab: {measuredGroovelabActive24h} aktiv
                 </span>
               </div>
               <div style={{ height: '7px', width: '100%', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-                <div style={{
-                  width: `${(measuredCampusActive24h + measuredGroovelabActive24h) > 0
-                    ? (measuredCampusActive24h / (measuredCampusActive24h + measuredGroovelabActive24h)) * 100
-                    : (campusActiveStudents + groovelabActiveStudents) > 0
-                      ? (campusActiveStudents / (campusActiveStudents + groovelabActiveStudents)) * 100
-                      : 50}%`,
-                  background: '#10b981',
-                  transition: 'width 0.4s ease'
-                }} />
-                <div style={{
-                  width: `${(measuredCampusActive24h + measuredGroovelabActive24h) > 0
-                    ? (measuredGroovelabActive24h / (measuredCampusActive24h + measuredGroovelabActive24h)) * 100
-                    : (campusActiveStudents + groovelabActiveStudents) > 0
-                      ? (groovelabActiveStudents / (campusActiveStudents + groovelabActiveStudents)) * 100
-                      : 50}%`,
-                  background: '#eab308',
-                  transition: 'width 0.4s ease'
-                }} />
+                {(measuredCampusActive24h + measuredGroovelabActive24h) > 0 ? (
+                  <>
+                    <div style={{
+                      width: `${(measuredCampusActive24h / (measuredCampusActive24h + measuredGroovelabActive24h)) * 100}%`,
+                      background: '#10b981',
+                      transition: 'width 0.4s ease'
+                    }} />
+                    <div style={{
+                      width: `${(measuredGroovelabActive24h / (measuredCampusActive24h + measuredGroovelabActive24h)) * 100}%`,
+                      background: '#eab308',
+                      transition: 'width 0.4s ease'
+                    }} />
+                  </>
+                ) : (
+                  <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '4px' }} />
+                )}
               </div>
             </div>
 
@@ -884,9 +920,9 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                 <span style={{ fontSize: '0.66rem', color: '#0284c7', fontWeight: 700 }}>IONOS DE</span>
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '4px 0', fontVariantNumeric: 'tabular-nums' }}>
-                P95: 18 ms
+                {liveDbLatency} ms
               </div>
-              <span style={{ fontSize: '0.70rem', color: '#10b981', fontWeight: 700 }}>Sub-Millisekunden Cache</span>
+              <span style={{ fontSize: '0.70rem', color: '#10b981', fontWeight: 700 }}>IONOS DB Roundtrip</span>
             </div>
 
             <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '16px', border: '1px solid #f1f5f9' }}>
@@ -897,7 +933,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '4px 0', fontVariantNumeric: 'tabular-nums' }}>
                 {slaUptime.toFixed(2)}%
               </div>
-              <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>HTTP 5xx: 0,00 %</span>
+              <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>Tier-1 SLA (IONOS DE)</span>
             </div>
           </div>
         </div>
@@ -914,24 +950,28 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               </span>
             </div>
 
-            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid #f1f5f9', marginBottom: '12px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', border: '1px solid #f1f5f9', marginBottom: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>
                   Abrechnung {currentMonthLabel}
                 </span>
-                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <CheckCircle size={12} color="#059669" /> 100% Synchron
+                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: invoiceStats.overdueInvoices > 0 ? '#b91c1c' : '#059669', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {invoiceStats.overdueInvoices > 0 ? (
+                    <><AlertTriangle size={12} color="#b91c1c" /> {invoiceStats.overdueInvoices} Überfällig</>
+                  ) : (
+                    <><CheckCircle size={12} color="#059669" /> 100% Synchron</>
+                  )}
                 </span>
               </div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px 0', fontVariantNumeric: 'tabular-nums' }}>
-                {validSchools.length} von {validSchools.length} Schulen
+                {invoiceStats.totalInvoices > 0 ? `${invoiceStats.paidInvoices} von ${invoiceStats.totalInvoices} Rechnungen bezahlt` : `${payingSchoolsCount} zahlende Schulen aktiv`}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                Alle B2B-Infrastruktur- &amp; Schülerbeiträge erfasst. Keine offenen Mahnungen.
+                {trialSchoolsCount > 0 ? `${trialSchoolsCount} Schule(n) beitragsfrei in Testphase.` : 'Alle B2B-Infrastruktur- & Schülerbeiträge synchronisiert.'}
               </div>
             </div>
 
-            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '14px 16px', border: '1px solid #f1f5f9', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '14px 16px', border: '1px solid #f1f5f9', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Calendar size={12} color="#64748b" /> Nächster Monatsabschluss
@@ -943,31 +983,9 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('billing')}
-                style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', background: 'transparent', border: 'none', padding: '4px 6px', cursor: 'pointer' }}
+                style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', border: 'none', padding: '5px 10px', borderRadius: '8px', cursor: 'pointer' }}
               >
-                Raten →
-              </button>
-            </div>
-
-            <div style={{ background: activeGlobalBroadcast ? '#fffbeb' : '#f8fafc', borderRadius: '16px', padding: '14px 16px', border: activeGlobalBroadcast ? 'none' : '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                {activeGlobalBroadcast ? <Megaphone size={16} color="#b45309" style={{ flexShrink: 0 }} /> : <CheckCircle size={16} color="#16a34a" style={{ flexShrink: 0 }} />}
-                <div style={{ minWidth: 0 }}>
-                  <strong style={{ fontSize: '0.78rem', color: activeGlobalBroadcast ? '#92400e' : '#0f172a', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {activeGlobalBroadcast ? `Broadcast: ${activeGlobalBroadcast.title}` : 'Kein aktiver Broadcast'}
-                  </strong>
-                  <span style={{ fontSize: '0.68rem', color: activeGlobalBroadcast ? '#b45309' : '#64748b', display: 'block' }}>
-                    {activeGlobalBroadcast ? 'Live für Schulen geschaltet' : 'Normalbetrieb aktiv'}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onNavigateTab('maintenance')}
-                style={{ padding: '5px 10px', borderRadius: '8px', background: activeGlobalBroadcast ? '#b45309' : '#ffffff', border: activeGlobalBroadcast ? 'none' : '1px solid #cbd5e1', color: activeGlobalBroadcast ? '#ffffff' : '#0f172a', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
-              >
-                {activeGlobalBroadcast ? 'Verwalten' : '+ Schalten'}
+                Financial Control →
               </button>
             </div>
           </div>
@@ -976,191 +994,94 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             <button
               type="button"
               onClick={handleExportAccountingCsv}
-              style={{ width: '100%', padding: '12px', borderRadius: '14px', background: '#0f172a', color: '#ffffff', border: 'none', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              style={{ width: '100%', padding: '13px', borderRadius: '14px', background: '#0f172a', color: '#ffffff', border: 'none', fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)' }}
             >
               <Download size={14} />
-              <span>Steuerberater-Monats-CSV exportieren</span>
+              <span>Steuerberater-Monats-CSV (DATEV) exportieren</span>
             </button>
-
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ShieldCheck size={13} color="#475569" /> SOC 2 &amp; OWASP ASVS L3
-              </div>
-              <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>
-                Zero-Secret Doktrin aktiv • Revisionssicherer Audit-Trail
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* ROW 3: REAL CURRENT MONTH REVENUE BREAKDOWN (2/3) & URGENT ACTION INBOX (1/3) */}
+      {/* ROW 3: MANDANTEN- & TESTPHASEN-RADAR (2/3) & BETREIBER-INBOX (1/3) */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '26px', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <TrendingUp size={18} color="#0f172a" /> Aktuelle Monats-KPIs &amp; Umsatzstruktur ({currentMonthLabel})
-                </h3>
-                <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Wahrhaftige Echtzeit-Zusammensetzung aus gebuchten Mandanten-Instanzen, Lizenzen und Speicher-Add-ons
-                </p>
-              </div>
-              <span style={{ background: '#ecfdf5', color: '#047857', border: 'none', padding: '4px 10px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <ArrowUpRight size={13} color="currentColor" /> 100% SSOT-Parität
-              </span>
-            </div>
-
-            <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '20px', border: '1px solid #f1f5f9', marginTop: '8px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-              <div style={{ background: '#ffffff', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
-                  1. Basis-Hosting (Flatrates)
-                </span>
-                <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
-                  {committedBaseMrr.toFixed(2).replace('.', ',')} €
-                </div>
-                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>
-                  {payingSchoolsCount} aktive zahlende Schulen
-                </span>
-              </div>
-
-              <div style={{ background: '#ffffff', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
-                  2. Nutzer-Bereitstellung
-                </span>
-                <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
-                  {seatUsageMrr.toFixed(2).replace('.', ',')} €
-                </div>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
-                  Lehrer-, Schüler- &amp; Passiv-Kontingente
-                </span>
-              </div>
-
-              <div style={{ background: '#ffffff', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>
-                  3. Audio-Tresor Add-ons
-                </span>
-                <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
-                  {storageAddonMrr.toFixed(2).replace('.', ',')} €
-                </div>
-                <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
-                  +{activeStorageAddonGb} GB Zusatzvolumen aktiv
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '16px' }}>
-            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>Gesamt-MRR (Netto)</span>
-              <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#059669', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
-                {totalMrr.toFixed(2).replace('.', ',')} €
-              </div>
-            </div>
-
-            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>Churn Rate</span>
-              <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
-                0,00 %
-              </div>
-            </div>
-
-            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>ARPU / Schule</span>
-              <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', marginTop: '2px', fontVariantNumeric: 'tabular-nums' }}>
-                {(totalMrr / Math.max(1, validSchools.length)).toFixed(2).replace('.', ',')} €
-              </div>
-            </div>
-
-            <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 750, textTransform: 'uppercase' }}>DSGVO Hosting</span>
-              <div style={{ fontSize: '0.98rem', fontWeight: 900, color: '#16a34a', marginTop: '2px' }}>
-                100% Konform
-              </div>
-            </div>
-          </div>
-        </div>
+        <MasterTenantRadar
+          schools={validSchools}
+          schoolStats={schoolStats}
+          masterPricing={masterPricing}
+          onSelectSchool={onSelectSchool}
+          onNavigateSchools={() => onNavigateTab('schools')}
+        />
 
         {/* Right: Urgent Action Inbox */}
-        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '26px', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <div style={{ background: '#ffffff', borderRadius: '24px', padding: '24px', border: '1px solid rgba(15, 23, 42, 0.08)', boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.03)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.10rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldAlert size={18} color="#0f172a" /> Handlungsbedarf &amp; Triage
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldAlert size={18} color="#0f172a" /> Betreiber-Inbox &amp; Triage
               </h3>
               <span style={{ background: (pendingStorageSchools.length > 0 || pendingUsers.length > 0) ? '#fef3c7' : '#f0fdf4', color: (pendingStorageSchools.length > 0 || pendingUsers.length > 0) ? '#b45309' : '#15803d', padding: '4px 9px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800 }}>
-                {pendingStorageSchools.length + (pendingUsers.length > 0 ? 1 : 0)} Offen
+                {pendingStorageSchools.length + pendingUsers.length} Offen
               </span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {pendingStorageSchools.length > 0 ? (
-                <div style={{ padding: '12px', borderRadius: '14px', background: '#fffbeb', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '0.80rem', color: '#92400e' }}>
-                      {pendingStorageSchools.length} Speicher-Anforderung(en)
-                    </strong>
-                    <span style={{ fontSize: '0.68rem', background: '#d97706', color: '#fff', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
-                      Dringend
+              {pendingStorageSchools.length === 0 && pendingUsers.length === 0 ? (
+                <div style={{ padding: '20px 16px', borderRadius: '16px', background: '#f0fdf4', border: '1px solid #dcfce7', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <CheckCircle size={22} color="#15803d" style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ fontSize: '0.86rem', color: '#15803d', display: 'block' }}>Alle Systeme synchron</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#166534', marginTop: '2px', display: 'block' }}>
+                      Keine offenen Ausweisfreischaltungen oder Speicheranträge. Regelbetrieb aktiv.
                     </span>
                   </div>
-                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#78350f' }}>
-                    Schulen haben Audio-Tresor Speichererweiterung gebucht. Volume prüfen.
-                  </p>
                 </div>
               ) : (
-                <div style={{ padding: '12px', borderRadius: '14px', background: '#f0fdf4', border: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <CheckCircle size={16} color="#15803d" />
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', color: '#15803d', display: 'block' }}>Audio-Tresor Speicher</strong>
-                    <span style={{ fontSize: '0.70rem', color: '#166534' }}>Alle Speicheranforderungen bereitgestellt.</span>
-                  </div>
-                </div>
-              )}
+                <>
+                  {pendingStorageSchools.length > 0 && (
+                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fffbeb', border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.80rem', color: '#92400e' }}>
+                          {pendingStorageSchools.length} Speicher-Anforderung(en)
+                        </strong>
+                        <span style={{ fontSize: '0.68rem', background: '#d97706', color: '#fff', padding: '2px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                          Dringend
+                        </span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#78350f' }}>
+                        Schulen haben Audio-Tresor Speichererweiterung gebucht. Volume prüfen.
+                      </p>
+                    </div>
+                  )}
 
-              {pendingUsers.length > 0 ? (
-                <div style={{ padding: '12px', borderRadius: '14px', background: '#fef2f2', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.80rem', color: '#991b1b', display: 'block' }}>
-                      {pendingUsers.length} Schülerfreischaltung(en)
-                    </strong>
-                    <span style={{ fontSize: '0.70rem', color: '#b91c1c' }}>Warten auf Zahlungs- &amp; Freigabeverifikation</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateTab('briefing')}
-                    style={{ padding: '6px 12px', borderRadius: '8px', background: '#dc2626', color: '#ffffff', border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
-                  >
-                    Prüfen →
-                  </button>
-                </div>
-              ) : (
-                <div style={{ padding: '12px', borderRadius: '14px', background: '#f0fdf4', border: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <CheckCircle size={16} color="#15803d" />
-                  <div>
-                    <strong style={{ fontSize: '0.78rem', color: '#15803d', display: 'block' }}>Schüler-Verifikation</strong>
-                    <span style={{ fontSize: '0.70rem', color: '#166534' }}>Alle Profile verifiziert &amp; synchronisiert.</span>
-                  </div>
-                </div>
+                  {pendingUsers.length > 0 && (
+                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ fontSize: '0.80rem', color: '#991b1b', display: 'block' }}>
+                          {pendingUsers.length} Schülerfreischaltung(en)
+                        </strong>
+                        <span style={{ fontSize: '0.70rem', color: '#b91c1c' }}>Warten auf Zahlungs- &amp; Freigabeverifikation</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('briefing')}
+                        style={{ padding: '6px 12px', borderRadius: '8px', background: '#dc2626', color: '#ffffff', border: 'none', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        Prüfen →
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
-
-              <div style={{ padding: '12px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldCheck size={16} color="#475569" />
-                <div>
-                  <strong style={{ fontSize: '0.78rem', color: '#0f172a', display: 'block' }}>Audit Trail &amp; Mandantentrennung</strong>
-                  <span style={{ fontSize: '0.70rem', color: '#64748b' }}>Lückenloses Audit-Logging aktiv. 0 Sicherheitslecks.</span>
-                </div>
-              </div>
             </div>
           </div>
 
           <button
             type="button"
             onClick={() => onNavigateTab('briefing')}
-            style={{ width: '100%', padding: '10px', borderRadius: '12px', background: '#0f172a', color: '#ffffff', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            style={{ width: '100%', padding: '11px', borderRadius: '12px', background: '#0f172a', color: '#ffffff', border: 'none', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.06)' }}
           >
-            <span>Vollständiges Logbuch &amp; Triage öffnen</span> <ChevronRight size={13} />
+            <span>Zahlungsabgleich &amp; Freischaltungen öffnen</span> <ChevronRight size={13} />
           </button>
         </div>
       </div>

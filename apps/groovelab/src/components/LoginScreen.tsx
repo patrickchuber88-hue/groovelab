@@ -18,7 +18,7 @@ import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
-import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
+import { getCanonicalQrLandingUrl, resetTenantAndNavigateToSelection } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
 import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from '../repositories/scheduleRepository';
@@ -4975,6 +4975,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       ) : (
         <SchoolLoginStudioLayout
           isGroovelabKiosk={isGroovelabKiosk}
+          onResetToSchoolSelection={resetTenantAndNavigateToSelection}
           onTogglePlatform={(val) => {
             setIsGroovelabKiosk(val);
             setStudioAuthMethod('qr');

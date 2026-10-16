@@ -3508,6 +3508,8 @@ export interface ExecutiveSummaryPdfParams {
   cpuPercent: number;
   ramPercent: number;
   activeConnections: number;
+  payingSchoolsCount?: number;
+  trialSchoolsCount?: number;
   serverUptime?: number;
   schools?: Array<{
     name: string;
@@ -3595,9 +3597,15 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
     doc.text(subtext, x + 4, y + 20);
   };
 
+  const payingCount = params.payingSchoolsCount ?? (params.activeSchoolsCount - params.bypassedSchoolsCount);
+  const trialCount = params.trialSchoolsCount ?? 0;
+  const subtextSchools = trialCount > 0
+    ? `${payingCount} zahlend • ${trialCount} Testphase${params.bypassedSchoolsCount > 0 ? ` • ${params.bypassedSchoolsCount} Kulanz` : ''}`
+    : `${payingCount} zahlend • ${params.bypassedSchoolsCount} Kulanz`;
+
   drawCard(20, 42, 53, 24, 'Monatlicher Umsatz (MRR)', `${params.totalMrr.toFixed(2).replace('.', ',')} €`, 'Committed SaaS & Seats');
   drawCard(78, 42, 53, 24, 'Jährliche Run-Rate (ARR)', `${params.totalArr.toFixed(2).replace('.', ',')} €`, '12-Monats Hochrechnung');
-  drawCard(136, 42, 54, 24, 'Aktive Musikschulen', `${params.activeSchoolsCount} Schulen`, `${params.activeSchoolsCount - params.bypassedSchoolsCount} zahlend • ${params.bypassedSchoolsCount} Kulanz`);
+  drawCard(136, 42, 54, 24, 'Aktive Musikschulen', `${params.activeSchoolsCount} Schulen`, subtextSchools);
 
   // Section 2: Revenue Decomposition Breakdown
   let currentY = 74;

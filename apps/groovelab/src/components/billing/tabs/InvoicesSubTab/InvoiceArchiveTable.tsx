@@ -49,23 +49,29 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
   const filteredGenerated = generated.filter(g => !dbIds.has(g.id));
 
   const allCombined = [
-    ...dbInvs.map(i => ({
-      id: i.id,
-      billing_date: formatDateDisplay(i.billing_date),
-      year: i.billing_date ? new Date(i.billing_date).getFullYear() : new Date().getFullYear(),
-      amount: i.amount,
-      status: i.status,
-      type: i.type,
-      isDb: true,
-      isCurrentMonth: false,
-      isTrialMonth: false
-    })),
+    ...dbInvs.map(i => {
+      const d = i.billing_date ? new Date(i.billing_date) : new Date();
+      const yr = !isNaN(d.getFullYear()) ? d.getFullYear() : new Date().getFullYear();
+      return {
+        id: i.id,
+        invoice_number: i.invoice_number || i.id,
+        billing_date: formatDateDisplay(i.billing_date),
+        year: yr,
+        amount: Number(i.amount || 0),
+        status: i.status || 'open',
+        type: i.type || 'INF',
+        isDb: true,
+        isCurrentMonth: false,
+        isTrialMonth: false
+      };
+    }),
     ...filteredGenerated.map(g => ({
       id: g.id,
+      invoice_number: g.id,
       billing_date: g.date,
       year: g.year ? parseInt(g.year) : new Date().getFullYear(),
-      amount: g.amount,
-      status: g.status === 'Bezahlt' ? 'paid' : (g.status === 'Vorschau' ? 'preview' : 'open'),
+      amount: Number(g.amount || 0),
+      status: g.status === 'Bezahlt' ? 'paid' : (g.status === 'Vorschau' ? 'preview' : (g.status === 'Versendet' ? 'issued' : 'open')),
       type: g.type,
       isDb: false,
       isCurrentMonth: g.isCurrentMonth,
@@ -73,9 +79,27 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
     }))
   ];
 
-  const previewInvoices = allCombined.filter(i => i.status === 'preview' || i.status === 'Vorschau');
-  const unpaidInvoices = allCombined.filter(i => (i.status === 'open' || i.status === 'overdue') && i.status !== 'preview');
-  const archivedInvoices = allCombined.filter(i => i.status !== 'open' && i.status !== 'overdue' && i.status !== 'preview');
+  // 1. Zone 1: Laufende Periode (Vorschau / Noch nicht fällig)
+  const previewInvoices = allCombined.filter(i => i.status === 'preview' || i.status === 'Vorschau' || String(i.id || '').startsWith('VS-'));
+
+  // 2. Zone 2: Ausstehende & fällige Rechnungen (OPOS)
+  const unpaidInvoices = allCombined.filter(i => 
+    !String(i.id || '').startsWith('VS-') && 
+    i.status !== 'preview' && 
+    i.status !== 'Vorschau' && 
+    (i.status === 'open' || i.status === 'overdue' || i.status === 'issued') &&
+    i.status !== 'paid' && 
+    i.status !== 'Bezahlt' && 
+    i.status !== 'cancelled' &&
+    Number(i.amount || 0) > 0
+  );
+
+  // 3. Zone 3: GoBD-Jahresarchiv (Alle echten Belege des Kalenderjahres, chronologisch)
+  const archivedInvoices = allCombined.filter(i => 
+    !String(i.id || '').startsWith('VS-') && 
+    i.status !== 'preview' && 
+    i.status !== 'Vorschau'
+  );
 
   const archivedByYear: Record<number, any[]> = {};
   archivedInvoices.forEach(i => {
@@ -117,16 +141,31 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontWeight: 700, color: isPreview ? '#0284c7' : '#0f172a', fontSize: '0.82rem' }}>
-                {isPreview ? invoice.id : (invoice.amount < 0 ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'))}
+                {isPreview ? invoice.id : (invoice.amount < 0 ? String(invoice.id).replace('INV-', 'GS-') : (invoice.invoice_number || String(invoice.id).replace('INV-', 'RE-')))}
               </span>
               {isPreview && (
                 <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd', letterSpacing: '0.03em' }}>
                   Vorschau
                 </span>
               )}
-              {invoice.status === 'issued' && (
+              {(invoice.status === 'issued' || invoice.status === 'Versendet' || invoice.status === 'dispatched' || invoice.status === 'delivered') && (
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd', letterSpacing: '0.03em' }}>
+                  {invoice.status === 'delivered' ? 'Zugestellt' : 'Versendet'}
+                </span>
+              )}
+              {(invoice.status === 'paid' || invoice.status === 'Bezahlt') && (
                 <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bbf7d0', letterSpacing: '0.03em' }}>
-                  Zugestellt
+                  Bezahlt
+                </span>
+              )}
+              {(invoice.status === 'open' || invoice.status === 'overdue') && !isPreview && (
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', padding: '2px 7px', borderRadius: '4px', border: '1px solid #fecaca', letterSpacing: '0.03em' }}>
+                  {invoice.status === 'overdue' ? 'Überfällig' : 'Offen'}
+                </span>
+              )}
+              {(invoice.status === 'cancelled' || invoice.status === 'Storniert') && (
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '2px 7px', borderRadius: '4px', border: '1px solid #e2e8f0', letterSpacing: '0.03em', textDecoration: 'line-through' }}>
+                  Storniert
                 </span>
               )}
             </div>
@@ -410,9 +449,9 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
             {/* Archived Years Accordion Sektion */}
             {sortedYears.length > 0 ? (
               sortedYears.map(yr => {
-                const isExpanded = expandedYears[yr] ?? false;
+                const isExpanded = expandedYears[yr] ?? (yr === new Date().getFullYear());
                 const yearInvoices = archivedByYear[yr] || [];
-                const summaryText = yearInvoices.length === 1 ? '1 Rechnung' : `${yearInvoices.length} Rechnungen`;
+                const summaryText = yearInvoices.length === 1 ? '1 Beleg' : `${yearInvoices.length} Belege`;
 
                 return (
                   <div key={yr} style={{ display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid rgba(15, 23, 42, 0.05)', borderRadius: '12px', background: '#f8fafc', overflow: 'hidden' }}>
@@ -432,7 +471,7 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                       onMouseOut={(e) => { e.currentTarget.style.background = '#ffffff'; }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a' }}>Archiv {yr}</span>
+                        <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#0f172a' }}>GoBD-Archiv {yr}</span>
                         <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>({summaryText})</span>
                       </div>
                       <div style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}>
@@ -449,7 +488,7 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                 );
               })
             ) : (
-              unpaidInvoices.length === 0 && (
+              previewInvoices.length === 0 && unpaidInvoices.length === 0 && (
                 <div style={{ textAlign: 'center', color: '#86868b', fontSize: '0.78rem', padding: '16px 0', border: '1px dashed rgba(0, 0, 0, 0.05)', borderRadius: '10px' }}>
                   Keine Rechnungen vorhanden.
                 </div>

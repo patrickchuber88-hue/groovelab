@@ -89,7 +89,7 @@ serve(async (req) => {
     }
 
     // 2. Parse request payload
-    const { invoice_id, pdf_base64, dry_run = false } = await req.json();
+    const { invoice_id, pdf_base64, recipient_email: customRecipientEmail, dry_run = false } = await req.json();
 
     if (!invoice_id || !pdf_base64) {
       return new Response(
@@ -134,12 +134,13 @@ serve(async (req) => {
       );
     }
 
-    // 4. Server-Side Address Verification
-    const recipientEmail = (school.billing_email || school.email || "").trim();
-    if (!recipientEmail || !recipientEmail.includes("@")) {
+    // 4. Server-Side Address Verification (RFC 5322 Strict Sanitization)
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    const recipientEmail = (customRecipientEmail || school.billing_email || school.email || "").trim();
+    if (!recipientEmail || !emailRegex.test(recipientEmail)) {
       return new Response(
         JSON.stringify({ 
-          error: `Für die Musikschule '${school.name}' ist keine gültige Rechnungs-E-Mail (billing_email) hinterlegt.` 
+          error: `Für die Musikschule '${school.name}' ist keine gültige Rechnungs-E-Mail hinterlegt (erhalten: '${recipientEmail || "leer"}'). Bitte eine vollständige E-Mail-Adresse angeben.` 
         }),
         {
           status: 422,
@@ -148,11 +149,19 @@ serve(async (req) => {
       );
     }
 
+    // If custom valid recipient email differs from school.billing_email, update school SSOT
+    if (customRecipientEmail && customRecipientEmail.trim() !== school.billing_email) {
+      await supabase
+        .from("schools")
+        .update({ billing_email: customRecipientEmail.trim() })
+        .eq("id", school.id);
+    }
+
     // 5. Compute cryptographic SHA-256 hash of invoice PDF
     const pdfSha256 = await computeSha256(pdf_base64);
 
-    // 6. SMTP Settings (Option A: Hetzner Mailhost / mail.your-server.de)
-    const smtpHost = Deno.env.get("SMTP_HOST") || "mail.your-server.de";
+    // 6. SMTP Settings (IONOS SMTP Relay smtp.ionos.de / Fallback: mail.your-server.de)
+    const smtpHost = Deno.env.get("SMTP_HOST") || "smtp.ionos.de"; // Sovereign Relay (Fallback: mail.your-server.de)
     const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "587", 10);
     const smtpUser = Deno.env.get("SMTP_USER") || "";
     const smtpPass = Deno.env.get("SMTP_PASS") || "";

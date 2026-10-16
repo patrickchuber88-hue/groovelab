@@ -1002,7 +1002,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         </tr>
                         <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Auftragsverarbeiter (Art. 28):</td>
-                          <td style={{ padding: '8px 4px' }}>Campus-Groovelab (Einzelunternehmen Patrick Huber, 79618 Rheinfelden, DE)</td>
+                          <td style={{ padding: '8px 4px' }}>Patrick Huber, Softwareentwicklung &amp; Cloud-Dienstleistungen (Einzelunternehmen), Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden), DE (Campus-Groovelab)</td>
                         </tr>
                         <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Zweckbestimmung:</td>
@@ -1022,7 +1022,10 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         </tr>
                         <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Empfänger &amp; Sub-Processors:</td>
-                          <td style={{ padding: '8px 4px' }}>Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland – ISO 27001)</td>
+                          <td style={{ padding: '8px 4px' }}>
+                            1. IONOS SE (Montabaur, Deutschland – Primärer Produktions-Cluster, ISO 27001)<br />
+                            2. Hetzner Online GmbH (Falkenstein/Nürnberg, Deutschland – Georedundantes Backup &amp; Storage Box, ISO 27001)
+                          </td>
                         </tr>
                         <tr>
                           <td style={{ padding: '8px 4px', fontWeight: 800, color: '#0f172a' }}>Drittlandtransfer:</td>
@@ -1153,7 +1156,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                         🇪🇺 100% Digitale Souveränität (Kein CLOUD Act)
                       </strong>
                       <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.55 }}>
-                        Campus-Groovelab unterliegt keinem Zugriff durch außereuropäische Behörden (kein US-CLOUD-Act, kein FISA 702). Die Plattform wird ausschließlich von einem deutschen Einzelunternehmen betrieben und in nach ISO 27001 auditierten Rechenzentren der Hetzner Online GmbH in Deutschland gehostet.
+                        Campus-Groovelab unterliegt keinem Zugriff durch außereuropäische Behörden (kein US-CLOUD-Act, kein FISA 702). Die Plattform wird ausschließlich von einem deutschen Einzelunternehmen betrieben und in nach ISO 27001 auditierten Rechenzentren der IONOS SE (Montabaur, Primär-Cluster) sowie der Hetzner Online GmbH (Falkenstein/Nürnberg, Georedundantes Backup &amp; Storage Box) in Deutschland gehostet.
                       </p>
                     </div>
                   </div>

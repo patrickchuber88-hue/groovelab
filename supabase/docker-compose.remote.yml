@@ -423,6 +423,12 @@ services:
       VAPID_PUBLIC_KEY: "${VAPID_PUBLIC_KEY}"
       VAPID_PRIVATE_KEY: "${VAPID_PRIVATE_KEY}"
       VAPID_SUBJECT: "${VAPID_SUBJECT}"
+      SMTP_HOST: "${SMTP_HOST:-smtp.ionos.de}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASS: "${SMTP_PASS:-}"
+      SMTP_FROM: "${SMTP_FROM:-rechnung@campus-groovelab.de}"
+      SMTP_SENDER_NAME: "${SMTP_SENDER_NAME:-Campus-Groovelab Plattformabrechnung}"
     command:
       [
         "start",

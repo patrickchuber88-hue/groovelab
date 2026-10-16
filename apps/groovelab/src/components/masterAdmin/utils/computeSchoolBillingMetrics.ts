@@ -1,5 +1,6 @@
 import type { School, SchoolStat } from '../MasterAdminTypes';
 import { DEFAULT_STORAGE_TIERS_EUR, DEFAULT_STORAGE_TIERS_CHF, StorageTier } from '../hooks/useMasterAdminPricing';
+import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
 
 export interface CanonicalBillingRates {
   priceCampus?: number | string;
@@ -127,8 +128,7 @@ export function computeSchoolBillingMetrics(
     Boolean(school.is_paused);
 
   const isTrialOrBypass =
-    Boolean(school.is_trial) ||
-    school.status === 'trial' ||
+    isSchoolTrialActive(school) ||
     Boolean(school.subscription_bypass);
 
   const hasCampus = Boolean(school.has_campus_subscription ?? stats?.hasCampus ?? true);
