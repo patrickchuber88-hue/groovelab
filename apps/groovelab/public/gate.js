@@ -64,6 +64,19 @@
 
         if (res.ok && data.success) {
           if (btnText) btnText.textContent = 'Freigeschaltet...';
+          // 🛡️ 0,1% Enterprise Goldstandard: Atomarer Cache- & SW-Flush vor Redirect
+          // Verhindert Stale-PWA-Deadlocks und Cache-Poisoning in Safari/WebKit
+          try {
+            if ('caches' in window) {
+              const cacheKeys = await caches.keys();
+              await Promise.all(cacheKeys.map(k => caches.delete(k)));
+            }
+            if ('serviceWorker' in navigator) {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(r => r.unregister()));
+            }
+          } catch (_) {}
+
           // Smoothly reload the root URL; Nginx will now grant access to the full app
           window.location.href = data.redirect || '/';
         } else {

@@ -72,11 +72,27 @@
   });
 
   // 3. 🛡️ Fail-Closed Bootstrap Watchdog (Deadlock & Freeze Immunity)
-  // If after 7 seconds React has not mounted, offer the user an immediate recovery stage instead of an endless spinner
+  // If after 5 seconds React has not mounted, trigger transparent auto-healing once before showing the card
   setTimeout(function() {
     try {
       var prebootEl = document.getElementById('pwa-preboot-stage');
       if (prebootEl && !isReactMounted()) {
+        // Auto-heal once silently: purge cache & service worker, then reload
+        if (!sessionStorage.getItem('__cg_pwa_auto_recovered')) {
+          sessionStorage.setItem('__cg_pwa_auto_recovered', '1');
+          if ('caches' in window) {
+            caches.keys().then(function(k) { k.forEach(function(x) { caches.delete(x); }); });
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(r) { r.forEach(function(x) { x.unregister(); }); });
+          }
+          setTimeout(function() {
+            window.location.reload(true);
+          }, 150);
+          return;
+        }
+
+        // If after auto-recovery it still doesn't mount (e.g. offline), show the recovery card
         prebootEl.innerHTML = '';
         var card = document.createElement('div');
         card.style.cssText = 'background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 28px 24px; max-width: 420px; width: 90%; box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.1); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;';
@@ -105,6 +121,7 @@
         reloadBtn.textContent = 'Frisch neu laden';
         reloadBtn.addEventListener('click', function() {
           sessionStorage.removeItem('__cg_pwa_recovery');
+          sessionStorage.removeItem('__cg_pwa_auto_recovered');
           if ('caches' in window) {
             caches.keys().then(function(k) { k.forEach(function(x) { caches.delete(x); }); });
           }
@@ -128,5 +145,5 @@
         prebootEl.appendChild(card);
       }
     } catch (_) {}
-  }, 7000);
+  }, 5000);
 })();

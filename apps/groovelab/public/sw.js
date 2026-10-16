@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1792177101010';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1792177101010';
+const CACHE_NAME = 'groovelab-static-v1792177832840';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1792177832840';
 const IMMUTABLE_CACHE = DYNAMIC_CACHE + '-immutable';
 const ASSETS_TO_CACHE = [
   '/',
@@ -271,12 +271,16 @@ self.addEventListener('fetch', function(event) {
           .then(function(networkResponse) {
             if (networkTimeout) clearTimeout(networkTimeout);
             if (networkResponse && networkResponse.status === 200) {
-              const cloneForIndex = networkResponse.clone();
-              const cloneForRoot = networkResponse.clone();
-              caches.open(CACHE_NAME).then(function(cache) {
-                cache.put('/index.html', cloneForIndex);
-                cache.put('/', cloneForRoot);
-              });
+              // 🛡️ Fail-Closed: Prüfe, ob die Antwort das Site-Gate ist (niemals als App-Shell cachen!)
+              const isGate = networkResponse.headers.get('x-site-gate') === '1';
+              if (!isGate) {
+                const cloneForIndex = networkResponse.clone();
+                const cloneForRoot = networkResponse.clone();
+                caches.open(CACHE_NAME).then(function(cache) {
+                  cache.put('/index.html', cloneForIndex);
+                  cache.put('/', cloneForRoot);
+                }).catch(function() {});
+              }
             }
             if (!hasResolved) {
               hasResolved = true;
