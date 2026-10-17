@@ -1504,6 +1504,20 @@ button, a, [role="button"], [onClick] {
   filter: brightness(1.02);
 }
 
+.sidebar-edge-toggle {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease-in-out, filter 0.2s ease !important;
+  transform: translateY(-50%) translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.sidebar-edge-toggle:hover {
+  transform: translateY(-50%) translateX(-4px) translateZ(0) !important;
+  filter: brightness(1.04);
+}
+.sidebar-edge-toggle:active {
+  transform: translateY(-50%) translateX(-1px) translateZ(0) !important;
+}
+
 @keyframes skeleton-pulse {
   0%, 100% {
     background-color: rgba(241, 245, 249, 0.6);

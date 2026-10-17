@@ -1111,7 +1111,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               gap: '10px', cursor: 'pointer', boxShadow: btnShadow, color: btnColor,
               fontWeight: 900, fontSize: '0.7rem', transition: 'all 0.2s ease-in-out'
             }}
-            className="hover-scale"
+            className="sidebar-edge-toggle"
             title="Termine & Mitteilungen ausklappen"
           >
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

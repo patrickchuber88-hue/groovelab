@@ -4,7 +4,7 @@
   "policy": "0,1% Enterprise Goldstandard Monolith Ceiling & Zero-Inline-Feature Axiom",
   "max_new_file_lines": 1500,
   "max_host_wiring_buffer_lines": 15,
-  "last_updated": "2026-10-16T22:20:24.424Z",
+  "last_updated": "2026-10-17T13:01:31.199Z",
   "total_monoliths_tracked": 80,
   "baselines": {
     "apps/groovelab/src/components/AudioTrackCarousel.tsx": 2254,
@@ -13,7 +13,7 @@
     "apps/groovelab/src/components/CampusDirectMessages.tsx": 5759,
     "apps/groovelab/src/components/CampusEventsBoard.tsx": 14811,
     "apps/groovelab/src/components/CampusSetupScreen.tsx": 1676,
-    "apps/groovelab/src/components/LoginScreen.tsx": 6305,
+    "apps/groovelab/src/components/LoginScreen.tsx": 6296,
     "apps/groovelab/src/components/MeisterwerkDocumentationModal.tsx": 3969,
     "apps/groovelab/src/components/ParentCampusActivationModal.tsx": 2248,
     "apps/groovelab/src/components/QRLandingPage.tsx": 12350,

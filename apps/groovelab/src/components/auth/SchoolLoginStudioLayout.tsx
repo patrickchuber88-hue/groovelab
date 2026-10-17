@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Music, ArrowLeft, Fingerprint, KeyRound, RotateCw, 
   Camera, CameraOff, X, Check, Pencil, QrCode, Tablet, GraduationCap, Lock, Delete, Users, ShieldCheck, Upload,
-  Compass
+  Compass, CreditCard
 } from 'lucide-react';
 import { CampusLoginSponsorBadge } from '../ui/CampusLoginSponsorBadge';
 import { TriAuthMethod } from './TriAuthGatewayBar';
+import { CampusIdPinAuthCard } from './CampusIdPinAuthCard';
 import { stopAllCameras } from '../../utils/cameraKillSwitch';
 import { resetTenantAndNavigateToSelection } from '../../utils/tenantUrlHelper';
 
@@ -527,10 +528,10 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
             transition: 'all 0.18s ease'
           }}
         >
-          <KeyRound size={16} color={activeMethod === 'pin' ? brandActiveTabColor : brandInactiveTabIcon} />
+          <CreditCard size={16} color={activeMethod === 'pin' ? brandActiveTabColor : brandInactiveTabIcon} />
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
-            <span>PIN-Code</span>
-            <span style={{ fontSize: '10px', fontWeight: 600, opacity: 0.8 }}>Ziffern / Tastatur</span>
+            <span>Ausweis-ID</span>
+            <span style={{ fontSize: '10px', fontWeight: 600, opacity: 0.8 }}>Nummer & PIN</span>
           </div>
         </button>
 
@@ -879,245 +880,18 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           </div>
         )}
 
-        {/* ─── TAB 2: PIN-CODE EINGABE (MIT TOUCH-NUMPAD) ─── */}
+        {/* ─── TAB 2: AUSWEIS-ID & PIN (0,1% APPLE GOLDSTANDARD SATELLIT) ─── */}
         {activeMethod === 'pin' && (
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: '13px', color: isGroovelabKiosk ? '#fde68a' : '#cbd5e1', fontWeight: 600 }}>
-                Gib deine Ausweis-Nummer oder persönliche PIN ein:
-              </p>
-            </div>
-
-            <form 
-              onSubmit={(e) => { 
-                e.preventDefault(); 
-                if (pinInput.trim() && pinLockoutSeconds <= 0) handlePinLogin(pinInput); 
-              }} 
-              style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}
-            >
-              <div style={{ position: 'relative', width: '100%' }}>
-                <input
-                  id="login-credential-input"
-                  name="campus_credential_code"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  aria-label="Ausweis-Nummer oder persönliche PIN"
-                  type="text"
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder={pinLockoutSeconds > 0 ? `Gesperrt (${pinLockoutSeconds}s)` : "PIN oder Ausweis-Nr..."}
-                  disabled={loading || pinLockoutSeconds > 0}
-                  autoFocus
-                  style={{
-                    width: '100%', boxSizing: 'border-box', padding: '12px 42px 12px 16px', borderRadius: '16px',
-                    border: isGroovelabKiosk ? '1.5px solid rgba(250, 204, 21, 0.40)' : '1.5px solid rgba(74, 222, 128, 0.35)',
-                    fontSize: '18px', fontWeight: 800, textAlign: 'center', outline: 'none',
-                    background: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.35)' : 'rgba(255, 255, 255, 0.08)',
-                    boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.25)',
-                    color: '#ffffff', letterSpacing: pinInput.length > 0 && /^\d+$/.test(pinInput) ? '0.22em' : 'normal',
-                    transition: 'border-color 0.15s ease'
-                  }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = brandAccentColor}
-                  onBlur={(e) => e.currentTarget.style.borderColor = isGroovelabKiosk ? 'rgba(250, 204, 21, 0.35)' : 'rgba(74, 222, 128, 0.35)'}
-                />
-                {pinInput.length > 0 && !loading && pinLockoutSeconds <= 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setPinInput('')}
-                    aria-label="Eingabe leeren"
-                    style={{
-                      position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                      background: 'rgba(255, 255, 255, 0.15)', border: 'none', borderRadius: '50%',
-                      width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#ffffff', cursor: 'pointer', padding: 0
-                    }}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              {/* 🏷️ Schnell-Eingabe Ausweis-Prefix & Sonderzeichen (0,1% Apple UX: S = Schüler, L = Lehrer, V = Verwaltung) */}
-              <div style={{ display: 'flex', gap: '5px', width: '100%' }}>
-                <button
-                  type="button"
-                  disabled={loading || pinLockoutSeconds > 0}
-                  onClick={() => {
-                    const targetPrefix = `${currentSchoolNum}-S-`;
-                    if (!pinInput.startsWith(targetPrefix)) {
-                      setPinInput(targetPrefix + pinInput.replace(/^[0-9]{1,4}-?[SLV]?-?/i, ''));
-                    }
-                  }}
-                  aria-label={`Ausweis-Präfix ${currentSchoolNum}-S- einfügen`}
-                  title={`Schüler-Ausweis (${currentSchoolNum}-S-)`}
-                  style={{
-                    flex: 2.2, height: '36px', borderRadius: '10px',
-                    border: isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.30)' : '1px solid rgba(74, 222, 128, 0.30)',
-                    background: isGroovelabKiosk ? 'rgba(250, 204, 21, 0.12)' : 'rgba(74, 222, 128, 0.12)',
-                    color: isGroovelabKiosk ? '#fde68a' : '#86efac',
-                    fontSize: '11px', fontWeight: 800, cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', lineHeight: 1.05,
-                    transition: 'all 0.12s ease', whiteSpace: 'nowrap'
-                  }}
-                >
-                  <span>{currentSchoolNum}-S-</span>
-                  <span style={{ fontSize: '8px', opacity: 0.8, fontWeight: 700 }}>Schüler</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || pinLockoutSeconds > 0}
-                  onClick={() => setPinInput(pinInput + 'S')}
-                  aria-label="Buchstabe S für Schüler einfügen"
-                  title="S = Schüler"
-                  style={{
-                    flex: 1, height: '36px', borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', lineHeight: 1.05,
-                    transition: 'all 0.12s ease'
-                  }}
-                >
-                  <span style={{ fontSize: '11px', fontWeight: 800 }}>+ S</span>
-                  <span style={{ fontSize: '8px', opacity: 0.7, fontWeight: 600 }}>Schüler</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || pinLockoutSeconds > 0}
-                  onClick={() => setPinInput(pinInput + 'L')}
-                  aria-label="Buchstabe L für Lehrer einfügen"
-                  title="L = Lehrer"
-                  style={{
-                    flex: 1, height: '36px', borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', lineHeight: 1.05,
-                    transition: 'all 0.12s ease'
-                  }}
-                >
-                  <span style={{ fontSize: '11px', fontWeight: 800 }}>+ L</span>
-                  <span style={{ fontSize: '8px', opacity: 0.7, fontWeight: 600 }}>Lehrer</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || pinLockoutSeconds > 0}
-                  onClick={() => setPinInput(pinInput + 'V')}
-                  aria-label="Buchstabe V für Verwaltung einfügen"
-                  title="V = Verwaltung"
-                  style={{
-                    flex: 1, height: '36px', borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px', lineHeight: 1.05,
-                    transition: 'all 0.12s ease'
-                  }}
-                >
-                  <span style={{ fontSize: '11px', fontWeight: 800 }}>+ V</span>
-                  <span style={{ fontSize: '8px', opacity: 0.7, fontWeight: 600 }}>Team</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || pinLockoutSeconds > 0}
-                  onClick={() => setPinInput('')}
-                  aria-label="Eingabefeld vollständig leeren"
-                  style={{
-                    flex: 1.1, height: '36px', borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: '#94a3b8',
-                    fontSize: '11px', fontWeight: 800, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.12s ease'
-                  }}
-                >
-                  <span>Clear</span>
-                </button>
-              </div>
-
-              {/* 🔢 Ergonomisches Touch-Numpad für Tablets, Kiosk & Mobile (mit Bindestrich) */}
-              <div 
-                style={{
-                  display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px',
-                  width: '100%', padding: '2px 0'
-                }}
-              >
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '0', 'DEL'].map((key) => {
-                  const isSpecial = key === '-' || key === 'DEL';
-                  const keyAriaLabel = key === 'DEL' ? 'Letztes Zeichen löschen' : key === '-' ? 'Bindestrich' : `Ziffer ${key}`;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-label={keyAriaLabel}
-                      disabled={loading || pinLockoutSeconds > 0}
-                      onClick={() => {
-                        if (key === 'DEL') {
-                          setPinInput(pinInput.slice(0, -1));
-                        } else {
-                          setPinInput((pinInput + key).slice(0, 16));
-                        }
-                      }}
-                      style={{
-                        height: '42px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.12)',
-                        background: isSpecial 
-                          ? (isGroovelabKiosk ? 'rgba(30, 41, 59, 0.65)' : 'rgba(0, 0, 0, 0.35)') 
-                          : (isGroovelabKiosk ? 'rgba(250, 204, 21, 0.12)' : 'rgba(255, 255, 255, 0.08)'),
-                        color: isSpecial ? (isGroovelabKiosk ? '#fde68a' : '#94a3b8') : '#ffffff',
-                        fontSize: isSpecial ? (key === '-' ? '22px' : '13px') : '17px', 
-                        fontWeight: 800, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.12s ease', userSelect: 'none', touchAction: 'manipulation'
-                      }}
-                      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
-                      onMouseUp={(e) => { e.currentTarget.style.transform = 'none'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
-                    >
-                      {key === 'DEL' ? <Delete size={18} /> : key}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !pinInput.trim() || pinLockoutSeconds > 0}
-                style={{
-                  width: '100%', padding: '13px 18px', borderRadius: '16px', border: 'none',
-                  background: (loading || !pinInput.trim() || pinLockoutSeconds > 0)
-                    ? (pinLockoutSeconds > 0 ? '#94a3b8' : 'rgba(255, 255, 255, 0.10)')
-                    : brandPrimaryColor,
-                  color: (loading || !pinInput.trim() || pinLockoutSeconds > 0)
-                    ? (pinLockoutSeconds > 0 ? '#ffffff' : 'rgba(255, 255, 255, 0.38)')
-                    : brandActiveTabColor,
-                  fontWeight: 800, fontSize: '14px',
-                  cursor: (loading || !pinInput.trim() || pinLockoutSeconds > 0) ? 'not-allowed' : 'pointer',
-                  boxShadow: (loading || !pinInput.trim() || pinLockoutSeconds > 0)
-                    ? 'none'
-                    : (isGroovelabKiosk ? '0 4px 14px rgba(250, 204, 21, 0.35)' : '0 4px 14px rgba(22, 163, 74, 0.35)'),
-                  transition: 'background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease, color 0.2s ease'
-                }}
-                onMouseEnter={(e) => { if (!loading && pinInput.trim() && pinLockoutSeconds <= 0) e.currentTarget.style.transform = 'scale(1.01)'; }}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
-              >
-                {loading ? 'Wird geprüft...' : pinLockoutSeconds > 0 ? `Sperre (${pinLockoutSeconds}s)` : 'Anmelden →'}
-              </button>
-
-              {pinLockoutSeconds > 0 && (
-                <div role="alert" style={{ fontSize: '11px', fontWeight: 750, color: '#ef4444', textAlign: 'center' }}>
-                  Sicherheitssperre: Bitte warte noch {pinLockoutSeconds} Sekunden.
-                </div>
-              )}
-            </form>
-          </div>
+          <CampusIdPinAuthCard
+            isGroovelabKiosk={isGroovelabKiosk}
+            schoolNumber={currentSchoolNum}
+            pinLockoutSeconds={pinLockoutSeconds}
+            loading={loading}
+            onSubmitId={(code) => handlePinLogin(code)}
+            brandAccentColor={brandAccentColor}
+            brandPrimaryColor={brandPrimaryColor}
+            brandActiveTabColor={brandActiveTabColor}
+          />
         )}
 
         {/* ─── TAB 3: PASSKEY BIOMETRIE ─── */}
@@ -1258,8 +1032,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                     }}
                   >
-                    <KeyRound size={14} color={brandAccentColor} />
-                    <span>PIN-Code</span>
+                    <CreditCard size={14} color={brandAccentColor} />
+                    <span>Ausweis-ID</span>
                   </button>
                 </div>
               </>

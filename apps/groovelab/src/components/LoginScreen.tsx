@@ -3547,7 +3547,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
-      if (isGroovelabKiosk && (user.role === 'student' || isTeacher)) {
+      if (isGroovelabKiosk && user.role === 'student') {
         await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
         return;
       }
@@ -3562,29 +3562,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-
-      if (isTeacher) {
-        if (user.is_observer) {
-          // Hospitanten are always sent to home mode without prompt
-          await finalizeLogin(user, loginStationId, false, true, userSchool);
-          return;
-        }
-
-        const isGroovelabScreen = isGroovelabKiosk;
-        if (isGroovelabScreen) {
-          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
-        } else {
-          // Campus Login strictly bypasses GrooveLab presence check-in
-          await finalizeLogin(user, loginStationId, false, true, userSchool);
-        }
-        return;
-      }
-
-      if (isBypass) {
-        await finalizeLogin(user, loginStationId, true, false, userSchool);
-      } else {
-        await finalizeLogin(user, loginStationId, isWithinAnyRoom, false, userSchool);
-      }
+      // 🛡️ 0,1% Goldstandard 2FA (AAL2): QR-Ausweis + persönliche 4-stellige PIN
+      setPinVerificationUser(user);
+      setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
+      setPinVerificationInput('');
+      setPinVerificationAttempts(0);
+      setLoading(false);
+      return;
     } catch (err: any) {
       console.error('[Login] Scan error:', err.message);
       setError(err.message);
@@ -6085,16 +6069,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </p>
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              {Array.from({ length: (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4 }).map((_, idx) => (
-                <div key={idx} style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  border: '2px solid #cbd5e1',
-                  background: pinVerificationInput.length > idx ? '#cbd5e1' : 'transparent',
-                  transition: 'all 0.15s ease'
-                }} />
-              ))}
+              {Array.from({ length: (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4 }).map((_, idx) => {
+                const isFilled = pinVerificationInput.length > idx;
+                const dotColor = schoolData?.primary_color || '#16a34a';
+                return (
+                  <div key={idx} style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    border: isFilled ? `2px solid ${dotColor}` : '2px solid #cbd5e1',
+                    background: isFilled ? dotColor : 'transparent',
+                    transform: isFilled ? 'scale(1.18)' : 'scale(1)',
+                    boxShadow: isFilled ? `0 0 10px ${dotColor}55` : 'none',
+                    transition: 'all 0.15s ease'
+                  }} />
+                );
+              })}
             </div>
 
             {renderKeypad('verify')}

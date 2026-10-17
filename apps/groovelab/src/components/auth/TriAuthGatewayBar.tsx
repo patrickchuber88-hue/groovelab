@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, KeyRound, Fingerprint, ShieldCheck } from 'lucide-react';
+import { QrCode, CreditCard, Fingerprint, ShieldCheck } from 'lucide-react';
 
 export type TriAuthMethod = 'qr' | 'pin' | 'passkey';
 
@@ -19,7 +19,7 @@ export interface TriAuthGatewayBarProps {
  * Bietet Schülern, Eltern und Lehrkräften die intuitive Gleichberechtigung
  * von 3 modernen Anmeldeverfahren im Apple HIG Segmented Control Design:
  * 1. 📷 QR-Code Ausweis
- * 2. 🔢 PIN-Code (Ausweis-Nummer oder persönliche Ziffern-PIN)
+ * 2. 🪪 Ausweis-ID (Ausweis-Nummer & persönliche Ziffern-PIN)
  * 3. 🔑 Passkey (Face ID / Touch ID / WebAuthn)
  * 
  * BFSG 2025 & WCAG 2.2 AA konform:
@@ -50,9 +50,9 @@ export const TriAuthGatewayBar: React.FC<TriAuthGatewayBarProps> = ({
     },
     {
       id: 'pin',
-      label: 'PIN-Code',
-      sublabel: 'Ziffern / Tastatur',
-      icon: <KeyRound size={16} strokeWidth={2.4} />
+      label: 'Ausweis-ID',
+      sublabel: 'Nummer & PIN',
+      icon: <CreditCard size={16} strokeWidth={2.4} />
     },
     {
       id: 'passkey',

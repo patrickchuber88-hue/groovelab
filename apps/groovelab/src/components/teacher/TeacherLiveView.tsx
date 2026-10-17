@@ -2431,7 +2431,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 fontSize: '0.7rem',
                 transition: 'all 0.2s ease-in-out'
               }}
-              className="hover-scale"
+              className="sidebar-edge-toggle"
               title="Band-Matching & Zusatz-Infos ausklappen"
             >
               <ChevronLeft size={18} color="#eab308" />
