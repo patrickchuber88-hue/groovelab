@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff, Terminal } from 'lucide-react';
+import { ShieldCheck, Scale, FileText, Download, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff, Terminal } from 'lucide-react';
 import { ACTIVE_LEGAL_VERSION, MINIMUM_ENFORCED_VERSION, LEGAL_DOCUMENTS, LEGAL_RELEASE_CONFIG, computeSha256, getLegalChangelog } from '../legal/legalContent';
 import { isUUID } from '../utils/uuidValidator';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
@@ -116,6 +116,60 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     }
     return false;
   });
+
+  const [signeeName, setSigneeName] = useState<string>(() => {
+    return `${user?.first_name || ''} ${user?.last_name || ''}`.trim();
+  });
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  const handleDownloadContractPdf = async () => {
+    if (isDownloadingPdf) return;
+    try {
+      setIsDownloadingPdf(true);
+      const { generateB2BContractPackagePDF } = await import('../utils/b2bContractPdfGenerator');
+      
+      let schoolName = 'Musikschule';
+      let address = '';
+      let postalCode = '';
+      let city = '';
+      let country: 'DE' | 'AT' | 'CH' = 'DE';
+
+      if (user?.school_id) {
+        try {
+          const { data: schoolData } = await supabase
+            .from('schools')
+            .select('name, address, postal_code, city, country')
+            .eq('id', user.school_id)
+            .maybeSingle();
+
+          if (schoolData) {
+            schoolName = schoolData.name || schoolName;
+            address = schoolData.address || '';
+            postalCode = schoolData.postal_code || '';
+            city = schoolData.city || '';
+            if (schoolData.country === 'CH' || schoolData.country === 'AT' || schoolData.country === 'DE') {
+              country = schoolData.country;
+            }
+          }
+        } catch {}
+      }
+
+      await generateB2BContractPackagePDF({
+        schoolName,
+        schoolId: user?.school_id,
+        adminName: signeeName.trim() || `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Schulleitung',
+        address,
+        postalCode,
+        city,
+        country
+      });
+    } catch (err) {
+      console.error('[LegalConsentGate] PDF generation failed:', err);
+      alert('Das Vertragspaket konnte nicht als PDF generiert werden. Bitte versuchen Sie es erneut.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const mandatoryCheckboxRef = useRef<HTMLDivElement>(null);
 
@@ -343,7 +397,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           client_timestamp: new Date().toISOString(),
           is_student_minor_flow: isStudent,
           is_major_reconsent: isMajorUpdateFlow,
-          previous_version: latestAcceptedVersion || null
+          previous_version: latestAcceptedVersion || null,
+          signee_name: signeeName.trim() || undefined
         }
       });
 
@@ -351,6 +406,24 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         console.error('[LegalConsentGate] Record consent error:', error);
         setErrorMsg('Zustimmung konnte serverseitig nicht gespeichert werden. Bitte versuchen Sie es erneut.');
         return;
+      }
+
+      // Parität für Schulverwaltungs-Dashboards: AVV-Unterzeichnername & Datum autoritativ synchronisieren
+      if (isAdmin && user.school_id) {
+        const trimmedSignee = signeeName.trim();
+        const signedTimestamp = new Date().toISOString();
+        void supabase
+          .from('schools')
+          .update({
+            avv_signed_at: signedTimestamp,
+            ...(trimmedSignee ? { avv_signee_name: trimmedSignee } : {})
+          })
+          .eq('id', user.school_id)
+          .then(({ error: schoolErr }) => {
+            if (schoolErr) {
+              console.warn('[LegalConsentGate] Non-fatal school avv update warning:', schoolErr.message);
+            }
+          });
       }
 
       setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
@@ -989,28 +1062,63 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             </div>
           )}
 
-          {/* Optional Toggle Full Text Accordion (§ 305 Abs. 2 BGB) */}
+          {/* Optional Toggle Full Text Accordion (§ 305 Abs. 2 BGB) & Direct PDF Download */}
           <div>
-            <button
-              type="button"
-              onClick={() => setShowFullText(!showFullText)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: themeColor,
-                fontWeight: 700,
-                fontSize: isMobile ? '0.78rem' : '0.82rem',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 0',
-                touchAction: 'manipulation'
-              }}
-            >
-              <span>{showFullText ? 'Vollständigen Vertragstext ausblenden' : 'Vollständigen konsolidierten Vertragstext anzeigen & prüfen'}</span>
-              {showFullText ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+            <div style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowFullText(!showFullText)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: themeColor,
+                  fontWeight: 700,
+                  fontSize: isMobile ? '0.78rem' : '0.82rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 0',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <span>{showFullText ? 'Vollständigen Vertragstext ausblenden' : 'Vollständigen konsolidierten Vertragstext anzeigen & prüfen'}</span>
+                {showFullText ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={handleDownloadContractPdf}
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    color: '#334155',
+                    fontWeight: 700,
+                    fontSize: isMobile ? '0.74rem' : '0.78rem',
+                    cursor: isDownloadingPdf ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    transition: 'all 0.15s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                  title="Amtliches 4-teiliges B2B-Vertragspaket inkl. TOMs & SLA für Träger und Rechnungsprüfungsamt als PDF herunterladen"
+                >
+                  <Download size={14} color="#64748b" />
+                  <span>{isDownloadingPdf ? 'PDF wird erstellt...' : 'Vertrag & AVV als PDF'}</span>
+                </button>
+              )}
+            </div>
 
             {showFullText && (
               <div style={{
@@ -1037,6 +1145,58 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               </div>
             )}
           </div>
+
+          {/* Klartext-Name des/der Vertretungsberechtigten (Rechtssicherheit gem. § 126a/b BGB & Art. 28 Abs. 9 DSGVO) */}
+          {isAdmin && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: isMobile ? '12px 14px' : '14px 16px'
+            }}>
+              <label 
+                htmlFor="legal-signee-name-input"
+                style={{
+                  fontSize: isMobile ? '0.74rem' : '0.78rem',
+                  fontWeight: 750,
+                  color: '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <span>Handelnde / vertretungsberechtigte Person:</span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>(Schulleitung, Verwaltung oder Trägervertreter)</span>
+              </label>
+              <input
+                id="legal-signee-name-input"
+                type="text"
+                value={signeeName}
+                onChange={(e) => setSigneeName(e.target.value)}
+                placeholder="Vor- und Nachname der handelnden Person"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '9px 12px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  outline: 'none',
+                  transition: 'border-color 0.15s ease'
+                }}
+                onFocus={(e) => (e.target.style.borderColor = themeColor)}
+                onBlur={(e) => (e.target.style.borderColor = '#cbd5e1')}
+              />
+            </div>
+          )}
 
           {/* ZONE 3: RECHTSSICHERES OPT-IN (EuGH Planet49 & BFSG 2025 Konform) */}
           <div 

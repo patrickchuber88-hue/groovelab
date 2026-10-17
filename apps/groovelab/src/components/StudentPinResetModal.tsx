@@ -3,6 +3,7 @@ import QRCode from 'react-qr-code';
 import { X, Check, Copy, Share2, QrCode as QrCodeIcon, ShieldCheck, Sparkles, MessageCircle, ExternalLink, Calendar } from 'lucide-react';
 import { formatSingleStudentAnonymized, useRealNamesVisibility } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
+import { supabase } from '../lib/supabase';
 
 interface StudentPinResetModalProps {
   student: {
@@ -27,6 +28,30 @@ export function StudentPinResetModal({
   const { visible: isPrivacyMode } = useRealNamesVisibility();
   const [copied, setCopied] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const performEmergencyReset = async () => {
+      setIsResetting(true);
+      try {
+        const { data, error } = await supabase.rpc('emergency_reset_student_session', {
+          p_student_id: student.id,
+          p_teacher_id: null
+        });
+        if (!error && (data?.success || (data as any)?.success)) {
+          if (isMounted) setResetDone(true);
+        }
+      } catch (err) {
+        console.warn('[StudentPinReset] Emergency session reset note:', err);
+      } finally {
+        if (isMounted) setIsResetting(false);
+      }
+    };
+    performEmergencyReset();
+    return () => { isMounted = false; };
+  }, [student.id]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -187,10 +212,10 @@ export function StudentPinResetModal({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 800, color: '#166534' }}>
             <ShieldCheck size={18} color="#34a853" />
-            <span>PIN erfolgreich zurückgesetzt</span>
+            <span>{resetDone ? 'PIN & Sitzungen erfolgreich zurückgesetzt' : isResetting ? 'Sitzungen werden beendet...' : 'PIN & Sitzungen zurückgesetzt'}</span>
           </div>
           <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
-            Der Schüler bzw. die Eltern öffnen den Link, bestätigen zur Sicherheit ihren <strong>Geburtstagstag (1–31)</strong> und legen sofort ihre neue 4-stellige Wunsch-PIN fest.
+            Vorherige Sitzungen wurden sofort beendet (kryptografischer Kill-Switch). Der Schüler bzw. die Eltern öffnen den Link, bestätigen zur Sicherheit ihren <strong>Geburtstagstag (1–31)</strong> und legen sofort ihre neue 4-stellige Wunsch-PIN fest.
           </p>
         </div>
 

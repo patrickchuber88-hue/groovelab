@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../utils/nameHelper';
 import { resolveCampusStudentAvatar, getDefaultMusicianAvatarUrl } from './StudioAvatar';
 import { deleteStudentFully } from '../utils/studentDeletionService';
-import { PasskeyNudgeBanner } from './admin/PasskeyNudgeBanner';
 import { CourtProofExportModal } from './admin/CourtProofExportModal';
 import { AdminStudentsSkeleton } from './admin/AdminStudentsSkeleton';
 
@@ -299,8 +298,6 @@ export function AdminDashboard({
         </div>
       )}
 
-      {/* Passkey Biometric Security Nudge for School Admins */}
-      <PasskeyNudgeBanner currentUser={admin} />
 
       {/* Header Bar: Quotas (when limits_enabled and not in Live, Briefing, Schedule or Events mode) */}
       {!hideHeader && activeTab !== 'live' && activeTab !== 'briefing' && activeTab !== 'schedule' && activeTab !== 'events' && schoolObj?.limits_enabled && (

@@ -25,8 +25,10 @@ import { invalidateActiveSessionsCache, optimisticallyInjectActiveSession } from
 import { CampusLoginSponsorBadge } from './ui/CampusLoginSponsorBadge';
 import { SchoolLoginStudioLayout } from './auth/SchoolLoginStudioLayout';
 import { LoginDevBypassBar } from './auth/LoginDevBypassBar';
+import { LoginPinModalsHub } from './auth/LoginPinModalsHub';
 import { TriAuthMethod } from './auth/TriAuthGatewayBar';
 import { BANNED_TOMBSTONE_SCHOOL_IDS } from '../utils/tenantSanitizer';
+import { getRememberedPin, setRememberedPin, clearRememberedPin } from '../utils/trustedDevicePin';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -113,6 +115,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
   const barcodeDetectorRef = useRef<any>(null);
   const lastFacingModeRef = useRef<'user' | 'environment' | null>(null);
   const [needsManualActivation, setNeedsManualActivation] = useState(isIOS && isStandalone);
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
@@ -219,6 +222,7 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
 
           video.onloadedmetadata = () => {
             if (active && video) {
+              setVideoReady(true);
               video.play().catch(err => {
                 // Ignore AbortError in Safari caused by rapid play/pause state transitions
                 if (err?.name !== 'AbortError') {
@@ -393,10 +397,17 @@ export function CustomQRScanner({ onScan, onError, paused, facingMode }: CustomQ
     <div style={{ position: 'relative', width: '100%', height: '100%', background: 'black' }}>
       <video
         ref={videoRef}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: videoReady ? 1 : 0,
+          transition: 'opacity 0.35s ease'
+        }}
         playsInline
         autoPlay
         muted
+        onLoadedData={() => setVideoReady(true)}
       />
       {needsManualActivation && (
         <div style={{ 
@@ -687,6 +698,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [pinVerificationInput, setPinVerificationInput] = useState('');
   const [pinVerificationIsWithinRoom, setPinVerificationIsWithinRoom] = useState(false);
   const [pinVerificationAttempts, setPinVerificationAttempts] = useState(0);
+  const [rememberPinOnDevice, setRememberPinOnDevice] = useState<boolean>(true);
 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [error, setError] = useState<string | null>(null);
@@ -732,7 +744,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [kioskSelectedRoomId, setKioskSelectedRoomId] = useState<string>('');
   const [activeSessionStationIds, setActiveSessionStationIds] = useState<string[]>([]);
   const [loadingKioskData, setLoadingKioskData] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(true);
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraHasError, setCameraHasError] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const qrFileInputRef = useRef<HTMLInputElement>(null);
@@ -829,10 +841,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [loginConsentAccepted, setLoginConsentAccepted] = useState(false);
   const [expandedSection, setExpandedSection] = useState<'none' | 'pin' | 'kiosk' | 'parentOnboarding'>(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
+    if (params.get('onboarding') === 'true' || params.get('onboarding') === 'parent' || params.get('parent_onboarding') === 'true') {
       return 'parentOnboarding';
     }
     return 'none';
+  });
+  const [onboardingTeacherId, setOnboardingTeacherId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('teacher_id') || params.get('teacher') || null;
   });
   const [isGroovelabKiosk, setIsGroovelabKiosk] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2572,80 +2588,123 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking on Login (§ 87 BetrVG / Art. 5 & 8 DSGVO)
 
 
-  const handleKeypadPress = (val: string, type: 'setup' | 'verify') => {
-    if (type === 'setup') {
-      if (val === 'back') {
-        setPinSetupInput(prev => prev.slice(0, -1));
-      } else if (pinSetupInput.length < 4) {
-        setPinSetupInput(prev => prev + val);
+  const handleParentVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentFirstName.trim() || !parentLastName.trim() || !parentInstrument.trim() || !parentDayOfBirth.trim()) {
+      setParentOnboardingError('Bitte fülle alle Pflichtfelder aus.');
+      return;
+    }
+    
+    const dayNum = parseInt(parentDayOfBirth, 10);
+    if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
+      setParentOnboardingError('Der Geburtstagstag muss zwischen 1 und 31 liegen.');
+      return;
+    }
+
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_onboarding', {
+        input_first_name: parentFirstName.trim(),
+        input_last_name: parentLastName.trim(),
+        input_instrument: parentInstrument.trim(),
+        input_day: dayNum,
+        input_school_id: schoolData?.id || null,
+        input_teacher_id: onboardingTeacherId || null
+      });
+
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (result && result.success) {
+        const studentId = result.student_id;
+        setVerifiedStudentId(studentId);
+        
+        // Fetch details from users
+        const { data: studentRow } = await supabase
+          .from('users')
+          .select('id, school_id, qr_token, ausweis_nummer')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        const qrToken = studentRow?.qr_token || result.qr_token || studentId;
+        const ausweisNr = studentRow?.ausweis_nummer || result.ausweis_nummer || '';
+
+        sessionStorage.setItem('groovelab_user_id', studentId);
+        setVerifiedStudentDetails({
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          id: studentId,
+          qr_token: qrToken,
+          ausweis_nummer: ausweisNr
+        });
+
+        const initialChildren: SiblingChild[] = [{
+          id: studentId,
+          first_name: parentFirstName.trim(),
+          last_name: parentLastName.trim(),
+          instrument: parentInstrument.trim(),
+          selectedSlots: {},
+          isNew: false
+        }];
+        setParentChildren(initialChildren);
+        setActiveParentChildIndex(0);
+
+        setIsPinSetupNeeded(true);
+        setParentOnboardingStep('setup-pin');
+      } else {
+        setParentOnboardingError(result?.message || 'Eingabe überprüfen. Bitte prüfe Vorname, Nachname, Instrument und den Tag des Geburtstags.');
       }
-    } else {
-      const limit = (pinVerificationUser?.role === 'student' && !pinVerificationUser?.has_personal_pin) ? 2 : 4;
-      if (val === 'back') {
-        setPinVerificationInput(prev => prev.slice(0, -1));
-      } else if (pinVerificationInput.length < limit) {
-        setPinVerificationInput(prev => prev + val);
-      }
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setParentOnboardingError(err.message || 'Ein unerwarteter Fehler ist aufgetreten.');
+    } finally {
+      setParentOnboardingLoading(false);
     }
   };
 
-  const renderKeypad = (type: 'setup' | 'verify') => {
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
-    return (
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '12px',
-        width: '100%',
-        maxWidth: '280px',
-        margin: '20px auto 0 auto'
-      }}>
-        {keys.map((k) => {
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => {
-                if (k === 'C') {
-                  if (type === 'setup') setPinSetupInput('');
-                  else setPinVerificationInput('');
-                } else if (k === '⌫') {
-                  handleKeypadPress('back', type);
-                } else {
-                  handleKeypadPress(k, type);
-                }
-              }}
-              style={{
-                height: '56px',
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                background: '#f8fafc',
-                color: '#0f172a',
-                fontSize: '1.25rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                outline: 'none',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-              }}
-            >
-              {k}
-            </button>
-          );
-        })}
-      </div>
-    );
-  };
+  const handleDirectPinActivation = async () => {
+    const pinStr = newOnboardingPin.join('');
+    const confirmStr = newOnboardingPinConfirm.join('');
+    if (pinStr.length < 4 || confirmStr.length < 4) {
+      setParentOnboardingError('Bitte erstelle eine vollständige 4-stellige PIN und bestätige sie.');
+      return;
+    }
+    if (pinStr !== confirmStr) {
+      setParentOnboardingError('Die eingegebenen PINs stimmen nicht überein.');
+      return;
+    }
+    if (!verifiedStudentId) {
+      setParentOnboardingError('Schüler-ID fehlt.');
+      return;
+    }
 
-  const handleParentVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setParentOnboardingError(
-      '🔒 Sicherheits-Standard (DSGVO Art. 25 / ASVS Level 3): Die Aktivierung erfolgt aus Datenschutzgründen ausschließlich über den persönlichen Einladungslink der Musikschule oder den QR-Code vom Schülerausweis. Bitte klicke auf den Link in deiner Einladungs-E-Mail oder scanne den QR-Code deines Kindes.'
-    );
-    return;
+    setParentOnboardingLoading(true);
+    setParentOnboardingError(null);
+    try {
+      await supabase.rpc('set_parent_pin', {
+        p_student_id: verifiedStudentId,
+        p_pin: pinStr
+      });
+      await supabase.rpc('set_personal_pin', {
+        p_user_id: verifiedStudentId,
+        p_new_pin: pinStr
+      });
+      await supabase
+        .from('users')
+        .update({ is_pin_activated: true })
+        .eq('id', verifiedStudentId);
+
+      setParentOnboardingStep('success');
+    } catch (err: any) {
+      console.error('Direct pin activation error:', err);
+      setParentOnboardingError(err.message || 'Fehler beim Aktivieren der PIN.');
+    } finally {
+      setParentOnboardingLoading(false);
+    }
   };
 
 
@@ -3263,33 +3322,75 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       // ⚡ Enterprise+ Tier-1 Privacy: Physical Station-Coupling replaces Geolocation (§ 87 BetrVG / DSGVO Art. 5 & 8)
       isWithinAnyRoom = true;
-      // Intercept login for PIN setup or verification if it's an Ausweis ID login
-      const isQrLogin = cleanPin.startsWith('t_') || (cleanPin.includes('-') && cleanPin.length > 20);
-      if (!isQrLogin) {
-        if (user.role === 'student' && isGroovelabKiosk) {
-          // Bypass birthday PIN setup and verification completely for students on GrooveLab
-          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom);
-          return;
+      // 🛡️ 0,1% Goldstandard 2FA (AAL2): Ausweis-ID + 4-stellige PIN
+      const isPinActivated = Boolean(user.has_personal_pin || user.is_pin_activated);
+
+      if (!isPinActivated) {
+        clearRememberedPin(user.id);
+        setPinSetupUser(user);
+        setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
+        setPinSetupInput('');
+        setLoading(false);
+        return;
+      }
+
+      // Check if trusted PIN is stored locally on this device
+      const cachedPin = getRememberedPin(user.id);
+      if (cachedPin && cachedPin.length === 4) {
+        let autoLoginOk = false;
+        let isParentAuto = false;
+
+        try {
+          if (user.role === 'student') {
+            const { data: sOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: cachedPin
+            });
+            if (sOk === true) {
+              autoLoginOk = true;
+            } else {
+              const { data: pOk } = await supabase.rpc('verify_parent_pin', {
+                student_id: user.id,
+                input_pin: cachedPin
+              });
+              if (pOk === true) {
+                autoLoginOk = true;
+                isParentAuto = true;
+              }
+            }
+          } else {
+            const { data: uOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: cachedPin
+            });
+            if (uOk === true) autoLoginOk = true;
+          }
+        } catch (autoErr) {
+          console.warn('[Login] Trusted device PIN verification error:', autoErr);
         }
 
-        const isPinActivated = user.role === 'student' ? true : Boolean(user.is_pin_activated || user.has_personal_pin);
-
-        if (!isPinActivated) {
-          setPinSetupUser(user);
-          setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
-          setPinSetupInput('');
-          setLoading(false);
+        if (autoLoginOk) {
+          console.log('[Login] Trusted Device Express-Login verified via server RPC!');
+          if (isParentAuto) {
+            sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
+            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+          }
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
           return;
         } else {
-          if (!user.ausweis_nummer && !isQrLogin) user.ausweis_nummer = cleanPin;
-          setPinVerificationUser(user);
-          setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
-          setPinVerificationInput('');
-          setPinVerificationAttempts(0);
-          setLoading(false);
-          return;
+          clearRememberedPin(user.id);
         }
       }
+
+      if (!user.ausweis_nummer && cleanPin && !cleanPin.startsWith('t_') && cleanPin.length < 20) {
+        user.ausweis_nummer = cleanPin;
+      }
+      setPinVerificationUser(user);
+      setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
+      setPinVerificationInput('');
+      setPinVerificationAttempts(0);
+      setLoading(false);
+      return;
 
 
       if (isTeacher) {
@@ -3548,19 +3649,64 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       console.log(`[Login] Scan successful. Geofence match: ${isWithinAnyRoom}`);
       
-      if (isGroovelabKiosk && user.role === 'student') {
-        await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
-        return;
-      }
-
-      const isPinActivated = user.role === 'student' ? true : Boolean(user.is_pin_activated || user.has_personal_pin);
+      // 🛡️ 0,1% Goldstandard 2FA (AAL2): QR-Ausweis + 4-stellige PIN
+      const isPinActivated = Boolean(user.has_personal_pin || user.is_pin_activated);
 
       if (!isPinActivated) {
+        clearRememberedPin(user.id);
         setPinSetupUser(user);
         setPinVerificationIsWithinRoom(isBypass ? true : isWithinAnyRoom);
         setPinSetupInput('');
         setLoading(false);
         return;
+      }
+
+      // Check if trusted PIN is stored locally on this device
+      const cachedPin = getRememberedPin(user.id);
+      if (cachedPin && cachedPin.length === 4) {
+        let autoLoginOk = false;
+        let isParentAuto = false;
+
+        try {
+          if (user.role === 'student') {
+            const { data: sOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: cachedPin
+            });
+            if (sOk === true) {
+              autoLoginOk = true;
+            } else {
+              const { data: pOk } = await supabase.rpc('verify_parent_pin', {
+                student_id: user.id,
+                input_pin: cachedPin
+              });
+              if (pOk === true) {
+                autoLoginOk = true;
+                isParentAuto = true;
+              }
+            }
+          } else {
+            const { data: uOk } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: cachedPin
+            });
+            if (uOk === true) autoLoginOk = true;
+          }
+        } catch (autoErr) {
+          console.warn('[Login] Trusted device PIN verification error:', autoErr);
+        }
+
+        if (autoLoginOk) {
+          console.log('[Login] Trusted Device Express-Login verified via server RPC!');
+          if (isParentAuto) {
+            sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
+            sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+          }
+          await finalizeLogin(user, loginStationId, isBypass ? true : isWithinAnyRoom, false, userSchool);
+          return;
+        } else {
+          clearRememberedPin(user.id);
+        }
       }
 
       // 🛡️ 0,1% Goldstandard 2FA (AAL2): QR-Ausweis + persönliche 4-stellige PIN
@@ -4354,6 +4500,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
               <button
                 type="button"
+                disabled={parentOnboardingLoading}
+                onClick={handleDirectPinActivation}
+                style={{
+                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
+                  background: '#34a853',
+                  color: '#ffffff',
+                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
+                  boxShadow: 'none'
+                }}
+              >
+                {parentOnboardingLoading ? 'Aktiviere PIN...' : 'PIN aktivieren & Schülerausweis laden'}
+              </button>
+
+              <button
+                type="button"
+                disabled={parentOnboardingLoading}
                 onClick={() => {
                   const pinStr = newOnboardingPin.join('');
                   const confirmStr = newOnboardingPinConfirm.join('');
@@ -4369,14 +4531,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   setParentOnboardingStep('preferences');
                 }}
                 style={{
-                  width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
-                  background: '#34a853',
-                  color: '#ffffff',
-                  fontWeight: 800, fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s',
-                  boxShadow: 'none'
+                  width: '100%', padding: '12px', borderRadius: '14px', border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700, fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
                 }}
               >
-                PIN festlegen & Weiter zu Wunschzeiten
+                Weiter zu den Wunschzeiten (optional)
               </button>
             </div>
           </div>
@@ -4964,7 +5125,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           onTogglePlatform={(val) => {
             setIsGroovelabKiosk(val);
             setStudioAuthMethod('qr');
-            setIsCameraActive(true);
+            setIsCameraActive(false);
             if (typeof window !== 'undefined') {
               localStorage.setItem('groovelab_active_platform', val ? 'groovelab' : 'campus');
               sessionStorage.setItem('groovelab_active_platform', val ? 'groovelab' : 'campus');
@@ -5861,330 +6022,28 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
       `}</style>
-      {/* PIN Setup Modal */}
-      {pinSetupUser && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: '20px',
-          fontFamily: 'Inter, system-ui, sans-serif'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '32px',
-            padding: '32px',
-            width: '100%',
-            maxWidth: '360px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-            border: '1px solid #f1f5f9',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center'
-          }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: isGroovelabKiosk ? '#fef3c7' : '#e6f4ea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isGroovelabKiosk ? '#d97706' : '#34a853', marginBottom: '16px' }}>
-              <Key size={28} />
-            </div>
-            
-            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN einrichten</h3>
-            <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-              Erster Login für <strong>{pinSetupUser.first_name} {pinSetupUser.last_name || ''}</strong>{pinSetupUser.ausweis_nummer ? ` (${pinSetupUser.ausweis_nummer})` : ''}.<br/>
-              Bitte lege eine geheime 4-stellige PIN fest.
-            </p>
-
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              {[0, 1, 2, 3].map((idx) => (
-                <div key={idx} style={{
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  border: '2px solid #cbd5e1',
-                  background: pinSetupInput.length > idx ? '#cbd5e1' : 'transparent',
-                  transition: 'all 0.15s ease'
-                }} />
-              ))}
-            </div>
-
-            {renderKeypad('setup')}
-
-            <button
-              onClick={async () => {
-                if (pinSetupInput.length !== 4) return;
-                const validation = validateNewPin(pinSetupInput);
-                if (!validation.isValid) {
-                  alert(validation.error || 'Ungültige PIN.');
-                  setPinSetupInput('');
-                  return;
-                }
-
-                setLoading(true);
-                try {
-                  const authQrToken = pinSetupUser.qr_token || pinSetupUser.teacher_qr_token || pinSetupUser.ausweis_nummer || pinSetupUser.id || '';
-                  if (authQrToken) {
-                    sessionStorage.setItem('groovelab_qr_token', authQrToken);
-                  }
-                  let rpcSuccess = false;
-                  let rpcErrorMsg = '';
-
-                  // 1. Primary RPC
-                  try {
-                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_initial_student_pin', {
-                      p_student_id: pinSetupUser.id,
-                      p_qr_token: authQrToken,
-                      p_pin: pinSetupInput
-                    });
-                    if (!rpcErr && (rpcRes === true || (rpcRes as any)?.success === true)) {
-                      rpcSuccess = true;
-                    } else if (rpcErr) {
-                      rpcErrorMsg = rpcErr.message;
-                    }
-                  } catch (e: any) {
-                    rpcErrorMsg = e?.message || '';
-                  }
-
-                  // 2. Secondary Fallback RPC
-                  if (!rpcSuccess) {
-                    try {
-                      const { data: pRes, error: pErr } = await supabase.rpc('set_personal_pin', {
-                        p_user_id: pinSetupUser.id,
-                        p_new_pin: pinSetupInput
-                      });
-                      if (!pErr && pRes === true) {
-                        rpcSuccess = true;
-                      } else if (pErr) {
-                        rpcErrorMsg = pErr.message || rpcErrorMsg;
-                      }
-                    } catch (e: any) {
-                      rpcErrorMsg = e?.message || rpcErrorMsg;
-                    }
-                  }
-
-                  if (!rpcSuccess) {
-                    throw new Error(rpcErrorMsg || 'Serverfehler beim Setzen der PIN.');
-                  }
-
-                  sessionStorage.removeItem('groovelab_qr_token');
-                  
-                  const user = {
-                    ...pinSetupUser,
-                    is_pin_activated: true,
-                    has_personal_pin: true,
-                    schools: pinSetupUser.schools || schoolData
-                  };
-                  setPinSetupUser(null);
-                  
-                  const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
-                  if (isTeacher) {
-                    if (user.is_observer) {
-                      await finalizeLogin(user, loginStationId, false, true);
-                    } else {
-                      const isGroovelabScreen = isGroovelabKiosk;
-                      if (isGroovelabScreen) {
-                        await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
-                      } else {
-                        // Campus Login strictly bypasses GrooveLab presence check-in
-                        await finalizeLogin(user, loginStationId, false, true);
-                      }
-                    }
-                  } else {
-                    await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom);
-                  }
-                } catch (err: any) {
-                  alert('Fehler beim Einrichten der PIN: ' + err.message);
-                  setLoading(false);
-                }
-              }}
-              disabled={pinSetupInput.length !== 4 || loading}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '16px',
-                background: pinSetupInput.length === 4 ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
-                color: '#0f172a',
-                fontWeight: 800,
-                border: 'none',
-                marginTop: '24px',
-                cursor: pinSetupInput.length === 4 ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s'
-              }}
-            >
-              PIN aktivieren &amp; Einloggen
-            </button>
-            
-            <button
-              onClick={() => {
-                setPinSetupUser(null);
-                setLoading(false);
-              }}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '16px', cursor: 'pointer' }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* PIN Verification Modal */}
-      {pinVerificationUser && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: '20px',
-          fontFamily: 'Inter, system-ui, sans-serif'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '32px',
-            padding: '32px',
-            width: '100%',
-            maxWidth: '360px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-            border: '1px solid #f1f5f9',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center'
-          }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', marginBottom: '16px' }}>
-              <Key size={28} />
-            </div>
-            
-            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>Persönliche PIN eingeben</h3>
-            <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-              Login für <strong>{pinVerificationUser.name || pinVerificationUser.first_name}</strong>{pinVerificationUser.ausweis_nummer ? ` (${pinVerificationUser.ausweis_nummer})` : ''}.<br/>
-              {(pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 'Bitte gib deinen Geburtstag (nur den Tag, z.B. 05) als PIN ein.' : 'Bitte gib deine 4-stellige PIN ein.'}
-            </p>
-
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-              {Array.from({ length: (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4 }).map((_, idx) => {
-                const isFilled = pinVerificationInput.length > idx;
-                const dotColor = schoolData?.primary_color || '#16a34a';
-                return (
-                  <div key={idx} style={{
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    border: isFilled ? `2px solid ${dotColor}` : '2px solid #cbd5e1',
-                    background: isFilled ? dotColor : 'transparent',
-                    transform: isFilled ? 'scale(1.18)' : 'scale(1)',
-                    boxShadow: isFilled ? `0 0 10px ${dotColor}55` : 'none',
-                    transition: 'all 0.15s ease'
-                  }} />
-                );
-              })}
-            </div>
-
-            {renderKeypad('verify')}
-
-            <button
-              onClick={async () => {
-                const expectedLength = (pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4;
-                if (pinVerificationInput.length !== expectedLength) return;
-                
-                let isMatch = false;
-                const { data: pinOk, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-                  user_uuid: pinVerificationUser.id,
-                  input_pin: pinVerificationInput
-                });
-                if (!pinErr && pinOk === true) {
-                  isMatch = true;
-                }
-
-                if (isMatch) {
-                  const user = {
-                    ...pinVerificationUser,
-                    schools: pinVerificationUser.schools || schoolData
-                  };
-                  setPinVerificationUser(null);
-                  setPinVerificationAttempts(0);
-                  
-                  const isTeacher = user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'admin';
-                  if (isTeacher) {
-                    if (user.is_observer) {
-                      await finalizeLogin(user, loginStationId, false, true);
-                    } else {
-                      const isGroovelabScreen = isGroovelabKiosk;
-                      if (isGroovelabScreen) {
-                        await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom, false);
-                      } else {
-                        // Campus Login strictly bypasses GrooveLab presence check-in
-                        await finalizeLogin(user, loginStationId, false, true);
-                      }
-                    }
-                  } else {
-                    await finalizeLogin(user, loginStationId, pinVerificationIsWithinRoom);
-                  }
-                } else {
-                  const newAttempts = pinVerificationAttempts + 1;
-                  setPinVerificationAttempts(newAttempts);
-
-                  if (pinVerificationUser.role === 'student' && newAttempts >= 3) {
-                    try {
-                      await supabase
-                        .from('users')
-                        .update({ is_campus_active: false, is_groovelab_active: false })
-                        .eq('id', pinVerificationUser.id);
-                      alert('Dieses Konto wurde nach 3 Fehlversuchen aus Sicherheitsgründen gesperrt. Bitte wende dich an die Musikschule.');
-                    } catch (e) {
-                      console.error(e);
-                    }
-                    setPinVerificationUser(null);
-                  } else {
-                    const limit = pinVerificationUser.role === 'student' ? 3 : 5;
-                    const remaining = limit - newAttempts;
-                    if (remaining <= 0) {
-                      alert('Zu viele Fehlversuche. Bitte wende dich an deine Schule.');
-                      setPinVerificationUser(null);
-                    } else {
-                      alert(`Die eingegebene PIN ist nicht korrekt. Noch ${remaining} Versuch${remaining === 1 ? '' : 'e'}.`);
-                    }
-                  }
-                  setPinVerificationInput('');
-                }
-              }}
-              disabled={pinVerificationInput.length !== ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4)}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '16px',
-                background: pinVerificationInput.length === ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4) ? (schoolData?.primary_color || '#eab308') : '#cbd5e1',
-                color: '#0f172a',
-                fontWeight: 800,
-                border: 'none',
-                marginTop: '24px',
-                cursor: pinVerificationInput.length === ((pinVerificationUser.role === 'student' && !pinVerificationUser.has_personal_pin) ? 2 : 4) ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s'
-              }}
-            >
-              Verifizieren &amp; Einloggen
-            </button>
-            
-            <button
-              onClick={() => {
-                setPinVerificationUser(null);
-                setLoading(false);
-              }}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginTop: '16px', cursor: 'pointer' }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      )}
+      {/* PIN Setup & Verification Modals Hub (0,1% Feature Monolith) */}
+      <LoginPinModalsHub
+        pinSetupUser={pinSetupUser}
+        pinVerificationUser={pinVerificationUser}
+        onCloseSetup={() => { setPinSetupUser(null); setLoading(false); }}
+        onCloseVerify={() => { setPinVerificationUser(null); setLoading(false); }}
+        onFinalizeLogin={finalizeLogin}
+        schoolData={schoolData}
+        isGroovelabKiosk={isGroovelabKiosk}
+        loginStationId={loginStationId}
+        pinVerificationIsWithinRoom={pinVerificationIsWithinRoom}
+        loading={loading}
+        setLoading={setLoading}
+        pinSetupInput={pinSetupInput}
+        setPinSetupInput={setPinSetupInput}
+        pinVerificationInput={pinVerificationInput}
+        setPinVerificationInput={setPinVerificationInput}
+        rememberPinOnDevice={rememberPinOnDevice}
+        setRememberPinOnDevice={setRememberPinOnDevice}
+        pinVerificationAttempts={pinVerificationAttempts}
+        setPinVerificationAttempts={setPinVerificationAttempts}
+      />
 
       {/* Unified 100% Compliant Legal Text Modal */}
       <LegalTextModal

@@ -8,6 +8,7 @@ const GhostSupportCapsule = lazy(() => import('../masterAdmin/GhostSupportCapsul
 const MaintenanceLockoutOverlay = lazy(() => import('../MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('../GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
 const PwaUpdateToast = lazy(() => import('../ui/PwaUpdateToast').then(m => ({ default: m.PwaUpdateToast })));
+const PasskeyNudgeBanner = lazy(() => import('../admin/PasskeyNudgeBanner').then(m => ({ default: m.PasskeyNudgeBanner })));
 
 export interface CampusSystemBannersOverlayProps {
   isGhostParam: boolean;
@@ -149,6 +150,11 @@ export const CampusSystemBannersOverlay: React.FC<CampusSystemBannersOverlayProp
             }}
             onDismiss={() => setShowPwaUpdateToast(false)}
           />
+        </Suspense>
+      )}
+      {user && (
+        <Suspense fallback={null}>
+          <PasskeyNudgeBanner currentUser={user} />
         </Suspense>
       )}
       <OfflineStatusBadge />

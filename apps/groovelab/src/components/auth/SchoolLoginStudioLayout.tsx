@@ -491,7 +491,6 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           aria-selected={activeMethod === 'qr'}
           onClick={() => {
             onSelectMethod('qr');
-            setIsCameraActive(true);
           }}
           style={{
             flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
@@ -622,37 +621,60 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                   background: '#0c0f12'
                 }}
               >
-                {/* LIVE Status Badge */}
-                <div 
-                  style={{
-                    position: 'absolute', top: '10px', left: '10px', zIndex: 15,
-                    background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '100px', padding: '3px 10px',
-                    display: 'flex', alignItems: 'center', gap: '6px', fontSize: '9.5px', fontWeight: 800,
-                    color: '#ffffff', pointerEvents: 'none'
-                  }}
-                >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: brandAccentColor }} />
-                  <span>LIVE</span>
-                </div>
+                {/* LIVE Status Badge (Only when camera active) */}
+                {isCameraActive && !cameraHasError && (
+                  <div 
+                    style={{
+                      position: 'absolute', top: '10px', left: '10px', zIndex: 15,
+                      background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '100px', padding: '3px 10px',
+                      display: 'flex', alignItems: 'center', gap: '6px', fontSize: '9.5px', fontWeight: 800,
+                      color: '#ffffff', pointerEvents: 'none'
+                    }}
+                  >
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: brandAccentColor }} />
+                    <span>LIVE</span>
+                  </div>
+                )}
 
-                {/* Flip Camera Button */}
-                <button
-                  type="button"
-                  onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
-                  aria-label="Kamera wechseln"
-                  title="Kamera wechseln"
-                  style={{
-                    position: 'absolute', top: '10px', right: '10px', zIndex: 15, width: '36px', height: '36px',
-                    borderRadius: '50%', background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', color: '#ffffff', transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)'}
-                >
-                  <RotateCw size={16} />
-                </button>
+                {/* Camera Controls (Flip & Stop) (Only when camera active) */}
+                {isCameraActive && !cameraHasError && (
+                  <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 15, display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                      aria-label="Kamera wechseln"
+                      title="Kamera wechseln"
+                      style={{
+                        width: '36px', height: '36px',
+                        borderRadius: '50%', background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: '#ffffff', transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)'}
+                    >
+                      <RotateCw size={15} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCameraActive(false)}
+                      aria-label="Kamera stoppen"
+                      title="Kamera stoppen"
+                      style={{
+                        width: '36px', height: '36px',
+                        borderRadius: '50%', background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', color: '#ffffff', transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.6)'}
+                    >
+                      <CameraOff size={15} />
+                    </button>
+                  </div>
+                )}
 
                 {/* Scan Success Flash */}
                 {scanSuccess && (
@@ -680,35 +702,30 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                       facingMode={facingMode}
                     />
 
-                    {/* Apple-Sight Corner Reticles (Zentriertes Zielfeld unterhalb der Top-Controls) */}
+                    {/* Apple-Sight Corner Reticles (Ruhiges, präzises Zielfeld ohne hektischen Laser) */}
                     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
                       <div style={{ position: 'absolute', top: '54px', left: '22px', width: '28px', height: '28px', borderTop: `3.5px solid ${brandAccentColor}`, borderLeft: `3.5px solid ${brandAccentColor}`, borderTopLeftRadius: '10px' }} />
                       <div style={{ position: 'absolute', top: '54px', right: '22px', width: '28px', height: '28px', borderTop: `3.5px solid ${brandAccentColor}`, borderRight: `3.5px solid ${brandAccentColor}`, borderTopRightRadius: '10px' }} />
                       <div style={{ position: 'absolute', bottom: '22px', left: '22px', width: '28px', height: '28px', borderBottom: `3.5px solid ${brandAccentColor}`, borderLeft: `3.5px solid ${brandAccentColor}`, borderBottomLeftRadius: '10px' }} />
                       <div style={{ position: 'absolute', bottom: '22px', right: '22px', width: '28px', height: '28px', borderBottom: `3.5px solid ${brandAccentColor}`, borderRight: `3.5px solid ${brandAccentColor}`, borderBottomRightRadius: '10px' }} />
-                      
-                      <div 
-                        style={{
-                          position: 'absolute', left: '22px', right: '22px', width: 'calc(100% - 44px)', height: '70px',
-                          background: `linear-gradient(180deg, transparent 0%, ${isGroovelabKiosk ? 'rgba(250, 204, 21, 0.25)' : 'rgba(74, 222, 128, 0.25)'} 50%, transparent 100%)`,
-                          animation: 'scanLaser 3s ease-in-out infinite'
-                        }} 
-                      />
                     </div>
                   </>
                 ) : (
                   <div 
                     style={{
                       width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
-                      alignItems: 'center', justifyContent: 'center', gap: '10px', color: '#ffffff',
+                      alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#ffffff',
                       padding: '24px', textAlign: 'center', boxSizing: 'border-box'
                     }}
                   >
                     {cameraHasError ? (
                       <>
-                        <CameraOff size={28} color="#ef4444" />
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
+                        <CameraOff size={32} color="#ef4444" />
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#fca5a5' }}>
                           Kamerazugriff blockiert
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', maxWidth: '240px', lineHeight: 1.35 }}>
+                          Bitte erlaube den Kamerazugriff in deinen Browser-Einstellungen.
                         </div>
                         {isIOS && isStandalone ? (
                           <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
@@ -743,8 +760,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                               setIsCameraActive(true);
                             }}
                             style={{
-                              padding: '8px 16px', borderRadius: '10px', border: 'none',
-                              background: brandPrimaryColor, color: brandTextColor, fontWeight: 800, fontSize: '12px', cursor: 'pointer', marginTop: '4px'
+                              padding: '10px 20px', borderRadius: '12px', border: 'none',
+                              background: brandPrimaryColor, color: brandTextColor, fontWeight: 800, fontSize: '12.5px', cursor: 'pointer', marginTop: '6px'
                             }}
                           >
                             Erneut versuchen
@@ -753,19 +770,61 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                       </>
                     ) : (
                       <>
-                        <Camera size={32} color={brandPrimaryColor} />
-                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255, 255, 255, 0.75)' }}>
-                          Kamera im Ruhezustand
+                        <div 
+                          style={{
+                            width: '64px', height: '64px', borderRadius: '20px',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginBottom: '4px',
+                            boxShadow: isGroovelabKiosk 
+                              ? '0 8px 24px rgba(250, 204, 21, 0.18)' 
+                              : '0 8px 24px rgba(74, 222, 128, 0.18)'
+                          }}
+                        >
+                          <Camera size={30} color={brandPrimaryColor} />
+                        </div>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                          QR-Ausweis scannen
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.72)', maxWidth: '240px', lineHeight: 1.35 }}>
+                          Halte deinen Ausweis oder QR-Code vor die Kamera, um dich anzumelden
                         </div>
                         <button
                           type="button"
-                          onClick={() => setIsCameraActive(true)}
+                          onClick={() => {
+                            setCameraHasError(false);
+                            setIsCameraActive(true);
+                          }}
                           style={{
-                            padding: '8px 18px', borderRadius: '12px', border: 'none',
-                            background: brandPrimaryColor, color: brandTextColor, fontWeight: 800, fontSize: '12px', cursor: 'pointer', marginTop: '6px'
+                            marginTop: '8px',
+                            padding: '11px 26px',
+                            borderRadius: '100px',
+                            border: 'none',
+                            background: brandPrimaryColor,
+                            color: brandTextColor,
+                            fontWeight: 800,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: isGroovelabKiosk 
+                              ? '0 4px 16px rgba(250, 204, 21, 0.35)' 
+                              : '0 4px 16px rgba(34, 197, 94, 0.35)',
+                            transition: 'transform 0.15s ease, filter 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.03)';
+                            e.currentTarget.style.filter = 'brightness(1.06)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.filter = 'none';
                           }}
                         >
-                          Kamera starten
+                          <Camera size={16} color={brandTextColor} strokeWidth={2.5} />
+                          <span>Kamera aktivieren</span>
                         </button>
                       </>
                     )}
@@ -1012,7 +1071,6 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                     type="button"
                     onClick={() => {
                       onSelectMethod('qr');
-                      setIsCameraActive(true);
                     }}
                     style={{
                       flex: 1, padding: '12px 14px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.2)',

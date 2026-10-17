@@ -154,102 +154,59 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
       style={{
         position: 'fixed',
         bottom: isMobile 
-          ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 16px)' 
+          ? 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 16px) + 16px)' 
           : '24px',
         right: isMobile ? '16px' : '24px',
         left: isMobile ? '16px' : 'auto',
         zIndex: 1050,
-        maxWidth: isMobile ? 'calc(100% - 32px)' : '460px',
-        width: isMobile ? 'calc(100% - 32px)' : 'auto',
+        maxWidth: isMobile ? 'calc(100% - 32px)' : '390px',
+        width: isMobile ? 'calc(100% - 32px)' : '390px',
         boxSizing: 'border-box',
         margin: '0',
-        padding: '14px 18px',
+        padding: '16px',
         opacity: isExiting ? 0 : 1,
         transform: isExiting ? 'translateY(16px) scale(0.96)' : 'translateY(0) scale(1)',
-        overflow: 'hidden',
+        overflow: 'visible',
         transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-        borderRadius: '18px',
-        background: 'rgba(236, 253, 245, 0.96)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1.5px solid #10b981',
-        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+        borderRadius: '20px',
+        background: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1.5px solid rgba(16, 185, 129, 0.35)',
+        boxShadow: '0 16px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(16, 185, 129, 0.06)',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
+        flexDirection: 'column',
+        gap: '10px',
         textAlign: 'left',
         pointerEvents: 'auto'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 300px' }}>
-        <div style={{
-          width: '38px',
-          height: '38px',
-          borderRadius: '12px',
-          background: '#ffffff',
-          color: '#10b981',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'none',
-          flexShrink: 0
-        }}>
-          <Fingerprint size={22} strokeWidth={2.3} />
-        </div>
-
-        <div>
-          <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>Schneller &amp; sicherer anmelden mit Passkey</span>
-            <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff' }}>
-              Empfohlen
-            </span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <div style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '10px',
+            background: 'rgba(16, 185, 129, 0.12)',
+            color: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: 'none',
+            flexShrink: 0
+          }}>
+            <Fingerprint size={20} strokeWidth={2.3} />
           </div>
-          <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600, marginTop: '2px' }}>
-            {successMsg ? (
-              <span style={{ color: '#059669', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Check size={14} /> {successMsg}
+
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span>Passkey aktivieren</span>
+              <span style={{ fontSize: '0.64rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: '#10b981', color: '#ffffff', border: 'none' }}>
+                Empfohlen
               </span>
-            ) : errorMsg ? (
-              <span style={{ color: '#dc2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <AlertCircle size={14} /> {errorMsg}
-              </span>
-            ) : (
-              'Nutze künftig FaceID, TouchID oder deinen Windows Hello Fingerabdruck – ganz ohne PIN-Eingabe.'
-            )}
+            </div>
           </div>
         </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        {!successMsg && (
-          <button
-            type="button"
-            onClick={handleRegisterPasskey}
-            disabled={isRegistering}
-            style={{
-              padding: '7px 14px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              fontSize: '0.76rem',
-              fontWeight: 800,
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: 'none',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#166534'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#15803d'}
-          >
-            <ShieldCheck size={14} />
-            <span>{isRegistering ? 'Wird aktiviert...' : 'Passkey jetzt aktivieren'}</span>
-          </button>
-        )}
 
         <button
           type="button"
@@ -265,14 +222,68 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
             borderRadius: '8px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'all 0.15s ease'
           }}
-          onMouseOver={(e) => e.currentTarget.style.color = '#0f172a'}
-          onMouseOut={(e) => e.currentTarget.style.color = '#64748b'}
+          onMouseOver={(e) => {
+            e.currentTarget.style.color = '#0f172a';
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.04)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.color = '#64748b';
+            e.currentTarget.style.background = 'transparent';
+          }}
         >
           <X size={16} />
         </button>
       </div>
+
+      <div style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 550, lineHeight: 1.45 }}>
+        {successMsg ? (
+          <span style={{ color: '#059669', fontWeight: 750, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Check size={15} /> {successMsg}
+          </span>
+        ) : errorMsg ? (
+          <span style={{ color: '#dc2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <AlertCircle size={15} /> {errorMsg}
+          </span>
+        ) : (
+          'Schneller & sicherer anmelden per FaceID, TouchID oder Windows Hello – ganz ohne PIN-Eingabe.'
+        )}
+      </div>
+
+      {!successMsg && (
+        <button
+          type="button"
+          onClick={handleRegisterPasskey}
+          disabled={isRegistering}
+          style={{
+            width: '100%',
+            padding: '9px 16px',
+            minHeight: '42px',
+            borderRadius: '12px',
+            background: '#10b981',
+            color: '#ffffff',
+            fontSize: '0.80rem',
+            fontWeight: 800,
+            border: 'none',
+            cursor: isRegistering ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: 'none',
+            transition: 'all 0.15s ease',
+            opacity: isRegistering ? 0.75 : 1
+          }}
+          onMouseOver={(e) => { if (!isRegistering) e.currentTarget.style.background = '#059669'; }}
+          onMouseOut={(e) => { if (!isRegistering) e.currentTarget.style.background = '#10b981'; }}
+        >
+          <ShieldCheck size={15} />
+          <span>{isRegistering ? 'Wird aktiviert...' : 'Passkey jetzt aktivieren'}</span>
+        </button>
+      )}
     </div>
   );
 };

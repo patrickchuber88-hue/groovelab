@@ -14,54 +14,56 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
       aria-atomic="true"
       style={{
         position: 'fixed',
-        bottom: typeof window !== 'undefined' && window.innerWidth <= 768 
-          ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 16px)' 
-          : '28px',
+        top: typeof window !== 'undefined' && window.innerWidth <= 768 
+          ? 'calc(env(safe-area-inset-top, 16px) + 16px)' 
+          : '20px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 9999999,
-        maxWidth: '480px',
+        maxWidth: '460px',
         width: 'calc(100% - 32px)',
-        background: 'rgba(15, 23, 42, 0.95)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
+        background: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1.5px solid rgba(16, 185, 129, 0.28)',
         borderRadius: '100px',
-        padding: '6px 10px 6px 16px',
-        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        padding: '6px 8px 6px 14px',
+        boxShadow: '0 16px 40px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '12px',
-        animation: 'cgSlideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+        animation: 'cgSlideDownFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards'
       }}
     >
       <style>{`
-        @keyframes cgSlideUpFade {
-          from { opacity: 0; transform: translate(-50%, 20px); }
+        @keyframes cgSlideDownFade {
+          from { opacity: 0; transform: translate(-50%, -18px); }
           to { opacity: 1; transform: translate(-50%, 0); }
         }
       `}</style>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
         <div style={{
-          width: '28px',
-          height: '28px',
+          width: '30px',
+          height: '30px',
           borderRadius: '50%',
-          background: 'rgba(52, 168, 83, 0.2)',
+          background: 'rgba(16, 185, 129, 0.12)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0
         }}>
-          <Sparkles size={15} color="#4ade80" />
+          <Sparkles size={16} color="#059669" />
         </div>
         <div style={{
-          fontSize: '0.82rem',
-          fontWeight: 700,
-          color: '#f8fafc',
+          fontSize: '0.84rem',
+          fontWeight: 750,
+          color: '#0f172a',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          textOverflow: 'ellipsis',
+          letterSpacing: '-0.01em'
         }}>
           Neues Update verfügbar!
         </div>
@@ -72,13 +74,13 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
           type="button"
           onClick={onUpdate}
           style={{
-            padding: '8px 16px',
-            minHeight: '44px',
+            padding: '8px 18px',
+            minHeight: '42px',
             borderRadius: '100px',
-            background: '#34a853',
+            background: '#10b981',
             color: '#ffffff',
             border: 'none',
-            fontSize: '0.82rem',
+            fontSize: '0.80rem',
             fontWeight: 800,
             cursor: 'pointer',
             display: 'flex',
@@ -88,10 +90,10 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
             transition: 'all 0.15s ease',
             touchAction: 'manipulation'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.background = '#2e9549'; }}
-          onMouseOut={(e) => { e.currentTarget.style.background = '#34a853'; }}
+          onMouseOver={(e) => { e.currentTarget.style.background = '#059669'; }}
+          onMouseOut={(e) => { e.currentTarget.style.background = '#10b981'; }}
         >
-          <RefreshCw size={13} />
+          <RefreshCw size={13} strokeWidth={2.4} />
           Aktualisieren
         </button>
 
@@ -99,27 +101,33 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
           type="button"
           onClick={onDismiss}
           style={{
-            width: '44px',
-            height: '44px',
-            minWidth: '44px',
-            minHeight: '44px',
+            width: '36px',
+            height: '36px',
+            minWidth: '36px',
+            minHeight: '36px',
             borderRadius: '50%',
             background: 'transparent',
-            color: '#94a3b8',
+            color: '#64748b',
             border: 'none',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'color 0.15s ease',
+            transition: 'all 0.15s ease',
             touchAction: 'manipulation'
           }}
-          onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
-          onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+          onMouseOver={(e) => { 
+            e.currentTarget.style.color = '#0f172a'; 
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+          }}
+          onMouseOut={(e) => { 
+            e.currentTarget.style.color = '#64748b'; 
+            e.currentTarget.style.background = 'transparent';
+          }}
           title="Später"
-          aria-label="Später"
+          aria-label="Hinweis schließen"
         >
-          <X size={15} />
+          <X size={16} />
         </button>
       </div>
     </div>
