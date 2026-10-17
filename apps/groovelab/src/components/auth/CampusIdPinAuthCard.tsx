@@ -26,6 +26,45 @@ export interface CampusIdPinAuthCardProps {
  * - Vollständige Tastatur-Bedienbarkeit (0-9, Backspace, Enter)
  * - Nahtlose 2FA-Vorbereitung (Schritt 1: Ausweis-ID -> Schritt 2: Persönliche PIN)
  */
+/**
+ * 0,1% Goldstandard Smart Ausweis-Resolver
+ * Löst kurze Nummern (z.B. "42") oder "0010042" nahtlos zur kanonischen ID auf.
+ */
+export function resolveCanonicalAusweisId(rawInput: string, schoolNumber: string = '001'): string {
+  const clean = rawInput.trim().toUpperCase().replace(/\s+/g, '');
+  if (!clean) return '';
+
+  // Wenn 6-stellige reine Ziffern vorliegen (z.B. Schulleitungs-PIN oder Recovery-Code): unverändert lassen
+  if (/^\d{6}$/.test(clean)) {
+    return clean;
+  }
+
+  // Bereits kanonisch: z.B. 001-S-0042, 001-L-0005, 001-V-0001
+  const canonMatch = clean.match(/^(\d{3})-([SLV])-(\d{1,4})$/);
+  if (canonMatch) {
+    return `${canonMatch[1]}-${canonMatch[2]}-${canonMatch[3].padStart(4, '0')}`;
+  }
+
+  // Mit Buchstabe ohne Bindestrich: z.B. 001S42 oder 001L5
+  const letterMatch = clean.match(/^(\d{3})([SLV])(\d{1,4})$/);
+  if (letterMatch) {
+    return `${letterMatch[1]}-${letterMatch[2]}-${letterMatch[3].padStart(4, '0')}`;
+  }
+
+  // 7 Ziffern (Schulnummer 3 + Sequenz 4): z.B. 0010042 oder 001-0042
+  const numOnlyMatch = clean.replace(/-/g, '').match(/^(\d{3})(\d{1,4})$/);
+  if (numOnlyMatch) {
+    return `${numOnlyMatch[1]}-S-${numOnlyMatch[2].padStart(4, '0')}`;
+  }
+
+  // Reine kurze Ziffernfolge (1 bis 4 Ziffern, z.B. "42" oder "5"):
+  if (/^\d{1,4}$/.test(clean)) {
+    return `${schoolNumber}-S-${clean.padStart(4, '0')}`;
+  }
+
+  return clean;
+}
+
 export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
   isGroovelabKiosk = false,
   schoolNumber = '001',
@@ -42,6 +81,11 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
   const isLocked = pinLockoutSeconds > 0;
   const isSubmitDisabled = loading || isLocked || !inputValue.trim();
 
+  const detectedId = resolveCanonicalAusweisId(inputValue, schoolNumber);
+  const showPill = inputValue.trim().length > 0 && 
+                   detectedId !== inputValue && 
+                   /^\d{1,4}$|^\d{3}-?\d{1,4}$/.test(inputValue.trim().replace(/-/g, ''));
+
   // Tastatur-Listener für native Eingabe ohne Klickzwang (Apple Desktop / Mac)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,9 +99,9 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
 
       if (isLocked || loading) return;
 
-      if (/^[0-9]$/.test(e.key)) {
+      if (/^[0-9a-zA-Z\-]$/.test(e.key)) {
         e.preventDefault();
-        setInputValue(prev => (prev + e.key).slice(0, 16));
+        setInputValue(prev => (prev + e.key.toUpperCase()).slice(0, 16));
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         setInputValue(prev => prev.slice(0, -1));
@@ -78,7 +122,8 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
 
   const handleSubmit = () => {
     if (isSubmitDisabled) return;
-    onSubmitId(inputValue.trim());
+    const finalId = resolveCanonicalAusweisId(inputValue, schoolNumber);
+    onSubmitId(finalId);
   };
 
   const handleKeypadPress = (key: string) => {
@@ -135,7 +180,7 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
           e.preventDefault(); 
           handleSubmit(); 
         }} 
-        style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}
       >
         <div style={{ position: 'relative', width: '100%' }}>
           <input
@@ -152,7 +197,7 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isLocked ? `Gesperrt (${pinLockoutSeconds}s)` : "z.B. 42 oder 001-S-42"}
+            placeholder={isLocked ? `Gesperrt (${pinLockoutSeconds}s)` : "z.B. 42 oder 001-S-0042"}
             disabled={loading || isLocked}
             autoFocus
             style={{
@@ -216,6 +261,28 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
             </button>
           )}
         </div>
+
+        {/* 🛡️ 0,1% Apple Feedback-Pill: Zeigt sofort die aufgelöste Ziel-ID an */}
+        {showPill && (
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '5px 12px',
+            borderRadius: '100px',
+            background: isGroovelabKiosk ? 'rgba(250, 204, 21, 0.18)' : 'rgba(74, 222, 128, 0.16)',
+            border: isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.35)' : '1px solid rgba(74, 222, 128, 0.35)',
+            fontSize: '11.5px',
+            fontWeight: 750,
+            color: isGroovelabKiosk ? '#fde68a' : '#86efac',
+            alignSelf: 'center',
+            animation: 'fadeIn 0.15s ease-out'
+          }}>
+            <ShieldCheck size={14} color={isGroovelabKiosk ? '#fde68a' : '#86efac'} />
+            <span>Erkannt als: <strong style={{ color: '#ffffff', letterSpacing: '0.04em' }}>{detectedId}</strong></span>
+          </div>
+        )}
 
         {/* 🔢 Kanonisches 3x4 Apple Numpad (Parität mit GlobalParentPinModal) */}
         <div 
