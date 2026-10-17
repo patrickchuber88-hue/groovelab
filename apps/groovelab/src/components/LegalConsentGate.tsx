@@ -867,7 +867,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         style={{
           background: '#ffffff',
           width: '100%',
-          maxWidth: isMobile ? '100%' : '680px',
+          maxWidth: isMobile ? '100%' : '740px',
           height: isMobile ? '100dvh' : 'auto',
           maxHeight: isMobile ? '100dvh' : '90vh',
           borderRadius: isMobile ? 0 : '28px',
@@ -972,6 +972,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         >
           {errorMsg && (
             <div style={{
+              flexShrink: 0,
               background: '#fee2e2',
               border: '1px solid #fca5a5',
               borderRadius: '12px',
@@ -991,6 +992,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           {/* 🔍 Major-Update Changelog-Lens (Delta-Fokus gem. BGH XI ZR 26/20) */}
           {isMajorUpdateFlow && activeChangelog ? (
             <div style={{
+              flexShrink: 0,
               background: themeBgLight,
               border: `1.5px solid ${themeBorder}`,
               borderRadius: isMobile ? '14px' : '18px',
@@ -1029,6 +1031,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           ) : (
             /* Kaltstart-Kernpunkte für Erstnutzer */
             <div style={{
+              flexShrink: 0,
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
               borderRadius: isMobile ? '14px' : '18px',
@@ -1063,7 +1066,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           )}
 
           {/* Optional Toggle Full Text Accordion (§ 305 Abs. 2 BGB) & Direct PDF Download */}
-          <div>
+          <div style={{ flexShrink: 0 }}>
             <div style={{
               display: 'flex',
               flexDirection: isMobile ? 'column' : 'row',
@@ -1149,6 +1152,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           {/* Klartext-Name des/der Vertretungsberechtigten (Rechtssicherheit gem. § 126a/b BGB & Art. 28 Abs. 9 DSGVO) */}
           {isAdmin && (
             <div style={{
+              flexShrink: 0,
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
@@ -1212,11 +1216,14 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             }}
             onClick={() => setCheckedMandatory(!checkedMandatory)}
             style={{
+              flexShrink: 0,
               border: checkedMandatory ? `2px solid ${themeColor}` : '1.5px solid #cbd5e1',
               background: checkedMandatory ? themeBgLight : '#ffffff',
               borderRadius: '16px',
-              padding: isMobile ? '12px 14px' : '14px 16px',
-              minHeight: '44px',
+              padding: isMobile ? '12px 14px' : '14px 18px',
+              minHeight: '48px',
+              height: 'auto',
+              boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px',
@@ -1238,12 +1245,12 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              marginTop: '1px',
+              marginTop: '2px',
               transition: 'all 0.15s ease'
             }}>
               {checkedMandatory && <Check size={15} color="#ffffff" strokeWidth={3} />}
             </div>
-            <div style={{ flex: 1, fontSize: isMobile ? '0.80rem' : '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.35 }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.80rem' : '0.84rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.45, wordBreak: 'break-word' }}>
               <span style={{ color: themeColor, fontWeight: 800 }}>[Pflicht] </span>
               {isMajorUpdateFlow ? (
                 isAdmin
@@ -1271,11 +1278,14 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               }}
               onClick={() => setCheckedAudio(!checkedAudio)}
               style={{
+                flexShrink: 0,
                 border: checkedAudio ? '2px solid #10b981' : '1.5px solid #e2e8f0',
                 background: checkedAudio ? '#ecfdf5' : '#ffffff',
                 borderRadius: '16px',
-                padding: isMobile ? '12px 14px' : '14px 16px',
-                minHeight: '44px',
+                padding: isMobile ? '12px 14px' : '14px 18px',
+                minHeight: '48px',
+                height: 'auto',
+                boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '12px',
@@ -1297,12 +1307,12 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                marginTop: '1px',
+                marginTop: '2px',
                 transition: 'all 0.15s ease'
               }}>
                 {checkedAudio && <Check size={15} color="#ffffff" strokeWidth={3} />}
               </div>
-              <div style={{ flex: 1, fontSize: isMobile ? '0.78rem' : '0.80rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.35 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: isMobile ? '0.78rem' : '0.82rem', fontWeight: 600, color: '#1e293b', lineHeight: 1.45, wordBreak: 'break-word' }}>
                 <span style={{ color: '#059669', fontWeight: 800 }}>[Freiwillige Einwilligung – Art. 8 DSGVO] </span>
                 {audioDoc.checkboxLabel}
               </div>
@@ -1311,20 +1321,27 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
 
           {/* Cryptographic Audit Notice */}
           <div style={{
+            flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             fontSize: isMobile ? '0.70rem' : '0.72rem',
             color: '#64748b',
             background: '#f8fafc',
-            padding: '8px 12px',
-            borderRadius: '10px'
+            border: '1px solid #e2e8f0',
+            padding: '9px 12px',
+            borderRadius: '10px',
+            lineHeight: 1.4,
+            boxSizing: 'border-box'
           }}>
             <Lock size={13} style={{ flexShrink: 0, color: '#94a3b8' }} />
             <span>
               Revisionssicherer Audit-Trail: Der Zustimmungsakt wird mit SHA-256 Checksumme, UTC-Zeitstempel und Benutzer-ID fälschungssicher protokolliert.
             </span>
           </div>
+
+          {/* 🛡️ Dekade 7: Occlusion Immunity Bottom Clearance Spacer */}
+          <div style={{ height: isMobile ? '14px' : '20px', flexShrink: 0 }} aria-hidden="true" />
         </main>
 
         {/* Footer Bar - ZONE 3: FESTSTEHENDER STICKY-FOOTER */}
