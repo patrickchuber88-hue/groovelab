@@ -3317,6 +3317,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       console.error('[Login] PIN login error:', err.message);
       setError(err.message);
       setLoading(false);
+      throw err;
     }
   };
 
