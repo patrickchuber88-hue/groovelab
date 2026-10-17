@@ -26,43 +26,123 @@ export interface CampusIdPinAuthCardProps {
  * - Vollständige Tastatur-Bedienbarkeit (0-9, Backspace, Enter)
  * - Nahtlose 2FA-Vorbereitung (Schritt 1: Ausweis-ID -> Schritt 2: Persönliche PIN)
  */
+export interface ResolvedAusweisIdentity {
+  canonicalId: string;
+  displayLabel: string;
+  role: 'student' | 'teacher' | 'admin' | 'unknown';
+}
+
 /**
  * 0,1% Goldstandard Smart Ausweis-Resolver
- * Löst kurze Nummern (z.B. "42") oder "0010042" nahtlos zur kanonischen ID auf.
+ * Löst kurze Nummern (z.B. "42", "1-42", "2-3", "0010042") nahtlos zur kanonischen ID auf
+ * und generiert ein barrierefreies, buchstabenfreies Anzeige-Label für die Apple-Pille.
+ * 
+ * Rollen-Schema (0,1% Standard):
+ * - 1 = Schüler / Student (95% aller Nutzer, Default bei reiner Nummer wie 42)
+ * - 2 = Lehrkraft / Dozent
+ * - 3 = Schulleitung / Verwaltung
  */
-export function resolveCanonicalAusweisId(rawInput: string, schoolNumber: string = '001'): string {
+export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = '001'): ResolvedAusweisIdentity {
   const clean = rawInput.trim().toUpperCase().replace(/\s+/g, '');
-  if (!clean) return '';
-
-  // Wenn 6-stellige reine Ziffern vorliegen (z.B. Schulleitungs-PIN oder Recovery-Code): unverändert lassen
-  if (/^\d{6}$/.test(clean)) {
-    return clean;
+  if (!clean) {
+    return { canonicalId: '', displayLabel: '', role: 'unknown' };
   }
 
-  // Bereits kanonisch: z.B. 001-S-0042, 001-L-0005, 001-V-0001
+  const snum = (schoolNumber || '001').padStart(3, '0');
+
+  // 1. 6-stellige reine Ziffern (z.B. Schulleitungs-PIN oder Notfall-Bypass):
+  if (/^\d{6}$/.test(clean)) {
+    return { canonicalId: clean, displayLabel: 'Schulleitungs-Code', role: 'admin' };
+  }
+
+  // 2. Bereits kanonisch mit Buchstabe (z.B. 001-S-0042, 001-L-0003, 001-V-0001):
   const canonMatch = clean.match(/^(\d{3})-([SLV])-(\d{1,4})$/);
   if (canonMatch) {
-    return `${canonMatch[1]}-${canonMatch[2]}-${canonMatch[3].padStart(4, '0')}`;
+    const [, sch, letter, seq] = canonMatch;
+    const padded = seq.padStart(4, '0');
+    const role = letter === 'S' ? 'student' : letter === 'L' ? 'teacher' : 'admin';
+    const label = letter === 'S' 
+      ? `Schülerausweis #${padded}` 
+      : letter === 'L' 
+        ? `Lehrerausweis #${padded}` 
+        : `Verwaltungsausweis #${padded}`;
+    return { canonicalId: `${sch}-${letter}-${padded}`, displayLabel: label, role };
   }
 
-  // Mit Buchstabe ohne Bindestrich: z.B. 001S42 oder 001L5
-  const letterMatch = clean.match(/^(\d{3})([SLV])(\d{1,4})$/);
+  // 3. Buchstabe ohne Bindestrich (z.B. 001S42, 001L3, S42):
+  const letterMatch = clean.match(/^(?:(\d{3}))?([SLV])-?(\d{1,4})$/);
   if (letterMatch) {
-    return `${letterMatch[1]}-${letterMatch[2]}-${letterMatch[3].padStart(4, '0')}`;
+    const [, sch, letter, seq] = letterMatch;
+    const targetSchool = sch || snum;
+    const padded = seq.padStart(4, '0');
+    const role = letter === 'S' ? 'student' : letter === 'L' ? 'teacher' : 'admin';
+    const label = letter === 'S' 
+      ? `Schülerausweis #${padded}` 
+      : letter === 'L' 
+        ? `Lehrerausweis #${padded}` 
+        : `Verwaltungsausweis #${padded}`;
+    return { canonicalId: `${targetSchool}-${letter}-${padded}`, displayLabel: label, role };
   }
 
-  // 7 Ziffern (Schulnummer 3 + Sequenz 4): z.B. 0010042 oder 001-0042
-  const numOnlyMatch = clean.replace(/-/g, '').match(/^(\d{3})(\d{1,4})$/);
-  if (numOnlyMatch) {
-    return `${numOnlyMatch[1]}-S-${numOnlyMatch[2].padStart(4, '0')}`;
+  // 4. Numerischer Rollenstandard (1=Schüler, 2=Lehrer, 3=Verwaltung):
+  // Format: [Schule]-[Rolle]-[Sequenz] (z.B. 001-1-0042, 001-2-0003) oder 8 Ziffern (00110042)
+  const fullNumericMatch = clean.match(/^(\d{3})-?([123])-?(\d{1,4})$/);
+  if (fullNumericMatch) {
+    const [, sch, roleDigit, seq] = fullNumericMatch;
+    const letter = roleDigit === '1' ? 'S' : roleDigit === '2' ? 'L' : 'V';
+    const role = roleDigit === '1' ? 'student' : roleDigit === '2' ? 'teacher' : 'admin';
+    const padded = seq.padStart(4, '0');
+    const label = role === 'student' 
+      ? `Schülerausweis #${padded}` 
+      : role === 'teacher' 
+        ? `Lehrerausweis #${padded}` 
+        : `Verwaltungsausweis #${padded}`;
+    return { canonicalId: `${sch}-${letter}-${padded}`, displayLabel: label, role };
   }
 
-  // Reine kurze Ziffernfolge (1 bis 4 Ziffern, z.B. "42" oder "5"):
+  // 5. Kurzformat mit numerischer Rolle (z.B. 1-42, 2-3, 3-1):
+  const shortRoleMatch = clean.match(/^([123])-(\d{1,4})$/);
+  if (shortRoleMatch) {
+    const [, roleDigit, seq] = shortRoleMatch;
+    const letter = roleDigit === '1' ? 'S' : roleDigit === '2' ? 'L' : 'V';
+    const role = roleDigit === '1' ? 'student' : roleDigit === '2' ? 'teacher' : 'admin';
+    const padded = seq.padStart(4, '0');
+    const label = role === 'student' 
+      ? `Schülerausweis #${padded}` 
+      : role === 'teacher' 
+        ? `Lehrerausweis #${padded}` 
+        : `Verwaltungsausweis #${padded}`;
+    return { canonicalId: `${snum}-${letter}-${padded}`, displayLabel: label, role };
+  }
+
+  // 6. 7 Ziffern (3 Stellen Schule + 4 Stellen Schüler-Sequenz, z.B. 0010042 oder 001-0042):
+  const sevenDigitMatch = clean.replace(/-/g, '').match(/^(\d{3})(\d{1,4})$/);
+  if (sevenDigitMatch && clean.replace(/-/g, '').length >= 5) {
+    const [, sch, seq] = sevenDigitMatch;
+    const padded = seq.padStart(4, '0');
+    return {
+      canonicalId: `${sch}-S-${padded}`,
+      displayLabel: `Schülerausweis #${padded}`,
+      role: 'student'
+    };
+  }
+
+  // 7. Reine kurze Ziffernfolge (1 bis 4 Ziffern, z.B. "42" oder "7"):
+  // Default: Schüler sind die Nummer 1 (95% aller Nutzer)!
   if (/^\d{1,4}$/.test(clean)) {
-    return `${schoolNumber}-S-${clean.padStart(4, '0')}`;
+    const padded = clean.padStart(4, '0');
+    return {
+      canonicalId: `${snum}-S-${padded}`,
+      displayLabel: `Schülerausweis #${padded}`,
+      role: 'student'
+    };
   }
 
-  return clean;
+  return { canonicalId: clean, displayLabel: '', role: 'unknown' };
+}
+
+export function resolveCanonicalAusweisId(rawInput: string, schoolNumber: string = '001'): string {
+  return resolveAusweisIdentity(rawInput, schoolNumber).canonicalId;
 }
 
 export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
@@ -81,10 +161,8 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
   const isLocked = pinLockoutSeconds > 0;
   const isSubmitDisabled = loading || isLocked || !inputValue.trim();
 
-  const detectedId = resolveCanonicalAusweisId(inputValue, schoolNumber);
-  const showPill = inputValue.trim().length > 0 && 
-                   detectedId !== inputValue && 
-                   /^\d{1,4}$|^\d{3}-?\d{1,4}$/.test(inputValue.trim().replace(/-/g, ''));
+  const detectedIdentity = resolveAusweisIdentity(inputValue, schoolNumber);
+  const showPill = inputValue.trim().length > 0 && !isLocked && detectedIdentity.displayLabel.length > 0;
 
   // Tastatur-Listener für native Eingabe ohne Klickzwang (Apple Desktop / Mac)
   useEffect(() => {
@@ -197,7 +275,7 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isLocked ? `Gesperrt (${pinLockoutSeconds}s)` : "z.B. 42 oder 001-S-0042"}
+            placeholder={isLocked ? `Gesperrt (${pinLockoutSeconds}s)` : "z.B. 42"}
             disabled={loading || isLocked}
             autoFocus
             style={{
@@ -262,7 +340,7 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
           )}
         </div>
 
-        {/* 🛡️ 0,1% Apple Feedback-Pill: Zeigt sofort die aufgelöste Ziel-ID an */}
+        {/* 🛡️ 0,1% Apple Feedback-Pill: Zeigt sofort die aufgelöste Identität barrierefrei an */}
         {showPill && (
           <div style={{
             display: 'inline-flex',
@@ -280,7 +358,7 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
             animation: 'fadeIn 0.15s ease-out'
           }}>
             <ShieldCheck size={14} color={isGroovelabKiosk ? '#fde68a' : '#86efac'} />
-            <span>Erkannt als: <strong style={{ color: '#ffffff', letterSpacing: '0.04em' }}>{detectedId}</strong></span>
+            <strong style={{ color: '#ffffff', letterSpacing: '0.02em' }}>{detectedIdentity.displayLabel}</strong>
           </div>
         )}
 
