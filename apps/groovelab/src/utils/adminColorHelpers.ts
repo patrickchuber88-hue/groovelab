@@ -26,21 +26,12 @@ export const getStationColor = (name: string | null | undefined, dbColor?: strin
   return "#64748b";
 };
 
-export const CANONICAL_LEHRWERK_COLOR = {
-  from: '#ffe4e6',
-  to: '#fecdd3',
-  text: '#e11d48',
-  accent: '#e11d48',
-  border: '#fecdd3',
-  badgeBg: '#fff1f2',
-  badgeText: '#e11d48',
-  shadowFrom: 'rgba(225, 29, 72, 0.18)',
-  shadowTo: 'rgba(225, 29, 72, 0.12)'
-};
-
-export const getLehrwerkColor = (_title?: string, _lehrwerkeList: any[] = []) => {
-  return CANONICAL_LEHRWERK_COLOR;
-};
+export {
+  CANONICAL_LEHRWERK_COLOR,
+  getLehrwerkColor,
+  CURATED_ALPHABETICAL_SONG_PALETTE,
+  getSongColor
+} from './songColorUtils';
 
 /**
  * Berechnet einen deterministischen HSL-Farbton (0-360) anhand des ersten Buchstabens.
@@ -66,10 +57,4 @@ export const getAlphabeticalUniColor = (name: string) => {
     avatarBg: `hsl(${hue}, 80%, 93%)`,
     avatarColor: `hsl(${hue}, 90%, 25%)`
   };
-};
-
-import { getSongColor as getCanonicalSongColor } from '../components/student/studentDateUtils';
-
-export const getSongColor = (title: string) => {
-  return getCanonicalSongColor(title);
 };

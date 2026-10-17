@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { getSongColor } from "../../utils/adminColorHelpers";
-import { renderSongVinylCover } from "./AdminSongsView";
+import { renderSongVinylCover } from "../student/CampusVinylCoverArt";
 
 export interface GrooveLabSongsViewProps {
   admin: any;

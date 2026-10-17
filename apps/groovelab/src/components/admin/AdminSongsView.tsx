@@ -6,11 +6,8 @@ import {
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { supabase } from "../../lib/supabase";
 
-import { getLehrwerkColor, getSongColor } from "../../utils/adminColorHelpers";
-export { getLehrwerkColor, getSongColor };
-
+import { getLehrwerkColor, getSongColor } from "../../utils/songColorUtils";
 import { renderSongVinylCover } from "../student/CampusVinylCoverArt";
-export { renderSongVinylCover };
 
 import { AdminMediathekSchnelltext } from "./mediathek/AdminMediathekSchnelltext";
 import { AdminMediathekScoreSnippets } from "./mediathek/AdminMediathekScoreSnippets";

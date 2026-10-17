@@ -9,7 +9,7 @@ import {
   Users,
   X
 } from "lucide-react";
-import { getSongColor } from "../AdminSongsView";
+import { getSongColor } from "../../../utils/songColorUtils";
 
 export interface AdminSongDetailModalProps {
   song: any;
