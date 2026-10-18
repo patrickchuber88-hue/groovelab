@@ -2002,26 +2002,26 @@ select option {
 .sim-viewport-mobile:not(.sim-viewport-landscape) .desktop-only-header,
 .sim-viewport-mobile:not(.sim-viewport-landscape) .main-sidebar,
 .sim-viewport-mobile:not(.sim-viewport-landscape) .desktop-greeting-banner,
-.sim-viewport-mobile:not(.sim-viewport-landscape) .glass-sidebar {
-  display: none !important;
-}
-
-.sim-viewport-portrait .sidebar-nav,
-.sim-viewport-portrait .sidebar-container,
-.sim-viewport-portrait .desktop-only-sidebar,
-.sim-viewport-portrait .desktop-only-header,
-.sim-viewport-portrait .main-sidebar,
-.sim-viewport-portrait .desktop-greeting-banner,
-.sim-viewport-portrait .glass-sidebar {
+.sim-viewport-mobile:not(.sim-viewport-landscape) .glass-sidebar,
+.sim-viewport-mobile.sim-viewport-portrait .sidebar-nav,
+.sim-viewport-mobile.sim-viewport-portrait .sidebar-container,
+.sim-viewport-mobile.sim-viewport-portrait .desktop-only-sidebar,
+.sim-viewport-mobile.sim-viewport-portrait .desktop-only-header,
+.sim-viewport-mobile.sim-viewport-portrait .main-sidebar,
+.sim-viewport-mobile.sim-viewport-portrait .desktop-greeting-banner,
+.sim-viewport-mobile.sim-viewport-portrait .glass-sidebar {
   display: none !important;
 }
 
 .sim-viewport-mobile:not(.sim-viewport-landscape) .cg-mobile-top-header,
-.sim-viewport-portrait .cg-mobile-top-header {
+.sim-viewport-mobile.sim-viewport-portrait .cg-mobile-top-header {
   display: flex !important;
 }
 
-.sim-viewport-landscape .cg-mobile-top-header {
+.sim-viewport-landscape .cg-mobile-top-header,
+.sim-viewport-tablet .cg-mobile-top-header,
+.sim-viewport-tablet-portrait .cg-mobile-top-header,
+.sim-viewport-tablet-landscape .cg-mobile-top-header {
   display: none !important;
 }
 
@@ -2031,19 +2031,19 @@ select option {
 }
 
 .sim-viewport-mobile .cg-mobile-bottom-nav,
-.sim-viewport-portrait .cg-mobile-bottom-nav {
+.sim-viewport-mobile.sim-viewport-portrait .cg-mobile-bottom-nav,
+.sim-viewport-tablet .cg-mobile-bottom-nav,
+.sim-viewport-tablet-portrait .cg-mobile-bottom-nav,
+.sim-viewport-tablet-landscape .cg-mobile-bottom-nav {
   display: none !important;
 }
 
 .sim-viewport-mobile .meisterwerk-mobile-bottom-dock,
-.sim-viewport-portrait .meisterwerk-mobile-bottom-dock,
-[class*="sim-viewport-"]:not(.sim-viewport-landscape) .meisterwerk-mobile-bottom-dock,
+.sim-viewport-mobile.sim-viewport-portrait .meisterwerk-mobile-bottom-dock,
 .sim-viewport-mobile .campus-events-mobile-bottom-dock,
-.sim-viewport-portrait .campus-events-mobile-bottom-dock,
-[class*="sim-viewport-"]:not(.sim-viewport-landscape) .campus-events-mobile-bottom-dock,
+.sim-viewport-mobile.sim-viewport-portrait .campus-events-mobile-bottom-dock,
 .sim-viewport-mobile .student-briefing-mobile-bottom-dock,
-.sim-viewport-portrait .student-briefing-mobile-bottom-dock,
-[class*="sim-viewport-"]:not(.sim-viewport-landscape) .student-briefing-mobile-bottom-dock {
+.sim-viewport-mobile.sim-viewport-portrait .student-briefing-mobile-bottom-dock {
   display: flex !important;
   position: absolute !important;
   bottom: 0 !important;
@@ -2057,10 +2057,22 @@ select option {
   z-index: 900 !important;
 }
 
+/* 🏛️ 0,1% Goldstandard: Tablets strictly suppress all mobile bottom docks */
+.sim-viewport-tablet .meisterwerk-mobile-bottom-dock,
+.sim-viewport-tablet-portrait .meisterwerk-mobile-bottom-dock,
+.sim-viewport-tablet-landscape .meisterwerk-mobile-bottom-dock,
+.sim-viewport-tablet .campus-events-mobile-bottom-dock,
+.sim-viewport-tablet-portrait .campus-events-mobile-bottom-dock,
+.sim-viewport-tablet-landscape .campus-events-mobile-bottom-dock,
+.sim-viewport-tablet .student-briefing-mobile-bottom-dock,
+.sim-viewport-tablet-portrait .student-briefing-mobile-bottom-dock,
+.sim-viewport-tablet-landscape .student-briefing-mobile-bottom-dock {
+  display: none !important;
+}
+
 /* Simulator Gemini Fullscreen Drawer Parity */
-[class*="sim-viewport-"] .cg-gemini-drawer,
 .sim-viewport-mobile .cg-gemini-drawer,
-.sim-viewport-portrait .cg-gemini-drawer {
+.sim-viewport-mobile.sim-viewport-portrait .cg-gemini-drawer {
   position: absolute !important;
   width: 100% !important;
   height: 100% !important;
@@ -2114,15 +2126,27 @@ select option {
 }
 
 .sim-viewport-mobile .main-wrapper,
-.sim-viewport-portrait .main-wrapper {
+.sim-viewport-mobile.sim-viewport-portrait .main-wrapper {
   margin-left: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 0 !important;
 }
 
+.sim-viewport-tablet .main-wrapper,
+.sim-viewport-tablet-portrait .main-wrapper,
+.sim-viewport-tablet-landscape .main-wrapper {
+  margin-left: 0 !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  width: calc(100% - var(--sidebar-width, 68px)) !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
 .sim-viewport-mobile .main-content,
-.sim-viewport-portrait .main-content {
+.sim-viewport-mobile.sim-viewport-portrait .main-content {
   padding-left: 4px !important;
   padding-right: 4px !important;
   padding-bottom: var(--mobile-scroll-clearance-bottom, calc(env(safe-area-inset-bottom, 12px) + 8px)) !important;
@@ -2133,16 +2157,26 @@ select option {
   box-sizing: border-box !important;
 }
 
+.sim-viewport-tablet .main-content,
+.sim-viewport-tablet-portrait .main-content,
+.sim-viewport-tablet-landscape .main-content {
+  padding: 0 24px 32px 24px !important;
+  gap: 24px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .sim-viewport-mobile .main-wrapper.messages-chat-active #main-content,
 .sim-viewport-mobile .main-wrapper.messages-chat-active .main-content,
-.sim-viewport-portrait .main-wrapper.messages-chat-active #main-content,
-.sim-viewport-portrait .main-wrapper.messages-chat-active .main-content,
+.sim-viewport-mobile.sim-viewport-portrait .main-wrapper.messages-chat-active #main-content,
+.sim-viewport-mobile.sim-viewport-portrait .main-wrapper.messages-chat-active .main-content,
 .main-wrapper.messages-chat-active #main-content,
 .main-wrapper.messages-chat-active .main-content,
 .sim-viewport-mobile .main-wrapper.homework-book-active #main-content,
 .sim-viewport-mobile .main-wrapper.homework-book-active .main-content,
-.sim-viewport-portrait .main-wrapper.homework-book-active #main-content,
-.sim-viewport-portrait .main-wrapper.homework-book-active .main-content,
+.sim-viewport-mobile.sim-viewport-portrait .main-wrapper.homework-book-active #main-content,
+.sim-viewport-mobile.sim-viewport-portrait .main-wrapper.homework-book-active .main-content,
 .main-wrapper.homework-book-active #main-content,
 .main-wrapper.homework-book-active .main-content {
   padding: 0 !important;
@@ -2255,12 +2289,19 @@ select option {
   .sidebar-nav:not(.is-collapsed) {
     --sidebar-width: var(--sidebar-width-expanded) !important;
   }
-  .sidebar-nav span:not(.badge-count),
-  .sidebar-nav .sidebar-logo-text {
-    display: none !important;
-  }
   .main-wrapper {
     margin-left: 0 !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: calc(100% - var(--sidebar-width)) !important;
+    overflow-x: hidden !important;
+  }
+  .cg-mobile-top-header,
+  .cg-mobile-bottom-nav,
+  .student-briefing-mobile-bottom-dock,
+  .meisterwerk-mobile-bottom-dock,
+  .campus-events-mobile-bottom-dock {
+    display: none !important;
   }
 }
 

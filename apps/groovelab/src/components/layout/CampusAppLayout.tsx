@@ -221,9 +221,14 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         setIsCommandPaletteOpen(prev => !prev);
       }
     };
+    const handleOpenQrModal = () => setShowQR(true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    window.addEventListener('campus_open_qr_modal', handleOpenQrModal);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('campus_open_qr_modal', handleOpenQrModal);
+    };
+  }, [setShowQR]);
 
   return (
     <div className={`app-layout ${isSidebarRailCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -344,7 +349,7 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
 
         return (
           <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''} ${isMobileHomeworkBook ? 'homework-book-active' : ''} ${hasDedicatedSubDock ? 'has-mobile-sub-dock' : ''}`} style={{ paddingTop: '0' }}>
-            {!isMobileActiveChat && (
+            {isMobile && !isMobileActiveChat && (
               <GeminiMobileShell
                 user={user}
                 school={school}

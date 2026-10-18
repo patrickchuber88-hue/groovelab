@@ -11,6 +11,8 @@ import { renderInstrumentIcon } from "../../utils/instruments";
 import { AvatarImage } from "../common/AvatarImage";
 import { StudioAvatar } from "../StudioAvatar";
 import { normalizeStationsForBlueprint } from "../../constants/groovelabLayoutDefaults";
+import { LiveLabLockOverlay } from "./LiveLabLockOverlay";
+import { StudentStationPairingModal } from "./StudentStationPairingModal";
 
 const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
   get: (_, prop: string) => renderInstrumentIcon(prop)
@@ -721,6 +723,15 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   const coupledStationId = typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null;
   const isCoupledSchoolIpad = Boolean(coupledStationId && coupledStationId !== 'skip');
   const canCheckIn = isTeacherRole || isCoupledSchoolIpad;
+  const [showStudentPairingModal, setShowStudentPairingModal] = useState(false);
+
+  const handleOpenQrTrigger = useCallback(() => {
+    if (viewMode === 'student') {
+      setShowStudentPairingModal(true);
+    } else {
+      setShowKioskView(true);
+    }
+  }, [viewMode, setShowKioskView]);
 
   // ⚡ 0,1% Goldstandard: Automatisches Einklappen der Sidebar beim Auschecken eines Schülers
   const handleStudentCheckout = useCallback((sessionId: string) => {
@@ -1021,110 +1032,23 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     <div style={{
                       position: 'relative',
                       width: '100%',
-                      background: 'rgba(255, 255, 255, 0.95)',
-                      border: '1.5px dashed rgba(234, 179, 8, 0.3)',
-                      borderRadius: '24px',
-                      padding: '24px',
-                      textAlign: 'center',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.04)',
-                      overflow: 'hidden'
+                      padding: '12px 0',
+                      boxSizing: 'border-box'
                     }}>
-                      {/* Light diagonal stripes overlay (5% opacity) */}
-                      <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        backgroundImage: 'repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(15, 23, 42, 0.05) 10px, rgba(15, 23, 42, 0.05) 11px)',
-                        pointerEvents: 'none',
-                        borderRadius: 'inherit',
-                        zIndex: 0
-                      }} />
-                      <div style={{ position: 'relative', zIndex: 1 }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '50%',
-                          background: 'rgba(251, 188, 5, 0.08)',
-                          border: '1px solid rgba(251, 188, 5, 0.15)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#eab308',
-                          margin: '0 auto 12px auto'
-                        }}>
-                          <Lock size={20} />
-                        </div>
-                        <h4 style={{ fontSize: '18px', fontWeight: 900, color: '#1e293b', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          <CampusGroovelabLogo size={18} fontSize="18px" /> Live
-                        </h4>
-                        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.4 }}>
-                          Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
-                        </p>
-                        {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                            <div className="spin-checkin" style={{ width: '20px', height: '20px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308' }}>
-                              Verbinde mit Live Lab...
-                            </span>
-                          </div>
-                        ) : canCheckIn ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
-                            <button
-                              type="button"
-                              onClick={effectiveCheckInHandler}
-                              className="pulse-btn-checkin"
-                              aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
-                              style={{
-                                padding: '12px 24px',
-                                borderRadius: '12px',
-                                background: '#fbbc05',
-                                border: 'none',
-                                color: '#0f172a',
-                                fontSize: '14px',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                boxShadow: 'none',
-                                touchAction: 'manipulation'
-                              }}
-                            >
-                              {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
-                            </button>
-
-                            {isCoupledSchoolIpad && !isTeacherRole && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (onLogout) {
-                                    onLogout();
-                                  } else {
-                                    window.dispatchEvent(new CustomEvent('campus_app_logout'));
-                                  }
-                                }}
-                                aria-label="Schüler wechseln und abmelden"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#64748b',
-                                  fontSize: '12px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  padding: '4px 8px',
-                                  borderRadius: '6px',
-                                  textDecoration: 'underline',
-                                  touchAction: 'manipulation'
-                                }}
-                              >
-                                Schüler wechseln / Abmelden
-                              </button>
-                            )}
-                          </div>
-                        ) : null}
-                        {checkingInStatus === 'error' && effectiveErrorMsg && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '12px' }}>
-                            <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
-                          </div>
-                        )}
-                      </div>
+                      <LiveLabLockOverlay
+                        isTeacherRole={isTeacherRole}
+                        isCoupledSchoolIpad={isCoupledSchoolIpad}
+                        canCheckIn={canCheckIn}
+                        checkingInStatus={checkingInStatus}
+                        effectiveCheckInHandler={effectiveCheckInHandler}
+                        shakeLock={shakeLock}
+                        effectiveErrorMsg={effectiveErrorMsg}
+                        onLogout={onLogout}
+                        viewMode={viewMode}
+                        onTabChange={onTabChange}
+                        onOpenQrScanner={handleOpenQrTrigger}
+                        variant="mobile"
+                      />
                     </div>
                   )}
 
@@ -1896,9 +1820,9 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           right: 0,
                           bottom: 0,
                           borderRadius: '24px',
-                          background: 'rgba(248, 250, 252, 0.65)',
-                          backdropFilter: 'blur(10px)',
-                          WebkitBackdropFilter: 'blur(10px)',
+                          background: 'rgba(248, 250, 252, 0.4)',
+                          backdropFilter: 'blur(4px)',
+                          WebkitBackdropFilter: 'blur(4px)',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
@@ -1919,117 +1843,20 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             zIndex: 0
                           }} />
 
-                          {/* 0,1% Goldstandard Apple Glass Card */}
-                          <div style={{
-                            background: 'rgba(255, 255, 255, 0.94)',
-                            backdropFilter: 'blur(20px)',
-                            WebkitBackdropFilter: 'blur(20px)',
-                            border: '1.5px solid rgba(251, 188, 5, 0.35)',
-                            boxShadow: '0 20px 48px rgba(15, 23, 42, 0.12)',
-                            borderRadius: '24px',
-                            padding: '36px 32px',
-                            maxWidth: '440px',
-                            width: '100%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            textAlign: 'center',
-                            position: 'relative',
-                            zIndex: 10
-                          }}>
-                            <div 
-                              className={shakeLock ? 'shake-lock-active' : ''}
-                              style={{
-                                width: '64px',
-                                height: '64px',
-                                borderRadius: '50%',
-                                background: 'rgba(251, 188, 5, 0.12)',
-                                border: '1.5px solid rgba(251, 188, 5, 0.3)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#d97706',
-                                marginBottom: '16px'
-                              }}
-                            >
-                              <Lock size={28} />
-                            </div>
-                            
-                            <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                              GrooveLab Live-Plattform
-                            </h4>
-                            <p style={{ fontSize: '14px', color: '#475569', maxWidth: '340px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
-                              Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
-                            </p>
-
-                            {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                                <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#d97706' }}>
-                                  Verbinde mit Live Lab...
-                                </span>
-                              </div>
-                            ) : canCheckIn ? (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                                <button
-                                  type="button"
-                                  onClick={effectiveCheckInHandler}
-                                  className="pulse-btn-checkin"
-                                  aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
-                                  style={{
-                                    padding: '14px 28px',
-                                    borderRadius: '16px',
-                                    background: '#fbbc05',
-                                    border: 'none',
-                                    color: '#0f172a',
-                                    fontSize: '15px',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    boxShadow: 'none',
-                                    touchAction: 'manipulation'
-                                  }}
-                                >
-                                  {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
-                                </button>
-
-                                {isCoupledSchoolIpad && !isTeacherRole && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (onLogout) {
-                                        onLogout();
-                                      } else {
-                                        window.dispatchEvent(new CustomEvent('campus_app_logout'));
-                                      }
-                                    }}
-                                    aria-label="Schüler wechseln und abmelden"
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#64748b',
-                                      fontSize: '13px',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      padding: '6px 12px',
-                                      borderRadius: '8px',
-                                      textDecoration: 'underline',
-                                      touchAction: 'manipulation'
-                                    }}
-                                  >
-                                    Schüler wechseln / Abmelden
-                                  </button>
-                                )}
-                              </div>
-                            ) : null}
-
-                            {checkingInStatus === 'error' && effectiveErrorMsg && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
-                                <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                                <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
-                              </div>
-                            )}
-                          </div>
+                          <LiveLabLockOverlay
+                            isTeacherRole={isTeacherRole}
+                            isCoupledSchoolIpad={isCoupledSchoolIpad}
+                            canCheckIn={canCheckIn}
+                            checkingInStatus={checkingInStatus}
+                            effectiveCheckInHandler={effectiveCheckInHandler}
+                            shakeLock={shakeLock}
+                            effectiveErrorMsg={effectiveErrorMsg}
+                            onLogout={onLogout}
+                            viewMode={viewMode}
+                            onTabChange={onTabChange}
+                            onOpenQrScanner={handleOpenQrTrigger}
+                            variant="blueprint"
+                          />
                         </div>
                       </>
                     )}
@@ -2188,9 +2015,9 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       right: 0,
                       bottom: 0,
                       borderRadius: '32px',
-                      background: 'rgba(248, 250, 252, 0.65)',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
+                      background: 'rgba(248, 250, 252, 0.4)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -2211,117 +2038,20 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         zIndex: 0
                       }} />
 
-                      {/* 0,1% Goldstandard Apple Glass Card */}
-                      <div style={{
-                        background: 'rgba(255, 255, 255, 0.94)',
-                        backdropFilter: 'blur(20px)',
-                        WebkitBackdropFilter: 'blur(20px)',
-                        border: '1.5px solid rgba(251, 188, 5, 0.35)',
-                        boxShadow: '0 20px 48px rgba(15, 23, 42, 0.12)',
-                        borderRadius: '24px',
-                        padding: '32px 24px',
-                        maxWidth: '400px',
-                        width: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        textAlign: 'center',
-                        position: 'relative',
-                        zIndex: 10
-                      }}>
-                        <div 
-                          className={shakeLock ? 'shake-lock-active' : ''}
-                          style={{
-                            width: '64px',
-                            height: '64px',
-                            borderRadius: '50%',
-                            background: 'rgba(251, 188, 5, 0.12)',
-                            border: '1.5px solid rgba(251, 188, 5, 0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#d97706',
-                            marginBottom: '16px'
-                          }}
-                        >
-                          <Lock size={28} />
-                        </div>
-                        
-                        <h4 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-                          GrooveLab Live-Plattform
-                        </h4>
-                        <p style={{ fontSize: '14px', color: '#475569', maxWidth: '300px', margin: '0 0 24px 0', lineHeight: 1.5, fontWeight: 500 }}>
-                          Bitte logge dich vor Ort in der Musikschule ein, um deine iPad-Station zu aktivieren und das Live Lab Board freizuschalten.
-                        </p>
-
-                        {checkingInStatus === 'locating' || checkingInStatus === 'verifying' ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                            <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#d97706' }}>
-                              Verbinde mit Live Lab...
-                            </span>
-                          </div>
-                        ) : canCheckIn ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                            <button
-                              type="button"
-                              onClick={effectiveCheckInHandler}
-                              className="pulse-btn-checkin"
-                              aria-label={isTeacherRole ? "Am Live Lab Board einloggen" : "Wieder an iPad-Station einchecken"}
-                              style={{
-                                padding: '14px 28px',
-                                borderRadius: '16px',
-                                background: '#fbbc05',
-                                border: 'none',
-                                color: '#0f172a',
-                                fontSize: '15px',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                boxShadow: 'none',
-                                touchAction: 'manipulation'
-                              }}
-                            >
-                              {isTeacherRole ? 'Einloggen' : 'Wieder einchecken'}
-                            </button>
-
-                            {isCoupledSchoolIpad && !isTeacherRole && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (onLogout) {
-                                    onLogout();
-                                  } else {
-                                    window.dispatchEvent(new CustomEvent('campus_app_logout'));
-                                  }
-                                }}
-                                aria-label="Schüler wechseln und abmelden"
-                                style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#64748b',
-                                  fontSize: '13px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  padding: '6px 12px',
-                                  borderRadius: '8px',
-                                  textDecoration: 'underline',
-                                  touchAction: 'manipulation'
-                                }}
-                              >
-                                Schüler wechseln / Abmelden
-                              </button>
-                            )}
-                          </div>
-                        ) : null}
-
-                        {checkingInStatus === 'error' && effectiveErrorMsg && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
-                            <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
-                          </div>
-                        )}
-                      </div>
+                      <LiveLabLockOverlay
+                        isTeacherRole={isTeacherRole}
+                        isCoupledSchoolIpad={isCoupledSchoolIpad}
+                        canCheckIn={canCheckIn}
+                        checkingInStatus={checkingInStatus}
+                        effectiveCheckInHandler={effectiveCheckInHandler}
+                        shakeLock={shakeLock}
+                        effectiveErrorMsg={effectiveErrorMsg}
+                        onLogout={onLogout}
+                        viewMode={viewMode}
+                        onTabChange={onTabChange}
+                        onOpenQrScanner={handleOpenQrTrigger}
+                        variant="card"
+                      />
                     </div>
                   )}
                   <div style={{ 
@@ -2405,8 +2135,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             />
           )}
 
-          {/* Floating Right-Edge Toggle Button when Collapsed */}
-          {isSidebarCollapsed && (
+          {/* Floating Right-Edge Toggle Button when Collapsed (only when checked in to prevent overlay collision) */}
+          {isUserCheckedIn && isSidebarCollapsed && (
             <button
               onClick={() => setIsSidebarCollapsed?.(false)}
               style={{
@@ -2415,9 +2145,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 top: '50%',
                 transform: 'translateY(-50%)',
                 zIndex: 99,
-                background: 'linear-gradient(135deg, #fefce8 0%, #fffbeb 100%)',
-                border: '1.5px solid #fef3c7',
-                borderRight: 'none',
+                background: '#fefce8',
+                border: 'none',
                 borderRadius: '16px 0 0 16px',
                 padding: '12px 8px',
                 display: 'flex',
@@ -2425,7 +2154,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 alignItems: 'center',
                 gap: '8px',
                 cursor: 'pointer',
-                boxShadow: 'none',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.04)',
                 color: '#854d0e',
                 fontWeight: 900,
                 fontSize: '0.7rem',
@@ -3363,7 +3092,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             )}
           </aside>
 
-          {showKioskView && (
+          {showKioskView && isTeacherRole && (
             <div style={{
               position: 'fixed',
               top: 0,
@@ -3487,6 +3216,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           type="button"
                           onClick={async () => {
                             if (isOccupied) {
+                              if (!isTeacherRole) {
+                                alert("Dieses iPad ist aktuell besetzt. Bitte wende dich an deine Lehrkraft, um den Platz zu wechseln.");
+                                return;
+                              }
                               const confirm = window.confirm(`Dieses iPad ist besetzt. Möchtest du die alte Sitzung beenden und dieses iPad übernehmen?`);
                               if (!confirm) return;
                             }
@@ -3546,6 +3279,26 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               </div>
             </div>
           )}
+
+          {/* ⚡ 0,1% Goldstandard: Didaktisches Vor-Ort-Pairing für Schüler */}
+          <StudentStationPairingModal
+            isOpen={showStudentPairingModal}
+            onClose={() => setShowStudentPairingModal(false)}
+            onShowBadge={() => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('campus_open_qr_modal'));
+              }
+            }}
+            onNavigateRepertoire={() => {
+              if (onTabChange) {
+                onTabChange('repertoire');
+              } else if (setActiveTab) {
+                setActiveTab('repertoire');
+              } else if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('campus_navigate_tab', { detail: { tab: 'repertoire' } }));
+              }
+            }}
+          />
 
           {showKioskPinSetup && (
             <div style={{

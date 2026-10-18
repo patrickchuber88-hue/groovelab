@@ -36,7 +36,8 @@ export const useCampusMessagingState = ({
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
 
   // Campus 1-on-1 Direct Messaging states (0.1% Goldstandard SWR Instant Hydration)
-  const effectiveUid = userId || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id')) : null) || '';
+  const isStudentRole = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'student';
+  const effectiveUid = userId || (typeof window !== 'undefined' ? (!isStudentRole ? sessionStorage.getItem('groovelab_selected_student_id') : null) || sessionStorage.getItem('groovelab_user_id') : null) || '';
   const [campusMessages, setCampusMessages] = useState<any[]>(() => getLocalMessagesCache(effectiveUid));
   const [campusMessagesLoading, setCampusMessagesLoading] = useState(false);
   const [campusUnreadCount, setCampusUnreadCount] = useState(0);

@@ -942,6 +942,7 @@ Deine Vorteile auf einen Blick:
         cardRef={passCardRef} 
         isLocked={!consentSaved}
         lockMessage="Elterliche Freigabe erforderlich"
+        schoolName={school?.name || 'Campus Musikschule'}
         style={{ marginBottom: '24px' }} 
       />
 

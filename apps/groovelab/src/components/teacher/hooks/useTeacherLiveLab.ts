@@ -252,12 +252,29 @@ export function useTeacherLiveLab({
     const now = new Date().toISOString();
 
     try {
+      // 0,1% Goldstandard: Anti-Hijacking Guard
+      // Schüler dürfen NIEMALS eine besetzte fremde Station übernehmen oder fremde Sitzungen beenden.
+      if (!isTeacher) {
+        const { data: existingOccupant } = await supabase
+          .from('sessions')
+          .select('id, user_id')
+          .eq('station_id', station.id)
+          .is('check_out_time', null)
+          .maybeSingle();
+
+        if (existingOccupant && existingOccupant.user_id !== userId) {
+          alert('Diese Station ist bereits besetzt. Bitte wende dich an deine Lehrkraft.');
+          setCheckingInStatus('idle');
+          return;
+        }
+      }
+
       await Promise.all([
         supabase.from('sessions').update({ 
           check_out_time: now,
           metadata: { is_switching_station: true }
         }).eq('user_id', userId).is('check_out_time', null),
-        (!isTeacher)
+        isTeacher
           ? supabase.from('sessions').update({ check_out_time: now }).eq('station_id', station.id).is('check_out_time', null)
           : Promise.resolve()
       ]);

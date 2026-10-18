@@ -393,8 +393,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               const deltaX = e.changedTouches[0].clientX - touchStartX;
               if (deltaX < -50 && activePlatform === 'campus') {
                 setActivePlatform('groovelab');
+                setActiveTab('live');
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
+                }
               } else if (deltaX > 50 && activePlatform === 'groovelab') {
                 setActivePlatform('campus');
+                setActiveTab('briefing');
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
+                  localStorage.setItem('campus_active_tab', 'briefing');
+                }
               }
               setTouchStartX(null);
             }}
@@ -479,6 +489,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     type="button"
                     onClick={() => {
                       setActivePlatform('groovelab');
+                      setActiveTab('live');
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('groovelab_active_tab', 'live');
+                        localStorage.setItem('groovelab_active_tab', 'live');
+                      }
                       setDrawerOpen(false);
                     }}
                     style={{

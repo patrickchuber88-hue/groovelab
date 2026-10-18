@@ -11,6 +11,7 @@ import { isSubdomainReserved } from '../constants/reservedSubdomains';
 import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../utils/inputSanitizer';
 import { generateHandoverUrl, isRegistrationUnlocked } from '../utils/cryptoAuth';
 import { RegistrationAccessModal } from './RegistrationAccessModal';
+import { downloadAppleWalletPass } from '../services/wallet/appleWalletPassService';
 
 
 interface SignupWizardProps {
@@ -392,31 +393,16 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
     }
   };
 
-  const downloadWalletPass = () => {
+  const downloadWalletPass = async () => {
     if (!createdUser) return;
-    const passContent = JSON.stringify({
-      passTypeIdentifier: "pass.de.groovelab.admin",
-      serialNumber: createdUser.qr_token,
-      teamIdentifier: "GROOVELAB",
-      organizationName: "Campus-Groovelab",
-      description: "Campus-Groovelab Admin Access Pass",
-      logoText: "Campus-Groovelab",
-      foregroundColor: "rgb(255, 255, 255)",
-      backgroundColor: "rgb(10, 54, 28)",
-      labelColor: "rgb(230, 244, 234)",
-      studentName: `${createdUser.first_name} ${createdUser.last_name}`,
-      instrument: "Administrator / Schulleitung",
-      qrToken: createdUser.qr_token
-    }, null, 2);
-
-    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `groovelab-pass-${createdUser.first_name || 'admin'}.pkpass`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadAppleWalletPass({
+      schoolName: createdUser.schoolName || schoolName || 'Campus-Groovelab',
+      userName: `${createdUser.first_name || ''} ${createdUser.last_name || ''}`.trim() || 'Administrator',
+      userRole: 'Administrator',
+      instrument: 'Schulleitung',
+      qrToken: createdUser.qr_token || createdUser.id || '',
+      isCampus: true
+    });
   };
 
   const handleNextStep1 = async (e: React.FormEvent) => {

@@ -4,6 +4,7 @@ import { IDBadgeCard, inlineAllImagesInElement } from '../../IDBadgeCard';
 import { revokeStudentToken } from '../../../utils/tokenSigner';
 import { maskLastName, formatSingleStudentAnonymized } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
+import { downloadAppleWalletPass } from '../../../services/wallet/appleWalletPassService';
 
 export interface AdminQRModalProps {
   user: any;
@@ -159,88 +160,24 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       }
     };
 
-    const downloadWalletPass = () => {
+    const downloadWalletPass = async () => {
       const isStudent = selectedQRUser.role === 'student';
       const formattedStudentName = isStudent
         ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
         : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`;
-      const safeFileSlug = (isStudent
-        ? formattedStudentName
-        : (selectedQRUser.first_name || 'user')).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
+      const userRole = selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : (selectedQRUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
+      const qrToken = selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '';
 
-      const passContent = JSON.stringify({
-        passTypeIdentifier: selectedQRUser.role === 'admin' ? 'pass.de.groovelab.admin' : (selectedQRUser.role === 'teacher' ? 'pass.de.groovelab.teacher' : 'pass.de.groovelab.student'),
-        serialNumber: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
-        teamIdentifier: "GROOVELAB",
-        organizationName: "Campus-Groovelab",
-        description: `Campus-Groovelab ${selectedQRUser.role} Pass`,
-        logoText: "Campus-Groovelab",
-        foregroundColor: "rgb(255, 255, 255)",
-        backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
-        labelColor: "rgb(230, 244, 234)",
-        studentName: formattedStudentName,
+      await downloadAppleWalletPass({
+        schoolName: schoolObj?.name || 'Campus-Groovelab',
+        userName: formattedStudentName,
+        userRole,
         instrument: selectedQRUser.instrument || (selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
-        qrToken: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
-      }, null, 2);
-
-      const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `campus-pass-${safeFileSlug}.pkpass`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+        qrToken,
+        isCampus: activePlatform === 'campus'
+      });
     };
 
-    const downloadGoogleWalletPass = () => {
-      const isStudent = selectedQRUser.role === 'student';
-      const formattedStudentName = isStudent
-        ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
-        : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`;
-      const safeFileSlug = (isStudent
-        ? formattedStudentName
-        : (selectedQRUser.first_name || 'user')).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
-
-      const passContent = JSON.stringify({
-        classId: `groovelab.${selectedQRUser.role || 'student'}`,
-        id: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
-        state: "ACTIVE",
-        barcode: {
-          type: "QR_CODE",
-          value: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
-        },
-        cardTitle: {
-          defaultValue: {
-            language: "de-DE",
-            value: "Campus-Groovelab"
-          }
-        },
-        subheader: {
-          defaultValue: {
-            language: "de-DE",
-            value: selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : (selectedQRUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'))
-          }
-        },
-        header: {
-          defaultValue: {
-            language: "de-DE",
-            value: formattedStudentName
-          }
-        }
-      }, null, 2);
-
-      const blob = new Blob([passContent], { type: 'application/json' });
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `google-wallet-pass-${safeFileSlug}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
-    };
 
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -294,6 +231,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
             activePlatform={activePlatform} 
             qrValue={getCanonicalQrLandingUrl((selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary') ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token) : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer))} 
             cardRef={qrCardRef}
+            schoolName={schoolObj?.name || 'Campus Musikschule'}
           />
 
           <button 
@@ -323,11 +261,12 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
           </button>
 
           {/* Wallet integration options */}
-          <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '10px' }}>
+          <div style={{ width: '100%', marginTop: '10px' }}>
             <button 
               onClick={downloadWalletPass}
+              aria-label="Zu Apple Wallet hinzufügen (.pkpass)"
               style={{
-                flex: 1,
+                width: '100%',
                 padding: '14px',
                 borderRadius: '16px',
                 border: '1.5px solid #e2e8f0',
@@ -336,9 +275,9 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '8px',
                 fontWeight: 800,
-                fontSize: '0.82rem',
+                fontSize: '0.86rem',
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 transition: 'all 0.2s'
@@ -352,38 +291,8 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
                 e.currentTarget.style.borderColor = '#e2e8f0';
               }}
             >
-              <span>Apple Wallet</span>
-            </button>
-
-            <button 
-              onClick={downloadGoogleWalletPass}
-              style={{
-                flex: 1,
-                padding: '14px',
-                borderRadius: '16px',
-                border: '1.5px solid #e2e8f0',
-                background: '#ffffff',
-                color: '#0f172a',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                fontWeight: 800,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f8fafc';
-                e.currentTarget.style.borderColor = '#cbd5e1';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#ffffff';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-              }}
-            >
-              <span>Google Wallet</span>
+              <span style={{ fontSize: '1.05rem', lineHeight: 1 }}></span>
+              <span>Zu Apple Wallet hinzufügen (.pkpass)</span>
             </button>
           </div>
 

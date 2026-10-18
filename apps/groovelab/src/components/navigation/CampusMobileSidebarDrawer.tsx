@@ -195,8 +195,13 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
         sessionStorage.setItem('groovelab_active_tab', 'live');
         localStorage.setItem('groovelab_active_tab', 'live');
       }
+    } else if (platform === 'groovelab') {
+      setActiveTab('live');
+      sessionStorage.setItem('groovelab_active_tab', 'live');
+      localStorage.setItem('groovelab_active_tab', 'live');
     }
-  }, [activePlatform, setActivePlatform, setActiveTab, isTeacher, isStaff]);
+    onClose();
+  }, [activePlatform, setActivePlatform, setActiveTab, isTeacher, isStaff, onClose]);
 
   if (!isOpen) return null;
 

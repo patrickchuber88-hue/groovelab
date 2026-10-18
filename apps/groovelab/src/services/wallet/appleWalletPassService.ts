@@ -118,6 +118,11 @@ export async function generateAppleWalletPassBlob(options: WalletPassOptions): P
     isCampus = true
   } = options;
 
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const dynamicSchoolYear = currentMonth >= 7 ? `${currentYear}/${currentYear + 1}` : `${currentYear - 1}/${currentYear}`;
+
   const zip = new JSZip();
 
   // 1. PassKit pass.json nach Apple Wallet Spezifikation
@@ -156,7 +161,7 @@ export async function generateAppleWalletPassBlob(options: WalletPassOptions): P
         {
           key: 'school_year',
           label: 'SCHULJAHR',
-          value: '2026/2027'
+          value: dynamicSchoolYear
         },
         {
           key: 'status',
@@ -260,91 +265,19 @@ export async function downloadAppleWalletPass(options: WalletPassOptions, filena
 }
 
 /**
- * Generiert eine native Google Wallet Save-URL
+ * @deprecated Google Wallet erfordert GCP US-Cloud Service Accounts und bricht die Zero US-Cloud Doktrin.
+ * Bitte stattdessen den lokalen Fotogalerie-Export (JPEG) oder die native PWA nutzen.
  */
-export function generateGoogleWalletPassUrl(options: WalletPassOptions): string {
-  const {
-    schoolName,
-    userName,
-    userRole = 'Schüler',
-    instrument = 'Instrument',
-    qrToken,
-    isCampus = true
-  } = options;
-
-  const genericPass = {
-    iss: 'campus-groovelab',
-    aud: 'google',
-    typ: 'savetowallet',
-    origins: [typeof window !== 'undefined' ? window.location.origin : 'https://campus-groovelab.de'],
-    payload: {
-      genericObjects: [
-        {
-          id: `campus_groovelab_${qrToken.slice(0, 16)}`,
-          classId: 'campus_groovelab_student_id_v1',
-          genericType: 'GENERIC_ID',
-          hexBackgroundColor: isCampus ? '#16a34a' : '#ca8a04',
-          logo: {
-            sourceUri: {
-              uri: typeof window !== 'undefined' ? `${window.location.origin}/campus_login_hero.png` : 'https://campus-groovelab.de/campus_login_hero.png'
-            },
-            contentDescription: {
-              defaultValue: {
-                language: 'de',
-                value: 'Campus-Groovelab Logo'
-              }
-            }
-          },
-          cardTitle: {
-            defaultValue: {
-              language: 'de',
-              value: isCampus ? 'Campus-Groovelab Ausweis' : 'GrooveLab Pass'
-            }
-          },
-          header: {
-            defaultValue: {
-              language: 'de',
-              value: userName
-            }
-          },
-          subheader: {
-            defaultValue: {
-              language: 'de',
-              value: `${schoolName || 'Musikschule'} • ${instrument}`
-            }
-          },
-          barcode: {
-            type: 'QR_CODE',
-            value: qrToken,
-            alternateText: `${userRole}: ${userName}`
-          }
-        }
-      ]
-    }
-  };
-
-  const jsonStr = JSON.stringify(genericPass);
-  const base64Payload = btoa(unescape(encodeURIComponent(jsonStr)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  return `https://pay.google.com/gp/v/save/${base64Payload}`;
+export function generateGoogleWalletPassUrl(_options: WalletPassOptions): string {
+  console.warn('[GoogleWalletPassService] Google Wallet wird zugunsten der Zero-US-Cloud-Doktrin und Datenminimierung nicht mehr unterstützt. Bitte Ausweis-Export (JPEG) oder PWA nutzen.');
+  return '';
 }
 
 /**
- * Öffnet Google Wallet Save Intent / Web Link
+ * @deprecated Google Wallet Intent deaktiviert (DSGVO Art. 5 Datenminimierung & Zero US-Cloud Doktrin).
  */
-export function openGoogleWalletPass(options: WalletPassOptions): boolean {
-  try {
-    const url = generateGoogleWalletPassUrl(options);
-    if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error('[GoogleWalletPassService] Fehler beim Öffnen von Google Wallet:', err);
-    return false;
-  }
+export function openGoogleWalletPass(_options: WalletPassOptions): boolean {
+  console.warn('[GoogleWalletPassService] Google Wallet Aufruf unterbunden (0% US-Cloud-Doktrin).');
+  return false;
 }
+

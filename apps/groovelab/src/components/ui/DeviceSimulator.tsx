@@ -589,17 +589,22 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
       root.style.setProperty('--safe-bottom', sab);
 
       // 2b. Inject Simulator Viewport Classes into Guest Document
+      const isMobilePreset = currentPreset.category === 'mobile';
+      const isTabletPreset = currentPreset.category === 'tablet';
+      const isRotatedOrLandscape = frameWidth > frameHeight;
       const viewportCategoryClass = `sim-viewport-${currentPreset.category}`;
-      const viewportOrientationClass = frameWidth > frameHeight ? 'sim-viewport-landscape' : 'sim-viewport-portrait';
+      const viewportOrientationClass = isMobilePreset
+        ? (isRotatedOrLandscape ? 'sim-viewport-landscape' : 'sim-viewport-portrait')
+        : (isRotatedOrLandscape ? 'sim-viewport-tablet-landscape sim-orientation-landscape' : 'sim-viewport-tablet-portrait sim-orientation-portrait');
       const viewportPwaClass = isPwa ? 'sim-viewport-pwa' : 'sim-viewport-browser';
       [root, doc.body].forEach(el => {
         if (!el) return;
         Array.from(el.classList).forEach(cls => {
-          if (cls.startsWith('sim-viewport-') || cls === 'pwa-standalone-mode') {
+          if (cls.startsWith('sim-viewport-') || cls.startsWith('sim-orientation-') || cls === 'pwa-standalone-mode') {
             el.classList.remove(cls);
           }
         });
-        el.classList.add(viewportCategoryClass, viewportOrientationClass, viewportPwaClass);
+        el.classList.add(viewportCategoryClass, ...viewportOrientationClass.split(' '), viewportPwaClass);
         if (isPwa) el.classList.add('pwa-standalone-mode');
       });
 
@@ -1387,7 +1392,11 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                 />
               ) : (
                 <div
-                  className={`sim-viewport-${currentPreset.category} ${frameWidth > frameHeight ? 'sim-viewport-landscape' : 'sim-viewport-portrait'} ${isPwa ? 'sim-viewport-pwa pwa-standalone-mode' : 'sim-viewport-browser'} no-scrollbar`}
+                  className={`sim-viewport-${currentPreset.category} ${
+                    currentPreset.category === 'mobile'
+                      ? (frameWidth > frameHeight ? 'sim-viewport-landscape' : 'sim-viewport-portrait')
+                      : (frameWidth > frameHeight ? 'sim-viewport-tablet-landscape sim-orientation-landscape' : 'sim-viewport-tablet-portrait sim-orientation-portrait')
+                  } ${isPwa ? 'sim-viewport-pwa pwa-standalone-mode' : 'sim-viewport-browser'} no-scrollbar`}
                   style={{
                     width: '100%',
                     flex: 1,

@@ -46,7 +46,7 @@ export function AdminDeviceSetupView({
   const grooveSettingsModalRef = useModalA11y<HTMLDivElement>(Boolean(activeGrooveSettingsModal), () => setActiveGrooveSettingsModal(null));
   const [selectedRoomId, setSelectedRoomId] = useState(() => rooms[0]?.id || '');
   const effectiveSchool = Array.isArray(school) ? school[0] : school;
-  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 1024 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape, .sim-viewport-iphone14, [class*="sim-viewport-mobile"], [class*="sim-viewport-tablet"]')));
+  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]')));
 
   // Academy Setup state
   const [name, setName] = useState(effectiveSchool?.name || '');

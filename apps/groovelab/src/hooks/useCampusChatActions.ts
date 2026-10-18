@@ -308,7 +308,10 @@ export function useCampusChatActions({
   }, [user?.id, supabase, setCampusMessages, fetchCampusMessages]);
 
   const handleMarkCampusMessagesAsRead = useCallback(async (senderId: string) => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    const uid = isStudent 
+      ? user?.id 
+      : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id);
     if (!uid || !senderId) return;
 
     const nowTime = Date.now();
@@ -350,7 +353,10 @@ export function useCampusChatActions({
   }, [user?.id, setCampusMessages, setCampusUnreadCount, supabase, debouncedFetchCampusMessages]);
 
   const handleMarkCampusGroupAsRead = useCallback(async (groupId: string) => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    const uid = isStudent 
+      ? user?.id 
+      : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id);
     if (!uid || !groupId) return;
 
     const nowTime = Date.now();
@@ -393,7 +399,10 @@ export function useCampusChatActions({
   }, [user?.id, setCampusMessages, setCampusUnreadCount, supabase, debouncedFetchCampusMessages]);
 
   const handleMarkCampusChannelAsRead = useCallback(async (channelId: string, groupId: string) => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    const uid = isStudent 
+      ? user?.id 
+      : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id);
     if (!uid || !channelId) return;
 
     const nowTime = Date.now();

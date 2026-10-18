@@ -1,5 +1,29 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { decryptMessagesBatch } from '../lib/security/messageCrypto';
+import { supabase as defaultSupabase } from '../lib/supabase';
+
+// 🛡️ Fail-Closed Session Lease Self-Healing (0,1% Goldstandard)
+export const ensureActiveSessionLease = async (userId: string): Promise<string | null> => {
+  if (!userId || userId.startsWith('admin-')) return null;
+  try {
+    const sId = typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : null;
+    const { data: authResult } = await defaultSupabase.rpc('authenticate_by_credential', {
+      p_credential: userId,
+      ...(sId ? { p_school_id: sId } : {})
+    });
+    if (authResult?.success && authResult?.lease_token) {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+        localStorage.setItem('gl_active_session_lease_ts', String(Date.now()));
+      }
+      return authResult.lease_token;
+    }
+  } catch (err) {
+    console.warn('[SessionLease] Auto-heal notice:', err);
+  }
+  return null;
+};
 
 // 🛡️ Tier-1 Enterprise+ Local Storage Read Receipts Cache (Offline-First / Zero-Bounce)
 export const getLocalChannelReads = (uid: string): Map<string, number> => {
@@ -494,7 +518,10 @@ export function useCampusMessagingData({
   }, [user, userBands, fetchStudentMessagesBackground, setStudentMessagesLoading]);
 
   const fetchCampusMessages = useCallback(async () => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    const isStudent = user?.role?.toLowerCase() === 'student';
+    const uid = isStudent 
+      ? user?.id 
+      : (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id);
     if (!uid) return;
     setCampusMessagesLoading(true);
     try {
@@ -539,8 +566,19 @@ export function useCampusMessagingData({
         });
       }
 
-      if (memberGroupsRes.data && memberGroupsRes.data.length > 0) {
-        memberGroupsRes.data.forEach((gm: any) => {
+      let memberGroupsData = memberGroupsRes.data;
+      if ((!memberGroupsData || memberGroupsData.length === 0) && user?.role?.toLowerCase() === 'student' && uid) {
+        const renewedToken = await ensureActiveSessionLease(uid);
+        if (renewedToken) {
+          const retryRes = await supabase.from('campus_chat_group_members').select('group_id, last_read_at').eq('user_id', uid);
+          if (retryRes.data && retryRes.data.length > 0) {
+            memberGroupsData = retryRes.data;
+          }
+        }
+      }
+
+      if (memberGroupsData && memberGroupsData.length > 0) {
+        memberGroupsData.forEach((gm: any) => {
           if (gm.group_id) {
             allGIds.add(gm.group_id);
             if (gm.last_read_at) {

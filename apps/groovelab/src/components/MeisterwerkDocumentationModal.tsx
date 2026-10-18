@@ -196,12 +196,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isInsideSimMobile = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'), [windowWidth]);
-  const isInsideSimTabletLandscape = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape'), [windowWidth]);
-  const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
-  const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
+  const isInsideSimMobile = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-mobile'), [windowWidth]);
+  const isInsideSimTablet = useMemo(() => typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet'), [windowWidth]);
+  const isInsideSim = isInsideSimMobile || isInsideSimTablet;
+  const isMobileView = (windowWidth < 768 && !isInsideSimTablet) || isInsideSimMobile;
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const isMobileOrSim = isFullscreen || isMobileView || isInsideSim || windowWidth < 1024;
+  const isMobileOrSim = isFullscreen || isMobileView;
   const [useNotebookLayout] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -2976,10 +2976,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         }
 
-        [class*="sim-viewport"] .modal-header-container,
         .sim-viewport-mobile .modal-header-container,
-        .sim-viewport-portrait .modal-header-container,
-        .sim-viewport-tablet .modal-header-container {
+        .sim-viewport-mobile.sim-viewport-portrait .modal-header-container {
           flex-direction: column !important;
           align-items: stretch !important;
           padding: 8px 12px 6px 12px !important;
@@ -2989,39 +2987,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           height: auto !important;
           min-height: auto !important;
         }
-        [class*="sim-viewport"] .header-top-row,
         .sim-viewport-mobile .header-top-row,
-        .sim-viewport-portrait .header-top-row,
-        .sim-viewport-tablet .header-top-row {
+        .sim-viewport-mobile.sim-viewport-portrait .header-top-row {
           width: 100% !important;
         }
-        [class*="sim-viewport"] .header-tabs-desktop-container,
         .sim-viewport-mobile .header-tabs-desktop-container,
-        .sim-viewport-portrait .header-tabs-desktop-container,
-        .sim-viewport-tablet .header-tabs-desktop-container {
+        .sim-viewport-mobile.sim-viewport-portrait .header-tabs-desktop-container {
           display: none !important;
         }
-        [class*="sim-viewport"] .header-desktop-archiv,
         .sim-viewport-mobile .header-desktop-archiv,
-        .sim-viewport-portrait .header-desktop-archiv,
-        .sim-viewport-tablet .header-desktop-archiv {
+        .sim-viewport-mobile.sim-viewport-portrait .header-desktop-archiv {
           display: none !important;
         }
-        [class*="sim-viewport"] .header-mobile-menu-row,
         .sim-viewport-mobile .header-mobile-menu-row,
-        .sim-viewport-portrait .header-mobile-menu-row,
-        .sim-viewport-tablet .header-mobile-menu-row {
+        .sim-viewport-mobile.sim-viewport-portrait .header-mobile-menu-row {
           display: flex !important;
         }
-        [class*="sim-viewport"] .header-left-info,
         .sim-viewport-mobile .header-left-info,
-        .sim-viewport-portrait .header-left-info,
-        .sim-viewport-tablet .header-left-info {
+        .sim-viewport-mobile.sim-viewport-portrait .header-left-info {
           flex-wrap: nowrap !important;
           width: auto !important;
           gap: 8px !important;
         }
-        @media (max-width: 768px), [class*="sim-viewport"], .sim-viewport-mobile, .sim-viewport-portrait {
+        .sim-viewport-tablet .header-tabs-desktop-container,
+        .sim-viewport-tablet-portrait .header-tabs-desktop-container,
+        .sim-viewport-tablet-landscape .header-tabs-desktop-container {
+          display: flex !important;
+        }
+        .sim-viewport-tablet .header-mobile-menu-row,
+        .sim-viewport-tablet-portrait .header-mobile-menu-row,
+        .sim-viewport-tablet-landscape .header-mobile-menu-row {
+          display: none !important;
+        }
+        @media (max-width: 768px), .sim-viewport-mobile, .sim-viewport-mobile.sim-viewport-portrait {
           .modal-content-container {
             flex-direction: column !important;
             overflow-y: auto !important;

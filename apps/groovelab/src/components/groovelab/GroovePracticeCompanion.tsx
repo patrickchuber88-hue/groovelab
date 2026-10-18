@@ -660,12 +660,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [mobileTab, setMobileTab] = useState<'metronome' | 'rhythms'>('metronome');
   const [isMobileView, setIsMobileView] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait');
+    return window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile');
   });
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileView(window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
+      setIsMobileView(window.innerWidth <= 768 || !!document.querySelector('.sim-viewport-mobile'));
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);

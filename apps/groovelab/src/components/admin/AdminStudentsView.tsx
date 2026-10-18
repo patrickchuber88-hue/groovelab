@@ -109,7 +109,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
   resolveUserAvatar
 }) => {
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
-    const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape, .sim-viewport-iphone14, [class*="sim-viewport-mobile"], [class*="sim-viewport-tablet"]'));
+    const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
     const isMobileLayout = windowWidth < 768 || isSimMobile;
 
     const activeStudentsCount = students.filter(s => !s.deleted_at && !(s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now())).length;

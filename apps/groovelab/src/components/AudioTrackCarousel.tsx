@@ -979,9 +979,9 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setHasError(false); refreshAudioSource(); }}
-          style={{ border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', cursor: 'pointer', height: isMobile ? '38px' : '34px', padding: '0 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, touchAction: 'manipulation' }}
+          style={{ border: '1px solid #e2e8f0', background: '#ffffff', color: '#475569', cursor: 'pointer', height: isMobile ? '38px' : '34px', padding: '0 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, touchAction: 'manipulation', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
           className="hover-scale-mini"
-          title="Erneut versuchen zu laden"
+          title="Erneut versuchen zu laden (JIT-Signatur erneuern)"
         >
           <RotateCw size={13} strokeWidth={2.4} /><span>Prüfen</span>
         </button>
@@ -1008,10 +1008,10 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
               setIsDeleting(false);
             }
           }}
-          style={{ border: hasError ? '1px solid #fca5a5' : 'none', background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'none'), color: '#ef4444', cursor: isDeleting ? 'wait' : 'pointer', height: isMobile ? '38px' : '34px', padding: hasError ? '0 8px' : 0, width: hasError ? 'auto' : (isMobile ? '36px' : '32px'), borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: isDeleting ? 1 : (hasError ? 1 : 0.6), transition: 'opacity 0.15s ease', touchAction: 'manipulation' }}
+          style={{ border: 'none', background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'transparent'), color: '#dc2626', cursor: isDeleting ? 'wait' : 'pointer', height: isMobile ? '38px' : '34px', padding: hasError ? '0 8px' : 0, width: hasError ? 'auto' : (isMobile ? '36px' : '32px'), borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: isDeleting ? 1 : (hasError ? 1 : 0.6), transition: 'opacity 0.15s ease', touchAction: 'manipulation' }}
           onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
           onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = hasError ? '1' : '0.6'; }}
-          title={isDeleting ? "Wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
+          title={isDeleting ? "Wird gelöscht..." : (hasError ? (url && (url.startsWith('campus_blob_') || url.startsWith('offline://')) ? "Aufnahme noch auf dem Lehrer-Gerät gepuffert (Cloud-Sync ausstehend)" : "Aufnahme nicht erreichbar (Klicke auf Prüfen oder wende dich an deine Lehrkraft)") : "Aufnahme entfernen")}
           aria-label={isDeleting ? "Aufnahme wird gelöscht..." : (hasError ? "Defekte Aufnahme entfernen" : "Aufnahme entfernen")}
         >
           {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
@@ -1149,13 +1149,11 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             isPlaying={isPlaying}
             duration={duration}
             currentTime={currentTime}
-            onSeek={(newTime) => {
-              setCurrentTime(newTime);
-              if (audioRef.current) audioRef.current.currentTime = newTime;
-            }}
+            onSeek={(newTime) => { setCurrentTime(newTime); if (audioRef.current) audioRef.current.currentTime = newTime; }}
             isLooping={isLooping}
             loopLocator={loopLocator}
             uiLevel={uiLevel}
+            hasError={hasError}
           />
         </div>
 
@@ -2036,9 +2034,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
                 }
               }}
               style={{
-                border: hasError ? '1px solid #fca5a5' : 'none',
+                border: 'none',
                 background: isDeleting ? '#fee2e2' : (hasError ? '#fef2f2' : 'none'),
-                color: '#ef4444',
+                color: '#dc2626',
                 cursor: isDeleting ? 'wait' : 'pointer',
                 padding: '4px',
                 borderRadius: '6px',
@@ -2051,7 +2049,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
               }}
               onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
               onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = hasError ? '1' : '0.6'; }}
-              title={isDeleting ? "Wird gelöscht..." : (hasError ? "Defekte Aufnahme löschen" : "Diese Aufnahme löschen")}
+              title={isDeleting ? "Wird gelöscht..." : (hasError ? (url && (url.startsWith('campus_blob_') || url.startsWith('offline://')) ? "Aufnahme noch auf dem Lehrer-Gerät gepuffert (Cloud-Sync ausstehend)" : "Aufnahme nicht erreichbar (Klicke auf Prüfen oder wende dich an deine Lehrkraft)") : "Diese Aufnahme löschen")}
               aria-label={isDeleting ? "Aufnahme wird gelöscht..." : (hasError ? "Defekte Aufnahme löschen" : "Diese Aufnahme löschen")}
             >
               {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -2147,13 +2145,11 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             isPlaying={isPlaying}
             duration={duration}
             currentTime={currentTime}
-            onSeek={(newTime) => {
-              setCurrentTime(newTime);
-              if (audioRef.current) audioRef.current.currentTime = newTime;
-            }}
+            onSeek={(newTime) => { setCurrentTime(newTime); if (audioRef.current) audioRef.current.currentTime = newTime; }}
             isLooping={isLooping}
             loopLocator={loopLocator}
             uiLevel={uiLevel}
+            hasError={hasError}
           />
         </div>
 

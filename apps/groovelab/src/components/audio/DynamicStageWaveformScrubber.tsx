@@ -23,6 +23,7 @@ export interface DynamicStageWaveformScrubberProps {
   isLooping?: boolean;
   loopLocator?: { startSec: number; endSec: number; enabled?: boolean } | null;
   uiLevel?: 'junior' | 'teen' | 'pro';
+  hasError?: boolean;
 }
 
 export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubberProps> = ({
@@ -31,7 +32,8 @@ export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubber
   currentTime,
   onSeek,
   isLooping = false,
-  loopLocator = null
+  loopLocator = null,
+  hasError = false
 }) => {
   const progressRatio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
   const hasLocator = Boolean(loopLocator && loopLocator.endSec > loopLocator.startSec && duration > 0);
@@ -41,6 +43,7 @@ export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubber
   const isLoopActive = Boolean(isLooping && loopLocator?.enabled);
 
   const handleScrubClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (hasError) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
@@ -53,6 +56,32 @@ export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubber
     }
     onSeek(newTime);
   };
+
+  // 🛡️ Fail-Closed Error State: Stumme, neutrale Hairline ohne aktiven Zeiger oder grünen Playhead
+  if (hasError) {
+    return (
+      <div 
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          height: '14px',
+          width: '100%',
+          padding: '4px 0',
+          boxSizing: 'border-box',
+          opacity: 0.55
+        }}
+        aria-hidden="true"
+      >
+        <div style={{
+          width: '100%',
+          height: '3px',
+          borderRadius: '99px',
+          background: '#f1f5f9'
+        }} />
+      </div>
+    );
+  }
 
   if (isPlaying) {
     return (

@@ -9,7 +9,7 @@ import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHe
 import { getSchoolProfileDTO } from '../api/bffClient';
 import { formatUserDisplayName } from '../utils/userDisplayName';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
-import { downloadAppleWalletPass, openGoogleWalletPass } from '../services/wallet/appleWalletPassService';
+import { downloadAppleWalletPass } from '../services/wallet/appleWalletPassService';
 import { resolveUserCampusId } from '../utils/campusIdHelper';
 
 interface QRCodeModalProps {
@@ -340,21 +340,6 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
     });
   };
 
-  const downloadGoogleWalletPass = () => {
-    const isCampus = activePlatform !== 'groovelab';
-    const qrToken = user.qr_token || user.teacher_qr_token || user.ausweis_nummer || user.id || '';
-    const userName = formatUserDisplayName(user);
-    const userRole = user.role === 'admin' ? 'Administrator' : (user.role === 'secretary' ? 'Sekretariat' : (user.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
-
-    openGoogleWalletPass({
-      schoolName: schoolNameAndCity,
-      userName,
-      userRole,
-      instrument: user.instrument || 'Instrument',
-      qrToken,
-      isCampus
-    });
-  };
   
   return (
     <div 
@@ -425,6 +410,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 activePlatform={activePlatform} 
                 qrValue={canonicalQrLandingUrl} 
                 cardRef={cardRef} 
+                schoolName={schoolNameAndCity}
               />
 
               {/* Single Action Panel Below (Max 440px Centered) */}
@@ -476,7 +462,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                   </button>
                 )}
 
-                {/* 2. Primary Wallet Row */}
+                {/* 2. Primary Wallet & Photo Export Row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <button 
                     onClick={downloadWalletPass} 
@@ -503,8 +489,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                     <span style={{ fontSize: '1.05rem', lineHeight: 1 }}></span> Apple Wallet
                   </button>
                   <button 
-                    onClick={downloadGoogleWalletPass} 
-                    aria-label="Zu Google Wallet hinzufügen"
+                    onClick={downloadImage} 
+                    aria-label="Ausweis als JPEG Bild herunterladen"
                     style={{ 
                       minHeight: '44px',
                       padding: '12px', 
@@ -518,90 +504,59 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
-                      gap: '8px',
+                      gap: '6px',
                       boxShadow: 'none',
                       touchAction: 'manipulation'
                     }}
                     className="hover-scale"
                   >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                    </svg>
-                    Google Wallet
+                    <Download size={15} /> Ausweis (JPEG)
                   </button>
                 </div>
 
-                {/* 3. Physical & Offline Export Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: isStudentUser ? '1fr 1fr' : '1fr', gap: '10px' }}>
-                  {isStudentUser && (
-                    <button 
-                      onClick={() => {
-                        const svgElement = cardRef.current?.querySelector('svg');
-                        if (!svgElement) return;
-                        const svgData = new XMLSerializer().serializeToString(svgElement);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 400;
-                        canvas.height = 440;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, 400, 440);
-                        ctx.strokeStyle = '#e2e8f0';
-                        ctx.lineWidth = 4;
-                        ctx.strokeRect(8, 8, 384, 424);
-
-                        const img = new Image();
-                        img.onload = () => {
-                          ctx.drawImage(img, 60, 40, 280, 280);
-
-                          ctx.fillStyle = '#0f172a';
-                          ctx.font = 'bold 16px Inter, system-ui, sans-serif';
-                          ctx.textAlign = 'center';
-                          ctx.fillText('Campus-Groovelab Check-in Code', 200, 365);
-
-                          ctx.fillStyle = '#64748b';
-                          ctx.font = '500 12px Inter, system-ui, sans-serif';
-                          ctx.fillText('Anonymer QR-Sticker für Notenheft & Koffer', 200, 392);
-
-                          const link = document.createElement('a');
-                          link.download = `QR_Sticker_Notenheft_Anonym.png`;
-                          link.href = canvas.toDataURL('image/png');
-                          link.click();
-                        };
-                        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
-                      }}
-                      aria-label="QR-Sticker für Notenheft und Koffer herunterladen"
-                      style={{ 
-                        minHeight: '44px',
-                        padding: '11px', 
-                        borderRadius: '14px', 
-                        border: '1.5px solid #e2e8f0', 
-                        background: '#f8fafc', 
-                        color: '#0f172a', 
-                        fontWeight: 800, 
-                        fontSize: '0.78rem', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '6px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                        touchAction: 'manipulation'
-                      }}
-                      className="hover-scale"
-                    >
-                      🏷️ Noten-Sticker
-                    </button>
-                  )}
+                {/* 3. Physical Sticker Export for Students */}
+                {isStudentUser && (
                   <button 
-                    onClick={downloadImage}
-                    aria-label="Ausweis als JPEG Bild herunterladen"
+                    onClick={() => {
+                      const svgElement = cardRef.current?.querySelector('svg');
+                      if (!svgElement) return;
+                      const svgData = new XMLSerializer().serializeToString(svgElement);
+                      const canvas = document.createElement('canvas');
+                      canvas.width = 400;
+                      canvas.height = 440;
+                      const ctx = canvas.getContext('2d');
+                      if (!ctx) return;
+
+                      ctx.fillStyle = '#ffffff';
+                      ctx.fillRect(0, 0, 400, 440);
+                      ctx.strokeStyle = '#e2e8f0';
+                      ctx.lineWidth = 4;
+                      ctx.strokeRect(8, 8, 384, 424);
+
+                      const img = new Image();
+                      img.onload = () => {
+                        ctx.drawImage(img, 60, 40, 280, 280);
+
+                        ctx.fillStyle = '#0f172a';
+                        ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('Campus-Groovelab Check-in Code', 200, 365);
+
+                        ctx.fillStyle = '#64748b';
+                        ctx.font = '500 12px Inter, system-ui, sans-serif';
+                        ctx.fillText('Anonymer QR-Sticker für Notenheft & Koffer', 200, 392);
+
+                        const link = document.createElement('a');
+                        link.download = `QR_Sticker_Notenheft_Anonym.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                      };
+                      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                    }}
+                    aria-label="QR-Sticker für Notenheft und Koffer herunterladen"
                     style={{ 
                       minHeight: '44px',
+                      width: '100%',
                       padding: '11px', 
                       borderRadius: '14px', 
                       border: '1.5px solid #e2e8f0', 
@@ -619,9 +574,9 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                     }}
                     className="hover-scale"
                   >
-                    <Download size={14} /> Ausweis (JPEG)
+                    🏷️ Noten-Sticker (für Notenheft & Koffer)
                   </button>
-                </div>
+                )}
 
                 {/* 4. Staff Only: Share Invitation Link with Parents / Students */}
                 {isStaffUser && !isSelfView && (

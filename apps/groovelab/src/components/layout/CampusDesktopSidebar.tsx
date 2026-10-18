@@ -332,11 +332,16 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   if (user?.role === 'teacher') {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
-                  setActivePlatform('groovelab');
+                  setActivePlatform?.('groovelab');
                   const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
                   if (isStaff) {
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
+                  setActiveStudentTab('live');
+                  sessionStorage.setItem('groovelab_active_tab', 'live');
+                  localStorage.setItem('groovelab_active_tab', 'live');
+                } else if (activeStudentTab !== 'live') {
+                  // 🎵 0,1% Goldstandard: Klick auf aktives GrooveLab re-fokussiert autoritativ die Live Lab Startseite
                   setActiveStudentTab('live');
                   sessionStorage.setItem('groovelab_active_tab', 'live');
                   localStorage.setItem('groovelab_active_tab', 'live');

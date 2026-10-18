@@ -1002,22 +1002,30 @@ export const ProfileBandModalsHub: React.FC<ProfileBandModalsHubProps> = ({
                       boxShadow: isSelected ? `0 0 40px ${brandColor}66` : '0 10px 30px rgba(0,0,0,0.4)',
                       position: 'relative',
                       flexShrink: 0,
-                      touchAction: 'manipulation'
+                      touchAction: 'manipulation',
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: '220px 220px',
+                      background: 'rgba(255, 255, 255, 0.05)'
                     }}
                     className="hover-scale"
                   >
-                    <img 
-                      src={av.url} 
-                      loading="lazy"
-                      decoding="async"
-                      style={{ 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        display: 'block' 
-                      }} 
-                      alt=""
-                    />
+                    <picture>
+                      <source srcSet={av.url.replace(/\.png$/i, '.webp')} type="image/webp" />
+                      <img 
+                        src={av.url} 
+                        loading="lazy"
+                        decoding="async"
+                        width={220}
+                        height={220}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover',
+                          display: 'block' 
+                        }} 
+                        alt=""
+                      />
+                    </picture>
                   </div>
                 );
               })}

@@ -375,15 +375,12 @@ export function CampusEventsBoard({
   }, []);
 
   const isMobilePortrait = useMemo(() => {
-    const isSimMobileOrPortrait = Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
-    const isSimLandscape = Boolean(document.querySelector('.sim-viewport-landscape'));
-    if (isSimMobileOrPortrait) {
-      return true;
+    const isSimMobile = Boolean(document.querySelector('.sim-viewport-mobile'));
+    if (isSimMobile) {
+      const isSimLandscape = Boolean(document.querySelector('.sim-viewport-landscape'));
+      return !isSimLandscape;
     }
-    if (isSimLandscape) {
-      return false;
-    }
-    return windowWidth <= 1024;
+    return windowWidth < 768;
   }, [windowWidth, orientationTick]);
 
   // Tabs for Column 3 (Event-Planung)

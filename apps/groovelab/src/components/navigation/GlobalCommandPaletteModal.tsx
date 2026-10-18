@@ -198,6 +198,11 @@ export const GlobalCommandPaletteModal: React.FC<GlobalCommandPaletteModalProps>
         keywords: ['daw', 'loop', 'groove', 'audio', 'sound', 'band'],
         onSelect: () => {
           setActivePlatform('groovelab');
+          setActiveStudentTab('live');
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('groovelab_active_tab', 'live');
+            localStorage.setItem('groovelab_active_tab', 'live');
+          }
           onClose();
         }
       }

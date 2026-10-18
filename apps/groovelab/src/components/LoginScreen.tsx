@@ -29,6 +29,7 @@ import { LoginPinModalsHub } from './auth/LoginPinModalsHub';
 import { TriAuthMethod } from './auth/TriAuthGatewayBar';
 import { BANNED_TOMBSTONE_SCHOOL_IDS } from '../utils/tenantSanitizer';
 import { getRememberedPin, setRememberedPin, clearRememberedPin } from '../utils/trustedDevicePin';
+import { downloadAppleWalletPass } from '../services/wallet/appleWalletPassService';
 
 const isIOS = typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const isStandalone = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone);
@@ -3182,30 +3183,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     }
   };
 
-  const downloadWalletPass = () => {
-    const passContent = JSON.stringify({
-      passTypeIdentifier: "pass.de.campus-groovelab.student",
-      serialNumber: verifiedStudentDetails?.qr_token || verifiedStudentId,
-      teamIdentifier: "CAMPUS_GROOVELAB",
-      organizationName: "Campus-Groovelab",
-      description: "Campus-Groovelab Student Access Pass",
-      logoText: "Campus-Groovelab",
-      foregroundColor: "rgb(255, 255, 255)",
-      backgroundColor: "rgb(10, 54, 28)",
-      labelColor: "rgb(230, 244, 234)",
-      studentName: `${verifiedStudentDetails?.first_name} ${verifiedStudentDetails?.last_name}`,
-      instrument: verifiedStudentDetails?.instrument || "ohne Zuweisung",
-      qrToken: verifiedStudentDetails?.qr_token || verifiedStudentId
-    }, null, 2);
-
-    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `campus-groovelab-pass-${verifiedStudentDetails?.first_name || 'schueler'}.pkpass`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadWalletPass = async () => {
+    await downloadAppleWalletPass({
+      schoolName: schoolData?.name || schoolName || 'Campus-Groovelab',
+      userName: `${verifiedStudentDetails?.first_name || ''} ${verifiedStudentDetails?.last_name || ''}`.trim() || 'Schüler',
+      userRole: 'Schüler',
+      instrument: verifiedStudentDetails?.instrument || 'Instrument',
+      qrToken: verifiedStudentDetails?.qr_token || verifiedStudentId || '',
+      isCampus: true
+    });
   };
 
   const handlePinLogin = async (pin: string) => {

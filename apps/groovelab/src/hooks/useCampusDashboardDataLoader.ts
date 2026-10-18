@@ -121,10 +121,12 @@ export function useCampusDashboardDataLoader({
   const fetchDashboardData = useCallback(async (userId: string, isInitial: boolean = false) => {
     try {
       if (isInitial && !user) setLoading(true);
-      // 🛡️ Fail-Closed Auth Recovery Guard: Ensure cryptographic session lease is present
+      // 🛡️ Fail-Closed Auth Recovery Guard: Ensure cryptographic session lease is present & fresh
       const activeLease = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
         || (typeof localStorage !== 'undefined' ? localStorage.getItem('gl_active_session_lease_id') : null);
-      if (!activeLease && userId && !userId.startsWith('admin-')) {
+      const leaseAgeMs = typeof localStorage !== 'undefined' ? (Date.now() - Number(localStorage.getItem('gl_active_session_lease_ts') || '0')) : 0;
+      const isLeaseStale = !activeLease || leaseAgeMs > 1000 * 60 * 60 * 12;
+      if (isLeaseStale && userId && !userId.startsWith('admin-')) {
         try {
           const sId = typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('groovelab_last_school_id')) : null;
           const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
@@ -133,7 +135,10 @@ export function useCampusDashboardDataLoader({
           });
           if (authResult?.success && authResult?.lease_token) {
             if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-            if (typeof localStorage !== 'undefined') localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+              localStorage.setItem('gl_active_session_lease_ts', String(Date.now()));
+            }
           }
         } catch (authErr) {
           console.warn('[useCampusDashboardDataLoader] Auto-heal session lease notice:', authErr);

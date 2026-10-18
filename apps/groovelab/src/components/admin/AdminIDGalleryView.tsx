@@ -8,13 +8,15 @@ export interface AdminIDGalleryViewProps {
   brandColor: string;
   onShowQR: (user: any) => void;
   activePlatform?: string;
+  schoolName?: string;
 }
 
 export const AdminIDGalleryView: React.FC<AdminIDGalleryViewProps> = ({
   users,
   brandColor,
   onShowQR,
-  activePlatform
+  activePlatform,
+  schoolName
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'teacher' | 'student' | 'vocalist'>('all');
@@ -204,6 +206,7 @@ export const AdminIDGalleryView: React.FC<AdminIDGalleryViewProps> = ({
               key={u.id}
               user={u} 
               activePlatform={activePlatform} 
+              schoolName={schoolName || u.school_name}
               selectedPrint={selectedPrintIds[u.id]} 
               onToggleSelectPrint={(e) => toggleSelectForPrint(u.id, e)} 
               onClick={() => onShowQR(u)} 
@@ -357,6 +360,7 @@ export const AdminIDGalleryView: React.FC<AdminIDGalleryViewProps> = ({
                       <IDBadgeCard 
                         user={u} 
                         activePlatform={activePlatform} 
+                        schoolName={schoolName || u.school_name}
                         isPrintVersion={true}
                       />
                     </div>

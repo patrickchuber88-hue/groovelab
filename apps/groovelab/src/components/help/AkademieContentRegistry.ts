@@ -294,7 +294,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     proTips: [
       '🛡️ Automatische Namensmaskierung: Zum Schutz von Minderjährigen werden Schülernamen im System als "Vorname + Nachname-Initial" (z. B. "Max M.") geführt.',
       '📁 Basis-Bereitstellung: Profile im Basis-Status verbleiben bei günstigen 0,09 € Bereitstellung – abgerechnet werden aktiv genutzte Module (0,49 €).',
-      '📲 Apple Wallet Pass: Schüler und Eltern können den Campus-Pass mit 1 Fingertipp direkt in die Apple/Google Wallet auf dem Smartphone laden.'
+      '📲 Apple Wallet & Fotogalerie: Schüler und Eltern können den Campus-Pass mit 1 Fingertipp direkt in die Apple Wallet laden oder in die Fotogalerie speichern.'
     ],
     invariants: [
       'Zero-Registration Doktrin: Schüler und Eltern müssen niemals Passwörter anlegen oder persönliche E-Mail-Adressen registrieren.',
@@ -723,9 +723,9 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     summary: 'Dein barrierefreier Einstieg in Campus-Groovelab: Scanne einfach deinen QR-Code auf dem Campus-Pass oder gib deine 5-stellige PIN ein. Du siehst sofort deine nächste Unterrichtsstunde, den Raum, aktuelle Vertretungen und wichtige Notizen deiner Lehrkraft.',
     steps: [
       {
-        title: '1. Campus-Pass bereitstellen & in Apple/Google Wallet laden',
-        desc: 'Dein Campus-Pass ist deine Eintrittskarte: Drucke ihn aus, lege ihn in den Notenhefter oder speichere ihn mit 1 Klick direkt in deiner Apple Wallet bzw. Google Wallet für blitzschnellen Check-in am Instrument.',
-        actionLabel: 'Pass im Wallet speichern',
+        title: '1. Campus-Pass bereitstellen & in Apple Wallet / Fotogalerie laden',
+        desc: 'Dein Campus-Pass ist deine Eintrittskarte: Drucke ihn aus, lege ihn in den Notenhefter oder speichere ihn mit 1 Klick direkt in deiner Apple Wallet bzw. der Fotogalerie für blitzschnellen Check-in am Instrument.',
+        actionLabel: 'Pass speichern',
         actionTarget: 'briefing'
       },
       {

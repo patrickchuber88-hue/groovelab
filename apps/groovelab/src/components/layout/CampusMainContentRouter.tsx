@@ -234,6 +234,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       const validGrooveTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile'];
       if (!validGrooveTabs.includes(activeStudentTab)) {
         setActiveStudentTab('live');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_tab', 'live');
+          localStorage.setItem('groovelab_active_tab', 'live');
+        }
       }
     }
   }, [isStudent, activePlatform, activeStudentTab, setActiveStudentTab]);
@@ -464,7 +468,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       )}
 
       {/* Live Lab Tab for Students (Lazy-mounted on first navigation, kept mounted for instant switching) */}
-      {isStudent && hasVisitedLiveLab && (
+      {isStudent && (hasVisitedLiveLab || isLiveLabActive) && (
         <div style={{ 
           display: isLiveLabActive ? 'flex' : 'none', 
           flexDirection: 'column', 

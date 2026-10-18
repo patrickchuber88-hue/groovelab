@@ -7,7 +7,7 @@ import {
   ArrowRight, 
   Clock, 
   Loader2,
-  ExternalLink
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatTeacherFullName, formatStudentDisplayName } from '../../utils/nameHelper';
@@ -98,8 +98,8 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
     } catch (e) {}
   }
 
-  const handleNavigate = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleNavigate = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) e.stopPropagation();
     if (typeof window === 'undefined') return;
     const targetDate = occDateStr;
     if (targetDate) {
@@ -126,256 +126,244 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
     ? parsedDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
     : '';
 
-  // 1. Reaktivierung (Kompakte WhatsApp-System-Pill, ~42px)
+  const timeMatch = String(content || '').match(/\b(\d{1,2}:\d{2})\s*(?:uhr)?\b/i);
+  const explicitTimeStr = timeMatch ? `${timeMatch[1]} Uhr` : (currentOcc?.start_time ? `${currentOcc.start_time.slice(0, 5)} Uhr` : null);
+
+  // 1. Reaktivierung (0,1% Apple System-Pill: randlos, Soft-Tint, volle Tastaturbedienbarkeit)
   if (isReactivation) {
     const teacherName = formatStudentDisplayName(selectedRecipient);
-    const shortLabel = `Planmäßig: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'} findet statt`;
+    const shortLabel = `Planmäßig: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'}${explicitTimeStr ? ` um ${explicitTimeStr}` : ''} findet statt`;
 
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '6px 0' }}>
         <div 
-          role="status"
-          aria-label={shortLabel}
+          role={parsedDate ? "button" : "status"}
+          tabIndex={parsedDate ? 0 : undefined}
+          onClick={parsedDate ? handleNavigate : undefined}
+          onKeyDown={parsedDate ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleNavigate(e);
+            }
+          } : undefined}
+          aria-label={parsedDate ? `${shortLabel} – Im Stundenplan ansehen` : shortLabel}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '6px',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: '100px',
-            padding: '4px 10px 4px 8px',
-            boxShadow: 'none',
+            gap: '8px',
+            background: 'rgba(16, 185, 129, 0.09)',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '5px 12px 5px 8px',
+            cursor: parsedDate ? 'pointer' : 'default',
+            userSelect: 'none',
+            transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
+          className={parsedDate ? "hover-scale" : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            background: '#15803d',
+            color: '#ffffff',
+            flexShrink: 0
+          }}>
+            <Check size={12} strokeWidth={3} />
+          </span>
+
+          <span style={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: '#14532d',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {formattedDateShort ? `${formattedDateShort} • ` : ''}{explicitTimeStr ? `${explicitTimeStr} • ` : ''}Planmäßig
+          </span>
+
+          {parsedDate && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: '#22c55e',
-              color: '#ffffff',
+              gap: '2px',
+              fontSize: '0.70rem',
+              fontWeight: 700,
+              color: '#047857',
+              marginLeft: '2px',
               flexShrink: 0
             }}>
-              <Check size={12} strokeWidth={3} />
-            </span>
-            <span style={{
-              fontSize: '0.76rem',
-              fontWeight: 750,
-              color: '#15803d',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {formattedDateShort ? `${formattedDateShort} • ` : ''}Planmäßig
-            </span>
-          </div>
-
-          {parsedDate && (
-            <button
-              type="button"
-              onClick={handleNavigate}
-              aria-label={`Im Stundenplan ansehen für ${formattedDateShort}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                background: '#ffffff',
-                border: '1.5px solid #10b981',
-                color: '#059669',
-                borderRadius: '100px',
-                padding: '2px 7px',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <Calendar size={11} color="#059669" />
               <span>Kalender</span>
-              <ExternalLink size={9} color="#059669" />
-            </button>
+              <ChevronRight size={13} strokeWidth={2.6} />
+            </span>
           )}
         </div>
       </div>
     );
   }
 
-  // 2. Absage / Ausfall (Kompakte WhatsApp-System-Pill, ~42px)
+  // 2. Absage / Ausfall (0,1% Apple System-Pill: randlos, Soft-Tint, volle Tastaturbedienbarkeit)
   if (isCancellation) {
     const teacherName = formatStudentDisplayName(selectedRecipient);
-    const shortLabel = `Terminausfall: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'} entfällt`;
+    const shortLabel = `Terminausfall: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'}${explicitTimeStr ? ` um ${explicitTimeStr}` : ''} entfällt`;
 
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '6px 0' }}>
         <div 
-          role="status"
-          aria-label={shortLabel}
+          role={parsedDate ? "button" : "status"}
+          tabIndex={parsedDate ? 0 : undefined}
+          onClick={parsedDate ? handleNavigate : undefined}
+          onKeyDown={parsedDate ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleNavigate(e);
+            }
+          } : undefined}
+          aria-label={parsedDate ? `${shortLabel} – Im Stundenplan ansehen` : shortLabel}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '6px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '100px',
-            padding: '4px 10px 4px 8px',
-            boxShadow: 'none',
+            gap: '8px',
+            background: 'rgba(239, 68, 68, 0.09)',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '5px 12px 5px 8px',
+            cursor: parsedDate ? 'pointer' : 'default',
+            userSelect: 'none',
+            transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
+          className={parsedDate ? "hover-scale" : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            background: '#dc2626',
+            color: '#ffffff',
+            flexShrink: 0
+          }}>
+            <X size={12} strokeWidth={3} />
+          </span>
+
+          <span style={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: '#7f1d1d',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {formattedDateShort ? `${formattedDateShort} • ` : ''}{explicitTimeStr ? `${explicitTimeStr} • ` : ''}Unterricht entfällt
+          </span>
+
+          {parsedDate && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: '#ef4444',
-              color: '#ffffff',
+              gap: '2px',
+              fontSize: '0.70rem',
+              fontWeight: 700,
+              color: '#991b1b',
+              marginLeft: '2px',
               flexShrink: 0
             }}>
-              <X size={12} strokeWidth={3} />
-            </span>
-            <span style={{
-              fontSize: '0.76rem',
-              fontWeight: 750,
-              color: '#b91c1c',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {formattedDateShort ? `${formattedDateShort} • ` : ''}Unterricht entfällt
-            </span>
-          </div>
-
-          {parsedDate && (
-            <button
-              type="button"
-              onClick={handleNavigate}
-              aria-label={`Im Stundenplan ansehen für ${formattedDateShort}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                background: '#ffffff',
-                border: '1px solid #fca5a5',
-                color: '#b91c1c',
-                borderRadius: '100px',
-                padding: '2px 7px',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <Calendar size={11} color="#b91c1c" />
               <span>Kalender</span>
-              <ExternalLink size={9} color="#b91c1c" />
-            </button>
+              <ChevronRight size={13} strokeWidth={2.6} />
+            </span>
           )}
         </div>
       </div>
     );
   }
 
-  // 2b. Reine Terminbestätigung (Kompakte WhatsApp-System-Pill, ~28px)
+  // 2b. Reine Terminbestätigung (0,1% Apple System-Pill: randlos, Soft-Tint, volle Tastaturbedienbarkeit)
   const isPureConfirmation = arrowIndex === -1 && 
     (content.includes('bestätigt') || lowerContent.includes('termin bestätigt') || lowerContent.includes('unterrichtstermin bestätigt')) && 
     !content.includes('abgelehnt');
 
   if (isPureConfirmation) {
     const teacherName = formatStudentDisplayName(selectedRecipient);
-    const shortLabel = `Termin bestätigt: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'}`;
+    const shortLabel = `Termin bestätigt: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'}${explicitTimeStr ? ` um ${explicitTimeStr}` : ''}`;
 
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '6px 0' }}>
         <div 
-          role="status"
-          aria-label={shortLabel}
+          role={parsedDate ? "button" : "status"}
+          tabIndex={parsedDate ? 0 : undefined}
+          onClick={parsedDate ? handleNavigate : undefined}
+          onKeyDown={parsedDate ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleNavigate(e);
+            }
+          } : undefined}
+          aria-label={parsedDate ? `${shortLabel} – Im Stundenplan ansehen` : shortLabel}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '6px',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: '100px',
-            padding: '4px 10px 4px 8px',
-            boxShadow: 'none',
+            gap: '8px',
+            background: 'rgba(16, 185, 129, 0.09)',
+            border: 'none',
+            borderRadius: '9999px',
+            padding: '5px 12px 5px 8px',
+            cursor: parsedDate ? 'pointer' : 'default',
+            userSelect: 'none',
+            transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             maxWidth: '100%',
             boxSizing: 'border-box'
           }}
+          className={parsedDate ? "hover-scale" : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            background: '#15803d',
+            color: '#ffffff',
+            flexShrink: 0
+          }}>
+            <Check size={12} strokeWidth={3} />
+          </span>
+
+          <span style={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: '#14532d',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {formattedDateShort ? `${formattedDateShort} • ` : ''}{explicitTimeStr ? `${explicitTimeStr} • ` : ''}Termin bestätigt
+          </span>
+
+          {parsedDate && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: '#15803d',
-              color: '#ffffff',
+              gap: '2px',
+              fontSize: '0.70rem',
+              fontWeight: 700,
+              color: '#047857',
+              marginLeft: '2px',
               flexShrink: 0
             }}>
-              <Check size={12} strokeWidth={3} />
-            </span>
-            <span style={{
-              fontSize: '0.76rem',
-              fontWeight: 750,
-              color: '#15803d',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-              {formattedDateShort ? `${formattedDateShort} • ` : ''}Termin bestätigt
-            </span>
-          </div>
-
-          {parsedDate && (
-            <button
-              type="button"
-              onClick={handleNavigate}
-              aria-label={`Im Stundenplan ansehen für ${formattedDateShort}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                background: '#ffffff',
-                border: '1.5px solid #10b981',
-                color: '#059669',
-                borderRadius: '100px',
-                padding: '2px 7px',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                touchAction: 'manipulation',
-                transition: 'all 0.15s ease'
-              }}
-              className="hover-scale"
-            >
-              <Calendar size={11} color="#059669" />
               <span>Kalender</span>
-              <ExternalLink size={9} color="#059669" />
-            </button>
+              <ChevronRight size={13} strokeWidth={2.6} />
+            </span>
           )}
         </div>
       </div>
@@ -520,10 +508,10 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
         {/* 2-Stufen Zeitvergleich Box */}
         {oldTime && newTime ? (
           <div style={{
-            background: isPending ? '#fffbeb' : '#f0fdf4',
+            background: isPending ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
             borderRadius: '12px',
             padding: '10px 12px',
-            border: isPending ? '1px solid #fef08a' : '1px solid #bbf7d0',
+            border: 'none',
             display: 'flex',
             flexDirection: 'column',
             gap: '6px'

@@ -97,21 +97,23 @@ export function useCampusRealtimeSync({
     }
     previousPlatform.current = activePlatform;
     
-    // Load the saved tab for the new platform to guarantee flawless switching
-    const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : (activePlatform === 'ensembles' ? 'ensembles_active_tab' : 'groovelab_active_tab');
-    const savedTab = typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null;
-    
-    let fallbackTab = 'live';
-    if (activePlatform === 'campus') {
-      fallbackTab = 'briefing';
-    } else if (activePlatform === 'ensembles') {
-      fallbackTab = 'overview';
+    // 🎵 0,1% Goldstandard: Beim Wechsel auf GrooveLab MUSS das Live Lab autoritativ als Startseite geladen werden
+    if (activePlatform === 'groovelab') {
+      setActiveStudentTab('live');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('groovelab_active_tab', 'live');
+        localStorage.setItem('groovelab_active_tab', 'live');
+      }
+    } else {
+      const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'ensembles_active_tab';
+      const savedTab = typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null;
+      const fallbackTab = activePlatform === 'campus' ? 'briefing' : 'overview';
+      const targetTab = (savedTab && savedTab !== 'live') ? savedTab : fallbackTab;
+      setActiveStudentTab(targetTab);
     }
-    
-    setActiveStudentTab(savedTab || fallbackTab);
   }, [activePlatform, user?.role]);
 
-  // Safety Hook: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
+  // Safety Hook 1: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
   useEffect(() => {
     if (activePlatform !== 'campus') return;
     if (user && user.role?.toLowerCase() === 'student') {
@@ -127,6 +129,22 @@ export function useCampusRealtimeSync({
         console.log('[Safety Hook] Enforcing student Campus Briefing Board redirect from invalid tab:', activeStudentTab);
         setActiveStudentTab('briefing');
         sessionStorage.setItem('campus_active_tab', 'briefing');
+      }
+    }
+  }, [user, activePlatform, activeStudentTab]);
+
+  // Safety Hook 2: Enforce that students in GrooveLab NEVER get stuck on an invalid Campus tab (e.g. 'briefing')
+  useEffect(() => {
+    if (activePlatform !== 'groovelab') return;
+    if (user && user.role?.toLowerCase() === 'student') {
+      const validGrooveTabs = ['live', 'practice', 'library', 'repertoire', 'matching', 'bands', 'messages', 'profile', 'settings'];
+      if (!validGrooveTabs.includes(activeStudentTab)) {
+        console.log('[Safety Hook] Enforcing student GrooveLab Live Lab redirect from invalid campus tab:', activeStudentTab);
+        setActiveStudentTab('live');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('groovelab_active_tab', 'live');
+          localStorage.setItem('groovelab_active_tab', 'live');
+        }
       }
     }
   }, [user, activePlatform, activeStudentTab]);

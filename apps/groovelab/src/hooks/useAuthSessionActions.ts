@@ -281,6 +281,10 @@ export function useAuthSessionActions({
       sessionStorage.removeItem('gl_active_session_lease_id');
       sessionStorage.removeItem('gl_global_device_key');
       sessionStorage.removeItem('cg_sponsor_session_shown');
+      sessionStorage.removeItem('groovelab_selected_student_id');
+      sessionStorage.removeItem('groovelab_selected_teacher_id');
+      localStorage.removeItem('groovelab_selected_student_id');
+      localStorage.removeItem('groovelab_selected_teacher_id');
 
       try {
         const keysToRemove: string[] = [];
@@ -321,6 +325,10 @@ export function useAuthSessionActions({
     // Prime sessionStorage immediately so customFetch interceptor injects user_id into x-client-info
     if (typeof window !== 'undefined' && userId) {
       sessionStorage.setItem('groovelab_user_id', userId);
+      sessionStorage.removeItem('groovelab_selected_student_id');
+      sessionStorage.removeItem('groovelab_selected_teacher_id');
+      localStorage.removeItem('groovelab_selected_student_id');
+      localStorage.removeItem('groovelab_selected_teacher_id');
       // 🏛️ 0,1% Goldstandard: Reset des Bildungsförderer-Ingress Flags für die neue Anmeldesitzung
       try {
         sessionStorage.removeItem('cg_sponsor_session_shown');
@@ -445,7 +453,7 @@ export function useAuthSessionActions({
       sessionStorage.setItem('groovelab_active_platform', 'campus');
       const startCampusTab = 'briefing';
       sessionStorage.setItem('campus_active_tab', startCampusTab);
-      sessionStorage.setItem('groovelab_active_tab', startCampusTab);
+      sessionStorage.setItem('groovelab_active_tab', 'live');
       setActivePlatform('campus');
       setActiveStudentTab(startCampusTab);
     } else if (isGroovelabActive) {
@@ -519,7 +527,7 @@ export function useAuthSessionActions({
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
         sessionStorage.setItem('campus_active_tab', 'briefing');
-        sessionStorage.setItem('groovelab_active_tab', 'briefing');
+        sessionStorage.setItem('groovelab_active_tab', 'live');
       }
     } else if (resolvedRole === 'teacher') {
       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
@@ -527,7 +535,7 @@ export function useAuthSessionActions({
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
         sessionStorage.setItem('campus_active_tab', 'briefing');
-        sessionStorage.setItem('groovelab_active_tab', 'briefing');
+        sessionStorage.setItem('groovelab_active_tab', 'live');
       }
     } else if (resolvedRole === 'secretary' || resolvedRole === 'admin') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');

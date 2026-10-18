@@ -105,12 +105,12 @@ export function useCampusSessionLifecycle({
             }
           }
         }
-        // Auto-correct if teacher/admin on groovelab has student-only tab active
+        // Auto-correct if teacher/admin on groovelab has campus-only or invalid tab active
         if (isTeacherOrAdmin && activePlatform === 'groovelab') {
-          const studentTabs = ['practice', 'library', 'repertoire', 'matching'];
-          if (studentTabs.includes(activeStudentTab)) {
+          const validGroovelabStaffTabs = ['live', 'schedule', 'students', 'team', 'rooms', 'songs', 'bands', 'stats', 'gallery', 'setup', 'messages', 'profile'];
+          if (!validGroovelabStaffTabs.includes(activeStudentTab)) {
             const fallbackTab = 'live';
-            console.log('[Tab Sync] Auto-correcting student-only tab for teacher/admin to fallback:', fallbackTab);
+            console.log('[Tab Sync] Auto-correcting invalid groovelab tab for teacher/admin to fallback:', fallbackTab);
             setActiveStudentTab(fallbackTab);
             if (typeof window !== 'undefined') {
               sessionStorage.setItem(storageKey, fallbackTab);
@@ -145,7 +145,7 @@ export function useCampusSessionLifecycle({
         }
       }
     }
-  }, [user?.id, user?.role, activePlatform]);
+  }, [user?.id, user?.role, activePlatform, activeStudentTab, setActiveStudentTab]);
 
   // Lock platform to groovelab on page load/initial mount in lab mode for security
   useEffect(() => {

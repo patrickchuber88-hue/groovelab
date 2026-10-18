@@ -2184,7 +2184,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
           >
             <IDBadgeCard
               user={{ ...student, first_name: firstName, last_name: lastName }}
-              activePlatform="campus"
+              activePlatform="campus" schoolName={schoolName}
             />
             <button
               type="button"

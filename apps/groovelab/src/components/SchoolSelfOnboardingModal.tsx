@@ -17,6 +17,7 @@ import { sanitizeSchoolName, sanitizeAddress, sanitizePersonName } from '../util
 import { generateHandoverUrl } from '../utils/cryptoAuth';
 import { logSecurityEvent } from '../services/auditLogService';
 import { computeSha256, ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS } from '../legal/legalContent';
+import { downloadAppleWalletPass } from '../services/wallet/appleWalletPassService';
 
 
 interface SchoolSelfOnboardingModalProps {
@@ -354,32 +355,16 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
     }
   };
 
-  const downloadWalletPass = () => {
+  const downloadWalletPass = async () => {
     if (!createdData) return;
-    const passContent = JSON.stringify({
-      passTypeIdentifier: "pass.de.campus-groovelab.admin",
-      serialNumber: createdData.user.qr_token,
-      teamIdentifier: "CAMPUS_GROOVELAB",
-      organizationName: "Campus-Groovelab",
-      description: "Campus-Groovelab Schulleiter-Ausweis",
-      logoText: "Campus-Groovelab",
-      foregroundColor: "rgb(255, 255, 255)",
-      backgroundColor: "rgb(21, 128, 61)",
-      labelColor: "rgb(230, 244, 234)",
-      studentName: `${createdData.user.first_name} ${createdData.user.last_name}`,
-      instrument: "Schulleitung / Administrator",
-      schoolName: createdData.school.name,
-      qrToken: createdData.user.qr_token
-    }, null, 2);
-
-    const blob = new Blob([passContent], { type: 'application/vnd.apple.pkpass' });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `campus-groovelab-pass-${createdData.user.first_name.toLowerCase()}.pkpass`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    await downloadAppleWalletPass({
+      schoolName: createdData.school?.name || 'Campus-Groovelab',
+      userName: `${createdData.user?.first_name || ''} ${createdData.user?.last_name || ''}`.trim() || 'Schulleitung',
+      userRole: 'Administrator',
+      instrument: 'Schulleitung',
+      qrToken: createdData.user?.qr_token || createdData.user?.id || '',
+      isCampus: true
+    });
   };
 
   const handleFinishAndEnterDashboard = () => {

@@ -136,13 +136,13 @@ export function useCampusNavigationAndWorkspaces({
       setActivePlatformRaw(targetVal);
       // Auto-switch the active tab to the saved tab of the target platform atomically within the same transition
       if (targetVal === 'campus') {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
         setActiveStudentTabRaw(savedTab === 'live' ? 'briefing' : savedTab);
       } else if (targetVal === 'ensembles') {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
         setActiveStudentTabRaw(savedTab);
       } else {
-        // 🎵 Beim Wechsel auf GrooveLab MUSS das Live Lab als Startseite geladen werden
+        // 🎵 0,1% Goldstandard: Beim Wechsel auf GrooveLab MUSS das Live Lab autoritativ als Startseite geladen werden
         setActiveStudentTabRaw('live');
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_active_tab', 'live');
@@ -152,6 +152,7 @@ export function useCampusNavigationAndWorkspaces({
     });
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('groovelab_active_platform', targetVal);
+      localStorage.setItem('groovelab_active_platform', targetVal);
     }
   }, [locationMode, user?.role, user?.schools, user?.is_campus_active, user?.is_groovelab_active]);
 

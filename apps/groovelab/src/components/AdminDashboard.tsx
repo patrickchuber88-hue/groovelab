@@ -727,6 +727,7 @@ export function AdminDashboard({
             brandColor={brandColor} 
             onShowQR={studentsState.setSelectedQRUser} 
             activePlatform={activePlatform} 
+            schoolName={schoolObj?.name}
           />
         </Suspense>
       )}

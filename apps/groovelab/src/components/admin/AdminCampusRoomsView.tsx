@@ -2523,9 +2523,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             }
           }
           .sim-viewport-mobile .rooms-board-grid,
-          .sim-viewport-portrait .rooms-board-grid,
-          .sim-viewport-tablet .rooms-board-grid,
-          .sim-viewport-landscape .rooms-board-grid {
+          .sim-viewport-mobile.sim-viewport-portrait .rooms-board-grid {
             grid-template-columns: 100% !important;
             display: block !important;
             width: 100% !important;

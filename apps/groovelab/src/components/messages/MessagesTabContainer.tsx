@@ -53,9 +53,12 @@ export function MessagesTabContainer({
   onAcknowledgeMessage,
   onNavigateToSchedule
 }: MessagesTabContainerProps) {
-  const currentUserId = typeof window !== 'undefined' 
-    ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || user?.id) 
-    : user?.id;
+  const isStudent = user?.role?.toLowerCase() === 'student';
+  const currentUserId = isStudent 
+    ? user?.id 
+    : (typeof window !== 'undefined' 
+        ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || user?.id) 
+        : user?.id);
 
   if (activePlatform === 'campus') {
     return (

@@ -345,18 +345,23 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
 
               const authoritativeSchoolId = resolvedDbUser.school_id || effectiveSchoolId;
               const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, authoritativeSchoolId).catch(() => null);
-              if (leaseRes && (leaseRes as any).lease_id) {
-                sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
+              const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
+              if (effectiveLeaseId) {
+                sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
               }
               setLocalhostDevLegalBypassed(true);
               sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_min_2026.1`, 'true');
               sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_admin_min_2026.1`, 'true');
               sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_secretary_min_2026.1`, 'true');
-              sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_teacher_min_2026.1`, 'true');
               sessionStorage.removeItem('groovelab_is_master_admin');
               localStorage.removeItem('groovelab_is_master_admin');
               sessionStorage.removeItem('groovelab_support_ghost');
+              sessionStorage.removeItem('groovelab_selected_student_id');
+              localStorage.removeItem('groovelab_selected_student_id');
+              sessionStorage.removeItem('groovelab_selected_teacher_id');
+              localStorage.removeItem('groovelab_selected_teacher_id');
+              sessionStorage.setItem('groovelab_user_role', resolvedDbUser.role || 'admin');
               sessionStorage.setItem('groovelab_active_workspace', 'secretary');
               sessionStorage.setItem('groovelab_active_platform', 'campus');
               sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -450,14 +455,18 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
               const authoritativeSchoolId = resolvedDbUser.school_id || effectiveSchoolId;
               const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, authoritativeSchoolId).catch(() => null);
-              if (leaseRes && (leaseRes as any).lease_id) {
-                sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
+              const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
+              if (effectiveLeaseId) {
+                sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
               }
               setLocalhostDevLegalBypassed(true);
               ['min_2026.1', 'teacher_min_2026.1', 'admin_min_2026.1', 'secretary_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));
               sessionStorage.removeItem('groovelab_is_master_admin'); localStorage.removeItem('groovelab_is_master_admin');
               sessionStorage.removeItem('groovelab_support_ghost');
+              sessionStorage.removeItem('groovelab_selected_student_id'); localStorage.removeItem('groovelab_selected_student_id');
+              sessionStorage.removeItem('groovelab_selected_teacher_id'); localStorage.removeItem('groovelab_selected_teacher_id');
+              sessionStorage.setItem('groovelab_user_role', 'teacher');
               sessionStorage.setItem('groovelab_active_workspace', 'teacher');
               sessionStorage.setItem('groovelab_active_platform', 'campus');
               sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -548,18 +557,23 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
               const authoritativeSchoolId = resolvedDbUser.school_id || effectiveSchoolId;
               const leaseRes = await registerClientSessionLease({ id: resolvedDbUser.id, role: resolvedDbUser.role }, authoritativeSchoolId).catch(() => null);
-              if (leaseRes && (leaseRes as any).lease_id) {
-                sessionStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
-                localStorage.setItem('gl_active_session_lease_id', (leaseRes as any).lease_id);
+              const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
+              if (effectiveLeaseId) {
+                sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
               }
               setLocalhostDevLegalBypassed(true);
               ['min_2026.1', 'student_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));
               sessionStorage.removeItem('groovelab_is_master_admin'); localStorage.removeItem('groovelab_is_master_admin');
               sessionStorage.removeItem('groovelab_support_ghost');
+              sessionStorage.removeItem('groovelab_selected_student_id'); localStorage.removeItem('groovelab_selected_student_id');
+              sessionStorage.removeItem('groovelab_selected_teacher_id'); localStorage.removeItem('groovelab_selected_teacher_id');
+              sessionStorage.setItem('groovelab_user_role', 'student');
               sessionStorage.setItem('groovelab_active_workspace', 'student');
               sessionStorage.setItem('groovelab_active_platform', 'campus');
               sessionStorage.setItem('campus_active_tab', 'briefing');
-              sessionStorage.setItem('groovelab_active_tab', 'briefing');
+              sessionStorage.setItem('groovelab_active_tab', 'live');
+              localStorage.setItem('groovelab_active_tab', 'live');
               sessionStorage.setItem('groovelab_location_mode', 'home');
               sessionStorage.setItem('groovelab_user_id', resolvedDbUser.id);
               sessionStorage.setItem('groovelab_cached_user', JSON.stringify(resolvedDbUser));

@@ -39,21 +39,17 @@ export function ScheduleBoard({ schoolId, userId }: ScheduleBoardProps) {
   }, []);
 
   const isMobilePortrait = useMemo(() => {
-    const isInsideSim = typeof document !== 'undefined' && (
-      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
-      document.querySelector('.sim-viewport-tablet') !== null
+    const isInsideSimMobile = typeof document !== 'undefined' && (
+      document.querySelector('.sim-viewport-mobile') !== null
     );
+    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape, .sim-viewport-tablet-landscape') !== null;
 
-    const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
+    if (isInsideSimMobile) {
+      return !isSimLandscape;
+    }
 
-    const isLandscapeMode = isSimLandscape || (
-      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
-    );
-
-    return !isLandscapeMode && (
-      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
-      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 834)
-    );
+    // On tablets (>= 768px) and desktop, always render ScheduleBoardDesktop
+    return typeof window !== 'undefined' && window.innerWidth < 768;
   }, [windowWidth, orientationTick]);
 
   const activePlatform = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab';

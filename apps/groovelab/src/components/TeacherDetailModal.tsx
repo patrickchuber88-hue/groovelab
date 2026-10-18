@@ -72,7 +72,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
       padding: '20px' 
     }}>
       <style>{`
-        @media (max-width: 1024px) {
+        @media (max-width: 640px) {
           .teacher-detail-panel {
             max-width: 100vw !important;
             width: 100vw !important;
@@ -84,8 +84,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
           }
         }
         .sim-viewport-mobile .teacher-detail-panel,
-        .sim-viewport-portrait .teacher-detail-panel,
-        .sim-viewport-tablet .teacher-detail-panel {
+        .sim-viewport-mobile.sim-viewport-portrait .teacher-detail-panel {
           max-width: 100% !important;
           width: 100% !important;
           max-height: 100dvh !important;

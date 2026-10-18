@@ -14,6 +14,7 @@ import { parseSongArtistAndTitle, Student } from '../meisterwerk.types';
 import { InlineAudioPlayer, MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
 import { DuettDeckModal } from './DuettDeckModal';
 import { AudioSettingsSheet } from './AudioSettingsSheet';
+import { AlbumRecordingActionBar } from './AlbumRecordingActionBar';
 import { UniversalLatencyEngine } from '../../../utils/universalLatencyEngine';
 import { resolveAuthoritativeUiLevel } from '../../../utils/audioTempoHelper';
 import { getCanonicalAudioKey, getCachedWaveformPeaks } from '../../../utils/waveformHelper';
@@ -2369,8 +2370,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     fontSize: '0.70rem',
                     fontWeight: 850,
                     color: '#6d28d9',
-                    background: '#f5f3ff',
-                    border: '1px solid #ddd6fe',
+                    background: 'rgba(109, 40, 217, 0.08)',
+                    border: 'none',
                     padding: '4px 10px',
                     borderRadius: '100px',
                     display: 'inline-flex',
@@ -2388,56 +2389,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', position: 'relative' }}>
                     {recordCountInRemaining !== null && recordCountInRemaining !== undefined ? (
-                      <div style={{
-                        flex: 1,
-                        height: '48px',
-                        background: recordCountInMode === 'metronome'
-                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
-                          : 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                        border: recordCountInMode === 'metronome' ? '2px solid #ef4444' : '2px solid #8b5cf6',
-                        borderRadius: '14px',
-                        padding: '4px 12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        boxShadow: recordCountInMode === 'metronome'
-                          ? '0 3px 12px rgba(239, 68, 68, 0.2)'
-                          : '0 3px 12px rgba(139, 92, 246, 0.2)',
-                        boxSizing: 'border-box'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: recordCountInMode === 'metronome'
-                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                              : 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                            color: '#ffffff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 950,
-                            fontSize: '1.10rem',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
-                          }}>
+                      <div style={{ width: '100%', height: '48px', background: recordCountInMode === 'metronome' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(139, 92, 246, 0.08)', border: 'none', borderRadius: '14px', padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: recordCountInMode === 'metronome' ? '#ef4444' : '#8b5cf6', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, fontSize: '1.05rem', flexShrink: 0 }}>
                             {recordCountInRemaining}
                           </div>
-                          <div>
-                            <div style={{
-                              fontSize: '0.78rem',
-                              fontWeight: 950,
-                              color: recordCountInMode === 'metronome' ? '#991b1b' : '#5b21b6'
-                            }}>
-                              {recordCountInMode === 'metronome' ? `Einzählen (${recordingBpm} BPM)...` : 'Bereit machen...'}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.80rem', fontWeight: 950, color: recordCountInMode === 'metronome' ? '#991b1b' : '#5b21b6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {recordCountInMode === 'metronome' ? `Einzählen (${recordingBpm} BPM)` : 'Bereit machen...'}
                             </div>
-                            <div style={{
-                              fontSize: '0.64rem',
-                              fontWeight: 700,
-                              color: recordCountInMode === 'metronome' ? '#b91c1c' : '#7c3aed',
-                              opacity: 0.9
-                            }}>
-                              {recordCountInMode === 'metronome' ? 'Klick wird mit aufgenommen' : 'Instrument ansetzen • Startet gleich!'}
+                            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: recordCountInMode === 'metronome' ? '#b91c1c' : '#7c3aed', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {recordCountInMode === 'metronome' ? 'Klick aktiv • Startet gleich' : 'Aufnahme startet gleich'}
                             </div>
                           </div>
                         </div>
@@ -2445,139 +2407,115 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           <button
                             type="button"
                             onClick={cancelActiveRecordCountIn}
-                            style={{
-                              background: '#ffffff',
-                              border: recordCountInMode === 'metronome' ? '1px solid #fca5a5' : '1px solid #ddd6fe',
-                              borderRadius: '8px',
-                              color: recordCountInMode === 'metronome' ? '#b91c1c' : '#6d28d9',
-                              padding: '4px 8px',
-                              fontSize: '0.68rem',
-                              fontWeight: 850,
-                              cursor: 'pointer'
-                            }}
+                            style={{ background: '#ffffff', border: recordCountInMode === 'metronome' ? '1px solid #fca5a5' : '1px solid #ddd6fe', borderRadius: '8px', color: recordCountInMode === 'metronome' ? '#b91c1c' : '#6d28d9', padding: '5px 10px', fontSize: '0.72rem', fontWeight: 850, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                             className="hover-scale-mini"
                             title="Abbrechen"
                           >
-                            ✕
+                            Abbrechen
                           </button>
                         )}
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={startRecordingAudio}
-                        disabled={isUploadingAudio}
-                        style={{
-                          flex: 1,
-                          height: '48px',
-                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '14px',
-                          padding: '8px 16px',
-                          fontSize: '0.90rem',
-                          fontWeight: 950,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Mic size={18} strokeWidth={2.8} />
-                        <span>Jetzt aufnehmen</span>
-                      </button>
-                    )}
+                      <>
+                        <button
+                          type="button"
+                          onClick={startRecordingAudio}
+                          disabled={isUploadingAudio}
+                          style={{ flex: 1, minWidth: 0, height: '48px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', borderRadius: '14px', padding: isMobileOrSim ? '0 12px' : '8px 16px', fontSize: isMobileOrSim ? '0.86rem' : '0.90rem', fontWeight: 950, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', whiteSpace: 'nowrap', boxShadow: 'none', transition: 'all 0.15s ease' }}
+                          className="hover-scale"
+                        >
+                          <Mic size={18} strokeWidth={2.8} />
+                          <span>{isMobileOrSim ? 'Aufnahme' : 'Jetzt aufnehmen'}</span>
+                        </button>
 
-                    {/* ⏱️ Metronom Studio-Kapsel (1-Tap Klick Toggle + Tempo Popover Dock) */}
-                    <div
-                      style={{
-                        position: 'relative',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        height: '48px',
-                        borderRadius: '14px',
-                        background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
-                        border: isRecordingMetronomeActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
-                        boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(16, 185, 129, 0.16)' : '0 1px 2px rgba(0,0,0,0.03)',
-                        transition: 'all 0.18s ease',
-                        flexShrink: 0
-                      }}
-                    >
-                      {/* Linker Teil: 1-Tap Klick AN/AUS Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = !isRecordingMetronomeActive;
-                          setIsRecordingMetronomeActive(next);
-                          if (next) playMetronomeTick(true);
-                        }}
-                        aria-label={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM). Tippen zum Ausschalten.` : 'Klick einschalten'}
-                        title={isRecordingMetronomeActive ? `Klick AN (${recordingBpm} BPM)` : 'Klick einschalten'}
-                        style={{
-                          height: '100%',
-                          padding: '0 12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: isRecordingMetronomeActive ? '#059669' : '#64748b',
-                          fontSize: '0.80rem',
-                          fontWeight: 850,
-                          touchAction: 'manipulation',
-                          borderRadius: '14px 0 0 14px'
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        <MechanicalMetronomeIcon
-                          size={17}
-                          color={isRecordingMetronomeActive ? '#10b981' : '#64748b'}
-                          strokeWidth={isRecordingMetronomeActive ? 2.5 : 2}
-                        />
-                        <span>{isRecordingMetronomeActive ? 'Klick AN' : 'Klick'}</span>
-                      </button>
+                        {/* ⏱️ Metronom Studio-Kapsel (1-Tap Klick Toggle + Tempo Popover Dock) */}
+                        <div
+                          style={{
+                            position: 'relative',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            height: '48px',
+                            borderRadius: '14px',
+                            background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
+                            border: isRecordingMetronomeActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
+                            boxShadow: isRecordingMetronomeActive ? '0 2px 8px rgba(16, 185, 129, 0.16)' : '0 1px 2px rgba(0,0,0,0.03)',
+                            transition: 'all 0.18s ease',
+                            flexShrink: 0
+                          }}
+                        >
+                          {/* Linker Teil: 1-Tap Klick AN/AUS Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !isRecordingMetronomeActive;
+                              setIsRecordingMetronomeActive(next);
+                              if (next) playMetronomeTick(true);
+                            }}
+                            aria-label={isRecordingMetronomeActive ? `Klick aktiv (${recordingBpm} BPM). Tippen zum Ausschalten.` : 'Klick einschalten'}
+                            title={isRecordingMetronomeActive ? `Klick AN (${recordingBpm} BPM)` : 'Klick einschalten'}
+                            style={{
+                              height: '100%',
+                              padding: isMobileOrSim ? '0 10px' : '0 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: isRecordingMetronomeActive ? '#059669' : '#64748b',
+                              fontSize: isMobileOrSim ? '0.78rem' : '0.80rem',
+                              fontWeight: 850,
+                              touchAction: 'manipulation',
+                              borderRadius: '14px 0 0 14px',
+                              whiteSpace: 'nowrap'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <MechanicalMetronomeIcon
+                              size={16}
+                              color={isRecordingMetronomeActive ? '#10b981' : '#64748b'}
+                              strokeWidth={isRecordingMetronomeActive ? 2.5 : 2}
+                            />
+                            <span>{isMobileOrSim ? 'Klick' : (isRecordingMetronomeActive ? 'Klick AN' : 'Klick')}</span>
+                          </button>
 
-                      {/* Vertikaler Trenner */}
-                      <div
-                        style={{
-                          width: '1px',
-                          height: '24px',
-                          background: isRecordingMetronomeActive ? '#10b981' : '#e2e8f0',
-                          flexShrink: 0
-                        }}
-                      />
+                          {/* Vertikaler Trenner */}
+                          <div
+                            style={{
+                              width: '1px',
+                              height: '24px',
+                              background: isRecordingMetronomeActive ? '#10b981' : '#e2e8f0',
+                              flexShrink: 0
+                            }}
+                          />
 
-                      {/* Rechter Teil: BPM Selector & Popover Trigger */}
-                      <button
-                        type="button"
-                        onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
-                        aria-label={`Tempo: ${recordingBpm} BPM. Tippen zum Ändern.`}
-                        title={`Tempo anpassen (${recordingBpm} BPM)`}
-                        style={{
-                          height: '100%',
-                          padding: '0 12px 0 10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: 'transparent',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: isRecordingMetronomeActive ? '#15803d' : '#334155',
-                          fontSize: '0.80rem',
-                          fontWeight: 850,
-                          touchAction: 'manipulation',
-                          borderRadius: '0 14px 14px 0'
-                        }}
-                        className="hover-scale-mini"
-                      >
-                        <span>{recordingBpm} BPM</span>
-                        <ChevronDown size={14} color={isRecordingMetronomeActive ? '#16a34a' : '#64748b'} strokeWidth={2.4} />
-                      </button>
+                          {/* Rechter Teil: BPM Selector & Popover Trigger */}
+                          <button
+                            type="button"
+                            onClick={() => setShowRecordingMetronomePopup(prev => !prev)}
+                            aria-label={`Tempo: ${recordingBpm} BPM. Tippen zum Ändern.`}
+                            title={`Tempo anpassen (${recordingBpm} BPM)`}
+                            style={{
+                              height: '100%',
+                              padding: isMobileOrSim ? '0 10px 0 8px' : '0 12px 0 10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: isRecordingMetronomeActive ? '#15803d' : '#334155',
+                              fontSize: isMobileOrSim ? '0.78rem' : '0.80rem',
+                              fontWeight: 850,
+                              touchAction: 'manipulation',
+                              borderRadius: '0 14px 14px 0',
+                              whiteSpace: 'nowrap'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <span>{recordingBpm} BPM</span>
+                            <ChevronDown size={14} color={isRecordingMetronomeActive ? '#16a34a' : '#64748b'} strokeWidth={2.4} />
+                          </button>
 
                       {/* 🎛️ Tempo Popover Dock */}
                       {showRecordingMetronomePopup && (
@@ -2784,7 +2722,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </>
+                )}
+              </div>
 
                   {/* Post-Take Micro Bar */}
                   {justRecordedAudioLabel && (
@@ -2848,17 +2788,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       type="button"
                       disabled={isReleasingAudio}
                       onClick={() => stopRecordingAudio()}
-                      style={{ flex: 1, height: '42px', background: isReleasingAudio ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '0.84rem', fontWeight: 950, cursor: isReleasingAudio ? 'wait' : 'pointer' }}
+                      style={{ flex: 1, minWidth: 0, height: '42px', background: isReleasingAudio ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: isMobileOrSim ? '0.80rem' : '0.84rem', fontWeight: 950, cursor: isReleasingAudio ? 'wait' : 'pointer', whiteSpace: 'nowrap', padding: isMobileOrSim ? '0 10px' : '0 14px' }}
                       className={isReleasingAudio ? undefined : "hover-scale"}
                     >
-                      {isReleasingAudio ? 'Klingt aus & sichert...' : 'Stopp & Take sichern'}
+                      {isReleasingAudio ? 'Klingt aus...' : (isMobileOrSim ? 'Stopp & Sichern' : 'Stopp & Take sichern')}
                     </button>
                     {handleRetakeRecordingAudio && (
                       <button
                         type="button"
                         disabled={isReleasingAudio}
                         onClick={handleRetakeRecordingAudio}
-                        style={{ height: '42px', background: '#ffffff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '10px', padding: '0 10px', fontSize: '0.78rem', fontWeight: 850, cursor: isReleasingAudio ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: isReleasingAudio ? 0.6 : 1 }}
+                        style={{ height: '42px', background: '#ffffff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: '10px', padding: isMobileOrSim ? '0 8px' : '0 10px', fontSize: '0.78rem', fontWeight: 850, cursor: isReleasingAudio ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: isReleasingAudio ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}
                         className={isReleasingAudio ? undefined : "hover-scale-mini"}
                         title="Neu aufnehmen"
                       >
@@ -3342,46 +3282,23 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
               </div>
 
               {/* Streaming Action Bar (Nur im aktuellen Monat aktiv, kein unnötiger Play-All Server-Traffic) */}
-              {isCurrentMonthAlbum && !isRecordingAudio && recordCountInRemaining === null && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '10px',
-                  marginTop: '12px',
-                  paddingTop: '12px',
-                  borderTop: '1px solid #f1f5f9'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => startRecordingAudio(undefined, activeSharedAlbum.title)}
-                    aria-label={`Neuen Take für ${activeSharedAlbum.title} aufnehmen`}
-                    style={{
-                      background: isTeacherMode
-                        ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
-                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '100px',
-                      padding: '11px 20px',
-                      minHeight: '44px',
-                      fontSize: '0.84rem',
-                      fontWeight: 850,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                      boxShadow: isTeacherMode
-                        ? '0 4px 16px rgba(22, 163, 74, 0.28)'
-                        : '0 4px 16px rgba(239, 68, 68, 0.28)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Mic size={15} strokeWidth={2.4} />
-                    <span>{isTeacherMode ? '+ Neues Vorbild' : '+ Neuer Take'}</span>
-                  </button>
-                </div>
+              {isCurrentMonthAlbum && (
+                <AlbumRecordingActionBar
+                  albumTitle={activeSharedAlbum.title}
+                  isTeacherMode={isTeacherMode}
+                  isRecordingAudio={isRecordingAudio}
+                  isReleasingAudio={isReleasingAudio}
+                  recordCountInRemaining={recordCountInRemaining}
+                  recordCountInMode={recordCountInMode}
+                  recordingBpm={recordingBpm}
+                  audioDuration={audioDuration}
+                  formatRecordTime={formatRecordTime}
+                  onStart={() => startRecordingAudio(undefined, activeSharedAlbum.title)}
+                  onStop={() => stopRecordingAudio()}
+                  onCancelCountIn={cancelActiveRecordCountIn}
+                  onRetake={handleRetakeRecordingAudio}
+                  isMobileOrSim={isMobileOrSim}
+                />
               )}
             </div>
           </div>

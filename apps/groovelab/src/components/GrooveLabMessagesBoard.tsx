@@ -65,7 +65,7 @@ export default function GrooveLabMessagesBoard({
 
   useEffect(() => {
     const handleResize = () => {
-      const mobileViewport = window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null;
+      const mobileViewport = window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile') !== null;
       setIsMobile(mobileViewport);
     };
     handleResize();
