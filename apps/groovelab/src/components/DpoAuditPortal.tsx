@@ -748,7 +748,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     },
                     {
                       title: 'III. Art. 32 Abs. 1 lit. c DSGVO – Verfügbarkeit & Belastbarkeit',
-                      desc: 'Automatisierte stündliche Age X25519 verschlüsselte Datenbank-Dumps in deutschen ISO 27001 Rechenzentren (IONOS SE Montabaur & Hetzner Falkenstein/Nürnberg), 99,5% Uptime SLA, Disaster Recovery Notfallplan (RTO <= 45 Min., RPO <= 60 Min.), lokaler IndexedDB Audio-Tresor für unterbrechungsfreien Offline-Betrieb in Proberäumen.'
+                      desc: 'Automatisierte stündliche Age X25519 verschlüsselte Datenbank-Dumps in deutschen ISO 27001 Rechenzentren (IONOS SE Montabaur & Hetzner Falkenstein/Nürnberg), 99,0% Uptime SLA (Jahresmittel), Disaster Recovery Notfallplan (RTO <= 45 Min., RPO <= 60 Min.), lokaler IndexedDB Audio-Tresor für unterbrechungsfreien Offline-Betrieb in Proberäumen.'
                     },
                     {
                       title: 'IV. Art. 32 Abs. 1 lit. d DSGVO – Überprüfung & Evaluierung',

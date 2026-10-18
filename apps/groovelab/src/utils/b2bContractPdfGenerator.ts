@@ -2,7 +2,7 @@
  * 🏛️ Campus-Groovelab Official B2B Contract Package PDF Generator
  * 
  * Generates an official, print-ready 4-part B2B SaaS Rental Contract (§ 535 BGB / Art. 253 OR),
- * Herrenberg Defense Schedule, AVV (Art. 28 DSGVO / Art. 9 nDSG), and SLA (99.5%)
+ * Herrenberg Defense Schedule, AVV (Art. 28 DSGVO / Art. 9 nDSG), and SLA (99.0%)
  * formatted according to DIN 5008 standards for municipal carriers, school boards, and RPAs.
  */
 
@@ -114,7 +114,7 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
     basePrice: selectedBasePrice,
     teacherCount: options.teacherCount || 0,
     directBilling: Boolean(options.studentDirectBilling),
-    slaTarget: '99.5%',
+    slaTarget: '99.0%',
     country: options.country || 'DE'
   };
   const sha256Digest = await computeCanonicalPayloadHash(canonicalPayload);
@@ -455,10 +455,10 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   drawFooter(3);
 
   // ==========================================================================
-  // SEITE 4: ANLAGE 3 – SERVICE LEVEL AGREEMENT (SLA 99,5 %) & PRÜFSIEGEL
+  // SEITE 4: ANLAGE 3 – SERVICE LEVEL AGREEMENT (SLA 99,0 %) & PRÜFSIEGEL
   // ==========================================================================
   doc.addPage();
-  drawHeader(4, 4, 'Anlage 3: Service Level Agreement (SLA 99,5 %)');
+  drawHeader(4, 4, 'Anlage 3: Service Level Agreement (SLA 99,0 %)');
 
   y = 28;
 
@@ -469,7 +469,7 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   y += 5;
 
   const slaIntro = doc.splitTextToSize(
-    'Der Betreiber garantiert für die Cloud-Infrastruktur von Campus-Groovelab eine Verfügbarkeit von mindestens 99,5 % im monatlichen Mittel (24/7), gemessen am Übergabepunkt der deutschen Rechenzentren (IONOS SE / Hetzner Online GmbH in Deutschland).',
+    'Der Betreiber garantiert für die Cloud-Infrastruktur von Campus-Groovelab eine Verfügbarkeit von mindestens 99,0 % im Kalenderjahr (Jahresmittel, 24/7, max. 7,3h Ausfall/Monat), gemessen am Übergabepunkt der deutschen Rechenzentren (IONOS SE / Hetzner Online GmbH in Deutschland).',
     contentWidth
   );
   doc.setFont('helvetica', 'normal');
@@ -490,10 +490,10 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   doc.text('STÖRUNGSKLASSIFIZIERUNG & REAKTIONSZEITEN:', margin + 4, y + 5);
 
   const slaT = [
-    'P1 (Kritisch – Gesamtausfall der Plattform): Reaktionszeit < 2 Stunden • Bearbeitungsbeginn unverzüglich',
-    'P2 (Schwerwiegend – Kernmodul beeinträchtigt, Workaround möglich): Reaktionszeit < 4 Stunden',
-    'P3 (Normal – Einzelne didaktische Funktion gestört, Schulbetrieb läuft): Reaktionszeit < 8 Stunden',
-    'P4 (Niedrig – Allgemeine Frage, redaktioneller Hinweis): Reaktionszeit < 24 Stunden (an Werktagen)'
+    'P1 (Kritisch – Gesamtausfall der Plattform): Reaktionszeit 6–12 Stunden • Bearbeitungsbeginn unverzüglich',
+    'P2 (Schwerwiegend – Kernmodul beeinträchtigt, Workaround möglich): Reaktionszeit < 24 Stunden',
+    'P3 (Normal – Einzelne didaktische Funktion gestört, Schulbetrieb läuft): Reaktionszeit < 48 Stunden',
+    'P4 (Niedrig – Allgemeine Frage, redaktioneller Hinweis): Reaktionszeit < 72 Stunden (an Werktagen)'
   ];
 
   doc.setFont('helvetica', 'normal');
@@ -515,11 +515,11 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   y += 4;
 
   const komp = [
-    '• 99,00 % bis 99,49 % Verfügbarkeit: 1 Gratismonat (Folgender Monat 100 % beitragsfrei auf das Basishosting)',
-    '• 98,00 % bis 98,99 % Verfügbarkeit: 2 Gratismonate beitragsfrei',
-    '• 95,00 % bis 97,99 % Verfügbarkeit: 3 Gratismonate (ein volles Folgequartal beitragsfrei)',
-    '• Unter 95,00 % Verfügbarkeit: 6 Gratismonate beitragsfrei',
-    'Barausschluss: Gratismonate stellen eine reine Sachkompensation dar. Ausschlussfrist für Anträge: 30 Tage nach Monatsende.'
+    '• 98,00 % bis 98,99 % Verfügbarkeit (> 7,2h Ausfall/Monat): 1 Gratismonat (Folgender Monat beitragsfrei auf Basishosting)',
+    '• 95,00 % bis 97,99 % Verfügbarkeit (> 14,4h Ausfall/Monat): 2 Gratismonate beitragsfrei',
+    '• 90,00 % bis 94,99 % Verfügbarkeit (> 36h Ausfall/Monat): 3 Gratismonate (Folgequartal beitragsfrei)',
+    '• Unter 90,00 % Verfügbarkeit (> 72h Ausfall/Monat): 6 Gratismonate beitragsfrei',
+    'Barausschluss: Reine Sachkompensation auf Basispauschale (§ 536 BGB Minderungsabgeltung). Ausschlussfrist: 30 Tage.'
   ];
 
   doc.setFont('helvetica', 'normal');

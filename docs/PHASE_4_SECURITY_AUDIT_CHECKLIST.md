@@ -109,7 +109,7 @@
 ## V. Go-Live-Runbook, Rechtsfreigabe & Operations (Punkte 76–100)
 *Status: 100% DSGVO, GoBD & Rechtskonformität*
 
-- [x] **76. Rechtliche Dokumenten-Verlinkung:** Impressum, Datenschutz, AGB (Teil A & B), AVV (Art. 28), SLA (99,5%), Eltern-Info (Art. 13), Kinderschutz (§ 8a SGB VIII), Widerruf (B2C) und Barrierefreiheitserklärung sind jederzeit barrierefrei abrufbar.
+- [x] **76. Rechtliche Dokumenten-Verlinkung:** Impressum, Datenschutz, AGB (Teil A & B), AVV (Art. 28), SLA (99,0%), Eltern-Info (Art. 13), Kinderschutz (§ 8a SGB VIII), Widerruf (B2C) und Barrierefreiheitserklärung sind jederzeit barrierefrei abrufbar.
 - [x] **77. Revisionssichere AGB-Protokollierung:** Zeitpunkt, IP-Hash, Version (`2026.3`) und User-ID werden bei Registrierung und Elternaktivierung unlöschbar erfasst (`public.legal_consents`).
 - [x] **78. DSGVO-Verarbeitungsverzeichnis (VVT):** Vollständiges Muster-VVT nach Art. 30 DSGVO liegt für Musikschulen und Schulträger vor (`VVT_MUSTER_SCHULTRAEGER_ART30.md`).
 - [x] **79. Stand-Alone AVV Suite (Art. 28 DSGVO):** Behördlich vollständiger Auftragsverarbeitungsvertrag inklusive Anlage 1 (Gegenstand & Daten) und Anlage 2 (Vollständige TOMs gem. Art. 32 DSGVO).

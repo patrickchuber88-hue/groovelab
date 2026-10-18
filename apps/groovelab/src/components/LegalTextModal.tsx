@@ -676,7 +676,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 if (showB2bTabs) {
                   tabs.push(
                     { id: 'avv', label: 'AVV (Art. 28)', icon: FileCheck },
-                    { id: 'sla', label: 'SLA (99,5%)', icon: Server }
+                    { id: 'sla', label: 'SLA (99,0%)', icon: Server }
                   );
                 }
 

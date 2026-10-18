@@ -2965,15 +2965,15 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
     : Math.max(0, Math.round((100 - uptime) * 432));
   const incidentNotes = typeof params === 'object' ? params.incidentNotes : undefined;
 
-  const isSlaAchieved = uptime >= 99.50;
+  const isSlaAchieved = uptime >= 99.00;
   const isMinorBreach = uptime >= 98.00 && !isSlaAchieved;
 
   // Staged Service Credits (Gratismonate auf die monatliche Hosting-Grundpauschale gem. § 2b AGB)
   let serviceCreditLabel = '0 Gratismonate';
   if (!isSlaAchieved) {
-    if (uptime >= 99.00) serviceCreditLabel = '1 Gratismonat (auf Hosting-Grundpauschale)';
-    else if (uptime >= 98.00) serviceCreditLabel = '2 Gratismonate (auf Hosting-Grundpauschale)';
-    else if (uptime >= 95.00) serviceCreditLabel = '3 Gratismonate (auf Hosting-Grundpauschale)';
+    if (uptime >= 98.00) serviceCreditLabel = '1 Gratismonat (auf Hosting-Grundpauschale)';
+    else if (uptime >= 95.00) serviceCreditLabel = '2 Gratismonate (auf Hosting-Grundpauschale)';
+    else if (uptime >= 90.00) serviceCreditLabel = '3 Gratismonate (auf Hosting-Grundpauschale)';
     else serviceCreditLabel = '6 Gratismonate (auf Hosting-Grundpauschale)';
   }
 
@@ -3026,10 +3026,10 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   doc.setFontSize(8.2);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
   if (isSlaAchieved) {
-    doc.text('SLA-Garantie: 99,50% • P95-API-Latenz: < 22 ms • 0 ungeplante Ausfallzeiten', 85, 77);
+    doc.text('SLA-Garantie: 99,00% (Jahresmittel) • P95-API-Latenz: < 22 ms • 0 ungeplante Ausfallzeiten', 85, 77);
     doc.text('Status: [OK] SLA-Ziel vollständig erfüllt (Keine Service-Gutschrift erforderlich)', 85, 84);
   } else {
-    doc.text(`SLA-Garantie: 99,50% • Erfasste Ausfallzeit: ${downtimeMins} Minuten`, 85, 77);
+    doc.text(`SLA-Garantie: 99,00% (Jahresmittel) • Erfasste Ausfallzeit: ${downtimeMins} Minuten`, 85, 77);
     doc.text(`Status: [!] ${serviceCreditLabel} wird auf der Folgerechnung gutgeschrieben`, 85, 84);
   }
 
@@ -3073,9 +3073,9 @@ export const generateSlaCertificatePDF = async (params: SlaCertificateParams | s
   currentY += 4;
 
   const slaClasses = [
-    { name: 'Klasse 1 (Kritisch / Totalausfall)', time: 'Reaktion: < 2 Std. | Ziel-Lösung: < 8 Std.', desc: 'Vollständiger Ausfall der Plattform oder des zentralen Login-Gateways (24/7 Notfall-Monitoring).' },
-    { name: 'Klasse 2 (Erheblich / Kernfunktion)', time: 'Reaktion: < 4 Std. | Ziel-Lösung: < 24 Std.', desc: 'Ausfall wesentlicher Module (z. B. Stundenplan-Sync, Raumbelegung); Plattform bedienbar.' },
-    { name: 'Klasse 3 (Geringfügig / Kosmetisch)', time: 'Reaktion: < 8 Std. | Reguläres Release', desc: 'Kosmetische UI-Fehler, Textglitches oder nicht-unterrichtsrelevante Verzögerungen.' }
+    { name: 'Klasse 1 (Kritisch / Totalausfall)', time: 'Reaktion: 6–12 Std. | Bearbeitung unverzüglich', desc: 'Vollständiger Ausfall der Plattform oder des zentralen Login-Gateways (Monitoring aktiv).' },
+    { name: 'Klasse 2 (Erheblich / Kernfunktion)', time: 'Reaktion: < 24 Std. | Ziel-Lösung: < 48 Std.', desc: 'Ausfall wesentlicher Module (z. B. Stundenplan-Sync, Raumbelegung); Plattform bedienbar.' },
+    { name: 'Klasse 3 (Geringfügig / Kosmetisch)', time: 'Reaktion: < 48 Std. | Reguläres Release', desc: 'Kosmetische UI-Fehler, Textglitches oder nicht-unterrichtsrelevante Verzögerungen.' }
   ];
 
   slaClasses.forEach(sc => {

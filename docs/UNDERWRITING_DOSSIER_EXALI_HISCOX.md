@@ -77,8 +77,8 @@ Bereitstellung, Hosting, Weiterentwicklung und Wartung der cloudbasierten Schulm
 > - **DSA-Meldeverfahren:** Ein elektronisches Melde- und Abhilfeverfahren (Notice-and-Takedown gem. Art. 6 & 16 Digital Services Act / DSA) an `copyright@campus-groovelab.de` ist live aktiv.
 
 ### Frage 5: Wie hoch ist die vertraglich zugesicherte Verfügbarkeit (SLA)?
-> **Antwort: 99,5 % im Jahresmittel.**  
-> **Erläuterung:** Gemäß § 1 Abs. 5 der B2B-AGB garantiert der Betreiber 99,5 % Verfügbarkeit (ausgenommen angekündigte Wartungsfenster). Bei Ausfällen greift die in den AGB verankerte **Nachrangigkeits- und Notfallklausel**: Der reguläre Musikschulunterricht findet offline statt; Campus-Groovelab ist ein didaktisches Zusatzsystem, kein behördliches Notfallmeldemedium.
+> **Antwort: 99,0 % im Jahresmittel.**  
+> **Erläuterung:** Gemäß Anlage 3 der B2B-Vereinbarungen garantiert der Betreiber 99,0 % Verfügbarkeit im Jahresmittel (ausgenommen angekündigte Wartungsfenster). Bei Ausfällen greift die in den Verträgen verankerte **Subsidiaritäts- und Notfallklausel**: Der reguläre Musikschulunterricht findet offline statt; Campus-Groovelab ist ein didaktisches Zusatzsystem, kein behördliches Notfallmeldemedium.
 
 ---
 

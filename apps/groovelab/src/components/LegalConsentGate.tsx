@@ -172,6 +172,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   };
 
   const mandatoryCheckboxRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -405,6 +406,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
       if (error) {
         console.error('[LegalConsentGate] Record consent error:', error);
         setErrorMsg('Zustimmung konnte serverseitig nicht gespeichert werden. Bitte versuchen Sie es erneut.');
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
@@ -449,6 +451,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     } catch (err: any) {
       console.error('[LegalConsentGate] Exception recording consent:', err);
       setErrorMsg('Ein unerwarteter Fehler ist aufgetreten: ' + (err.message || String(err)));
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSaving(false);
     }
@@ -955,6 +958,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
 
         {/* Body Content - ZONE 2: ELASTISCHER SCROLL-BEREICH */}
         <main 
+          ref={scrollContainerRef}
           className="pwa-scroll-container"
           data-modal-scroll="true"
           style={{
@@ -1356,89 +1360,115 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             background: '#ffffff',
             boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.05)',
             display: 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            alignItems: isMobile ? 'stretch' : 'center',
-            justifyContent: 'space-between',
-            gap: isMobile ? '10px' : '16px',
+            flexDirection: 'column',
+            gap: '10px',
             flexShrink: 0,
             position: 'relative',
             zIndex: 10
           }}
         >
-          {/* Status-Text oder Tap-Trigger */}
-          <div 
-            onClick={!checkedMandatory ? handleScrollToMandatory : undefined}
-            style={{
-              fontSize: isMobile ? '0.74rem' : '0.78rem',
-              color: checkedMandatory ? '#059669' : '#d97706',
-              fontWeight: 700,
+          {errorMsg && (
+            <div style={{
+              background: '#fee2e2',
+              border: '1px solid #fca5a5',
+              borderRadius: '10px',
+              padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: isMobile ? 'center' : 'flex-start',
-              gap: '6px',
-              cursor: !checkedMandatory ? 'pointer' : 'default',
-              userSelect: 'none'
-            }}
-          >
-            {checkedMandatory ? (
-              <>
-                <Check size={14} color="#059669" strokeWidth={3} />
-                <span>✓ Pflichtbestätigung ausgewählt</span>
-              </>
-            ) : (
-              <span style={{ textDecoration: isMobile ? 'underline' : 'none' }}>
-                ⚠️ Bitte Pflichtfeld bestätigen (Tippen zum Fokussieren)
-              </span>
-            )}
-          </div>
-
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={() => {
-              if (!checkedMandatory) {
-                handleScrollToMandatory();
-                return;
-              }
-              handleConfirmConsents();
-            }}
-            style={{
-              background: checkedMandatory ? themeColor : '#e2e8f0',
-              color: checkedMandatory ? '#ffffff' : '#64748b',
-              border: 'none',
-              borderRadius: isMobile ? '14px' : '16px',
-              padding: isMobile ? '14px 20px' : '12px 24px',
-              minHeight: '44px',
-              fontSize: isMobile ? '0.90rem' : '0.90rem',
-              fontWeight: 800,
-              cursor: isSaving ? 'not-allowed' : 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               gap: '8px',
-              touchAction: 'manipulation',
-              userSelect: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: checkedMandatory ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            {isSaving ? (
-              <>
-                <div className="spinner-border animate-spin" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#ffffff', borderRadius: '50%' }} />
-                <span>Wird protokolliert...</span>
-              </>
-            ) : (
-              <>
-                <Scale size={16} />
-                <span>
-                  {!checkedMandatory 
-                    ? 'Zu den Pflicht-Einwilligungen' 
-                    : (isMajorUpdateFlow ? 'Änderungen verbindlich bestätigen' : 'Rechtssicher bestätigen & Weiter')}
+              color: '#991b1b',
+              fontSize: '0.80rem',
+              fontWeight: 600,
+              boxSizing: 'border-box'
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{errorMsg}</span>
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
+            gap: isMobile ? '10px' : '16px',
+            width: '100%'
+          }}>
+            {/* Status-Text oder Tap-Trigger */}
+            <div 
+              onClick={!checkedMandatory ? handleScrollToMandatory : undefined}
+              style={{
+                fontSize: isMobile ? '0.74rem' : '0.78rem',
+                color: checkedMandatory ? '#059669' : '#d97706',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: isMobile ? 'center' : 'flex-start',
+                gap: '6px',
+                cursor: !checkedMandatory ? 'pointer' : 'default',
+                userSelect: 'none'
+              }}
+            >
+              {checkedMandatory ? (
+                <>
+                  <Check size={14} color="#059669" strokeWidth={3} />
+                  <span>✓ Pflichtbestätigung ausgewählt</span>
+                </>
+              ) : (
+                <span style={{ textDecoration: isMobile ? 'underline' : 'none' }}>
+                  ⚠️ Bitte Pflichtfeld bestätigen (Tippen zum Fokussieren)
                 </span>
-              </>
-            )}
-          </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => {
+                if (!checkedMandatory) {
+                  handleScrollToMandatory();
+                  return;
+                }
+                handleConfirmConsents();
+              }}
+              style={{
+                background: checkedMandatory ? themeColor : '#e2e8f0',
+                color: checkedMandatory ? '#ffffff' : '#64748b',
+                border: 'none',
+                borderRadius: isMobile ? '14px' : '16px',
+                padding: isMobile ? '14px 20px' : '12px 24px',
+                minHeight: '44px',
+                fontSize: isMobile ? '0.90rem' : '0.90rem',
+                fontWeight: 800,
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: checkedMandatory ? '0 4px 14px rgba(0,0,0,0.15)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              {isSaving ? (
+                <>
+                  <div className="spinner-border animate-spin" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#ffffff', borderRadius: '50%' }} />
+                  <span>Wird protokolliert...</span>
+                </>
+              ) : (
+                <>
+                  <Scale size={16} />
+                  <span>
+                    {!checkedMandatory 
+                      ? 'Zu den Pflicht-Einwilligungen' 
+                      : (isMajorUpdateFlow ? 'Änderungen verbindlich bestätigen' : 'Rechtssicher bestätigen & Weiter')}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

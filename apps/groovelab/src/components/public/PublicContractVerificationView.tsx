@@ -73,7 +73,7 @@ export const PublicContractVerificationView: React.FC = () => {
             contractType: data.contract_type || 'B2B-SaaS-Mietvertrag & AVV',
             legalBasis: data.legal_basis || '§ 535 ff. BGB / Art. 253 OR i. V. m. Art. 28 DSGVO & Art. 9 CH-nDSG',
             herrenbergStatus: data.herrenberg_status || 'BSG B 12 R 3/20 R Konformität (Zweistufiges Dispositionsmodell)',
-            slaTarget: data.sla_target || '99,5 % Verfügbarkeit (24/7/365)',
+            slaTarget: data.sla_target || '99,0 % Verfügbarkeit im Jahresmittel (24/7/365)',
             datacenterLocation: data.datacenter_location || data.hosting_location || 'IONOS SE & Hetzner Online GmbH (Deutschland • ISO/IEC 27001)',
             isoCertifications: data.iso_certifications || 'ISO/IEC 27001:2022, ISO/IEC 27701 (PIMS), BSI IT-Grundschutz',
             usCloudTransfer: data.us_cloud_transfer || '0,00 % (Vollständige Immunität gegen US FISA 702 & CLOUD Act)'
@@ -519,10 +519,10 @@ export const PublicContractVerificationView: React.FC = () => {
                     <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Service Level Agreement (SLA)</span>
                   </div>
                   <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 800 }}>
-                    99,5 % Verfügbarkeit (24/7/365)
+                    99,0 % Verfügbarkeit im Jahresmittel (24/7/365)
                   </h4>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    Reaktionszeit P1 &lt; 2 Stunden. Netzübergabepunkt Hetzner Deutschland.
+                    Reaktionszeit P1 6–12 Stunden. Netzübergabepunkt ISO 27001 Rechenzentren Deutschland.
                   </span>
                 </div>
 

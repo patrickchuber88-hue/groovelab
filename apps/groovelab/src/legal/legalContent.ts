@@ -70,7 +70,7 @@ export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
         'BGH-feste Hold-Harmless-Freistellungsklauseln ohne unverhältnismäßiges „erstes Anfordern“',
         'Herrenberg-Compliance & Enthaftungsschild gegenüber Sozialversicherungsträgern (§ 7a SGB IV / BSG B 12 R 3/20 R)',
         'Stand-Alone B2B Auftragsverarbeitungsvertrag (Art. 28 DSGVO) inklusive Anlage 1 und Anlage 2 (Art. 32 TOM-Katalog)',
-        'B2B Service Level Agreement (SLA & 99,5 % Verfügbarkeitsgarantie mit klaren Störungsklassen)',
+        'B2B Service Level Agreement (SLA & 99,0 % Verfügbarkeitsgarantie mit klaren Störungsklassen)',
         'Muster-Datenschutzinformation nach Art. 13 DSGVO für Musikschulen zur Schüler- und Eltern-Weitergabe',
         'Institutionelle Kinderschutz-Charta & Grenzachtungs-Kodex gem. § 8a SGB VIII / BKiSchG',
         'Zwingende aktive Opt-In-Checkbox für B2B-AGB und AVV beim Schul-Onboarding',
@@ -547,7 +547,7 @@ Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen D
     isMandatory: false,
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
-      'Verfügbarkeitsgarantie von 99,5 % im jeweiligen Kalendermonat am Übergabepunkt an das öffentliche Internet',
+      'Verfügbarkeitsgarantie von 99,0 % im Kalenderjahr (Jahresmittel, max. 7,3h Ausfall/Monat) am Übergabepunkt an das öffentliche Internet',
       'Strikter Ausschluss der Drittbegünstigung (§ 328 BGB): Gilt ausschließlich im B2B-Verhältnis mit der Schule (0 % Endnutzer-SLA)',
       'Subsidiaritäts- & Redundanzdoktrin (§ 254 BGB): Kein Ersatz von Dozentenhonoraren oder Unterrichtsausfällen',
       'Geplante Wartungsfenster (täglich 02:00–05:00 Uhr MEZ mit 48h Vorankündigung) & unaufschiebbare Notfall-Sicherheits-Patches',
@@ -562,9 +562,9 @@ Der Auftragnehmer stellt dem Auftraggeber sowie den zuständigen behördlichen D
 (3) **Subsidiaritäts- & Redundanzdoktrin:** Campus-Groovelab ist ein didaktisches Add-On. Der primäre Unterrichtsbetrieb der Musikschule sowie das Bereithalten von Unterrichtsräumen und Instrumenten sind vom Betrieb der Cloud-Plattform unabhängig. Ein Ausfall des Systems begründet keinen Anspruch auf Erstattung von Lehrkräftehonoraren, Unterrichtsausfallentschädigungen oder Schülerkursgebühren (§ 254 BGB).
 
 ### 2. Verfügbarkeitszusage & Messmethode
-(1) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Plattform am Übergabepunkt der Server- und Datenbankinfrastruktur des Rechenzentrums an das öffentliche Internet von mindestens **99,5 % im jeweiligen Kalendermonat**.
-(2) **Berechnungsformel:** Die Verfügbarkeitsquote berechnet sich nach folgender Formel auf Basis von 24 Stunden an allen Tagen des Kalendermonats:
-$$\\text{Verfügbarkeit} = \\frac{\\text{Gesamtzeit im Monat} - \\text{Wartungszeiten} - \\text{Nicht-ausgeschlossene Ausfallzeit}}{\\text{Gesamtzeit im Monat} - \\text{Wartungszeiten}} \\times 100\\,\\%$$
+(1) Der Betreiber gewährleistet eine Verfügbarkeit der Cloud-Plattform am Übergabepunkt der Server- und Datenbankinfrastruktur des Rechenzentrums an das öffentliche Internet von mindestens **99,0 % im Kalenderjahr (Jahresmittel)** (entsprechend einer zulässigen Gesamtausfallzeit von maximal 87,6 Stunden pro Kalenderjahr bzw. durchschnittlich 7,3 Stunden je Kalendermonat).
+(2) **Berechnungsformel:** Die Verfügbarkeitsquote berechnet sich nach folgender Formel auf Basis von 24 Stunden an allen Tagen des Kalenderjahres (bzw. des jeweiligen Abrechnungsmonats):
+$$\\text{Verfügbarkeit} = \\frac{\\text{Gesamtzeit} - \\text{Wartungszeiten} - \\text{Nicht-ausgeschlossene Ausfallzeit}}{\\text{Gesamtzeit} - \\text{Wartungszeiten}} \\times 100\\,\\%$$
 (3) Die Plattform gilt als verfügbar, wenn autorisierte Nutzer auf die Kernfunktionen (Authentifizierung, Datenbank-RPCs und Hauptnavigation) über das Internet zugreifen können. Reine Latenzerhöhungen im Millisekundenbereich stellen keine Nichtverfügbarkeit dar.
 
 ### 3. Wartungsfenster & Notfall-Sicherheits-Patches
@@ -573,34 +573,34 @@ $$\\text{Verfügbarkeit} = \\frac{\\text{Gesamtzeit im Monat} - \\text{Wartungsz
 (3) Zeiten ordnungsgemäßer planmäßiger oder unaufschiebbarer Notfall-Wartungsfenster gelten nicht als Ausfallzeiten und bleiben bei der Berechnung der Verfügbarkeitsquote unberücksichtigt.
 
 ### 4. Störungsklassen & Support-Reaktionszeiten
-Meldungen über technische Beeinträchtigungen werden während der regulären Service- und Supportzeiten (Mo: 08:00–10:00 Uhr, Do: 08:30–11:00 Uhr, Fr: 08:30–11:00 Uhr MEZ sowie für asynchrone elektronische Tickets an Werktagen Mo–Fr) nach folgendem Schema priorisiert:
+(1) Der Support wird inhabergeführt erbracht. Zur Gewährleistung eines verlässlichen Betriebs erfolgen Analysen und Fehlerbehebungen außerhalb der Unterrichtszeiten an Werktagen (Mo–Fr) vorrangig in den Vormittags- und Abendstunden. Störungsmeldungen werden nach folgendem Schema priorisiert:
 
 • **Priorität 1 (Kritisch – Gesamtausfall):** Kernsysteme (Login, Datenbank) sind für alle oder die Mehrheit der Nutzer unbenutzbar.  
-  ➔ *Ziel-Reaktionszeit (Beginn der Entstörung):* **< 2 Stunden** (außerhalb der Supportzeit max. 4 Stunden).  
-  ➔ *Angestrebter Workaround / Wiederherstellung:* **< 8 Stunden**.
+  ➔ *Ziel-Reaktionszeit (Beginn der Entstörung):* **6 bis 12 Stunden** (werktags; außerhalb der Supportzeit bis zum nächsten Werktag 09:00 Uhr).  
+  ➔ *Angestrebter Workaround / Wiederherstellung:* **< 24 Stunden**.
 
 • **Priorität 2 (Hoch – Wesentliche Teilsysteme beeinträchtigt):** Wichtige Module (z. B. Stundenplaner, Audio-Engine oder Raumverwaltung) weisen erhebliche Störungen auf; Basisbetrieb bleibt möglich.  
-  ➔ *Ziel-Reaktionszeit:* **< 4 Stunden**.  
-  ➔ *Angestrebte Fehlerbehebung:* **< 24 Stunden**.
+  ➔ *Ziel-Reaktionszeit:* **< 12 Stunden**.  
+  ➔ *Angestrebte Fehlerbehebung:* **< 48 Stunden**.
 
 • **Priorität 3 (Mittel – Isolierte Komfortfunktionen):** Einzelne didaktische Komfortfunktionen (z. B. Gamification-XP, Avatar-Upload, Sticker-Animationen) sind gestört; Unterrichts- und Verwaltungsbetrieb gesichert.  
-  ➔ *Ziel-Reaktionszeit:* **< 8 Stunden**.  
+  ➔ *Ziel-Reaktionszeit:* **< 24 Stunden**.  
   ➔ *Behebung:* Im regulären Releasezyklus.
 
 • **Priorität 4 (Niedrig – Allgemeine Anfragen):** Allgemeine Support-, Bedien- oder Konfigurationsfragen.  
-  ➔ *Ziel-Reaktionszeit:* **< 24 Stunden**.
+  ➔ *Ziel-Reaktionszeit:* **< 48 Stunden**.
 
 *(Hinweis: Bei den angegebenen Reaktions- und Behebungszeiten handelt es sich um qualifizierte Serviceziele [Best-Effort], nicht um verschuldensunabhängige Fristgarantien.)*
 
 ### 5. Kompensation: Das beitragsfreie Gratismonate-Modell
-(1) Unterschreitet der Betreiber die garantierte Mindestverfügbarkeit von 99,5 % in einem Kalendermonat aus von ihm zu vertretenden Gründen, erhält der Kunde als pauschalierte Entschädigung und Minderung beitragsfreie Verlängerungsmonate (**„Gratismonate“**) auf die monatliche Hosting-Basispauschale:
+(1) Unterschreitet der Betreiber die garantierte Mindestverfügbarkeit von 99,0 % in einem Kalendermonat aus von ihm zu vertretenden Gründen, erhält der Kunde als pauschalierte Entschädigung und Minderung beitragsfreie Verlängerungsmonate (**„Gratismonate“**) auf die monatliche Hosting-Basispauschale:
 
 | Monatliche Verfügbarkeit | Reale Ausfallzeit im Monat | Kompensation (Beitragsfreie Freimonate) |
 |:---|:---|:---|
-| **99,00 % bis 99,49 %** | mehr als 3,6 Stunden Ausfall | **1 Gratismonat** (folgender Monat 100 % beitragsfrei) |
-| **98,00 % bis 98,99 %** | mehr als 7,2 Stunden Ausfall | **2 Gratismonate** (die nächsten 2 Monate beitragsfrei) |
-| **95,00 % bis 97,99 %** | mehr als 14,4 Stunden Ausfall | **3 Gratismonate** (ein volles Folgequartal beitragsfrei) |
-| **Unter 95,00 %** | mehr als 36,0 Stunden Ausfall | **6 Gratismonate** (ein volles Folgehalbjahr beitragsfrei) |
+| **98,00 % bis 98,99 %** | mehr als 7,2 Stunden Ausfall | **1 Gratismonat** (folgender Monat 100 % beitragsfrei) |
+| **95,00 % bis 97,99 %** | mehr als 14,4 Stunden Ausfall | **2 Gratismonate** (die nächsten 2 Monate beitragsfrei) |
+| **90,00 % bis 94,99 %** | mehr als 36,0 Stunden Ausfall | **3 Gratismonate** (ein volles Folgequartal beitragsfrei) |
+| **Unter 90,00 %** | mehr als 72,0 Stunden Ausfall | **6 Gratismonate** (ein volles Folgehalbjahr beitragsfrei) |
 
 (2) **Strikte Bemessungsgrundlage:** Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 19,90 € / CHF 25.90, GrooveLab 12,90 € / CHF 16.80 bzw. Kombi 24,90 € / CHF 32.50; Bestandsschutz für Altverträge: 14,90 € / 9,90 € / 19,90 € bzw. CHF 19.90 / 14.90 / 29.90). Schüleraktivierungsgebühren, Pädagogen- & Administrationspauschalen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.
 (3) **Erfüllung & Anrechnung:** Bei monatlicher Zahlweise wird die Hosting-Basispauschale für die Folgemonate auf 0,00 € gesetzt. Bei jährlicher Vorauszahlung (mit Rabatt) werden die Gratismonate beitragsfrei an das vereinbarte Ende der bezahlten Schuljahresperiode angehängt, sodass sich der nächste Rechnungsstichtag entsprechend nach hinten verschiebt.
