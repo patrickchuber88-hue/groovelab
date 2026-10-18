@@ -1,16 +1,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../../../lib/supabase';
-import { processPureRawBlob, processStudioMastering, audioBufferToWavBlob, ensureCenteredStereoAudioBuffer, alignAudioBufferToGrid } from '../../../../utils/audioMasteringEngine';
+import { 
+  processPureRawBlob, 
+  processStudioMastering, 
+  processPureRawAudioBuffer,
+  processStudioMasteringAudioBuffer,
+  audioBufferToWavBlob, 
+  ensureCenteredStereoAudioBuffer, 
+  alignAudioBufferToGrid,
+  TARGET_PURE_RAW_LUFS,
+  TARGET_PEAK_DBTP,
+  MAX_PURE_RAW_LIMITER_GR_DB
+} from '../../../../utils/audioMasteringEngine';
 import { storeBlob, deleteBlob } from '../../../../utils/blobStorage';
 import { validateMediaBlob } from '../../../../utils/mediaSecurityValidator';
 import { fixWebmDuration } from '../../../../utils/webmDurationPatcher';
 import { buildCanonicalAudioStoragePath, getSecureAudioUrl } from '../../../../utils/audioStorageHelper';
-import { acquireAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../../../services/audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../../../services/audioPermissionService';
 import { playCountInBeep } from '../MeisterwerkAudioPlayers';
 import { SharedAudioEngine } from '../../../../utils/sharedAudioEngine';
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle } from '../../../../utils/audioNamingHelper';
 import { UniversalLatencyEngine } from '../../../../utils/universalLatencyEngine';
-import { STUDIO_RECORDING_TAIL_DECAY_MS, applyBufferTailFadeOut } from '../../../../utils/audioTailEngine';
+import { 
+  STUDIO_RECORDING_TAIL_DECAY_MS, 
+  applyBufferTailFadeOut,
+  applyBufferHeadFadeIn,
+  applyBufferZeroPopEnvelopes
+} from '../../../../utils/audioTailEngine';
 import { getSimulatedNow } from '../../studentDateUtils';
 import { Student } from '../../meisterwerk.types';
 
@@ -258,6 +274,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
     try {
       const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
       if (!stream) return null;
+      await stabilizeAudioStream(stream, 300);
 
       const songId = typeof overrideSongId === 'string' ? overrideSongId : selectedActiveSongId;
       setActiveRecordingSongId(songId || null);
@@ -369,13 +386,28 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
             if (latencyCompensationSec > 0) {
               capturedBuffer = alignAudioBufferToGrid(capturedBuffer, latencyCompensationSec, audioCtx);
             }
-            // 🪄 0,1% DAW Goldstandard: Cos² Soft-Release Fade-Out (35ms) am Puffer-Ende gegen Klicks & Kanten-Cuts
-            applyBufferTailFadeOut(capturedBuffer, 0.035);
-            dspDuration = capturedBuffer.duration;
-            processedBlob = audioBufferToWavBlob(capturedBuffer, {
-              title: overrideLabel || audioLabelRef.current || 'Aufnahme',
-              artist: isTeacherModeRef.current ? 'Lehrkraft' : (student?.name || 'Schüler')
-            });
+            // 🪄 0,1% DAW Goldstandard: Zero-Pop Envelopes (5ms Head Fade-In + 35ms Cos² Tail Soft-Release)
+            applyBufferZeroPopEnvelopes(capturedBuffer, 0.005, 0.035);
+
+            if (isMasterworkSong) {
+              const masterRes = await processStudioMasteringAudioBuffer(capturedBuffer);
+              processedBlob = masterRes.masteredBlob;
+              dspDuration = masterRes.durationSec || capturedBuffer.duration;
+            } else {
+              processPureRawAudioBuffer(capturedBuffer, {
+                targetLufs: TARGET_PURE_RAW_LUFS,
+                targetPeakDb: TARGET_PEAK_DBTP,
+                maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+                padActive: isRecordingPadActiveRef.current
+              });
+              // Nach Normalisierung erneut klickfreien Nulldurchgang an den Schnittgrenzen sichern
+              applyBufferZeroPopEnvelopes(capturedBuffer, 0.003, 0.035);
+              dspDuration = capturedBuffer.duration;
+              processedBlob = audioBufferToWavBlob(capturedBuffer, {
+                title: overrideLabel || audioLabelRef.current || 'Aufnahme',
+                artist: isTeacherModeRef.current ? 'Lehrkraft' : (student?.name || 'Schüler')
+              });
+            }
           } catch (pcmWavErr) {
             console.warn('[useMeisterwerkAudioRecording] PCM WAV export error:', pcmWavErr);
           }

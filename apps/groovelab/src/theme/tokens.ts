@@ -45,30 +45,30 @@ export const DESIGN_TOKENS = {
     adminGlow: 'none'
   },
 
-  // 🌈 Module Primary & Surface Colors
+  // 🌈 Module Primary & Surface Colors (Apple 2-Farben-Standard: border: 'transparent' bei getönten Flächen)
   colors: {
     campus: {
       primary: '#34a853',
       primaryDark: '#15803d',
-      surface: '#e6f4ea',
+      surface: 'rgba(52, 168, 83, 0.10)',
       surfaceLight: '#f0fdf4',
-      border: '#bbf7d0',
+      border: 'transparent',
       text: '#166534'
     },
     groovelab: {
       primary: '#eab308',
       primaryDark: '#ca8a04',
-      surface: '#fefce8',
+      surface: 'rgba(234, 179, 8, 0.12)',
       surfaceLight: '#fffbeb',
-      border: '#fde047',
+      border: 'transparent',
       text: '#854d0e'
     },
     admin: {
       primary: '#ea4335',
       primaryDark: '#dc2626',
-      surface: '#fce8e6',
+      surface: 'rgba(234, 67, 53, 0.10)',
       surfaceLight: '#fef2f2',
-      border: '#fecaca',
+      border: 'transparent',
       text: '#991b1b'
     },
     neutral: {

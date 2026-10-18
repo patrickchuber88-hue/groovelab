@@ -1,96 +1,101 @@
-# Implementierungsplan: Forensische 360° Reparatur aller kaputten Tabellen & Schema-Cache-Alignment [0,1% Goldstandard]
+# Implementation Plan: 0,1% Kanonische Numerische Campus-ID Governance (Ablösung Buchstaben-Standard)
 
-## 1. Executive Summary & Forensischer Befund (360° Root Cause Analysis)
+## 1. Forensische Ursachenanalyse (Forensic Analysis)
 
-Beim Anlegen einer neuen Musikschule im Master-Admin-Leitstand (*„Neue Musikschule einbinden“*) bricht der Vorgang mit einer modalen Fehlermeldung ab (siehe Screenshot):
-```
-Fehler beim Anlegen der Musikschule: Could not find the 'invite_expires_at' column of 'schools' in the schema cache
-```
+### 1.1 Ausgangslage & Befund
+* **Problemstellung:** Auf dem gedruckten und digitalen Schulausweis ([`IDBadgeCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/IDBadgeCard.tsx#L441), siehe User-Screenshot Linus K.) wird unter dem QR-Code aktuell noch die ID mit Buchstaben für Schüler angezeigt:
+  > **Aktuell:** `ID: 001-S-0001`
+* **Login-Zustand:** Im Login-Screen ([`CampusIdPinAuthCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/auth/CampusIdPinAuthCard.tsx)) wurde die Rolle bereits auf ein reines Ziffernschema umgestellt (Rollen-Pills: `1` = Schüler, `2` = Lehrkraft, `3` = Schulleitung / Verwaltung). Das Tastenfeld verfügt ausschließlich über Ziffern `0`–`9` (ohne Buchstaben).
+* **Bruch in der User Experience:** Ein Schüler/Kind sieht auf seinem physischen oder digitalen Ausweis den Buchstaben `S` (`001-S-0001`), kann diesen Buchstaben auf dem Numpad des iPads oder Kiosk-Terminals jedoch gar nicht eintippen. Das Kind tippt logischerweise seine Rollen-Ziffer `1-0001` (oder `001-1-0001`).
 
-Eine lückenlose, forensische 360°-Analyse der Live-PostgreSQL-Datenbank (`deployuser@85.215.73.216`), des PostgREST-Schema-Caches und aller Frontend-Workspaces (`apps/` und `packages/`) brachte die tieferliegende Ursache sowie **weitere defekte und fehlende Tabellen** ans Licht:
-
-### 🔴 Der fundamentale Auslöser (Root Cause)
-1. **Migrations-Ledger-Diskrepanz:**
-   In `scripts/apply_pending_migrations.sh` (Zeilen 48–65) wurden am 10. Oktober 2026 alle Migrationen von 1 bis 539 pauschal als `baseline` in `private_auth.schema_migrations_ledger` registriert. Zahlreiche Migrationen wurden jedoch auf der Live-Datenbank **tatsächlich nie ausgeführt**, weil sie zuvor an Fehlern abbrachen (z. B. Fremdschlüssel auf den View `users` statt die Basistabelle `users_raw`, Typeninkompatibilitäten `BIGINT = UUID` oder fehlendes `DROP FUNCTION ... CASCADE` bei Änderung des Return-Types).
-2. **PostgREST-Schema-Cache-Drift auf `public.schools`:**
-   Beim Aufruf von `supabase.from('schools').insert(schoolPayload)` sendet `ProvisionSchoolModal.tsx` die Felder `invite_expires_at`, `invite_token`, `operator_notes`, `phone`, `trial_until` und `is_approved`. Da Migration 352 wegen eines Return-Type-Konflikts in `get_master_schools_overview()` abbrach, existierten diese Spalten nicht in `public.schools`. PostgREST verweigerte den Insert und brach ab.
-3. **Weitere 22 nicht-funktionale oder fehlende Tabellen/Views im Gesamtsystem:**
-   Durch die unvollständige historische Migration fehlen essentielle Tabellen für Master-Admin-Tabs, Didaktik und Crisis-Management bzw. führen zu stillen Fehlern oder leeren Ansichten:
-   - `platform_feedback` (Master Admin Feedback-Tab `FeedbackTab.tsx` / `FeedbackHubModal.tsx` leer)
-   - `global_broadcasts` (Master Admin Executive-Tab Wartungsmodus schlägt fehl)
-   - `band_rehearsals` (GrooveLab Band-Profil Probenplanung wirft Fehler)
-   - `lesson_makeup_tokens` (Krisenmanagement & Lehrkraft-Schülerdetail wirft Fehler)
-   - `student_ranking_profiles`, `student_nickname_history`, `student_groove_scores`, `student_ear_scores` (Campus Gamification & Leaderboards werfen Fehler wegen `bigint = uuid` Operator-Konflikt)
-   - `teacher_sandbox_entries` (Lehrer-Studio Sandkasten scheitert an View-Referenz `users`)
-   - `student_worldtour_progress` (Didaktische Weltreise scheitert an View-Referenz `users`)
-   - `audio_milestones` & `audio_recordings` (Audio-Biografie scheitert an `tenant_id bigint` Typenkonflikt)
-   - Kompatibilitäts-Drift: Aufrufe auf `pending_students`, `presence_sessions`, `user_skills`, `student_teachers`, `student_notes`, `shouts` scheitern, da der Code Legacy-Tabellennamen abfragt, während die DB modifizierte Bezeichnungen (`sessions`, `user_song_skills`, `user_notes`, `pending_students_decrypted`) führt.
-
----
-
-## 2. Detaillierte Schadens- & Reparatur-Matrix (360° Inventur)
-
-| Betroffene Tabelle / View | Bounded Context | Ursache des Defekts | Konkrete Auswirkung | Geplante 0,1% Goldstandard-Reparatur |
-| :--- | :--- | :--- | :--- | :--- |
-| `public.schools` | Master Admin | Migration 352 & 575 nicht angewendet | **Schulanlage bricht ab** (`invite_expires_at` missing); Mahnstufen & Notizen fehlen | Spalten `operator_notes`, `invite_token`, `invite_expires_at`, `phone`, `trial_until`, `is_approved`, `dunning_level`, `dunning_moratorium_until`, `dunning_kulanz_reason`, `dunning_last_letter_at`, `dunning_paused` anlegen + Indizes |
-| `public.platform_feedback` | Master Admin & Campus | Migration 284 scheiterte an `REFERENCES users(id)` (View!) | Feedback-Tab im Master-Admin zeigt 0 Items / Insert scheitert | Tabelle mit ENUMs (`feedback_type`, `feedback_status`, `hero_opt_in_type`), Foreign Key auf `users_raw(id)` und RLS erstellen |
-| `public.global_broadcasts` | Master Admin | Tabelle im Frontend referenziert, DDL fehlte | Umschalten des Plattform-Wartungsmodus scheitert im ExecutiveTab | Tabelle `global_broadcasts` mit Status, Severity, Type, RLS und Master-Admin-Mutation anlegen |
-| `public.band_rehearsals` | GrooveLab | Tabelle im Frontend referenziert, DDL fehlte | Feste Probenzeiten in Bands können nicht geladen/gespeichert werden | Tabelle `band_rehearsals` mit `band_id`, `school_id`, `day`, `time`, RLS anlegen |
-| `public.lesson_makeup_tokens` | Campus / Secretary | Migration 407 scheiterte an `REFERENCES users(id)` | Nachhol-Token im Sekretariats-Krisenboard werfen Fehler | Tabelle `lesson_makeup_tokens` mit Foreign Key auf `users_raw(id)` und RLS erstellen |
-| `public.student_ranking_profiles` & `student_nickname_history` | Campus Leaderboard | Migration 398 definierte `school_id BIGINT` statt `UUID` | RLS-Operator-Fehler `operator does not exist: bigint = uuid` | Tabelle mit `school_id UUID REFERENCES schools(id)`, Nickname-Validierung und RLS anlegen |
-| `public.student_groove_scores` | GrooveLab Trainer | Migration 400 definierte `school_id BIGINT` statt `UUID` | Scores im GrooveTrainer werden nicht persistiert | Tabelle mit `school_id UUID`, Song-Bezug, Accuracy, Streak und RLS anlegen |
-| `public.student_ear_scores` | Campus EarLab | Migration 506 definierte `school_id BIGINT` statt `UUID` | Gehörbildungs-Highscores werden nicht gespeichert | Tabelle mit `school_id UUID`, Reaction-Time, Accuracy und RLS anlegen |
-| `public.teacher_sandbox_entries` | Campus Lehrkraft | Migration 412 scheiterte an `REFERENCES users(id)` | Lehrer-Sandkasten für Unterrichtsmodule wirft Fehler | Tabelle mit `teacher_id UUID REFERENCES users_raw(id)` und RLS anlegen |
-| `public.student_worldtour_progress` | Campus Gamification | Migration 467 scheiterte an `REFERENCES users(id)` | Weltreise-Sterne und XP werden nicht gespeichert | Tabelle mit `user_id UUID REFERENCES users_raw(id)`, UNIQUE Constraint und RLS anlegen |
-| `public.audio_recordings` & `audio_milestones` | Campus Audio | Migration 273 definierte `tenant_id BIGINT` statt `UUID` | Audio-Aufnahmen & Meilensteine können nicht zugeordnet werden | Tabellen mit `school_id UUID REFERENCES schools(id)`, Storage-Path und RLS anlegen |
-| `public.school_year_playlists` | Campus Audio | Migration 273 definierte `tenant_id BIGINT` | Schuljahres-Playlists fehlen | Tabelle mit `school_id UUID` und RLS anlegen |
-| `public.users_raw` & `public.students` | Core Auth & Profile | Spalten aus Migration 382 & 383 fehlten in DB | PWA-Push, Onboarding-Consent und Skill-Radar unvollständig | Spalten `campus_usage_mode`, `consent_version`, `parent_name`, `parental_consent_given_at`, `parent_pin_hash`, `personal_pin_hash`, `skill_radar_levels`, `timetable_source` anlegen |
-| `public.pending_students` | Legacy / Roster | Frontend fragt an 5 Stellen `pending_students` ab | Ungültige Tabellenabfrage | Kompatibilitäts-View `pending_students` auf `pending_students_decrypted` anlegen |
-| `public.presence_sessions` | Admin Roster Detail | Frontend fragt `presence_sessions` ab | Export und Session-Liste in Modal leer | Kompatibilitäts-View `presence_sessions` auf `public.sessions` anlegen |
-| `public.user_skills` | Lehrkraft Detail | Frontend fragt `user_skills` ab | Skill-Radar in TeacherStudentDetailModal leer | Kompatibilitäts-View `user_skills` auf `public.user_song_skills` anlegen |
-| `public.student_teachers` | Avatar Relational | Frontend sucht `student_teachers` Junction | Fach-Ermittlung im Avatar schlägt auf Fallback zurück | Kompatibilitäts-View `student_teachers` auf `public.schedules` anlegen |
-| `public.student_notes` | DSGVO Takeout | DSGVO-Export fragt `student_notes` ab | Fehlermeldung bei Datenexport | Kompatibilitäts-View `student_notes` auf `public.user_notes` anlegen |
-| `public.shouts` | GrooveLab Shoutbox | Schul-Löschung bereinigt `shouts` | Warnung im Delete-Log | Kompatibilitäts-View `shouts` auf `public.band_shoutbox` (mit `school_id` via JOIN) anlegen |
-| `public.school_billing_accounts` | Billing Cleanup | Löschroutine bereinigt Restbestände | Warnung im Delete-Log | Basistabelle `school_billing_accounts` mit `school_id UUID` anlegen |
-| RPC `get_master_schools_overview` | Master Admin | Return Type Konflikt zwischen `JSONB` und `TABLE` | Schulleitstand & Billing-Dashboard können nicht konsistent laden | Funktion mit `DROP FUNCTION ... CASCADE` säubern und als JSONB-fähigen autoritativen SSOT-RPC neu installieren |
-| PostgREST Schema-Cache | API Gateway | Cache veraltet, neue Spalten nicht bekannt | PostgREST wirft `Could not find column ... in schema cache` | Transaktionales `NOTIFY pgrst, 'reload schema'` nach Migration |
+### 1.2 Forensische Codebase-Traversierung (Single Source of Truth)
+Alle Campus-IDs im gesamten System stammen aus einem einzigen zentralen Modul:
+1. **[`apps/groovelab/src/utils/campusIdHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/utils/campusIdHelper.ts):**
+   * `CampusRoleCode` ist als `'V' | 'L' | 'S'` typisiert.
+   * `getCampusRoleCode()` liefert für Schüler `'S'`, für Lehrer `'L'`, für Verwaltung `'V'`.
+   * `formatCanonicalCampusId()` baut `${sNum}-${rCode}-${paddedSeq}` (z. B. `001-S-0001`).
+   * `isCanonicalCampusId()` prüft `/^\d{3}-[VLS]-\d{4}$/i`.
+   * `resolveUserCampusId(user)` gibt bei Vorhandensein von `user.ausweis_nummer` (`'001-S-0001'`) den Wert direkt zurück, ohne ihn in das Ziffernschema zu normalisieren.
+2. **[`apps/groovelab/src/components/IDBadgeCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/IDBadgeCard.tsx):**
+   * Zeile 195: `const canonicalCampusId = resolveUserCampusId(user);`
+   * Zeile 441: Rendert `ID: {canonicalCampusId}`.
+3. **Verbundene Screens (100% Symmetrie über `resolveUserCampusId`):**
+   * [`StudentModalHeader.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/detail/shared/StudentModalHeader.tsx#L296) (Karteikarte & Copy-Button)
+   * [`StudentProfileTab.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/StudentProfileTab.tsx#L231) (Schülerprofil & Copy-Button)
+   * [`AdminTeachersView.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/admin/AdminTeachersView.tsx#L232) & [`SecretaryEmployeesView.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/secretary/SecretaryEmployeesView.tsx#L515)
+   * [`CampusSidebarUserHub.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/layout/CampusSidebarUserHub.tsx#L58)
+   * [`AdminIDGalleryView.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/admin/AdminIDGalleryView.tsx) (Sammelausweisdruck)
+   * [`QRCodeModal.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/QRCodeModal.tsx#L423) (Ausweis-Modal & JPEG-Export)
+4. **Login-Kopplung ([`CampusIdPinAuthCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/auth/CampusIdPinAuthCard.tsx)):**
+   * `resolveAusweisIdentity()` übersetzte Eingaben wie `1-0001` bisher intern heimlich zurück in `canonicalId: 001-S-0001`, um die alte Datenbankspalte zu matchen, während `supportId: 001-1-0001` hieß.
+   * Wenn wir die kanonische ID auf `001-1-0001` umstellen, muss sowohl das Frontend als auch der Auth-RPC symmetrisch funktionieren.
+5. **Datenbank & RPCs ([`authenticate_by_credential`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/supabase/migrations/571_enterprise_legal_and_b2c_contract_goldstandard.sql#L1289)):**
+   * Migration 574 vergibt in `assign_canonical_ausweis_nummer()` bisher `'S'`, `'L'`, `'V'`.
+   * Wir benötigen Migration 585 zur Backfill-Harmonisierung (`-S-` -> `-1-`, `-L-` -> `-2-`, `-V-` -> `-3-`) und Dual-Format-Toleranz im RPC, damit Altsysteme, gedruckte Altkarten und neue Ziffernkarten zu 100% kollisionsfrei und ohne Ausfallzeit koexistieren.
 
 ---
 
-## 3. Die 4-Phasen-Architektur der Reparatur
+## 2. Geplante Architektur & Lösungsansatz
 
-### Phase 1: Vorbereitung & Transaktionsprüfung (Abgeschlossen)
-- Vollständiger Dry-Run aller SQL-DDL-Befehle via SSH in einer isolierten PostgreSQL-Transaktion (`BEGIN; ... ROLLBACK;`).
-- Verifikation, dass alle Syntaxfehler, Foreign-Key-Kollisionen und Typenkonflikte restlos beseitigt sind (0 Fehler, 0 Warnungen).
+### Säule 1: Zentraler Helper [`apps/groovelab/src/utils/campusIdHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/utils/campusIdHelper.ts)
+* **Erweiterung von `CampusRoleCode`:**
+  `export type CampusRoleCode = '1' | '2' | '3' | 'S' | 'L' | 'V';`
+* **`getCampusRoleCode()` liefert autoritativ numerische Rollen:**
+  * Schüler: `'1'` (Standard)
+  * Lehrkraft: `'2'`
+  * Verwaltung / Admin / Sekretariat: `'3'`
+* **`formatCanonicalCampusId()`:**
+  * Mappt Rollen-Eingaben automatisch auf Ziffern (`'S'`|`'1'` -> `'1'`, `'L'`|`'2'` -> `'2'`, `'V'`|`'3'` -> `'3'`).
+  * Garantiert feste 10 Zeichen: `{Schule_3Stellen}-{Rolle_1Stelle}-{Sequenz_4Stellen}` (z. B. `001-1-0001`).
+* **`isCanonicalCampusId()`:**
+  * Erkennt sowohl neue Ziffern-IDs (`001-1-0001`) als auch Alt-IDs (`001-S-0001`): `/^\d{3}-([123VLS])-\d{4}$/i`.
+* **`resolveUserCampusId(user)` (Normalisierungs-Garantie):**
+  * Erkennt bestehende Ausweisnummern mit Buchstaben (`001-S-XXXX`, `001-L-XXXX`, `001-V-XXXX`) und normalisiert diese **sofort und deterministisch** auf die kanonische Ziffernform:
+    * `001-S-0001` -> `001-1-0001`
+    * `001-L-0001` -> `001-2-0001`
+    * `001-V-0001` -> `001-3-0001`
+  * Default-Fallback bei `!user`: `'001-1-0001'`.
 
-### Phase 2: Autoritativer Migrations-Container (Geplant nach Freigabe)
-- Erstellung der konsolidierten, 100% idempotenten Reparatur-Migration:
-  `supabase/migrations/576_enterprise_repair_all_broken_tables_goldstandard.sql`
-- Sichere Hinterlegung aller 10 DDL-Blöcke (Schools, Users/Students, Feedback, Broadcasts, Rehearsals, Makeup-Tokens, Leaderboards, Worldtour, Audio, Kompatibilitäts-Views).
-- Integration von `DROP FUNCTION IF EXISTS public.get_master_schools_overview() CASCADE;` und anschließender Neuanlage des RPCs.
+### Säule 2: Login-Resilienz [`apps/groovelab/src/components/auth/CampusIdPinAuthCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/auth/CampusIdPinAuthCard.tsx)
+* `resolveAusweisIdentity()`:
+  * Gibt als `canonicalId` primär die neue Ziffern-ID aus (`001-1-0042`, `001-2-0003`, `001-3-0001`).
+  * Stellt gleichzeitig `legacyId` (`001-S-0042`) bereit.
+* In `handleSubmit()`:
+  * Führt primär den Login mit der kanonischen Ziffern-ID aus.
+  * Schlägt dieser fehl (z. B. wenn die lokale oder Remote-DB noch nicht migriert ist), greift automatisch ein geräuschloser Fallback auf die `legacyId` (`-S-`).
+  * **Ergebnis:** Null Login-Ausfälle, unabhängig vom Migrationsstand der jeweiligen Datenbank.
 
-### Phase 3: Rollout auf IONOS Live-Cluster (`85.215.73.216`)
-- Ausführung der ausstehenden Migrationen (572, 573, 575, 576) via `scripts/apply_pending_migrations.sh`.
-- Atomarer PostgREST Schema-Cache Reload (`NOTIFY pgrst, 'reload schema'`).
-- Validierung der Integritäts-Matrix (alle 22 Tabellen/Views `EXISTS = true`).
+### Säule 3: UI-Konsistenz in Modals & Badges
+* [`IDBadgeCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/IDBadgeCard.tsx): Zeigt sofort `ID: 001-1-0001` an (Linus K. und alle weiteren Schüler).
+* [`StudentModalHeader.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/detail/shared/StudentModalHeader.tsx) & [`StudentProfileTab.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/StudentProfileTab.tsx): Aktualisierung der Aria-Labels und Inline-Kommentare auf `{Schul-ID}-1-{Nummer}`.
+* [`legalContent.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/legal/legalContent.ts#L847): Aktualisierung des Muster-Beispiels im Widerrufsformular von `001-S-0042` auf `001-1-0042`.
 
-### Phase 4: Forensische Verifikation & Smoke Test
-- Verifikation über `python3 scratch/forensic_table_analysis.py`: Bestätigung von **0 fehlenden Tabellen** und **0 fehlenden RPCs**.
-- Simulierte Neuanlage einer Schule (Payload mit `invite_expires_at`, `operator_notes`, `phone` etc.) auf der Live-DB via API.
-- Abruf von Feedback, Wartungsmodus, Probenzeiten und Leaderboards.
+### Säule 4: Datenbank-Migration 585 (`supabase/migrations/585_canonical_numeric_campus_id_governance.sql`)
+* **Trigger-Aktualisierung (`assign_canonical_ausweis_nummer`):**
+  * Schülern wird bei Neuanlage automatisch `v_school_num || '-1-' || lpad(v_next_seq, 4, '0')` zugewiesen (Lehrern `'-2-'`, Verwaltung `'-3-'`).
+* **Backfill-Update:**
+  * Atomare Migration aller Bestandsdatensätze in `users_raw.ausweis_nummer` von `-S-` auf `-1-`, `-L-` auf `-2-`, `-V-` auf `-3-`.
+* **RPC-Härtung (`authenticate_by_credential`):**
+  * Bidirektionale Äquivalenz: Der RPC prüft sowohl auf `v_clean` als auch auf die jeweils andere Repräsentation (`-1-` <-> `-S-`).
 
 ---
 
-## 4. Anti-Regressions-Garantie & Invarianten
-- **100% Idempotent:** Alle Statements nutzen `IF NOT EXISTS`, `DROP POLICY IF EXISTS`, `CREATE OR REPLACE VIEW`. Ein erneutes Ausführen ist jederzeit gefahrlos möglich.
-- **Zero Data Loss:** Keine bestehende Tabelle oder Spalte wird gedroppt oder geleert. Bestehende Produktivdaten (Schulen, Benutzer, Rechnungen) bleiben unberührt.
-- **Multi-Tenancy Default-Deny:** Alle neu erstellten Tabellen haben `ENABLE ROW LEVEL SECURITY` mit striktem `school_id = get_current_user_school_id()` bzw. Master-Admin-Check.
+## 3. Detaillierte Implementierungsschritte
+
+1. **Schritt 1:** Anpassung von [`campusIdHelper.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/utils/campusIdHelper.ts) (Rollen-Schema 1/2/3, Normalisierung `001-S-` -> `001-1-`, Typen, Tests).
+2. **Schritt 2:** Anpassung von [`CampusIdPinAuthCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/auth/CampusIdPinAuthCard.tsx) (Kanonische Ziffern-ID Rückgabe + automatischer Fallback-Airbag).
+3. **Schritt 3:** Bereinigung von Text- und Label-Referenzen in [`IDBadgeCard.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/IDBadgeCard.tsx), [`StudentModalHeader.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/detail/shared/StudentModalHeader.tsx), [`StudentProfileTab.tsx`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/student/tabs/StudentProfileTab.tsx) und [`legalContent.ts`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/legal/legalContent.ts).
+4. **Schritt 4:** Erstellung der idempotenten SQL-Migration `supabase/migrations/585_canonical_numeric_campus_id_governance.sql`.
 
 ---
 
-> [!IMPORTANT]
-> ## 🛑 ZWINGENDER STOPP-PUNKT: Strikter Genehmigungsvorbehalt (Zero Auto-Execute)
-> Gemäß den Projektregeln und der Implementierungsplan-Governance hält der KI-Agent nach Vorlage dieses Plans zwingend an (STOP).
-> **Es wurden noch keine Änderungen an der Produktionsdatenbank oder dem Quellcode vorgenommen.**
-> 
-> Bitte geben Sie den Plan frei (z. B. mit *„Genehmigt“*, *„Freigabe erteilt“* oder *„Plan ausführen“*), um mit Phase 3 (Rollout & Reparatur) zu beginnen.
+## 4. Verifikationsplan
+
+* **Frontend-Parität:**
+  * Prüfung, dass `IDBadgeCard` für Linus K. und alle Schüler exakt `ID: 001-1-0001` (bzw. `001-1-XXXX`) rendert.
+  * Prüfung, dass Lehrkräfte `001-2-XXXX` und Schulleitungen `001-3-XXXX` erhalten.
+  * Verifikation des Kopiervorgangs in Schüler-Karteikarte und Profil (kopiert `001-1-XXXX`).
+* **Login-Parität:**
+  * Verifikation, dass die Eingabe von `1-1`, `1-0001`, `001-1-0001` und legacy `001-S-0001` gleichermaßen erfolgreich authentifiziert wird.
+* **Governance-Integrität:**
+  * Ausführung von `npm run gate` ausschließlich bei expliziter Nutzeraufforderung oder beim Codewort `commit`.

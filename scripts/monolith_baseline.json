@@ -4,7 +4,7 @@
   "policy": "0,1% Enterprise Goldstandard Monolith Ceiling & Zero-Inline-Feature Axiom",
   "max_new_file_lines": 1500,
   "max_host_wiring_buffer_lines": 15,
-  "last_updated": "2026-10-17T15:54:45.814Z",
+  "last_updated": "2026-10-18T06:27:14.675Z",
   "total_monoliths_tracked": 80,
   "baselines": {
     "apps/groovelab/src/components/AudioTrackCarousel.tsx": 2254,
@@ -64,7 +64,7 @@
     "apps/groovelab/src/components/student/meisterwerk/DuettDeckModal.tsx": 3614,
     "apps/groovelab/src/components/student/meisterwerk/MeisterwerkAudioPlayers.tsx": 3432,
     "apps/groovelab/src/components/student/meisterwerk/MeisterwerkDocumentTab.tsx": 11218,
-    "apps/groovelab/src/components/student/meisterwerk/MeisterwerkRecordingsTab.tsx": 3995,
+    "apps/groovelab/src/components/student/meisterwerk/MeisterwerkRecordingsTab.tsx": 3886,
     "apps/groovelab/src/components/student/meisterwerk/MeisterwerkStickerAlbumTab.tsx": 3003,
     "apps/groovelab/src/components/student/meisterwerk/components/songArchitecture/SongArchitectureWizardModal.tsx": 1757,
     "apps/groovelab/src/components/student/meisterwerk/hooks/useMeisterwerkHomework.ts": 1798,

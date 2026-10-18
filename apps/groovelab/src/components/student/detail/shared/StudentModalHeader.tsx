@@ -293,7 +293,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
               <Calendar size={14} /> Member seit {memberSince}
             </div>
 
-            {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-S-{Nummer}) */}
+            {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-1-{Nummer}) */}
             <span
               role="button"
               tabIndex={0}

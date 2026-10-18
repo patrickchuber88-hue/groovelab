@@ -9553,14 +9553,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               );
                             }
                             return (
-                              <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#d97706', background: '#fffbe8', border: '1px solid #fde68a', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler hat keine Sperrzeiten, konnte aber wegen voller Tages-Kapazität nicht automatisch eingeteilt werden. Erweitere deine Unterrichtszeiten.">
-                                <AlertCircle size={9} color="#d97706" />
+                              <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#92400e', background: 'rgba(245, 158, 11, 0.12)', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler hat keine Sperrzeiten, konnte aber wegen voller Tages-Kapazität nicht automatisch eingeteilt werden. Erweitere deine Unterrichtszeiten.">
+                                <AlertCircle size={9} color="#92400e" />
                                 <span>Nicht zugeteilt</span>
                               </span>
                             );
                           })()
                         ) : s.hasPreferences ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.12)', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
                             <Star size={9} color="currentColor" />
                             <span>Zeiten da</span>
                           </span>

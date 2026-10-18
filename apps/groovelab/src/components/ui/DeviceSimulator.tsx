@@ -394,6 +394,25 @@ const MobileBrowserBar: React.FC<BrowserBarProps> = ({ currentPath, onRefresh })
   );
 };
 
+/**
+ * 🏛️ 0,1% Goldstandard: Fail-Safe Input Guard
+ * Detects whether the active keyboard focus is within a text input, preventing accidental shortcut triggers.
+ */
+function isInteractiveInputField(target: HTMLElement | null): boolean {
+  if (!target) return false;
+  const tag = target.tagName;
+  const role = target.getAttribute ? target.getAttribute('role') : null;
+  return (
+    tag === 'INPUT' ||
+    tag === 'TEXTAREA' ||
+    tag === 'SELECT' ||
+    Boolean(target.isContentEditable) ||
+    role === 'textbox' ||
+    role === 'combobox' ||
+    role === 'searchbox'
+  );
+}
+
 interface DeviceSimulatorProps {
   children: React.ReactNode;
 }
@@ -411,6 +430,17 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
     if (typeof window === 'undefined' || !isDev) return false;
     return localStorage.getItem('groovelab_dev_simulator_active') === 'true';
   });
+
+  const [hudMessage, setHudMessage] = useState<string | null>(null);
+  const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerHud = useCallback((msg: string) => {
+    if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
+    setHudMessage(msg);
+    hudTimerRef.current = setTimeout(() => {
+      setHudMessage(null);
+    }, 2800);
+  }, []);
 
   const [selectedPresetId, setSelectedPresetId] = useState<string>(() => {
     if (typeof window === 'undefined') return 'iphone16pro';
@@ -641,6 +671,41 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
           }
         } catch {}
       });
+
+      // 7. 🏛️ 0,1% Goldstandard: Cross-Frame Keydown Bridge
+      // Relays shortcuts from inside the guest iframe to the parent host window
+      const guestWin = iframe.contentWindow;
+      const handleGuestKeyDown = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement | null;
+        if (isInteractiveInputField(target)) return;
+
+        const isD = e.code === 'KeyD' || e.key === 'D' || e.key === 'd';
+        const isR = e.code === 'KeyR' || e.key === 'R' || e.key === 'r';
+        const isP = e.code === 'KeyP' || e.key === 'P' || e.key === 'p';
+        const isEsc = e.key === 'Escape';
+
+        if ((e.shiftKey && (isD || isR || isP) && !e.metaKey && !e.ctrlKey && !e.altKey) || isEsc) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: e.key,
+              code: e.code,
+              shiftKey: e.shiftKey,
+              altKey: e.altKey,
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              bubbles: true
+            })
+          );
+        }
+      };
+
+      try {
+        guestWin.removeEventListener('keydown', (guestWin as unknown as { __simBridgeHandler?: (e: KeyboardEvent) => void }).__simBridgeHandler as EventListener, true);
+      } catch {}
+      (guestWin as unknown as { __simBridgeHandler?: (e: KeyboardEvent) => void }).__simBridgeHandler = handleGuestKeyDown;
+      guestWin.addEventListener('keydown', handleGuestKeyDown, true);
     } catch {
       // Graceful fallback if same-origin is delayed during hot-reload
     }
@@ -713,39 +778,52 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
     };
   }, [isDev, isActive, simulationMode, renderEngine, isPwa]);
 
-  // Global Keyboard Shortcuts (Shift + D: Toggle, Shift + P: PWA/Browser, Shift + R: Rotate)
+  // Global Keyboard Shortcuts (Shift + D: Toggle, Shift + P: PWA/Browser, Shift + R: Rotate, Escape: Close)
   useEffect(() => {
     if (!isDev) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      const isContentEditable = (e.target as HTMLElement)?.isContentEditable;
-      const role = (e.target as HTMLElement)?.getAttribute('role');
+      const target = e.target as HTMLElement | null;
+      if (isInteractiveInputField(target)) return;
 
-      // Fail-safe protection: Never intercept shortcuts when typing in inputs or text fields
-      if (
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        tag === 'SELECT' ||
-        isContentEditable ||
-        role === 'textbox'
-      ) {
-        return;
-      }
+      const isD = e.code === 'KeyD' || e.key === 'D' || e.key === 'd';
+      const isR = e.code === 'KeyR' || e.key === 'R' || e.key === 'r';
+      const isP = e.code === 'KeyP' || e.key === 'P' || e.key === 'p';
+      const isEsc = e.key === 'Escape';
 
-      if (e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+      if (e.shiftKey && isD && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        setIsActive(prev => !prev);
-      } else if (e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+        setIsActive(prev => {
+          const next = !prev;
+          if (next) {
+            triggerHud(`📱 Device Simulator: ${currentPreset.shortName} • [Umschalt+D] Schließen • [Umschalt+R] Drehen • [Esc] Exit`);
+          } else {
+            triggerHud('📱 Device Simulator beendet');
+          }
+          return next;
+        });
+      } else if (isActive && isEsc) {
         e.preventDefault();
-        setSimulationMode(prev => (prev === 'pwa' ? 'browser' : 'pwa'));
-      } else if (e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+        setIsActive(false);
+        triggerHud('📱 Device Simulator beendet');
+      } else if (isActive && e.shiftKey && isP && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        setIsRotated(prev => !prev);
+        setSimulationMode(prev => {
+          const next = prev === 'pwa' ? 'browser' : 'pwa';
+          triggerHud(next === 'pwa' ? '⚡ PWA Standalone Modus aktiv' : '🌐 Mobile Browser Modus aktiv');
+          return next;
+        });
+      } else if (isActive && e.shiftKey && isR && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setIsRotated(prev => {
+          const next = !prev;
+          triggerHud(next ? '🔄 Querformat (Landscape)' : '📱 Hochformat (Portrait)');
+          return next;
+        });
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDev]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isDev, isActive, currentPreset.shortName, triggerHud]);
 
   // In production mode, render children transparently with zero overhead
   if (!isDev) {
@@ -799,9 +877,39 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
     }
   };
 
-  // Inactive mode: render children transparently
+  // Inactive mode: render children transparently (with transient HUD if active)
   if (!isActive) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        {hudMessage && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(15, 23, 42, 0.95)',
+              color: '#f8fafc',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              borderRadius: '100px',
+              padding: '8px 18px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.6)',
+              zIndex: 9999999,
+              pointerEvents: 'none',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              letterSpacing: '-0.2px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {hudMessage}
+          </div>
+        )}
+      </>
+    );
   }
 
   const iframeSrc = typeof window !== 'undefined' ? window.location.href : '/';
@@ -1267,6 +1375,7 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                   src={iframeSrc}
                   title="Device Simulator Guest Viewport"
                   onLoad={syncIframeDocument}
+                  allow="microphone; camera; midi; encrypted-media; autoplay; clipboard-read; clipboard-write; display-capture"
                   style={{
                     width: '100%',
                     height: '100%',
@@ -1306,6 +1415,34 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* 🏛️ 0,1% Goldstandard: Transient HUD Toast Notification */}
+        {hudMessage && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(15, 23, 42, 0.95)',
+              color: '#f8fafc',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              borderRadius: '100px',
+              padding: '8px 18px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.6)',
+              zIndex: 9999999,
+              pointerEvents: 'none',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              letterSpacing: '-0.2px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {hudMessage}
           </div>
         )}
       </div>

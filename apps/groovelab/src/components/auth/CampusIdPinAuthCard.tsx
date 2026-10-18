@@ -17,6 +17,7 @@ export interface ResolvedAusweisIdentity {
   displayLabel: string;
   role: 'student' | 'teacher' | 'admin' | 'unknown';
   supportId?: string;
+  legacyId?: string;
 }
 
 /**
@@ -55,10 +56,11 @@ export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = 
         ? `Lehrerausweis #${padded}` 
         : `Verwaltungsausweis #${padded}`;
     return {
-      canonicalId: `${sch}-${letter}-${padded}`,
+      canonicalId: `${sch}-${roleDigit}-${padded}`,
       displayLabel: label,
       role,
-      supportId: `${sch}-${roleDigit}-${padded}`
+      supportId: `${sch}-${roleDigit}-${padded}`,
+      legacyId: `${sch}-${letter}-${padded}`
     };
   }
 
@@ -75,10 +77,11 @@ export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = 
         ? `Lehrerausweis #${padded}` 
         : `Verwaltungsausweis #${padded}`;
     return {
-      canonicalId: `${snum}-${letter}-${padded}`,
+      canonicalId: `${snum}-${roleDigit}-${padded}`,
       displayLabel: label,
       role,
-      supportId: `${snum}-${roleDigit}-${padded}`
+      supportId: `${snum}-${roleDigit}-${padded}`,
+      legacyId: `${snum}-${letter}-${padded}`
     };
   }
 
@@ -95,10 +98,11 @@ export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = 
         ? `Lehrerausweis #${padded}` 
         : `Verwaltungsausweis #${padded}`;
     return {
-      canonicalId: `${sch}-${letter}-${padded}`,
+      canonicalId: `${sch}-${roleDigit}-${padded}`,
       displayLabel: label,
       role,
-      supportId: `${sch}-${roleDigit}-${padded}`
+      supportId: `${sch}-${roleDigit}-${padded}`,
+      legacyId: `${sch}-${letter}-${padded}`
     };
   }
 
@@ -108,10 +112,11 @@ export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = 
     const [, sch, seq] = sevenDigitMatch;
     const padded = seq.padStart(4, '0');
     return {
-      canonicalId: `${sch}-S-${padded}`,
+      canonicalId: `${sch}-1-${padded}`,
       displayLabel: `Schülerausweis #${padded}`,
       role: 'student',
-      supportId: `${sch}-1-${padded}`
+      supportId: `${sch}-1-${padded}`,
+      legacyId: `${sch}-S-${padded}`
     };
   }
 
@@ -120,10 +125,11 @@ export function resolveAusweisIdentity(rawInput: string, schoolNumber: string = 
   if (/^\d{1,4}$/.test(clean)) {
     const padded = clean.padStart(4, '0');
     return {
-      canonicalId: `${snum}-S-${padded}`,
+      canonicalId: `${snum}-1-${padded}`,
       displayLabel: `Schülerausweis #${padded}`,
       role: 'student',
-      supportId: `${snum}-1-${padded}`
+      supportId: `${snum}-1-${padded}`,
+      legacyId: `${snum}-S-${padded}`
     };
   }
 
@@ -272,10 +278,19 @@ export const CampusIdPinAuthCard: React.FC<CampusIdPinAuthCardProps> = ({
   const handleSubmit = async () => {
     if (isSubmitDisabled) return;
     setErrorMessage(null);
-    const finalId = resolveCanonicalAusweisId(inputValue, schoolNumber);
+    const resolved = resolveAusweisIdentity(inputValue, schoolNumber);
+    const finalId = resolved.canonicalId;
     try {
       await onSubmitId(finalId);
     } catch (err: any) {
+      // 🛡️ Fail-Closed Airbag: Wenn die Datenbank noch auf altem Buchstaben-Schema ist,
+      // probiere transparent den Legacy-Identifikator (z.B. 001-S-0001 statt 001-1-0001)
+      if (resolved.legacyId && resolved.legacyId !== finalId) {
+        try {
+          await onSubmitId(resolved.legacyId);
+          return;
+        } catch (_) {}
+      }
       setErrorMessage(err?.message || 'Ausweisnummer nicht gefunden.');
     }
   };

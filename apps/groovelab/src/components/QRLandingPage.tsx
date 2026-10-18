@@ -1232,44 +1232,43 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       }
     }, 1000);
 
-    // Orientation event handler
+    // Orientation event handler (0,1% Goldstandard: Strikte Tischlage <= 8 Grad, Fail-Closed)
     const handleOrientation = (e: DeviceOrientationEvent) => {
       const beta = e.beta;
       const gamma = e.gamma;
       
       if (beta === null || gamma === null) {
-        // Fall back to flat if no orientation details
-        isOrientedFlat = true;
-        currentFlatType = 'face-up';
+        isOrientedFlat = false;
+        currentFlatType = 'none';
         return;
       }
 
-      // Flat Face-Up: screen up, beta and gamma near 0
-      const faceUp = Math.abs(beta) < 18 && Math.abs(gamma) < 18;
+      // Flat Face-Up: screen up, beta und gamma <= 8 Grad (Tischlage mit Kamera-Bump)
+      const faceUp = Math.abs(beta) <= 8.0 && Math.abs(gamma) <= 8.0;
       
-      // Flat Face-Down: screen down, beta near 180 (or -180) and gamma near 0
-      const faceDown = Math.abs(Math.abs(beta) - 180) < 18 && Math.abs(gamma) < 18;
+      // Flat Face-Down: screen down, beta nahe 180 (oder -180) und gamma <= 8 Grad
+      const faceDown = Math.abs(Math.abs(beta) - 180) <= 8.0 && Math.abs(gamma) <= 8.0;
       
       isOrientedFlat = faceUp || faceDown;
       currentFlatType = faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none');
     };
 
-    // Motion event handler
+    // Motion event handler (0,1% Goldstandard: Unterdrückung von Handheld-Nutzung & Tremor)
     const handleMotion = (e: DeviceMotionEvent) => {
-      const acc = e.acceleration;
+      const acc = e.acceleration || e.accelerationIncludingGravity;
       if (!acc) return;
       const x = acc.x || 0;
       const y = acc.y || 0;
-      const z = acc.z || 0;
+      const z = (e.acceleration ? acc.z : 0) || 0;
       const magnitude = Math.sqrt(x * x + y * y + z * z);
       
-      // Filter out lower magnitude instrument vibrations (use 1.8 m/s^2)
-      if (magnitude > 1.8) {
+      // Schwellenwert > 1.4 m/s^2: Erkennt Handheld-Bedienung und Tremor sofort
+      if (magnitude > 1.4) {
         isMoving = true;
         if (motionTimeout) clearTimeout(motionTimeout);
         motionTimeout = setTimeout(() => {
           isMoving = false;
-        }, 1500);
+        }, 1200);
       }
     };
 
@@ -3065,24 +3064,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const usesSensors = isMobile && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
 
-    let permission = 'denied';
-    if (usesSensors && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+    let permission = 'granted';
+    if (usesSensors) {
       try {
-        permission = await Promise.race([
-          (DeviceOrientationEvent as any).requestPermission(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 800))
-        ]) as string;
+        const reqOri = (typeof DeviceOrientationEvent !== 'undefined' && typeof (DeviceOrientationEvent as any).requestPermission === 'function')
+          ? (DeviceOrientationEvent as any).requestPermission().catch(() => 'denied')
+          : Promise.resolve('granted');
+        const reqMot = (typeof DeviceMotionEvent !== 'undefined' && typeof (DeviceMotionEvent as any).requestPermission === 'function')
+          ? (DeviceMotionEvent as any).requestPermission().catch(() => 'denied')
+          : Promise.resolve('granted');
+        const [oRes, mRes] = await Promise.all([reqOri, reqMot]);
+        permission = (oRes === 'granted' && mRes === 'granted') ? 'granted' : 'denied';
       } catch (err) {
-        console.warn("Sensor permission request failed or timed out:", err);
-        permission = 'granted'; // Fallback to let the timer run
+        permission = 'denied';
       }
-    } else {
-      permission = 'granted';
     }
 
-    if (permission === 'granted') {
-      setPreStartCountdown(3);
-      setTimerRunning(true);
+    if (permission !== 'granted') {
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert('Sensor-Berechtigung verweigert: Der Fokus-Timer erfordert Zugriff auf die Bewegungssensoren, um die Ausrichtung zu prüfen. Bitte erlaube den Zugriff in den iOS/Browser-Einstellungen! 🛑');
+      }
+      return;
+    }
+
+    setPreStartCountdown(3);
+    setTimerRunning(true);
       setShowCheckpoint(false);
       nextCheckpointSecondsRef.current = Math.floor(Math.random() * 180) + 300; // 5-8 minutes
 
@@ -3123,10 +3129,6 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               }
             });
         });
-
-    } else {
-      alert("Damit die Anti-Schummel-Erkennung funktioniert, benötigen wir Sensor-Zugriff!");
-    }
   };
 
   // ── PIN-Eingabe: Ziffern-Eingabe-Handler ─────────────────────────────────
@@ -9715,12 +9717,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   )}
 
                   {hasCampusStudent && (
-                    <span style={{ background: '#e6f4ea', color: '#34a853', border: '1px solid #ceebd6', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    <span style={{ background: 'rgba(52, 168, 83, 0.10)', color: '#15803d', border: 'none', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                       CAMPUS
                     </span>
                   )}
                   {hasGrooveLabStudent && (
-                    <span style={{ background: '#fefce8', color: '#ca8a04', border: '1px solid #fef08a', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    <span style={{ background: 'rgba(234, 179, 8, 0.12)', color: '#854d0e', border: 'none', padding: '2px 6px', borderRadius: '6px', fontSize: '0.58rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                       GROOVELAB
                     </span>
                   )}

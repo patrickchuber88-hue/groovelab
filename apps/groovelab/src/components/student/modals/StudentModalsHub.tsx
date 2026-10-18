@@ -690,6 +690,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
           isOpen={focusGuard.isAborted}
           reason={focusGuard.abortReason}
           toolName="Fokus-Übetimer"
+          uiLevel={studentUiLevel}
           onClose={() => {
             focusGuard.acknowledgeAbort();
           }}

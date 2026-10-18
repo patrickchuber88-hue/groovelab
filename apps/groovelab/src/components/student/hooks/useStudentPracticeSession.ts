@@ -6,6 +6,7 @@ import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RA
 import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
 import { toLocalYYYYMMDD, getSimulatedNow, getDaysBetweenLocal, getISOWeek } from '../studentDateUtils';
 import { MIN_PRACTICE_SECONDS } from '../utils/studentAvatarDashboardUtils';
+import { useDeviceAntiCheatGuard, DeviceAntiCheatAbortReason } from '../../../hooks/useDeviceAntiCheatGuard';
 
 export type PracticeSessionValidationMode = 'sensor_verified' | 'desktop_focus_guard' | 'sensors_unsupported';
 
@@ -131,20 +132,8 @@ export function useStudentPracticeSession({
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   );
 
-  // Gyro Detox, sensor & flat orientation states (Fail-Closed: kein optimistischer Default auf Mobile)
-  const [isPhoneFlat, setIsPhoneFlat] = useState(!isMobile);
-  const isPhoneFlatRef = useRef(isPhoneFlat);
-  useEffect(() => {
-    isPhoneFlatRef.current = isPhoneFlat;
-  }, [isPhoneFlat]);
-  const [flatType, setFlatType] = useState<'face-up' | 'face-down' | 'none'>('none');
-  const [graceSecondsLeft, setGraceSecondsLeft] = useState(10);
+  // 🛡️ Fail-Closed Anti-Cheat Session Abort & State
   const [sessionAbortedNotice, setSessionAbortedNotice] = useState<string | null>(null);
-
-  const hasReceivedSensorEventRef = useRef(false);
-  const isDeviceMovingRef = useRef(false);
-  const motionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notFlatGraceRef = useRef(0);
 
   // Focus logs state
   const [fokusLogs, setFokusLogs] = useState<PracticeSessionFokusLog[]>([]);
@@ -198,7 +187,7 @@ export function useStudentPracticeSession({
         detail: { reason, message }
       }));
     } catch {}
-    if (reason === 'permission_denied' || reason === 'sensor_events_missing') {
+    if (reason === 'permission_denied' || reason === 'sensor_probe_failed') {
       try {
         if (typeof window !== 'undefined' && typeof window.alert === 'function') {
           window.alert(message);
@@ -207,171 +196,25 @@ export function useStudentPracticeSession({
     }
   }, []);
 
-  // 🛡️ WebKit Dual-Permission Handshake (DeviceOrientationEvent & DeviceMotionEvent synchron im Klick-Event anfordern)
-  const requestOrientationPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined') return true;
-
-    try {
-      const DeviceOrientationWithPermission = typeof DeviceOrientationEvent !== 'undefined'
-        ? (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> })
-        : undefined;
-      const DeviceMotionWithPermission = typeof DeviceMotionEvent !== 'undefined'
-        ? (DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> })
-        : undefined;
-
-      const orientationPromise = typeof DeviceOrientationWithPermission?.requestPermission === 'function'
-        ? DeviceOrientationWithPermission.requestPermission().catch((err: unknown) => {
-            console.warn('[OrientationPermission] DeviceOrientationEvent requestPermission error:', err);
-            return 'denied';
-          })
-        : Promise.resolve('granted');
-
-      const motionPromise = typeof DeviceMotionWithPermission?.requestPermission === 'function'
-        ? DeviceMotionWithPermission.requestPermission().catch((err: unknown) => {
-            console.warn('[OrientationPermission] DeviceMotionEvent requestPermission error:', err);
-            return 'denied';
-          })
-        : Promise.resolve('granted');
-
-      const [orientationRes, motionRes] = await Promise.all([orientationPromise, motionPromise]);
-      const granted = orientationRes === 'granted' && motionRes === 'granted';
-
-      if (!granted && isMobile) {
-        const notice = 'Sensor-Berechtigung verweigert: Der Fokus-Timer benötigt Zugriff auf die Bewegungssensoren, um die Ausrichtung zu prüfen. Bitte erlaube den Zugriff in den iOS/Browser-Einstellungen! 🛑';
-        abortActiveSession('permission_denied', notice);
-      }
-
-      return granted;
-    } catch (err) {
-      console.warn('[OrientationPermission] Dual permission handshake error:', err);
-      if (isMobile) {
-        const notice = 'Sensor-Berechtigungsfehler: Zugriff auf die Lagesensoren fehlgeschlagen. 🛑';
-        abortActiveSession('permission_denied', notice);
-      }
-      return false;
+  // 🛡️ 0,1% Goldstandard: Autarker Anti-Cheat Guard Satellit (Desktop, PWA & Mobile)
+  const antiCheat = useDeviceAntiCheatGuard({
+    isActive: sessionActive && !isSessionPaused,
+    toolName: 'Fokus-Timer',
+    allowMusicStandMode: false,
+    onHardAbort: (reason: DeviceAntiCheatAbortReason, message: string) => {
+      releaseScreenWakeLock();
+      abortActiveSession(reason, message);
     }
-  }, [isMobile, abortActiveSession]);
+  });
 
-  // 📱 Sensor-Listener Engine: Gyroscope & Accelerometer mit 400ms Fail-Closed Liveness-Probe
-  useEffect(() => {
-    if (!sessionActive || typeof window === 'undefined') {
-      setIsPhoneFlat(!isMobile);
-      setFlatType('none');
-      notFlatGraceRef.current = 0;
-      hasReceivedSensorEventRef.current = false;
-      return;
-    }
-
-    if (!isMobile || !('DeviceOrientationEvent' in window)) {
-      // Desktop / Laptop ohne Lagesensoren: Standardmäßig aktiv (Immunität durch Desktop Focus-Loss Guard)
-      setIsPhoneFlat(true);
-      setFlatType('face-up');
-      return;
-    }
-
-    // Mobilgerät: Zunächst false (Fail-Closed), bis Lagesensor echte Flachlage meldet
-    setIsPhoneFlat(false);
-    setFlatType('none');
-    hasReceivedSensorEventRef.current = false;
-
-    // 400ms Sensor-Probe: Überprüft, ob das Mobilgerät nach Aktivierung echte Events liefert
-    const probeTimeout = setTimeout(() => {
-      if (sessionActive && !hasReceivedSensorEventRef.current) {
-        console.warn('[Anti-Cheat] Sensor probe failed after 400ms: No sensor events received.');
-        abortActiveSession(
-          'sensor_events_missing',
-          'Keine Sensor-Signale empfangen: Auf Mobilgeräten erfordert der Fokus-Timer aktive Lagesensoren. Bitte stelle sicher, dass Sensoren im Browser erlaubt sind. 🛑'
-        );
-      }
-    }, 400);
-
-    let lastFlatVal: boolean | null = null;
-    let lastFlatTypeVal: 'face-up' | 'face-down' | 'none' | null = null;
-
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const beta = e.beta;
-      const gamma = e.gamma;
-      if (beta !== null || gamma !== null) {
-        hasReceivedSensorEventRef.current = true;
-      }
-      if (beta === null || gamma === null) {
-        if (lastFlatVal !== false) { lastFlatVal = false; setIsPhoneFlat(false); }
-        if (lastFlatTypeVal !== 'none') { lastFlatTypeVal = 'none'; setFlatType('none'); }
-        return;
-      }
-
-      // Flat Face-Up: Display zeigt nach oben, Neigung beta & gamma < 22 Grad
-      const faceUp = Math.abs(beta) < 22 && Math.abs(gamma) < 22;
-      // Flat Face-Down: Display liegt flach auf dem Tisch (beta nahe 180/-180, gamma < 22)
-      const faceDown = Math.abs(Math.abs(beta) - 180) < 22 && Math.abs(gamma) < 22;
-
-      const isOrientedFlat = faceUp || faceDown;
-      const nextFlatType: 'face-up' | 'face-down' | 'none' = faceDown ? 'face-down' : (faceUp ? 'face-up' : 'none');
-      if (lastFlatTypeVal !== nextFlatType) {
-        lastFlatTypeVal = nextFlatType;
-        setFlatType(nextFlatType);
-      }
-
-      const isStill = !isDeviceMovingRef.current;
-      const isTrulyFlat = isOrientedFlat && isStill;
-
-      if (lastFlatVal !== isTrulyFlat) {
-        lastFlatVal = isTrulyFlat;
-        setIsPhoneFlat(isTrulyFlat);
-      }
-    };
-
-    const handleMotion = (e: DeviceMotionEvent) => {
-      const acc = e.acceleration || e.accelerationIncludingGravity;
-      if (acc) {
-        hasReceivedSensorEventRef.current = true;
-      }
-      if (!acc) return;
-      const x = acc.x || 0;
-      const y = acc.y || 0;
-      const z = (e.acceleration ? acc.z : 0) || 0;
-      const magnitude = Math.sqrt(x * x + y * y + z * z);
-
-      // Schwellenwert > 2.0 m/s^2: Handy wird in der Hand gehalten / bewegt
-      if (magnitude > 2.0) {
-        isDeviceMovingRef.current = true;
-        if (lastFlatVal !== false) {
-          lastFlatVal = false;
-          setIsPhoneFlat(false);
-        }
-
-        if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
-        motionTimeoutRef.current = setTimeout(() => {
-          isDeviceMovingRef.current = false;
-        }, 1500);
-      }
-    };
-
-    window.addEventListener('deviceorientation', handleOrientation);
-    window.addEventListener('devicemotion', handleMotion);
-
-    return () => {
-      clearTimeout(probeTimeout);
-      window.removeEventListener('deviceorientation', handleOrientation);
-      window.removeEventListener('devicemotion', handleMotion);
-      if (motionTimeoutRef.current) clearTimeout(motionTimeoutRef.current);
-    };
-  }, [sessionActive, isMobile, abortActiveSession]);
-
-  // Active Timer Loop (Pausiert nach 5s Nicht-Flachlage; stoppt zuverlässig bei Pause)
+  // Active Timer Loop (Pausiert bei Nicht-Flachlage oder Veto; bricht bei Timeout hart ab)
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (sessionActive && !isSessionPaused) {
       timer = setInterval(() => {
-        // Anti-Cheat: Wenn Handy auf Mobile nicht flach auf dem Tisch liegt
-        if (isMobile && !isPhoneFlatRef.current) {
-          notFlatGraceRef.current += 1;
-          // Die ersten 5s sind Gnadenfrist (zum Ablegen). Danach zählt der Timer NICHT weiter!
-          if (notFlatGraceRef.current > 5) {
-            return;
-          }
-        } else {
-          notFlatGraceRef.current = 0;
+        // Anti-Cheat: Wenn Unterbrechung aktiv ist oder Gerät nicht flach liegt -> Zeit friert ein!
+        if (antiCheat.isInterrupted || !antiCheat.isTableFlat) {
+          return;
         }
 
         setSecondsElapsed(prev => prev + 1);
@@ -385,50 +228,23 @@ export function useStudentPracticeSession({
       if (timer) clearInterval(timer);
       releaseScreenWakeLock();
     };
-  }, [sessionActive, isSessionPaused, isMobile, requestScreenWakeLock, releaseScreenWakeLock]);
+  }, [sessionActive, isSessionPaused, antiCheat.isInterrupted, antiCheat.isTableFlat, requestScreenWakeLock, releaseScreenWakeLock]);
 
-  // 🛡️ 0,1% Goldstandard Anti-Cheat: Sofort-Abbruch bei Tab-Wechsel / App-Verlassen / Desktop Focus-Loss
+  // 🛡️ TDDDG § 25 & W3C WakeLock Specification: Release lock on tab hide / visibilitychange
   useEffect(() => {
-    if (typeof document === 'undefined' || typeof window === 'undefined') return;
-
     const handleVisibilityChange = () => {
       if (document.hidden) {
         releaseScreenWakeLock();
-        if (sessionActive) {
-          console.warn('[Anti-Cheat] Focus session immediately aborted due to tab switch/backgrounding.');
-          abortActiveSession(
-            'tab_switch',
-            'Fokus-Session abgebrochen: Du hast den Tab oder die App gewechselt. Beim Üben bleibt der Fokus-Timer geöffnet! 🛑'
-          );
-        }
-      } else if (sessionActive && !isSessionPausedRef.current) {
+      } else if (sessionActive && !isSessionPaused) {
         requestScreenWakeLock();
       }
     };
 
-    // Desktop Focus-Loss Guard: Auf Desktops wird Fenster-Fokusverlust überwacht
-    const handleWindowBlur = () => {
-      if (!isMobile && sessionActive) {
-        setTimeout(() => {
-          if (sessionActive && (!document.hasFocus() || document.hidden)) {
-            console.warn('[Anti-Cheat] Desktop focus session aborted due to window blur.');
-            abortActiveSession(
-              'focus_loss',
-              'Fokus-Session abgebrochen: Du hast das Browser-Fenster verlassen. Beim Üben am Computer bleibt der Tab im Fokus! 🛑'
-            );
-          }
-        }, 150);
-      }
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [sessionActive, isMobile, releaseScreenWakeLock, requestScreenWakeLock, abortActiveSession]);
+  }, [sessionActive, isSessionPaused, requestScreenWakeLock, releaseScreenWakeLock]);
 
   // Fetch Fokus Logs
   const fetchFokusLogs = useCallback(async () => {
@@ -806,12 +622,13 @@ export function useStudentPracticeSession({
     isSessionPaused,
     setIsSessionPaused,
     isSessionPausedRef,
-    isPhoneFlat,
-    flatType,
-    graceSecondsLeft,
-    sessionAbortedNotice,
+    isPhoneFlat: antiCheat.isTableFlat,
+    flatType: antiCheat.flatType === 'music-stand' ? 'face-up' : antiCheat.flatType,
+    graceSecondsLeft: antiCheat.graceSecondsLeft,
+    sessionAbortedNotice: sessionAbortedNotice || antiCheat.abortNotice,
     setSessionAbortedNotice,
-    requestOrientationPermission,
+    requestOrientationPermission: antiCheat.requestSensorPermissions,
+    antiCheatGuard: antiCheat,
     fokusLogs,
     setFokusLogs,
     monthlyFocusMinutes,

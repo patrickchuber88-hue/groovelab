@@ -56,3 +56,70 @@ export function applyBufferTailFadeOut(
 
   return buffer;
 }
+
+/**
+ * 🪄 DAW Goldstandard: Cos² Soft-Attack Fade-In am Puffer-Anfang (Zero-Pop Attack)
+ * 
+ * Wendet über die ersten `fadeDurationSec` Sekunden (Standard: 5 ms = 0.005 s)
+ * eine stetig differenzierbare (C¹-kontinuierliche) Cos²-Kurve an.
+ * Dadurch gleitet das Signal von exakt 0.00 % Nulldurchgang harmonisch auf 100 % Amplitude.
+ * 
+ * Beseitigt Einschalt-Klicks und Sample-0 Phasenbrüche bei allen Aufnahmen ohne Transienten-Verlust.
+ * 
+ * @param buffer Der Stereo- oder Mono-AudioBuffer
+ * @param fadeDurationSec Dauer des Fade-Ins in Sekunden (Standard: 0.005 s = 5 ms)
+ * @returns Der manipulierte AudioBuffer für Chaining
+ */
+export function applyBufferHeadFadeIn(
+  buffer: AudioBuffer,
+  fadeDurationSec = 0.005
+): AudioBuffer {
+  if (!buffer || buffer.length <= 0 || fadeDurationSec <= 0) return buffer;
+
+  const sampleRate = buffer.sampleRate;
+  // Maximal 40 % der Gesamtlänge faden, falls die Aufnahme ultrakurz sein sollte
+  const fadeSamples = Math.min(
+    Math.round(fadeDurationSec * sampleRate),
+    Math.floor(buffer.length * 0.40)
+  );
+
+  if (fadeSamples <= 0) return buffer;
+
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const channelData = buffer.getChannelData(ch);
+
+    for (let i = 0; i < fadeSamples; i++) {
+      // t läuft von 0 (erstes Sample) bis 1 (Ende des Fade-Ins)
+      const t = i / fadeSamples;
+      // Cos² Equal-Power Fade-In: 0.5 * (1 - cos(pi * t))
+      // t = 0 -> 0.0 (exakter Nulldurchgang, Steigung = 0)
+      // t = 1 -> 1.0 (nahtloser Übergang in das Nutzsignal)
+      const fadeFactor = 0.5 * (1 - Math.cos(Math.PI * t));
+      channelData[i] *= fadeFactor;
+    }
+  }
+
+  return buffer;
+}
+
+/**
+ * 🪄 0,1% DAW Goldstandard: Zero-Pop Envelope Schutz für beide Puffer-Grenzen
+ * 
+ * Wendet sowohl am Puffer-Anfang (Head Fade-In) als auch am Puffer-Ende (Tail Fade-Out)
+ * harmonische Cos²-Hüllkurven an. Garantiert vollständige Knacks- und Plopp-Immunität.
+ * 
+ * @param buffer Der AudioBuffer
+ * @param headFadeSec Fade-In Dauer in Sekunden (Standard: 0.005 s = 5 ms)
+ * @param tailFadeSec Fade-Out Dauer in Sekunden (Standard: 0.035 s = 35 ms)
+ * @returns Der manipulierte AudioBuffer für Chaining
+ */
+export function applyBufferZeroPopEnvelopes(
+  buffer: AudioBuffer,
+  headFadeSec = 0.005,
+  tailFadeSec = 0.035
+): AudioBuffer {
+  applyBufferHeadFadeIn(buffer, headFadeSec);
+  applyBufferTailFadeOut(buffer, tailFadeSec);
+  return buffer;
+}
+

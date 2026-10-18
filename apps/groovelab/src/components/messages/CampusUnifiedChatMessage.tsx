@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  CheckCheck, 
   GraduationCap, 
   ShieldCheck, 
   Calendar, 
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import { CampusDynamicAvatar } from '../CampusDirectMessages';
 import { CompactAppointmentEventCard } from './CompactAppointmentEventCard';
+import { CampusMessageStatusTicks } from './CampusMessageStatusTicks';
 import { cleanChatMessageContent } from '../../utils/chatRespectGuard';
 import { formatStudentDisplayName, formatTeacherFullName } from '../../utils/nameHelper';
 
@@ -66,6 +66,7 @@ export interface CampusUnifiedChatMessageProps {
   appointmentContextLabel?: string | null;
   replyCount?: number;
   onOpenTopicThread?: (topicId: string) => void;
+  recipientIsOffDuty?: boolean;
 }
 
 /**
@@ -90,7 +91,8 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
   isSuperseded = false,
   appointmentContextLabel,
   replyCount,
-  onOpenTopicThread
+  onOpenTopicThread,
+  recipientIsOffDuty = false
 }) => {
   const isSelf = msg.sender_id === currentUserId;
   const isSys = isChatMessageSystem(msg);
@@ -124,6 +126,10 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
 
   // 1. System Notification Event Pill
   if (isSys) {
+    // 🛡️ Deduplizierung: Identische aufeinanderfolgende Systemnachrichten/Terminbestätigungen deduplizieren
+    if (prevMsg && isChatMessageSystem(prevMsg) && prevMsg.content === msg.content && !isNewDay) {
+      return null;
+    }
     return (
       <React.Fragment>
         {pedagogicalBanner}
@@ -209,6 +215,9 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
 
       {/* Natural Message Bubble Row */}
       <div
+        data-message-id={msg.id}
+        data-is-read={String(Boolean(msg.is_read))}
+        data-sender-id={msg.sender_id}
         style={{
           display: 'flex',
           alignItems: 'flex-end',
@@ -446,11 +455,15 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
               }}
             >
               <span>{timeStr}</span>
-              {isSelf && (
-                <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
-                </div>
-              )}
+              <CampusMessageStatusTicks
+                status={msg.status}
+                isRead={Boolean(msg.is_read)}
+                readAt={msg.read_at}
+                isSelf={isSelf}
+                recipientIsOffDuty={recipientIsOffDuty}
+                isGroup={isGroup}
+                size={14}
+              />
               {isGroup && !isSelf && onInitiateReport && (
                 <button
                   type="button"

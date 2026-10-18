@@ -364,6 +364,7 @@ export function useCampusChatActions({
         if (m.group_id === groupId && m.sender_id !== uid) {
           unreadCountDiff++;
           affectedMsgIds.push(m.id);
+          return { ...m, is_read: true, read_at: new Date(nowTime).toISOString() };
         }
         return m;
       });
@@ -409,6 +410,7 @@ export function useCampusChatActions({
         if (m.group_id === groupId && (m.channel_id === channelId || (!m.channel_id && channelId)) && m.sender_id !== uid) {
           unreadCountDiff++;
           affectedIds.push(m.id);
+          return { ...m, is_read: true, read_at: new Date(nowTime).toISOString() };
         }
         return m;
       });

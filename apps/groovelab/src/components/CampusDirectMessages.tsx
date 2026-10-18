@@ -78,6 +78,7 @@ import { extractOccurrenceDateFromMessage, parseLocalDate } from './messages/Com
 import { CampusUnifiedChatMessage } from './messages/CampusUnifiedChatMessage';
 import { playChatMessageSentSound, triggerChatHapticFeedback } from '../utils/chatSoundAndHaptics';
 import { getLocalGroupsCache, setLocalGroupsCache, getLocalChannelsCache, setLocalChannelsCache, getLocalTeachersCache, setLocalTeachersCache } from '../hooks/useCampusMessagingData';
+import { useMessageReadObserver } from '../hooks/useMessageReadObserver';
 
 const GROUP_ICON_MAP: Record<string, any> = {
   guitar: Guitar, acoustic_guitar: Music, piano: Layers, drums: Disc, mic: Mic, violin: Activity,
@@ -2618,6 +2619,23 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     isUserScrolledUpRef.current = distanceFromBottom > 150;
   }, []);
 
+  // 🏛️ 0.1% WhatsApp & Apple Goldstandard Viewport Read Engine
+  useMessageReadObserver({
+    containerRef: chatScrollContainerRef,
+    messages: displayedMessages,
+    currentUserId: effectiveUid || user?.id || '',
+    enabled: Boolean(selectedRecipient && (effectiveUid || user?.id)),
+    onMarkMessagesRead: async (ids: string[]) => {
+      const uid = effectiveUid || user?.id;
+      if (!uid || ids.length === 0) return;
+      try {
+        saveLocalReadMsgIds(uid, ids);
+        await supabase.rpc('mark_messages_read_batch', { p_message_ids: ids, p_user_id: uid });
+        selectedRecipient?.is_group ? saveLocalGroupRead(uid, selectedRecipient.id, Date.now()) : saveLocalDirectRead(uid, selectedRecipient.id, Date.now());
+      } catch (err) { console.warn('[useMessageReadObserver] Batch error:', err); }
+    }
+  });
+
   const activeRootTopics = useMemo(() => {
     if (selectedRecipient?.is_group) {
       return activeThreadMessages.filter(m => !m.parent_message_id);
@@ -4635,6 +4653,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       isSuperseded={isSuperseded}
                       appointmentContextLabel={occContext?.label}
                       replyCount={topicRepliesCountMap.get(msg.id) || 0}
+                      recipientIsOffDuty={Boolean(isRecipientInQuietHours && (isStudent || !isTeacherOrStaff))}
                       onOpenTopicThread={(topicId) => {
                         setOneOnOneMode('threads');
                         setFocusedTopicId(topicId);
@@ -4791,12 +4810,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 {(() => {
                   const isUserTeacher = user?.role?.toLowerCase() === 'teacher' || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'secretary';
                   const vettedQuickChips = isUserTeacher ? [
-                    { icon: CheckCheck, label: 'Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
+                    { icon: Sparkles, label: 'Alles klar!', text: 'Alles klar, vielen Dank für die Information!' },
                     { icon: Music, label: 'Noten & Instrument dabei?', text: 'Bitte an das Notenheft und das Instrument für den Unterricht denken.' },
                     { icon: Clock, label: '5 Min. später vor Ort', text: 'Ich bin gleich da, verzögert sich um ca. 5 Minuten.' },
-                    { icon: Sparkles, label: 'Keine Sorge, alles gut!', text: 'Keine Sorge, alles in bester Ordnung!' }
+                    { icon: CheckCheck, label: 'Keine Sorge, alles gut!', text: 'Keine Sorge, alles in bester Ordnung!' }
                   ] : [
-                    { icon: CheckCheck, label: 'Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
+                    { icon: Sparkles, label: 'Alles klar!', text: 'Alles klar, vielen Dank für die Information!' },
                     { icon: Clock, label: 'Bin ca. 5 Min. später da', text: 'Ich verspäte mich leider um ca. 5 Minuten, bin aber gleich da!' },
                     { icon: Music, label: 'Noten & Instrument dabei', text: 'Notenheft und Instrument sind eingepackt, alles bereit!' },
                     { icon: HeartHandshake, label: 'Danke für das Verständnis!', text: 'Vielen Dank für das Verständnis und die Geduld!' }
@@ -4816,18 +4835,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         <button
                           key={`chip-${idx}`}
                           type="button"
-                          onClick={async () => {
-                            try {
-                              if (chip.label.includes('Gesehen')) {
-                                await sendDirectQuickMessage(chip.text);
-                                await handleAcknowledgeAndMarkAsRead(selectedRecipient);
-                                setTypedMessage('');
-                              } else {
-                                setTypedMessage(chip.text);
-                              }
-                            } catch (err) {
-                              console.error('Fehler bei Quick-Chip Aktion:', err);
-                            }
+                          onClick={() => {
+                            setTypedMessage(chip.text);
                           }}
                           style={{
                             padding: '5px 12px',

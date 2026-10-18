@@ -731,6 +731,7 @@ export function StudentAvatarDashboard({
           isMobile={profile.isMobile}
           handleTabChangeLocal={profile.handleTabChangeLocal}
           setSelectedTopic={setSelectedTopic}
+          focusGuard={practice.antiCheatGuard}
         />
       </Suspense>
 

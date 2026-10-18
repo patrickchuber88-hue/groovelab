@@ -5674,9 +5674,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               {/* Right: Status + Senden */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {lastSubmittedTime && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: scheduleStatus === 'approved' ? 'rgba(230, 244, 234, 0.95)' : 'rgba(254, 243, 199, 0.95)', border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : '#f59e0b'}`, color: scheduleStatus === 'approved' ? '#1e7e34' : '#92400e', padding: '6px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: scheduleStatus === 'approved' ? 'rgba(52, 168, 83, 0.12)' : 'rgba(245, 158, 11, 0.12)', border: 'none', color: scheduleStatus === 'approved' ? '#15803d' : '#92400e', padding: '6px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
                     {scheduleStatus === 'approved' ? (
-                      <CheckCircle size={13} strokeWidth={2.4} color="#1e7e34" aria-hidden="true" />
+                      <CheckCircle size={13} strokeWidth={2.4} color="#15803d" aria-hidden="true" />
                     ) : (
                       <Clock size={13} strokeWidth={2.4} color="#92400e" aria-hidden="true" />
                     )}
@@ -8290,14 +8290,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               );
                             }
                             return (
-                              <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#d97706', background: '#fffbe8', border: '1px solid #fde68a', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler hat keine Sperrzeiten, konnte aber wegen voller Tages-Kapazität nicht automatisch eingeteilt werden. Erweitere deine Unterrichtszeiten.">
-                                <AlertCircle size={9} color="#d97706" />
+                              <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#92400e', background: 'rgba(245, 158, 11, 0.12)', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler hat keine Sperrzeiten, konnte aber wegen voller Tages-Kapazität nicht automatisch eingeteilt werden. Erweitere deine Unterrichtszeiten.">
+                                <AlertCircle size={9} color="#92400e" />
                                 <span>Nicht zugeteilt</span>
                               </span>
                             );
                           })()
                         ) : s.hasPreferences ? (
-                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#166534', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
+                          <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.12)', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Wunsch- & Sperrzeiten gemeldet (Stundenplan-Onboarding abgeschlossen)">
                             <Star size={9} color="currentColor" />
                             <span>Zeiten da</span>
                           </span>

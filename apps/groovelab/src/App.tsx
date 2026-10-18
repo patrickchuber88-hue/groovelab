@@ -43,20 +43,20 @@ function App() {
     <LegalConsentGate user={orchestrator.user}>
       <Suspense fallback={<DashboardLoader />}>
         <SecurityHoneyTrap />
-        <DeviceSimulator>
-          <CampusSystemBannersOverlay {...orchestrator.bannersOverlayProps} />
-          <CampusAppLayout {...orchestrator.layoutProps} />
-          <ErrorBoundary fallback={null}>
-            <CampusAppModalsHub {...orchestrator.modalsHubProps} />
-          </ErrorBoundary>
-        </DeviceSimulator>
+        <CampusSystemBannersOverlay {...orchestrator.bannersOverlayProps} />
+        <CampusAppLayout {...orchestrator.layoutProps} />
+        <ErrorBoundary fallback={null}>
+          <CampusAppModalsHub {...orchestrator.modalsHubProps} />
+        </ErrorBoundary>
       </Suspense>
     </LegalConsentGate>
   );
 
   return (
     <>
-      {appBody}
+      <DeviceSimulator>
+        {appBody}
+      </DeviceSimulator>
       {(isDevEnvironment() || (typeof window !== 'undefined' && localStorage.getItem('groovelab_dev_date_sim_visible') === 'true')) && (
         <Suspense fallback={null}>
           <DateSimulationDevWidget />

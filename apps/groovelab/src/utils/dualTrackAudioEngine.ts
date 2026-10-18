@@ -22,6 +22,7 @@ import {
   TARGET_PEAK_DBTP, 
   TARGET_PURE_RAW_LUFS 
 } from './audioMasteringEngine';
+import { applyBufferTailFadeOut } from './audioTailEngine';
 import { getBlob } from './blobStorage';
 import { getOfflineAudioRecord } from './offlineAudioVault';
 
@@ -499,6 +500,9 @@ export async function renderDuettMixdown(params: {
     applyLookaheadLeveler: false, // Makrodynamik des bereits balancierten Duetts nicht plattbügeln
     preserveDynamics: false
   });
+
+  // 🪄 0,1% DAW Goldstandard: Cos² Soft-Release Fade-Out am Mixdown-Ende
+  applyBufferTailFadeOut(renderedBuffer, 0.035);
 
   return audioBufferToWavBlob(renderedBuffer);
 }

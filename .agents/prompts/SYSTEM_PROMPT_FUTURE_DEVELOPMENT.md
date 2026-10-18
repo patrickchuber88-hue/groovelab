@@ -62,9 +62,12 @@ Verstößt eine geplante Aktion gegen eines dieser Axiome, halte sofort an:
    - Modale Dialoge erzwingen den WAI-ARIA Contract (`role="dialog"`, `aria-modal="true"`, Fokus-Falle).
    - Kontrast-Parität $\ge 4,5:1$ bei Textfarben auf Brand-Hintergründen.
    - **Desktop Layout Immunity:** Desktop-Grid-Layouts (`>= 769px`) sind unantastbar; responsive Anpassungen bleiben strikt auf Mobile (`<= 768px`) beschränkt.
-3. **Unifarben- & Monochrom-Kontur-Axiom (Zero Color-Clash):**
-   - Farbige Buttons oder Widgets müssen ausnahmslos unifarben sein.
-   - Besitzt ein Element einen farbigen Hintergrund, ist ein Rand in einer abweichenden Farbe streng verboten (`border: 'none'` ist Standard; homogene Nuancen derselben Farbfamilie sind zulässig).
+3. **Apple 2-Farben-Axiom (Zero Color-Clash & Verbot des 3-Farben-Sandwichs):**
+   - Jedes UI-Element (Badge, Button, Status-Chip, Tab, Card-Tag) nutzt **maximal 2 Farben**. Das 3-Farben-Sandwich (blasser Hintergrund + dunkler Rand + Schrift) ist streng untersagt.
+   - **Filled (Aktiv/Primär):** Satte Markenfarbe (`#34a853` / `#eab308` / `#ea4335`) + Weiß / Slate-900 mit `border: none`.
+   - **Soft Tinted (Status/Chip):** 8–12% Tönung der Markenfarbe + satter Markentext mit `border: none` (kein Kanten-Clutter).
+   - **Ghost Outline (Filter/Sekundär):** Weißer oder transparenter Hintergrund + 1px Markenrand + Markentext.
+   - Besitzt ein Element einen farbigen oder getönten Hintergrund, ist ein Rand in einer abweichenden Farbe verboten (`border: 'none'` ist Standard). Detail-Spezifikation: `.agents/prompts/APPLE_DESIGN_SYSTEM_GOLDSTANDARD.md`.
 4. **Zero-Dummy-Axiom:**
    - Es dürfen im gesamten Quellcode NIEMALS statische Persona-Namen, Test-IBANs oder Phantasie-Daten verwendet werden. Mandanten werden mit vollständigen Stammdaten geführt.
 5. **WebAudio & Mobile PWA Lifecycle Hygiene:**

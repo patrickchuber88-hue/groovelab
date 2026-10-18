@@ -844,7 +844,7 @@ E-Mail: kontakt@campus-groovelab.de
 Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die Bereitstellung des kostenpflichtigen Zugangs Campus-Groovelab (Modul Campus):
 
 • **Name der Musikschule / Träger:** __________________________________________________  
-• **Campus-ID des Schülers (z. B. 001-S-0042, auf Schulausweis/QR):** ___________________  
+• **Campus-ID des Schülers (z. B. 001-1-0042, auf Schulausweis/QR):** ___________________  
 • **Name des Schülers / Kindes:** ____________________________________________________  
 • **Name des/der Erziehungsberechtigten:** ___________________________________________  
 • **Anschrift des/der Erziehungsberechtigten:** ________________________________________  

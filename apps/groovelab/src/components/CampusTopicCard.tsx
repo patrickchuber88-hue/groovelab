@@ -13,6 +13,7 @@ import {
   Music
 } from 'lucide-react';
 import { cleanChatMessageContent } from '../utils/chatRespectGuard';
+import { CampusMessageStatusTicks } from './messages/CampusMessageStatusTicks';
 
 export const ALLOWED_TOPIC_EMOJIS = ['👍', '❤️', '🎵', '👏', '🔥', '🚀'] as const;
 export type TopicEmojiType = typeof ALLOWED_TOPIC_EMOJIS[number];
@@ -130,14 +131,14 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
   };
 
   const studentTopicQuickChips = useMemo(() => [
-    { label: '✓ Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
+    { label: 'Alles klar!', text: 'Alles klar, vielen Dank für die Information!' },
     { label: '👍 Passt für mich!', text: 'Das passt perfekt für mich!' },
     { label: '🎵 Wird geübt & vorbereitet!', text: 'Wird geübt und für die nächste Stunde vorbereitet!' },
     { label: '💚 Danke für die Hilfe!', text: 'Vielen Dank für die Unterstützung und Hilfe!' }
   ], []);
 
   const teacherTopicQuickChips = useMemo(() => [
-    { label: '✓ Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
+    { label: 'Alles klar!', text: 'Alles klar, vielen Dank für die Rückmeldung!' },
     { label: '👍 Super, machen wir so!', text: 'Alles klar, machen wir genau so!' },
     { label: '🎹 Klären wir in der Stunde', text: 'Das schauen wir uns direkt in der nächsten Stunde gemeinsam an.' },
     { label: '👏 Sehr schön, weiter so!', text: 'Super Fortschritt, weiter so!' }
@@ -169,6 +170,9 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
 
   return (
     <article
+      data-message-id={topic.id}
+      data-is-read={(!isUnread).toString()}
+      data-sender-id={topic.sender_id}
       aria-labelledby={`topic-title-${topic.id}`}
       style={{
         background: '#ffffff',
@@ -247,8 +251,17 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
             </span>
           )}
 
-          <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginLeft: 'auto' }}>
+          <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
             {formatTime(topic.created_at)}
+            {topic.sender_id === currentUserId && (
+              <CampusMessageStatusTicks
+                status={topic.status || (topic.is_read ? 'read' : 'sent')}
+                isRead={Boolean(topic.is_read)}
+                readAt={topic.read_at}
+                isSelf={true}
+                size={12}
+              />
+            )}
           </span>
         </div>
       </div>
@@ -457,6 +470,9 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
               return (
                 <div
                   key={reply.id}
+                  data-message-id={reply.id}
+                  data-is-read={reply.is_read ? 'true' : 'false'}
+                  data-sender-id={reply.sender_id}
                   style={{
                     background: '#f8fafc',
                     borderRadius: '12px',
@@ -497,8 +513,17 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
                         Lehrkraft
                       </span>
                     )}
-                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600, marginLeft: 'auto' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 600, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                       {formatTime(reply.created_at)}
+                      {reply.sender_id === currentUserId && (
+                        <CampusMessageStatusTicks
+                          status={reply.status || (reply.is_read ? 'read' : 'sent')}
+                          isRead={Boolean(reply.is_read)}
+                          readAt={reply.read_at}
+                          isSelf={true}
+                          size={11}
+                        />
+                      )}
                     </span>
                   </div>
 

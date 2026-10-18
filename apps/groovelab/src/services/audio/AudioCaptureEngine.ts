@@ -20,7 +20,8 @@ import {
   INSTRUMENT_WORKLET_PROCESSOR_NAME, 
   getInstrumentWorkletBlobUrl 
 } from './InstrumentAudioWorkletProcessor';
-import { acquireAudioStream } from '../audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream } from '../audioPermissionService';
+import { applyBufferZeroPopEnvelopes } from '../../utils/audioTailEngine';
 
 export type MetricsListener = (metrics: AudioEngineMetrics) => void;
 export type StateListener = (state: AudioCaptureState) => void;
@@ -204,6 +205,7 @@ export class AudioCaptureEngine {
       }
 
       this.mediaStream = await acquireAudioStream(constraints);
+      await stabilizeAudioStream(this.mediaStream, 300);
 
       // Verify acquired hardware track settings
       const track = this.mediaStream.getAudioTracks()[0];
@@ -305,6 +307,9 @@ export class AudioCaptureEngine {
       }
       offset += chunkL.length;
     }
+
+    // 🪄 0,1% DAW Goldstandard: Zero-Pop Envelope Schutz (5ms Head Fade-In + 35ms Cos² Tail Soft-Release)
+    applyBufferZeroPopEnvelopes(audioBuffer, 0.005, 0.035);
 
     return audioBuffer;
   }

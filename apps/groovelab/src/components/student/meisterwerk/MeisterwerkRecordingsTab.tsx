@@ -361,161 +361,6 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
   const accentColor = theme.accentColor || theme.textColor || '#2563eb';
   const textColor = isSleeve ? '#0f172a' : (theme.textColor || '#0f172a');
 
-  // 0. 🎨 SWISS UNI-COLOR PASSEPARTOUT (0,1% Adobe InDesign & Swiss Graphic Design Goldstandard)
-  if (isPassepartout) {
-    const cardWidth = isLarge ? '124px' : '100%';
-    const cardMaxWidth = maxWidth || (isLarge ? '124px' : '110px');
-    const borderPadding = isLarge ? '9px' : '8px';
-
-    return (
-      <div
-        role={effectiveDisabled ? 'presentation' : 'button'}
-        tabIndex={effectiveDisabled ? -1 : 0}
-        aria-label={ariaLabel || (effectiveDisabled ? `Monats-LP: ${title}, ${monthCode || ''} (Demnächst)` : `Monats-LP: ${title}, ${monthCode || ''} (${takesNum} Takes)`)}
-        aria-disabled={effectiveDisabled ? 'true' : undefined}
-        onClick={effectiveDisabled ? undefined : onClick}
-        onKeyDown={(e) => {
-          if (!effectiveDisabled && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault();
-            onClick();
-          }
-        }}
-        onMouseEnter={() => !effectiveDisabled && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocus={() => !effectiveDisabled && setIsHovered(true)}
-        onBlur={() => setIsHovered(false)}
-        style={{
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          cursor: effectiveDisabled ? 'default' : 'pointer',
-          userSelect: 'none',
-          outline: 'none',
-          width: cardWidth,
-          maxWidth: cardMaxWidth,
-          aspectRatio: '1 / 1',
-          borderRadius: '16px',
-          background: effectiveDisabled ? `${theme.bg}22` : theme.bg,
-          border: isActive
-            ? (theme.border ? `1.5px solid ${theme.border}` : '1.5px solid rgba(0, 0, 0, 0.08)')
-            : (effectiveDisabled
-              ? `1.5px solid ${theme.bg}40`
-              : (theme.border ? `1px solid ${theme.border}` : '1.5px solid rgba(0, 0, 0, 0.08)')),
-          boxShadow: effectiveDisabled
-            ? 'none'
-            : (isActive
-              ? `0 16px 36px -4px ${theme.bg}50, 0 4px 14px rgba(15, 23, 42, 0.08)`
-              : (isHovered
-                ? `0 10px 24px -2px ${theme.bg}48, 0 3px 8px rgba(15, 23, 42, 0.06)`
-                : `0 4px 14px -2px ${theme.bg}35, 0 1px 3px rgba(15, 23, 42, 0.04)`)),
-          transform: (!effectiveDisabled && isHovered) ? 'translateY(-4px)' : 'none',
-          transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease',
-          padding: borderPadding,
-          boxSizing: 'border-box'
-        }}
-        className={effectiveDisabled ? '' : 'hover-scale-mini'}
-      >
-        {/* 🖼️ Samtig-weißes Kunstdruck-Zentrum (Inlay) */}
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: isLarge ? '12px' : '10px',
-            background: effectiveDisabled ? '#fbfcfe' : '#ffffff',
-            boxShadow: effectiveDisabled ? 'none' : 'inset 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03)',
-            border: effectiveDisabled ? '1px solid rgba(0, 0, 0, 0.03)' : '1px solid rgba(0, 0, 0, 0.04)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: isLarge ? '8px 6px 7px' : '7px 5px 6px',
-            boxSizing: 'border-box',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Oben: Monatsnummer in unifarbener Markenfarbe (oder Slate-400 bei Zukunftsmonat) + Monatskürzel */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              lineHeight: 1,
-              marginTop: '1px'
-            }}
-          >
-            <span
-              style={{
-                fontSize: isLarge ? '1.45rem' : '1.25rem',
-                fontWeight: 950,
-                color: effectiveDisabled ? '#94a3b8' : theme.bg,
-                lineHeight: 1,
-                letterSpacing: '-0.03em'
-              }}
-            >
-              {monthNumber ? (monthNumber < 10 ? `0${monthNumber}` : monthNumber) : ''}
-            </span>
-            <span
-              style={{
-                fontSize: isLarge ? '0.60rem' : '0.52rem',
-                fontWeight: 900,
-                color: effectiveDisabled ? '#94a3b8' : '#64748b',
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                marginTop: '2px',
-                lineHeight: 1
-              }}
-            >
-              {monthCode || ''}
-            </span>
-          </div>
-
-          {/* Unten: Monatsname & Take-Pill Badge */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              width: '100%',
-              gap: '2px',
-              marginBottom: '1px'
-            }}
-          >
-            <span
-              style={{
-                fontSize: isLarge ? '0.70rem' : '0.62rem',
-                fontWeight: 800,
-                color: effectiveDisabled ? '#64748b' : '#1e293b',
-                textAlign: 'center',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                width: '100%',
-                lineHeight: 1.15
-              }}
-            >
-              {title}
-            </span>
-            <div
-              style={{
-                fontSize: isLarge ? '0.56rem' : '0.50rem',
-                fontWeight: 850,
-                color: effectiveDisabled ? '#94a3b8' : (takesNum > 0 ? theme.bg : '#94a3b8'),
-                background: effectiveDisabled ? '#f1f5f9' : (takesNum > 0 ? `${theme.bg}14` : '#f8fafc'),
-                border: effectiveDisabled ? '1px solid #e2e8f0' : `1px solid ${takesNum > 0 ? `${theme.bg}28` : '#e2e8f0'}`,
-                padding: '1.5px 6px',
-                borderRadius: '100px',
-                lineHeight: 1.1,
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {effectiveDisabled ? 'Demnächst' : (badge || countDisplay)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // 1. 💽 PEEKING VINYL & SLEEVE (0,1% Goldstandard: Haptische Studio-Hülle + herausgleitende Farb-Schallplatte)
   if (isPeekingSleeve) {
@@ -857,45 +702,66 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
     );
   }
 
+  const isLightMonth = ['#eab308', '#facc15', '#65a30d', '#a3e635'].includes(theme.bg) || theme.textColor === '#0f172a';
+  const effectiveTextColor = isSleeve ? '#0f172a' : (isLightMonth ? '#0f172a' : (theme.textColor || '#ffffff'));
+  const effectiveMutedColor = isLightMonth ? '#334155' : 'rgba(255, 255, 255, 0.85)';
+
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={ariaLabel || `Vinyl LP Album: ${title}`}
-      onClick={onClick}
+      role={effectiveDisabled ? 'presentation' : 'button'}
+      tabIndex={effectiveDisabled ? -1 : 0}
+      aria-label={ariaLabel || (effectiveDisabled ? `Monats-LP: ${title}, ${monthCode || ''} (${takesNum} Takes)` : `Vinyl LP Album: ${title}`)}
+      aria-disabled={effectiveDisabled ? 'true' : undefined}
+      onClick={effectiveDisabled ? undefined : onClick}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (!effectiveDisabled && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onClick();
         }
       }}
+      onMouseEnter={() => !effectiveDisabled && setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => !effectiveDisabled && setIsHovered(true)}
+      onBlur={() => setIsHovered(false)}
       style={{
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        cursor: 'pointer',
+        cursor: effectiveDisabled ? 'default' : 'pointer',
         userSelect: 'none',
         outline: 'none',
         width: outerWidth,
-        maxWidth: maxWidth || (isLarge ? '120px' : '108px'),
-        transition: 'transform 0.18s ease'
+        maxWidth: maxWidth || (isLarge ? '120px' : '116px'),
+        transform: (!effectiveDisabled && isHovered) ? 'translateY(-4px)' : 'none',
+        transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease'
       }}
-      className="hover-scale-mini"
+      className={effectiveDisabled ? '' : 'hover-scale-mini'}
     >
-      {/* 📦 Flat Swiss Studio Sleeve (Campus Studio Module Ästhetik - Clean Swiss Design) */}
+      {/* 📦 Flat Swiss Studio Sleeve (100% Unifarben) */}
       <div style={{
         position: 'relative',
         width: sleeveSize ? `${sleeveSize}px` : '100%',
         aspectRatio: '1 / 1',
         borderRadius: '16px',
         background: isSleeve ? '#ffffff' : theme.bg,
-        border: isActive
-          ? (isSleeve ? `2px solid ${accentColor}` : '2px solid #ffffff')
-          : (isSleeve ? '1.5px solid #e2e8f0' : (theme.border ? `1px solid ${theme.border}` : '1px solid rgba(255, 255, 255, 0.22)')),
-        boxShadow: isActive
-          ? (isSleeve ? `0 8px 24px -2px ${accentColor}33, 0 2px 6px rgba(15, 23, 42, 0.06)` : '0 8px 24px rgba(15, 23, 42, 0.25), inset 0 1px 1px rgba(255,255,255,0.45)')
-          : (isSleeve ? '0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02)' : `${theme.shadow || '0 4px 14px -2px rgba(0,0,0,0.18)'}, inset 0 1px 1px rgba(255,255,255,0.30)`),
+        opacity: effectiveDisabled ? 0.46 : 1,
+        border: (isActive || isCurrent)
+          ? '2px solid #ffffff'
+          : (isSleeve
+            ? '1.5px solid #e2e8f0'
+            : (effectiveDisabled
+              ? '1px solid rgba(255, 255, 255, 0.16)'
+              : (theme.border ? `1px solid ${theme.border}` : '1px solid rgba(255, 255, 255, 0.22)'))),
+        boxShadow: isCurrent
+          ? `0 0 0 2.5px #ffffff, 0 12px 28px -4px ${accentColor}55, 0 2px 8px rgba(15, 23, 42, 0.10)`
+          : (isActive
+            ? (isSleeve ? `0 8px 24px -2px ${accentColor}33, 0 2px 6px rgba(15, 23, 42, 0.06)` : '0 8px 24px rgba(15, 23, 42, 0.25), inset 0 1px 1px rgba(255,255,255,0.45)')
+            : (effectiveDisabled
+              ? 'none'
+              : (isHovered
+                ? `0 10px 24px -2px ${accentColor}40, inset 0 1px 1px rgba(255,255,255,0.35)`
+                : (isSleeve ? '0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02)' : `${theme.shadow || '0 4px 14px -2px rgba(0,0,0,0.18)'}, inset 0 1px 1px rgba(255,255,255,0.30)`)))),
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -928,8 +794,8 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
             borderRadius: '10px',
             background: isSleeve
               ? `${accentColor}14`
-              : (textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.22)'),
-            border: isSleeve ? `1px solid ${accentColor}30` : '1px solid rgba(255, 255, 255, 0.35)',
+              : (isLightMonth ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.22)'),
+            border: isSleeve ? `1px solid ${accentColor}30` : (isLightMonth ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.35)'),
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
             backdropFilter: 'blur(4px)',
             WebkitBackdropFilter: 'blur(4px)',
@@ -946,10 +812,10 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
             lineHeight: 1
           }}>
             <span style={{
-              fontSize: isLarge ? '1.45rem' : '1.20rem',
+              fontSize: isLarge ? '1.45rem' : '1.25rem',
               fontWeight: 950,
-              color: isSleeve ? accentColor : textColor,
-              textShadow: (!isSleeve && textColor === '#ffffff') ? '0 1px 2px rgba(0, 0, 0, 0.20)' : 'none',
+              color: isSleeve ? accentColor : effectiveTextColor,
+              textShadow: (!isSleeve && !isLightMonth && effectiveTextColor === '#ffffff') ? '0 1px 2px rgba(0, 0, 0, 0.20)' : 'none',
               letterSpacing: '-0.03em',
               lineHeight: 1
             }}>
@@ -958,10 +824,12 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
             <span style={{
               fontSize: '0.60rem',
               fontWeight: 900,
-              color: isSleeve ? '#64748b' : textColor,
-              opacity: isSleeve ? 1 : 0.9,
+              color: isSleeve ? '#64748b' : effectiveMutedColor,
+              opacity: isSleeve ? 1 : 0.95,
               letterSpacing: '0.12em',
-              marginTop: '3px'
+              textTransform: 'uppercase',
+              marginTop: '3px',
+              lineHeight: 1
             }}>
               {monthCode || ''}
             </span>
@@ -980,7 +848,8 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
           <span style={{
             fontSize: '0.70rem',
             fontWeight: 850,
-            color: textColor,
+            color: effectiveTextColor,
+            textShadow: (!isSleeve && !isLightMonth && effectiveTextColor === '#ffffff') ? '0 1px 2px rgba(0, 0, 0, 0.15)' : 'none',
             textAlign: 'center',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -994,13 +863,13 @@ const VinylRecordCover: React.FC<VinylRecordCoverProps> = ({
             fontWeight: 800,
             color: isSleeve
               ? (takesNum > 0 ? accentColor : '#64748b')
-              : textColor,
+              : effectiveTextColor,
             background: isSleeve
               ? (takesNum > 0 ? `${accentColor}14` : '#f1f5f9')
-              : (textColor === '#0f172a' ? 'rgba(0, 0, 0, 0.10)' : 'rgba(255, 255, 255, 0.24)'),
+              : (isLightMonth ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.24)'),
             border: isSleeve
               ? `1px solid ${takesNum > 0 ? `${accentColor}30` : '#e2e8f0'}`
-              : '1px solid rgba(255, 255, 255, 0.35)',
+              : (isLightMonth ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.35)'),
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
             backdropFilter: 'blur(4px)',
             WebkitBackdropFilter: 'blur(4px)',
@@ -1995,7 +1864,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
       // 5. MAI: Frisches Maigrün / Smaragd (Blütezeit)
       5: { bg: '#10b981', shadow: '0 6px 14px -2px rgba(16, 185, 129, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#10b981' },
       // 6. JUNI: Strahlendes Apfelgrün / Knackige Limette (Frühsommer)
-      6: { bg: '#65a30d', shadow: '0 6px 14px -2px rgba(101, 163, 13, 0.35)', border: 'rgba(255, 255, 255, 0.28)', textColor: '#ffffff', accentColor: '#65a30d' },
+      6: { bg: '#65a30d', shadow: '0 6px 14px -2px rgba(101, 163, 13, 0.35)', border: 'rgba(255, 255, 255, 0.35)', textColor: '#0f172a', accentColor: '#4d7c0f' },
       // 7. JULI: Warmes Sonnengelb (Hochsommer)
       7: { bg: '#eab308', shadow: '0 6px 14px -2px rgba(234, 179, 8, 0.35)', border: 'rgba(255, 255, 255, 0.35)', textColor: '#0f172a', accentColor: '#d97706' },
       // 8. AUGUST: Sonniges Mango / Warmes Mandarine (Spätsommer)
@@ -2487,10 +2356,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   </div>
                   <div>
                     <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                      {isTeacherMode ? 'Studio-Aufnahmen' : 'Vinyl-Aufnahmestudio'}
+                      {isTeacherMode ? 'Studio-Aufnahmen' : 'Aufnahmestudio'}
                     </h2>
                     <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>
-                      1-Tap Aufnahme & Vorbilder
+                      Mikrofon bereit
                     </span>
                   </div>
                 </div>
@@ -3040,15 +2909,16 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
               {studentAudiosList.length === 0 ? (
                 <div style={{
-                  padding: '20px 14px',
+                  padding: '24px 16px',
                   textAlign: 'center',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '8px',
                   background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-                  borderRadius: '14px',
-                  border: '1.5px dashed #cbd5e1'
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.02)'
                 }}>
                   <div style={{
                     width: '36px',
@@ -3065,11 +2935,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     <Disc size={18} strokeWidth={2} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#334155' }}>
-                      Dein Studio ist bereit
+                    <div style={{ fontSize: '0.84rem', fontWeight: 900, color: '#334155' }}>
+                      Dein Studio-Archiv
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.35 }}>
-                      Tippe oben auf „Jetzt aufnehmen“, um deinen ersten Take einzuspielen!
+                      Nimm deinen ersten Take auf.
                     </div>
                   </div>
                 </div>
@@ -3199,6 +3069,14 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
               </div>
             </div>
 
+            {/* 💽 Haptische Vitrinen-Regalbodenlinie (0,1% Swiss Grid Fuge) */}
+            <div style={{
+              width: '100%',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent 0%, #e2e8f0 10%, #e2e8f0 90%, transparent 100%)',
+              margin: '2px 0 6px'
+            }} />
+
             {/* 2. DIE 12 MONATS-LPS (4x3 Großformat in Schuljahres-Reihenfolge mit Uni-Farben) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
@@ -3210,16 +3088,29 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     12 Monats-Platten in Schuljahres-Reihenfolge ({startMonthName} – {endMonthName}) • 4×3 Studio-Regal
                   </span>
                 </div>
-                <div style={{
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.66rem',
-                  fontWeight: 800,
-                  color: '#475569'
-                }}>
-                  {allMonthsList.reduce((acc, curr) => acc + curr.totalCount, 0)} Takes gesamt
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    color: '#64748b'
+                  }}>
+                    {allMonthsList.filter(m => m.totalCount > 0).length} / 12 Monate bespielt
+                  </div>
+                  <div style={{
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    color: '#475569'
+                  }}>
+                    {allMonthsList.reduce((acc, curr) => acc + curr.totalCount, 0)} Takes gesamt
+                  </div>
                 </div>
               </div>
 
@@ -3235,10 +3126,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   return (
                     <VinylRecordCover
                       key={`month-lp-${m.monthKey}`}
-                      variant="passepartout"
+                      variant="vivid"
                       title={m.monthLabel.split(' ')[0]}
                       subtitle={`${m.year}`}
-                      badge={isLockedFuture ? 'Demnächst' : `${m.totalCount} Takes`}
+                      badge={`${m.totalCount} Takes`}
                       theme={theme}
                       monthNumber={m.monthNumber}
                       monthCode={m.monthCode}
@@ -3251,7 +3142,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         if (isLockedFuture) return;
                         setActiveSharedAlbum({
                           type: 'month',
-                          variant: 'passepartout',
+                          variant: 'vivid',
                           title: m.monthLabel,
                           subtitle: `${m.teacherCount} Lehrkraft • ${m.studentCount} Schüler`,
                           badge: `${m.totalCount} Takes`,
@@ -3354,7 +3245,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 title={activeSharedAlbum.title.split(' ')[0]}
                 size="large"
                 isActive={true}
-                variant={activeSharedAlbum.variant || (activeSharedAlbum.type === 'month' ? 'passepartout' : 'vivid')}
+                variant={activeSharedAlbum.variant || 'vivid'}
                 theme={activeSharedAlbum.theme}
                 icon={activeSharedAlbum.icon}
                 monthNumber={activeSharedAlbum.monthNumber}

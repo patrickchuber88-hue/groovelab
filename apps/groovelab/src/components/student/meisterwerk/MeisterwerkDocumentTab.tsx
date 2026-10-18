@@ -6909,7 +6909,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <span>Vorbereitungsraum & Aufgaben-Studio</span>
                     </span>
                   </div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 10px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.10)', border: 'none', padding: '2px 10px', borderRadius: '100px' }}>
                     Lehrer-Cockpit
                   </span>
                 </div>
@@ -7207,7 +7207,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <span>Eintrag & Hausaufgabe</span>
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: 'rgba(52, 168, 83, 0.10)', border: 'none', padding: '2px 8px', borderRadius: '100px' }}>
                       Schüler-Vorschau
                     </span>
                   </div>

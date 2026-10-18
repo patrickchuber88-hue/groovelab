@@ -415,7 +415,7 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
           )}
         </div>
 
-        {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-{Rolle}-{Nummer}) */}
+        {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-{Rolle: 1/2/3}-{Nummer}) */}
         <div 
           style={{ 
             textAlign: 'center', 

@@ -1329,21 +1329,21 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(1)}
-                              style={{ background: '#e6f4ea', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#15803d', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
+                              style={{ background: 'rgba(52, 168, 83, 0.12)', border: 'none', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#15803d', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
                               <Bell size={13} /> Glocke
                             </button>
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(2)}
-                              style={{ background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#4338ca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
+                              style={{ background: 'rgba(99, 102, 241, 0.12)', border: 'none', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#4338ca', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
                               <Music size={13} /> Harfe
                             </button>
                             <button
                               type="button"
                               onClick={() => playMilestoneSound(3)}
-                              style={{ background: '#f3e8ff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#7e22ce', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
+                              style={{ background: 'rgba(168, 85, 247, 0.12)', border: 'none', borderRadius: '10px', padding: '10px 8px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', color: '#7e22ce', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', minHeight: '44px', touchAction: 'manipulation' }}
                             >
                               <Sparkles size={13} /> Akkord
                             </button>

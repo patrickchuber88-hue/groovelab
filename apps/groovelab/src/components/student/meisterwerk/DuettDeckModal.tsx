@@ -25,7 +25,8 @@ import {
   Timer
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../../utils/blobStorage';
-import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { applyBufferTailFadeOut } from '../../../utils/audioTailEngine';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../../utils/audioMasteringEngine';
 import { 
   getSharedAudioContext, 
@@ -1093,6 +1094,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       }
 
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       activeStreamRef.current = stream;
 
       // 🎚️ Live Real-Time Peak & VU Meter Hookup
@@ -1223,6 +1225,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             setStudentDuration(decodedStudent.duration);
           }
 
+          // 🪄 0,1% DAW Goldstandard: Cos² Soft-Release Fade-Out am Puffer-Ende
+          applyBufferTailFadeOut(lockedStudentBuffer, 0.035);
           studentBufferRef.current = lockedStudentBuffer;
           const rawStd = extractRawPeaks(lockedStudentBuffer, 320);
           setStudentRawPeaks(rawStd);

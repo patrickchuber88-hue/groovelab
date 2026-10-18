@@ -611,6 +611,14 @@ export function useCampusMessagingData({
               return { ...m, is_read: true };
             }
           }
+          if (m.group_id && m.sender_id !== uid) {
+            const grpLastRead = groupLastReadMap.get(m.group_id) || 0;
+            const chanLastRead = m.channel_id && channelLastReadMap.has(m.channel_id) ? (channelLastReadMap.get(m.channel_id) || 0) : 0;
+            const effectiveReadTime = Math.max(grpLastRead, chanLastRead);
+            if (effectiveReadTime > 0 && new Date(m.created_at).getTime() <= effectiveReadTime) {
+              return { ...m, is_read: true };
+            }
+          }
           return m;
         });
 
@@ -636,7 +644,7 @@ export function useCampusMessagingData({
           if (maxReadTime > 0) {
             return msgTime > maxReadTime;
           }
-          return true;
+          return false;
         }).length;
 
         setCampusUnreadCount(directUnread + groupUnread);

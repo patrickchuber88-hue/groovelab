@@ -14,7 +14,7 @@ import {
 } from '../../utils/audioMasteringEngine';
 import { storeBlob } from '../../utils/blobStorage';
 import { MilestoneData, CustomPlaylist, CustomPlaylistTrack } from './AudioBiographyView';
-import { acquireAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 
 interface JuniorAudioBiographyWizardProps {
   isOpen: boolean;
@@ -254,6 +254,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
       audioChunksRef.current = [];
       // 🌟 1. Request microphone permission FIRST before starting any visual countdown
       const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       streamRef.current = stream;
 
       const recorder = new MediaRecorder(stream);

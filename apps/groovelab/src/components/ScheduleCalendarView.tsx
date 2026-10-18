@@ -5371,14 +5371,14 @@ export function ScheduleCalendarView({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
+      case 'scheduled': return { bg: 'rgba(52, 168, 83, 0.08)', border: '#34a853', text: '#15803d' };
       case 'cancelled':
       case 'teacher_ausfall':
       case 'canceled_by_teacher_ausfall':
-        return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
-      case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(254, 243, 199, 0.55)', border: '#eab308', text: '#854d0e' };
-      default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
+        return { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444', text: '#991b1b' };
+      case 'pending_reschedule': return { bg: 'rgba(245, 158, 11, 0.08)', border: '#f59e0b', text: '#92400e' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(234, 179, 8, 0.12)', border: '#eab308', text: '#854d0e' };
+      default: return { bg: 'rgba(148, 163, 184, 0.08)', border: '#cbd5e1', text: '#475569' };
     }
   };
 

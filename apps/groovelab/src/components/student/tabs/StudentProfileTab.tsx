@@ -228,7 +228,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                   • Mitglied seit {studentUser.created_at && !isNaN(new Date(studentUser.created_at).getTime()) ? new Date(studentUser.created_at).toLocaleDateString('de-DE') : 'unbekannt'}
                 </span>
 
-                {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-S-{Nummer}) */}
+                {/* 🛡️ 0.1% Goldstandard Kanonische Campus-ID ({Schul-ID}-1-{Nummer}) */}
                 <span
                   role="button"
                   tabIndex={0}

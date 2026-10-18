@@ -5,16 +5,16 @@
  * Format: {SCHUL_NUMMER_3STELLIG}-{ROLLE}-{USER_NUMMER_4STELLIG} (Exakt 10 Zeichen)
  * 
  * Beispiele:
- * - 001-V-0001 (Verwaltung / Schulleitung #1 an Schule 001 Musäk Bad Säckingen)
- * - 001-L-0001 (Lehrkraft / Dozent #1 an Schule 001)
- * - 001-S-0001 (Schüler #1 an Schule 001 - z. B. Linus K.)
- * - 002-S-0042 (Schüler #42 an Schule 002)
+ * - 001-3-0001 (Verwaltung / Schulleitung #1 an Schule 001 Musäk Bad Säckingen)
+ * - 001-2-0001 (Lehrkraft / Dozent #1 an Schule 001)
+ * - 001-1-0001 (Schüler #1 an Schule 001 - z. B. Linus K.)
+ * - 002-1-0042 (Schüler #42 an Schule 002)
  * 
  * Symmetrie mit Rechnungs-Engine:
  * Rechnungsnummer AKT-001-2609-01 korrespondiert 1:1 mit Schulkennung 001.
  */
 
-export type CampusRoleCode = 'V' | 'L' | 'S';
+export type CampusRoleCode = '1' | '2' | '3' | 'V' | 'L' | 'S';
 
 /**
  * Bekannte Schulkennungen (Single Source of Truth)
@@ -65,26 +65,39 @@ export const formatSchoolNumericId = (id?: string | null | number, padLength = 3
 
 /**
  * Ermittelt das Rollen-Kürzel für die Campus-ID:
- * V = Verwaltung / Schulleitung / Admin / Sekretariat
- * L = Lehrkraft / Dozent / Pädagoge
- * S = Schüler / Schülerin (Default)
+ * 3 = Verwaltung / Schulleitung / Admin / Sekretariat (legacy: V)
+ * 2 = Lehrkraft / Dozent / Pädagoge (legacy: L)
+ * 1 = Schüler / Schülerin (Default, legacy: S)
  */
 export const getCampusRoleCode = (role?: string | null, roles?: string[] | null): CampusRoleCode => {
   const allRoles = roles || (role ? [role] : []);
   const isVerwaltung = allRoles.some(r => ['admin', 'secretary', 'verwaltung', 'superadmin', 'owner'].includes(r?.toLowerCase() || '')) ||
                        ['admin', 'secretary', 'verwaltung', 'superadmin', 'owner'].includes(role?.toLowerCase() || '');
-  if (isVerwaltung) return 'V';
+  if (isVerwaltung) return '3';
 
   const isTeacher = allRoles.some(r => ['teacher', 'lehrer', 'dozent', 'instructor'].includes(r?.toLowerCase() || '')) ||
                     ['teacher', 'lehrer', 'dozent', 'instructor'].includes(role?.toLowerCase() || '');
-  if (isTeacher) return 'L';
+  if (isTeacher) return '2';
 
-  return 'S';
+  return '1';
+};
+
+/**
+ * Normalisiert eine beliebige kanonische Campus-ID auf das 0,1% reine Ziffernschema (z. B. "001-S-0001" -> "001-1-0001").
+ */
+export const normalizeCampusIdToNumeric = (id?: string | null): string => {
+  if (!id || typeof id !== 'string') return '';
+  const clean = id.trim().toUpperCase();
+  const match = clean.match(/^(\d{3})-([123VLS])-(\d{1,4})$/);
+  if (!match) return clean;
+  const [, sch, role, seq] = match;
+  const digitRole = (role === 'S' || role === '1') ? '1' : (role === 'L' || role === '2') ? '2' : '3';
+  return `${sch}-${digitRole}-${seq.padStart(4, '0')}`;
 };
 
 /**
  * Formatiert eine Campus-ID nach dem kanonischen 10-Zeichen-Standard:
- * {001}-{V|L|S}-{0001}
+ * {001}-{1|2|3}-{0001}
  */
 export const formatCanonicalCampusId = (
   schoolNumericId: number | string,
@@ -92,7 +105,11 @@ export const formatCanonicalCampusId = (
   sequence: number | string
 ): string => {
   const sNum = formatSchoolNumericId(schoolNumericId, 3);
-  const rCode = roleCode.toUpperCase() as CampusRoleCode;
+  let rCode = String(roleCode).toUpperCase();
+  if (rCode === 'S' || rCode === '1') rCode = '1';
+  else if (rCode === 'L' || rCode === '2') rCode = '2';
+  else if (rCode === 'V' || rCode === '3') rCode = '3';
+  else rCode = '1';
   
   let numVal = parseInt(String(sequence).replace(/\D/g, ''), 10);
   if (isNaN(numVal) || numVal <= 0) numVal = 1;
@@ -104,12 +121,12 @@ export const formatCanonicalCampusId = (
 };
 
 /**
- * Prüft, ob ein gegebener String eine kanonische Campus-ID ist (bevorzugt feste 10 Zeichen).
+ * Prüft, ob ein gegebener String eine kanonische Campus-ID ist (bevorzugt feste 10 Zeichen, Ziffern- oder Legacy-Format).
  */
 export const isCanonicalCampusId = (val?: string | null): boolean => {
   if (!val || typeof val !== 'string') return false;
-  // Strikt: 001-S-0001 oder lenient: 1-S-0001
-  return /^\d{3}-[VLS]-\d{4}$/i.test(val.trim());
+  // Strikt: 001-1-0001 (oder legacy: 001-S-0001)
+  return /^\d{3}-([123VLS])-\d{4}$/i.test(val.trim());
 };
 
 /**
@@ -151,10 +168,10 @@ const deriveStableSequenceFromUuid = (uuid: string, roleCode: CampusRoleCode, us
   }
   const absHash = Math.abs(hash);
 
-  if (roleCode === 'V') {
+  if (roleCode === 'V' || roleCode === '3') {
     return (absHash % 50) + 1; // 1..50 (Verwaltung)
   }
-  if (roleCode === 'L') {
+  if (roleCode === 'L' || roleCode === '2') {
     return (absHash % 80) + 1; // 1..80 (reales Kollegium: 1..80 Dozenten)
   }
   // Schüler: 1..2500 (reale Musikschulgröße)
@@ -163,10 +180,10 @@ const deriveStableSequenceFromUuid = (uuid: string, roleCode: CampusRoleCode, us
 
 /**
  * Autoritativer Resolver: Löst für ein beliebiges User-Objekt die kanonische Campus-ID auf.
- * Garantiert 10-Zeichen-Format (z. B. "001-S-0001") und 100% Symmetrie zu den Rechnungsbelegen ("AKT-001-...").
+ * Garantiert 10-Zeichen-Format (z. B. "001-1-0001") und 100% Symmetrie zu den Rechnungsbelegen ("AKT-001-...").
  */
 export const resolveUserCampusId = (user?: any, fallbackSchoolId?: string | null): string => {
-  if (!user) return '001-S-0001';
+  if (!user) return '001-1-0001';
 
   const existingAusweis = (user.ausweis_nummer || user.ausweisNummer || '').trim();
 
@@ -174,14 +191,14 @@ export const resolveUserCampusId = (user?: any, fallbackSchoolId?: string | null
   // Veraltete / fehlerhafte Zufalls-Präfixe (28- oder 538-) werden verworfen
   const hasLegacyBuggyPrefix = existingAusweis.startsWith('28-') || existingAusweis.startsWith('538-');
   if (isCanonicalCampusId(existingAusweis) && !hasLegacyBuggyPrefix) {
-    return existingAusweis.toUpperCase();
+    return normalizeCampusIdToNumeric(existingAusweis);
   }
 
   // 2. Bestimme Schulnummer (Default: 1 -> "001")
   const rawSchoolId = user.school_id || user.schoolId || fallbackSchoolId || null;
   const schoolNum = user.school_number || user.schools?.school_number || user.school_numeric_id || user.schoolNumericId || getSchoolNumericId(rawSchoolId);
 
-  // 3. Bestimme Rollen-Code (V, L, S) nach Höchstrang-Prinzip
+  // 3. Bestimme Rollen-Code (3=Verwaltung, 2=Lehrer, 1=Schüler) nach Höchstrang-Prinzip
   const roleCode = getCampusRoleCode(user.role, user.roles);
 
   // 4. Bestimme Sequenznummer (0,1% Goldstandard Nummernkreis-Governance):
@@ -193,13 +210,13 @@ export const resolveUserCampusId = (user?: any, fallbackSchoolId?: string | null
   const numVal = digitsOnly ? parseInt(digitsOnly, 10) : 0;
 
   // Plausibilitätsgrenzen für echte Altsystem-Personalnummern (z. B. aus WinMusik/MBS):
-  // - Verwaltung (V): max. 99 Mitarbeiter (Zahlen >= 100 sind PINs, keine Personalnummern)
-  // - Lehrkraft (L): max. 499 Lehrkräfte (Zahlen >= 500 sind PINs, keine Personalnummern)
-  // - Schüler (S): max. 9999 Schüler (sofern kein Starter-PIN Format)
+  // - Verwaltung (3 / V): max. 99 Mitarbeiter (Zahlen >= 100 sind PINs, keine Personalnummern)
+  // - Lehrkraft (2 / L): max. 499 Lehrkräfte (Zahlen >= 500 sind PINs, keine Personalnummern)
+  // - Schüler (1 / S): max. 9999 Schüler (sofern kein Starter-PIN Format)
   const isPlausibleLegacySeq = !isStarterPinPattern && numVal > 0 && (
-    (roleCode === 'V' && numVal < 100) ||
-    (roleCode === 'L' && numVal < 500) ||
-    (roleCode === 'S' && numVal <= 9999)
+    ((roleCode === 'V' || roleCode === '3') && numVal < 100) ||
+    ((roleCode === 'L' || roleCode === '2') && numVal < 500) ||
+    ((roleCode === 'S' || roleCode === '1') && numVal <= 9999)
   );
 
   let sequence: number;

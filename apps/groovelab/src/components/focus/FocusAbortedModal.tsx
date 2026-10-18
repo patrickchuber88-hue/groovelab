@@ -1,18 +1,23 @@
 import React, { useEffect } from 'react';
-import { TimerOff, AlertOctagon, RotateCcw } from 'lucide-react';
+import { TimerOff, AlertOctagon, RotateCcw, Smartphone, HandMetal, Sparkles } from 'lucide-react';
 import { FocusAbortReason } from '../../hooks/useFocusInterruptionGuard';
+import { DeviceAntiCheatAbortReason } from '../../hooks/useDeviceAntiCheatGuard';
+
+export type AnyFocusAbortReason = FocusAbortReason | DeviceAntiCheatAbortReason | string;
 
 export interface FocusAbortedModalProps {
   isOpen: boolean;
-  reason: FocusAbortReason | null;
+  reason: AnyFocusAbortReason | null;
   toolName?: string;
+  uiLevel?: 'junior' | 'teen' | 'pro' | string;
   onClose: () => void;
 }
 
 export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
   isOpen,
   reason,
-  toolName = 'Übe-Tool',
+  toolName = 'Fokus-Timer',
+  uiLevel = 'teen',
   onClose
 }) => {
   useEffect(() => {
@@ -31,7 +36,82 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
 
   if (!isOpen) return null;
 
-  const isStrikeLimit = reason === 'strike_limit_exceeded';
+  const isJunior = uiLevel === 'junior';
+  const isPro = uiLevel === 'pro';
+
+  // Wording & Details Resolution
+  const getReasonDetails = (): { title: string; subtitle: string; icon: React.ReactNode } => {
+    switch (reason) {
+      case 'device_lifted_timeout':
+        return {
+          title: 'Gerät vom Tisch angehoben',
+          subtitle: `Das Gerät wurde während des Übens angehoben und nicht innerhalb von 10 Sekunden wieder ruhig auf den Tisch gelegt.`,
+          icon: <Smartphone size={36} />
+        };
+      case 'device_motion_strike':
+        return {
+          title: 'Handheld-Nutzung registriert',
+          subtitle: `Die Bewegungssensoren haben aktive Hände am Gerät registriert. Beim Instrumenten-Üben bleibt das Smartphone unbewegt auf dem Tisch.`,
+          icon: <Smartphone size={36} />
+        };
+      case 'touch_interaction_strike':
+        return {
+          title: 'Display-Bedienung erkannt',
+          subtitle: `Der Bildschirm wurde während der Fokus-Session berührt. Wer Instrument übt, bedient kein Smartphone.`,
+          icon: <AlertOctagon size={36} />
+        };
+      case 'desktop_input_strike':
+        return {
+          title: 'Aktive Computernutzung erkannt',
+          subtitle: `Anhaltende Tastatur- oder Mauseingaben registriert. Die volle Aufmerksamkeit gehört dem Instrument.`,
+          icon: <AlertOctagon size={36} />
+        };
+      case 'app_switch_timeout':
+        return {
+          title: 'Tab- oder App-Wechsel',
+          subtitle: `Du hast die App verlassen oder den Tab gewechselt. Der Fokus-Timer bleibt während des Übens im Vordergrund.`,
+          icon: <TimerOff size={36} />
+        };
+      case 'strike_limit_exceeded':
+        return {
+          title: 'Kulanz-Limit erreicht (2. Unterbrechung)',
+          subtitle: `Du hast das ${toolName} während einer laufenden Session ein zweites Mal unterbrochen. Die 10s-Kulanz gilt nur 1× pro Session.`,
+          icon: <AlertOctagon size={36} />
+        };
+      case 'permission_denied':
+        return {
+          title: 'Sensor-Berechtigung erforderlich',
+          subtitle: `Für die Anti-Schummel-Prüfung benötigt der Fokus-Timer Zugriff auf die Lagesensoren. Bitte in den Einstellungen erlauben!`,
+          icon: <AlertOctagon size={36} />
+        };
+      case 'sensor_probe_failed':
+        return {
+          title: 'Keine Sensor-Signale empfangen',
+          subtitle: `Das Mobilgerät liefert keine Lagesensordaten. Bitte Sensoren im Browser aktivieren.`,
+          icon: <AlertOctagon size={36} />
+        };
+      case 'timeout':
+      default:
+        return {
+          title: '10-Sekunden-Zeitlimit überschritten',
+          subtitle: `Du hast das ${toolName} unterbrochen und bist nicht innerhalb von 10 Sekunden zurückgekehrt.`,
+          icon: <TimerOff size={36} />
+        };
+    }
+  };
+
+  const { title: reasonTitle, subtitle: reasonSubtitle, icon: reasonIcon } = getReasonDetails();
+
+  // Pedagogical Motivation Text
+  const getPedagogicalNote = () => {
+    if (isJunior) {
+      return 'Hoppla! Dein Zauber-Fokus braucht absolute Ruhe auf dem Tisch, damit deine magische Übe-Flamme brennt. Schnapp dir dein Instrument und starte gleich eine neue Zauber-Runde! 🪄';
+    }
+    if (isPro) {
+      return 'Disziplin-Abbruch: Die Session wurde verworfen (0 Minuten gewertet). Konzentriertes Üben am Instrument erfordert physische Trennung von störenden Bildschirmen.';
+    }
+    return 'Die angebrochene Übezeit und XP dieser Session wurden nach den Anti-Ablenkungs-Regeln verworfen. Starte jetzt einen neuen Versuch und bleibe mit vollem Fokus am Instrument!';
+  };
 
   return (
     <div
@@ -73,15 +153,15 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
             width: '64px',
             height: '64px',
             borderRadius: '20px',
-            background: '#fee2e2',
-            color: '#dc2626',
+            background: isJunior ? '#fef3c7' : '#fee2e2',
+            color: isJunior ? '#d97706' : '#dc2626',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '20px'
           }}
         >
-          {isStrikeLimit ? <AlertOctagon size={36} /> : <TimerOff size={36} />}
+          {isJunior ? <Sparkles size={36} /> : reasonIcon}
         </div>
 
         {/* Title */}
@@ -95,7 +175,7 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
             letterSpacing: '-0.02em'
           }}
         >
-          Übe-Session abgebrochen
+          {isJunior ? 'Zauber-Fokus erloschen 🪄' : 'Übe-Session abgebrochen'}
         </h2>
 
         {/* Reason Box */}
@@ -115,12 +195,10 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
               margin: '0 0 6px 0',
               fontSize: '14px',
               fontWeight: 700,
-              color: '#dc2626'
+              color: isJunior ? '#b45309' : '#dc2626'
             }}
           >
-            {isStrikeLimit
-              ? 'Kulanz-Limit erreicht (2. Unterbrechung)'
-              : '10-Sekunden-Zeitlimit überschritten'}
+            {reasonTitle}
           </p>
           <p
             style={{
@@ -130,13 +208,11 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
               lineHeight: 1.4
             }}
           >
-            {isStrikeLimit
-              ? `Du hast das ${toolName} während einer laufenden Session ein zweites Mal verlassen. Die Kulanz von 10 Sekunden gilt nur maximal 1× pro Session.`
-              : `Du hast das ${toolName} verlassen und bist nicht innerhalb von 10 Sekunden zurückgekehrt.`}
+            {reasonSubtitle}
           </p>
         </div>
 
-        {/* Explanation */}
+        {/* Pedagogical Note */}
         <p
           style={{
             margin: '0 0 24px 0',
@@ -145,7 +221,7 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
             lineHeight: 1.5
           }}
         >
-          Die angebrochene Übezeit und XP dieser Session wurden nach den Fokus-Regeln verworfen. Starte einfach gleich eine neue Runde und bleibe konzentriert dabei!
+          {getPedagogicalNote()}
         </p>
 
         {/* Action Button */}
@@ -164,7 +240,7 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
             minHeight: '48px',
             padding: '12px 24px',
             background: '#0f172a',
-            color: '#facc15',
+            color: isJunior ? '#fef08a' : '#facc15',
             border: 'none',
             borderRadius: '14px',
             fontWeight: 700,
@@ -180,8 +256,8 @@ export const FocusAbortedModal: React.FC<FocusAbortedModalProps> = ({
           }}
           aria-label="Abbruch-Hinweis bestätigen und schließen"
         >
-          <RotateCcw size={18} />
-          <span>Verstanden &amp; Neue Session starten</span>
+          {isJunior ? <Sparkles size={18} /> : <RotateCcw size={18} />}
+          <span>{isJunior ? 'Neue Zauber-Runde starten! 🚀' : 'Verstanden & Neue Session starten'}</span>
         </button>
       </div>
 

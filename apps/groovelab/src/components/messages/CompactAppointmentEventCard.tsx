@@ -80,6 +80,7 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
   const content: string = msg.content || '';
   const cleanContent = String(content || '').replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
   const lowerContent = cleanContent.toLowerCase();
+  const arrowIndex = content.indexOf('->');
 
   const isReactivation = msg.message_type === 'cancellation_reset' ||
     content.includes('🔄') || lowerContent.includes('reaktiviert') || lowerContent.includes('zurückgesetzt') || lowerContent.includes('wiederhergestellt') || lowerContent.includes('regulär statt') || lowerContent.includes('entwarnung') || lowerContent.includes('einsatzbereit');
@@ -293,6 +294,94 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
     );
   }
 
+  // 2b. Reine Terminbestätigung (Kompakte WhatsApp-System-Pill, ~28px)
+  const isPureConfirmation = arrowIndex === -1 && 
+    (content.includes('bestätigt') || lowerContent.includes('termin bestätigt') || lowerContent.includes('unterrichtstermin bestätigt')) && 
+    !content.includes('abgelehnt');
+
+  if (isPureConfirmation) {
+    const teacherName = formatStudentDisplayName(selectedRecipient);
+    const shortLabel = `Termin bestätigt: ${teacherName ? `${teacherName} am ` : ''}${formattedDateShort || 'Termin'}`;
+
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0' }}>
+        <div 
+          role="status"
+          aria-label={shortLabel}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '6px',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '100px',
+            padding: '4px 10px 4px 8px',
+            boxShadow: 'none',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: '#15803d',
+              color: '#ffffff',
+              flexShrink: 0
+            }}>
+              <Check size={12} strokeWidth={3} />
+            </span>
+            <span style={{
+              fontSize: '0.76rem',
+              fontWeight: 750,
+              color: '#15803d',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              {formattedDateShort ? `${formattedDateShort} • ` : ''}Termin bestätigt
+            </span>
+          </div>
+
+          {parsedDate && (
+            <button
+              type="button"
+              onClick={handleNavigate}
+              aria-label={`Im Stundenplan ansehen für ${formattedDateShort}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                background: '#ffffff',
+                border: '1.5px solid #10b981',
+                color: '#059669',
+                borderRadius: '100px',
+                padding: '2px 7px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                touchAction: 'manipulation',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Calendar size={11} color="#059669" />
+              <span>Kalender</span>
+              <ExternalLink size={9} color="#059669" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // 3. Verschiebungsvorschlag / Interaktive Bestätigung (Schlanke Aktions-Pill)
   const isCurrentUserSender = isSender !== undefined 
     ? isSender 
@@ -304,7 +393,6 @@ export const CompactAppointmentEventCard: React.FC<CompactAppointmentEventCardPr
   let oldTime = '';
   let newTime = '';
 
-  const arrowIndex = content.indexOf('->');
   if (arrowIndex !== -1) {
     title = isCurrentUserSender ? 'Terminverschiebung übermittelt' : 'Neue Unterrichtszeit';
     if (isSuperseded) {
