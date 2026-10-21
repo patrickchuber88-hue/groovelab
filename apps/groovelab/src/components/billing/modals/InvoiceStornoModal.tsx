@@ -170,7 +170,7 @@ export const InvoiceStornoModal: React.FC<InvoiceStornoModalProps> = ({
           />
         </div>
 
-        <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#fef2f2', border: '1px solid #fecaca', fontSize: '0.74rem', color: '#991b1b', lineHeight: 1.35 }}>
+        <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#fef2f2', border: 'none', fontSize: '0.74rem', color: '#991b1b', lineHeight: 1.35 }}>
           🛡️ <strong>GoBD Unveränderbarkeit:</strong> Der Ursprungsbeleg wird nicht gelöscht, sondern als storniert markiert. Es wird automatisch eine Gegenbuchung mit Belegnummer <code>ST-...</code> im Ledger angelegt.
         </div>
 

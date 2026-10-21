@@ -289,7 +289,7 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
       let btnTextColor = 'white';
 
       if (theme === 'groovelab') {
-        primaryColor = '#eab308';
+        primaryColor = '#facc15';
         primaryBg = '#fefce8';
         btnTextColor = '#1d1d1f';
       } else if (theme === 'admin') {
@@ -652,7 +652,7 @@ export function usePremiumOnboardingTour({ tourKey, steps, platformTheme = 'camp
 }
 
 export function TourStartButton({ onClick, platformTheme = 'campus' }: { onClick: () => void, platformTheme?: 'campus' | 'groovelab' | 'admin' }) {
-  const color = platformTheme === 'campus' ? '#34a853' : platformTheme === 'admin' ? '#ea4335' : '#eab308';
+  const color = platformTheme === 'campus' ? '#34a853' : platformTheme === 'admin' ? '#ea4335' : '#facc15';
   return (
     <button
       onClick={onClick}

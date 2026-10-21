@@ -127,7 +127,7 @@ export const RoomTopCatalogToggleBtn: React.FC<RoomTopCatalogToggleBtnProps> = (
           <>
             <Box size={14} strokeWidth={2.5} color={brandColor} />
             <span>Räume</span>
-            <span style={{ fontSize: '0.66rem', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '100px', fontWeight: 850 }}>
+            <span style={{ fontSize: '0.66rem', background: '#dcfce7', color: '#15803d', border: 'none', padding: '1px 6px', borderRadius: '100px', fontWeight: 850 }}>
               {roomCount}
             </span>
             <ChevronDown size={13} strokeWidth={2.4} color="#64748b" />

@@ -39,7 +39,7 @@ export const MasteryCompleteModal: React.FC<MasteryCompleteModalProps> = ({
         recycle={false}
         numberOfPieces={400}
         gravity={0.20}
-        colors={['#fbbf24', '#f59e0b', '#d97706', '#10b981', '#ffffff', '#eab308']}
+        colors={['#fbbf24', '#f59e0b', '#d97706', '#10b981', '#ffffff', '#facc15']}
       />
 
       <div

@@ -505,8 +505,8 @@ export function buildHomeworkNotesPayload(params: {
 
 /**
  * 🏛️ SSOT: Autoritatives Löschen der laufenden Hausaufgabe
- * Bereinigt progress_matrix, deaktiviert Standalone-Hausaufgaben,
- * leert L1/L2 Caches und sendet Realtime-Broadcasts.
+ * Bereinigt progress_matrix, deaktiviert Standalone-Hausaufgaben & Song-Hausaufgaben,
+ * leert alle L1/L2 Caches (inkl. Wochenschlüssel & Lehrwerke-Status) und sendet Realtime-Broadcasts.
  */
 export async function deleteCurrentHomeworkAuthoritative(
   studentId: string, 
@@ -514,49 +514,168 @@ export async function deleteCurrentHomeworkAuthoritative(
 ): Promise<void> {
   if (!studentId) return;
 
-  // 1. progress_matrix der aktuellen Woche bereinigen
-  if (currentWeekNum) {
+  const nowIso = new Date().toISOString();
+
+  // Compute canonical ISO week number if not explicitly provided
+  let resolvedWeekNumStr = currentWeekNum ? String(currentWeekNum).trim() : '';
+  if (!resolvedWeekNumStr) {
+    const d = new Date();
+    const target = new Date(d.valueOf());
+    const dayNr = (d.getDay() + 6) % 7;
+    target.setDate(target.getDate() - dayNr + 3);
+    const firstThursday = target.valueOf();
+    target.setMonth(0, 1);
+    if (target.getDay() !== 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+    }
+    const weekNumInt = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+    resolvedWeekNumStr = String(weekNumInt).padStart(2, '0');
+  }
+
+  const paddedKw = resolvedWeekNumStr.padStart(2, '0');
+  const unpaddedKw = String(parseInt(resolvedWeekNumStr, 10) || resolvedWeekNumStr);
+
+  // 1. progress_matrix der aktuellen Woche bereinigen (sowohl KW 09 als auch KW 9 + alle aktiven KW-Container)
+  const { error: kwPaddedErr } = await supabase
+    .from('progress_matrix')
+    .update({
+      is_current_homework: false,
+      homework_notes: null,
+      updated_at: nowIso
+    })
+    .eq('student_id', studentId)
+    .ilike('topic_name', `Hausaufgabe KW ${paddedKw}%`);
+
+  if (kwPaddedErr) {
+    console.warn('[deleteCurrentHomeworkAuthoritative] padded KW update warning:', kwPaddedErr);
+  }
+
+  if (unpaddedKw !== paddedKw) {
     await supabase
       .from('progress_matrix')
       .update({
         is_current_homework: false,
         homework_notes: null,
-        updated_at: new Date().toISOString()
+        updated_at: nowIso
       })
       .eq('student_id', studentId)
-      .ilike('topic_name', `Hausaufgabe KW ${currentWeekNum}`);
+      .ilike('topic_name', `Hausaufgabe KW ${unpaddedKw}%`);
   }
 
-  // 2. Alle aktuell aktiven Hausaufgabenzeilen des Schülers deaktivieren
+  // Auch jeden aktiv markierten Wochen-Container (is_current_homework = true) leeren
   await supabase
     .from('progress_matrix')
     .update({
       is_current_homework: false,
-      updated_at: new Date().toISOString()
+      homework_notes: null,
+      updated_at: nowIso
+    })
+    .eq('student_id', studentId)
+    .eq('is_current_homework', true)
+    .ilike('topic_name', 'Hausaufgabe KW %');
+
+  // 2. Alle aktuell aktiven Standalone-Hausaufgabenzeilen des Schülers deaktivieren
+  const { error: deactivateErr } = await supabase
+    .from('progress_matrix')
+    .update({
+      is_current_homework: false,
+      updated_at: nowIso
     })
     .eq('student_id', studentId)
     .eq('is_current_homework', true);
 
-  // 3. L1/L2 Caches bereinigen
+  if (deactivateErr) {
+    throw deactivateErr;
+  }
+
+  // 3. Aktive Song-Hausaufgaben in user_song_skills deaktivieren
+  try {
+    await supabase
+      .from('user_song_skills')
+      .update({
+        is_current_homework: false,
+        updated_at: nowIso
+      })
+      .eq('user_id', studentId)
+      .eq('is_current_homework', true);
+  } catch {}
+
+  // 4. L1/L2 Caches restlos bereinigen
   if (typeof window !== 'undefined') {
     try {
       localStorage.removeItem(`campus_homework_notes_${studentId}`);
       localStorage.removeItem(`campus_homework_week_${studentId}`);
-      const latestKey = `groovelab_student_prep_${studentId}_latest`;
-      const latestRaw = localStorage.getItem(latestKey);
-      if (latestRaw) {
-        const parsed = JSON.parse(latestRaw);
-        parsed.currentWeekNotes = [];
-        parsed.currentWeekItems = [];
-        parsed.parsedCurrentLehrwerke = [];
-        parsed.parsedCurrentSongs = [];
-        localStorage.setItem(latestKey, JSON.stringify(parsed));
+
+      // Bereinige ALLE groovelab_student_prep_${studentId}_* Caches (inkl. _YYYY-WXX und _latest)
+      const prepPrefix = `groovelab_student_prep_${studentId}_`;
+      const keysToUpdate: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prepPrefix)) {
+          keysToUpdate.push(k);
+        }
+      }
+      keysToUpdate.forEach(k => {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            parsed.currentWeekNotes = [];
+            parsed.currentWeekItems = [];
+            parsed.parsedCurrentLehrwerke = [];
+            parsed.parsedCurrentSongs = [];
+            parsed.currentRawSnapshotLwToken = undefined;
+            parsed.currentRawSnapshotSongsToken = undefined;
+            localStorage.setItem(k, JSON.stringify(parsed));
+          }
+        } catch {}
+      });
+
+      // Bereinige aktive Hausaufgaben-Seiten in student_lehrwerke_progress
+      const storedLw = localStorage.getItem('student_lehrwerke_progress');
+      if (storedLw) {
+        const parsedLw: any[] = JSON.parse(storedLw);
+        if (Array.isArray(parsedLw)) {
+          let lwChanged = false;
+          const updatedLw = parsedLw.map(item => {
+            if (String(item?.studentId) === String(studentId) && item.pageStates) {
+              const nextStates = { ...item.pageStates };
+              Object.keys(nextStates).forEach(pStr => {
+                const cur = nextStates[pStr];
+                if (cur?.isCurrentHomework || cur?.status === 'homework') {
+                  nextStates[pStr] = {
+                    ...cur,
+                    isCurrentHomework: false,
+                    status: cur.status === 'homework' ? 'locked' : cur.status,
+                    updatedAt: nowIso
+                  };
+                  lwChanged = true;
+                }
+              });
+              return { ...item, pageStates: nextStates };
+            }
+            return item;
+          });
+          if (lwChanged) {
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updatedLw));
+          }
+        }
       }
     } catch {}
 
-    window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId } }));
-    window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail: { studentId } }));
-    window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail: { studentId } }));
-    window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId } }));
+    // 5. Cross-Tab BroadcastChannel & lokale Window-Events mit explizitem deleted-Flag
+    if ('BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('campus_homework_bus');
+        bc.postMessage({ type: 'HOMEWORK_DELETED', studentId, deleted: true });
+        bc.close();
+      } catch {}
+    }
+
+    const detail = { studentId, deleted: true };
+    window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail }));
+    window.dispatchEvent(new CustomEvent('campus_homework_notes_updated', { detail }));
+    window.dispatchEvent(new CustomEvent('groovelab_student_prep_updated', { detail }));
+    window.dispatchEvent(new CustomEvent('homework-updated', { detail }));
   }
 }

@@ -20,7 +20,7 @@ const cleanRoomName = (name: string | null | undefined): string => {
 export function DeviceSetupScreen({
   school,
   admin,
-  brandColor = '#eab308',
+  brandColor = '#facc15',
   onUpdate
 }: DeviceSetupScreenProps = {}) {
   const [rooms, setRooms] = useState<any[]>([]);
@@ -495,7 +495,7 @@ export function DeviceSetupScreen({
                 height: '60px',
                 borderRadius: '20px',
                 background: '#fefce8',
-                border: '1.5px solid #fef08a',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -524,7 +524,7 @@ export function DeviceSetupScreen({
                         width: '20px',
                         height: '20px',
                         borderRadius: '50%',
-                        background: isFilled ? '#eab308' : '#f1f5f9',
+                        background: isFilled ? '#facc15' : '#f1f5f9',
                         border: isFilled ? '2px solid #ca8a04' : '2px solid #cbd5e1',
                         transform: isFilled ? 'scale(1.15)' : 'scale(1)',
                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -539,7 +539,7 @@ export function DeviceSetupScreen({
               {pinError && (
                 <div style={{
                   background: '#fef2f2',
-                  border: '1px solid #fecaca',
+                  border: 'none',
                   color: '#ef4444',
                   padding: '10px 18px',
                   borderRadius: '12px',
@@ -557,7 +557,7 @@ export function DeviceSetupScreen({
               {cooldownRemaining > 0 && (
                 <div style={{
                   background: '#fffbeb',
-                  border: '1px solid #fde68a',
+                  border: 'none',
                   color: '#b45309',
                   padding: '10px 18px',
                   borderRadius: '12px',
@@ -738,10 +738,10 @@ export function DeviceSetupScreen({
               const matches = name.match(/\d+/g);
               if (!matches) return '#64748b';
               const num = parseInt(matches[matches.length - 1]);
-              if (num === 1 || num === 2) return '#eab308'; // Yellow
+              if (num === 1 || num === 2) return '#facc15'; // Yellow
               if (num === 3 || num === 4) return '#a855f7'; // Purple
               if (num === 5 || num === 6) return '#3b82f6'; // Blue
-              if (num === 7 || num === 8) return '#eab308'; // Yellow
+              if (num === 7 || num === 8) return '#facc15'; // Yellow
               return '#64748b';
             };
 
@@ -1077,7 +1077,7 @@ export function DeviceSetupScreen({
           borderRadius: '16px', 
           fontSize: '0.78rem', 
           lineHeight: '1.45', 
-          border: '1px solid #fef08a', 
+          border: 'none', 
           textAlign: 'left' 
         }}>
           <strong style={{ fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>Rechtssicherer SaaS-Betrieb in ISO 27001-zertifizierten Rechenzentren</strong>
@@ -1089,7 +1089,7 @@ export function DeviceSetupScreen({
         {/* Download Card */}
         <div style={{ 
           background: '#fefce8', 
-          border: '1px solid #fef08a', 
+          border: 'none', 
           borderRadius: '16px', 
           padding: '16px', 
           display: 'flex', 
@@ -1134,7 +1134,7 @@ export function DeviceSetupScreen({
         {/* AVV Card */}
         <div style={{ 
           background: '#e6f4ea', 
-          border: '1px solid #a7f3d0', 
+          border: 'none', 
           borderRadius: '16px', 
           padding: '16px', 
           fontSize: '0.76rem',
@@ -1220,7 +1220,7 @@ export function DeviceSetupScreen({
             </div>
 
             {loginError && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+              <div style={{ background: '#fef2f2', border: 'none', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
                 {loginError}
               </div>
             )}
@@ -1252,7 +1252,7 @@ export function DeviceSetupScreen({
                     gap: '10px'
                   }}
                 >
-                  <Fingerprint size={20} color="#eab308" />
+                  <Fingerprint size={20} color="#facc15" />
                   <span>{adminLoginLoading ? 'Verifiziere Passkey...' : 'Mit Passkey anmelden (Touch ID)'}</span>
                 </button>
 
@@ -1318,7 +1318,7 @@ export function DeviceSetupScreen({
                     padding: '12px',
                     borderRadius: '12px',
                     background: '#f8fafc',
-                    border: '2px solid #22c55e',
+                    border: '2px solid #34a853',
                     color: '#0f172a',
                     fontSize: '1.3rem',
                     fontWeight: 900,

@@ -520,7 +520,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
               height: '48px',
               borderRadius: '16px',
               background: '#fff7ed',
-              border: '1px solid #ffedd5',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -597,7 +597,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
               }
 
               if (entry.isCurrentUser) {
-                cardBorder = isGold ? '2px solid #f59e0b' : '1.5px solid #22c55e';
+                cardBorder = isGold ? '2px solid #f59e0b' : '1.5px solid #34a853';
               }
 
               return (

@@ -13,8 +13,8 @@
  */
 
 import React from 'react';
-import { MicroScoreDuration, MicroScoreNote } from './microScore.types';
-import { MicroScoreGridSlot } from './microScoreGridEngine';
+import { MicroScoreDuration } from './microScore.types';
+import { MicroScoreGridSlot, getSpokenBeatLabel } from './microScoreGridEngine';
 import { SMUFL_GLYPHS } from '../worldtour/worldTourMusicGlyphs';
 
 export interface MicroScoreBeatGridOverlayProps {
@@ -39,6 +39,7 @@ export interface MicroScoreBeatGridOverlayProps {
   getStaffY: (pitch: string, isBass: boolean, isDrum?: boolean) => number;
   isBassClef: boolean;
   isDrumClef?: boolean;
+  hideActiveGhostHead?: boolean;
 }
 
 export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps> = ({
@@ -62,7 +63,8 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
   onSelectSlot,
   getStaffY,
   isBassClef,
-  isDrumClef = false
+  isDrumClef = false,
+  hideActiveGhostHead = false
 }) => {
   const isCurrentBarActive = activeBar === barIndex;
   const bottomY = showTabs ? tabTopY + tabHeight : staffTopY + staffHeight;
@@ -76,6 +78,8 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
       {slots.map((slot) => {
         const slotX = barStartX + 12 + (slot.fraction / totalFractions) * (measureWidth - 24);
         const isSlotActive = isCurrentBarActive && slot.isCursorHere && !isPlaying && !readOnly;
+        const canInteractWithSlot = !readOnly && (slot.isOccupied || isSlotActive);
+        const spokenBeat = getSpokenBeatLabel(slot.beatLabel);
 
         return (
           <g
@@ -84,9 +88,17 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
               e.stopPropagation();
               if (!readOnly) onSelectSlot(barIndex, slot.fraction);
             }}
-            style={{ cursor: readOnly ? 'default' : 'pointer' }}
+            style={{ cursor: canInteractWithSlot ? 'pointer' : 'default' }}
           >
-            {/* 1. Barrierefreie Klick- & Touch-Dropzone (mind. 32px breit) */}
+            <title>
+              {slot.isOccupied
+                ? `Takt ${barIndex + 1} · ${spokenBeat} (klicken zum Bearbeiten)`
+                : isSlotActive
+                ? `Aktiver Eingabe-Platzhalter: Takt ${barIndex + 1} · ${spokenBeat}`
+                : `Folgender Platzhalter: Takt ${barIndex + 1} · ${spokenBeat}`}
+            </title>
+
+            {/* 1. Barrierefreie Klick- & Touch-Dropzone */}
             <rect
               x={slotX - 14}
               y={staffTopY - 18}
@@ -103,93 +115,87 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
                 x2={slotX}
                 y2={bottomY + 6}
                 stroke="#6366f1"
-                strokeWidth="1.8"
+                strokeWidth="1.6"
                 strokeDasharray="3 2"
               />
             )}
 
-            {/* 3. Ghost-Platzhalter für freie Beat-Stationen */}
+            {/* 3. Apple Single-Target Placeholder: Nur der aktive Eingabe-Platzhalter zeigt die Geisternote auf den Linien
+                   (und blendet sich aus, sobald der Nutzer mit der Maus eine echte Tonhöhe anvisiert -> 0% Doppel-Ghosting) */}
             {showStaff && !slot.isOccupied && (
-              <g
-                id={`ghost-slot-${barIndex}-${slot.fraction}`}
-                opacity={isSlotActive ? 0.85 : 0.38}
-                style={{ pointerEvents: 'none' }}
-              >
-                {/* Fokus-Glow auf aktivem Slot */}
-                {isSlotActive && (
-                  <circle
-                    cx={slotX}
-                    cy={defaultGhostStaffY}
-                    r="15"
-                    fill="rgba(99, 102, 241, 0.15)"
-                    stroke="#6366f1"
-                    strokeWidth="1.2"
-                    strokeDasharray="2 2"
-                  />
-                )}
+              isSlotActive ? (
+                !hideActiveGhostHead ? (
+                  <g
+                    id={`ghost-slot-${barIndex}-${slot.fraction}`}
+                    opacity={0.88}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {/* Magnetischer Fokus-Ring auf dem aktiven Platzhalter */}
+                    <circle
+                      cx={slotX}
+                      cy={defaultGhostStaffY}
+                      r="14"
+                      fill="rgba(99, 102, 241, 0.12)"
+                      stroke="#6366f1"
+                      strokeWidth="1.2"
+                      strokeDasharray="2.5 2"
+                    />
 
-                {/* Notenkopf des Platzhalters (harmonisch auf 12.5px Raster skaliert) */}
-                <ellipse
+                    {/* Notenkopf des aktiven Platzhalters */}
+                    <ellipse
+                      cx={slotX}
+                      cy={defaultGhostStaffY}
+                      rx="6.6"
+                      ry="4.7"
+                      transform={`rotate(-22 ${slotX} ${defaultGhostStaffY})`}
+                      fill={activeDuration === '1' || activeDuration === '2' ? '#ffffff' : '#6366f1'}
+                      stroke="#6366f1"
+                      strokeWidth="1.6"
+                    />
+
+                    {/* Notenhals des aktiven Platzhalters (außer bei Ganzer Note) */}
+                    {activeDuration !== '1' && (
+                      <line
+                        x1={slotX + 5.8}
+                        y1={defaultGhostStaffY}
+                        x2={slotX + 5.8}
+                        y2={defaultGhostStaffY - 27}
+                        stroke="#6366f1"
+                        strokeWidth="1.35"
+                      />
+                    )}
+
+                    {/* Fähnchen für Achtel & 16tel (vertikal korrekt nach unten gerichtet) */}
+                    {activeDuration === '8' && (
+                      <path
+                        d={SMUFL_GLYPHS.flag8thUp}
+                        transform={`translate(${slotX + 5.8}, ${defaultGhostStaffY - 27}) scale(0.032, -0.032)`}
+                        fill="#6366f1"
+                      />
+                    )}
+                    {activeDuration === '16' && (
+                      <path
+                        d={SMUFL_GLYPHS.flag16thUp}
+                        transform={`translate(${slotX + 5.8}, ${defaultGhostStaffY - 27}) scale(0.032, -0.032)`}
+                        fill="#6366f1"
+                      />
+                    )}
+                  </g>
+                ) : null
+              ) : (
+                <circle
+                  id={`ghost-slot-${barIndex}-${slot.fraction}`}
                   cx={slotX}
                   cy={defaultGhostStaffY}
-                  rx="6.8"
-                  ry="4.8"
-                  transform={`rotate(-22 ${slotX} ${defaultGhostStaffY})`}
-                  fill={activeDuration === '1' || activeDuration === '2' ? '#ffffff' : (isSlotActive ? '#6366f1' : '#64748b')}
-                  stroke={isSlotActive ? '#6366f1' : '#64748b'}
-                  strokeWidth="1.6"
-                  strokeDasharray={isSlotActive ? 'none' : '2 1.5'}
+                  r="2.4"
+                  fill="#cbd5e1"
+                  style={{ pointerEvents: 'none' }}
                 />
-
-                {/* Schlagzahl (1, 2, 3, 4) dezent im oder unter dem Geister-Notenkopf */}
-                {!isSlotActive && (
-                  <text
-                    x={slotX}
-                    y={defaultGhostStaffY + 2.8}
-                    fontSize="7.5"
-                    fontWeight="900"
-                    fill="#475569"
-                    textAnchor="middle"
-                    fontFamily="'Plus Jakarta Sans', sans-serif"
-                  >
-                    {slot.beatLabel}
-                  </text>
-                )}
-
-                {/* Notenhals des Platzhalters (außer bei Ganzer Note) */}
-                {activeDuration !== '1' && (
-                  <line
-                    x1={slotX + 6.0}
-                    y1={defaultGhostStaffY}
-                    x2={slotX + 6.0}
-                    y2={defaultGhostStaffY - 28}
-                    stroke={isSlotActive ? '#6366f1' : '#64748b'}
-                    strokeWidth="1.3"
-                    strokeDasharray={isSlotActive ? 'none' : '2 2'}
-                  />
-                )}
-
-                {/* Fähnchen für Achtel & 16tel */}
-                {activeDuration === '8' && (
-                  <path
-                    d={SMUFL_GLYPHS.flag8thUp}
-                    transform={`translate(${slotX + 6.0}, ${defaultGhostStaffY - 28}) scale(0.038, 0.038)`}
-                    fill={isSlotActive ? '#6366f1' : '#64748b'}
-                  />
-                )}
-                {activeDuration === '16' && (
-                  <path
-                    d={SMUFL_GLYPHS.flag16thUp}
-                    transform={`translate(${slotX + 6.0}, ${defaultGhostStaffY - 28}) scale(0.038, 0.038)`}
-                    fill={isSlotActive ? '#6366f1' : '#64748b'}
-                  />
-                )}
-              </g>
+              )
             )}
 
-            {/* 5. Zählzeiten-Lineal (Beat-Ruler) unter dem System mit 0% Überlappung */}
+            {/* 4. Zählzeiten-Lineal (Beat-Ruler) unter dem System (1, 2, 3, 3+, 4, 4+) */}
             <g id={`ruler-slot-${barIndex}-${slot.fraction}`}>
-              {/* Dezenter 3.5px Beat-Tick am Zählzeiten-Lineal (0% Notensystem-Störung) */}
               {slot.fraction % 4 === 0 && !isSlotActive && (
                 <line
                   x1={slotX}
@@ -201,14 +207,13 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
                 />
               )}
 
-              {/* Badge-Hintergrund für aktive Zählzeit */}
               {isSlotActive ? (
                 <rect
-                  x={slot.beatLabel.length > 2 ? slotX - 13 : slotX - 11}
+                  x={slot.beatLabel.length > 2 ? slotX - 13 : slot.beatLabel.length > 1 ? slotX - 11 : slotX - 10}
                   y={rulerY - 9}
-                  width={slot.beatLabel.length > 2 ? "26" : "22"}
+                  width={slot.beatLabel.length > 2 ? "26" : slot.beatLabel.length > 1 ? "22" : "20"}
                   height="18"
-                  rx="5"
+                  rx="5.5"
                   fill="#6366f1"
                 />
               ) : slot.isOccupied ? (
@@ -217,19 +222,18 @@ export const MicroScoreBeatGridOverlay: React.FC<MicroScoreBeatGridOverlayProps>
                   y={rulerY - 8}
                   width={slot.beatLabel.length > 2 ? "26" : slot.beatLabel.length > 1 ? "22" : "18"}
                   height="16"
-                  rx="4"
+                  rx="4.5"
                   fill="#f1f5f9"
                   stroke="#cbd5e1"
                   strokeWidth="0.8"
                 />
               ) : null}
 
-              {/* Text der Zählzeit (1, 2, 3, 4 bzw. +) */}
               <text
                 x={slotX}
-                y={rulerY + 4.5}
-                fontSize={isSlotActive ? '10.5' : '9.5'}
-                fontWeight="900"
+                y={rulerY + 4.2}
+                fontSize={isSlotActive ? '10.2' : '9.2'}
+                fontWeight={isSlotActive || slot.isOccupied ? '900' : '800'}
                 fill={isSlotActive ? '#ffffff' : slot.isOccupied ? '#0f172a' : '#94a3b8'}
                 textAnchor="middle"
                 fontFamily="'Plus Jakarta Sans', sans-serif"

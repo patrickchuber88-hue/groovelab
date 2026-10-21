@@ -319,6 +319,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
   // 📱 Prevent tablet display sleep during music practice on music stand
   usePwaWakeLock(true);
+  const isTabletPortrait = typeof window !== 'undefined' && window.innerWidth <= 1024;
 
   // 📱 0,1% Goldstandard: Mobiler Termine & Mitteilungen Bottom Sheet State
   const [isMobileSidebarSheetOpen, setIsMobileSidebarSheetOpen] = useState<boolean>(false);
@@ -445,7 +446,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
       return { key, label: 'Technik & Finger', icon: '⚡', color: '#0369a1', bg: '#e0f2fe', border: '#bae6fd' };
     }
     if (key === 'intonation' || key === 'klang') {
-      return { key, label: 'Klang & Ton', icon: '🎵', color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' };
+      return { key, label: 'Klang & Ton', icon: '🎵', color: '#34a853', bg: 'rgba(52, 168, 83, 0.10)', border: 'rgba(52, 168, 83, 0.25)' };
     }
     if (key === 'ausdruck') {
       return { key, label: 'Ausdruck & Gefühl', icon: '🎭', color: '#7e22ce', bg: '#f3e8ff', border: '#e9d5ff' };
@@ -587,9 +588,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
         icon: <Check size={16} strokeWidth={3.2} />,
         shortLabel: 'Vorspielen',
         fullMessage: 'Vorspielen – Kann ich! 🚀',
-        activeBg: '#16a34a',
-        activeBorder: '#15803d',
-        glowColor: 'rgba(22, 163, 74, 0.45)'
+        activeBg: '#34a853',
+        activeBorder: '#34a853',
+        glowColor: 'rgba(52, 168, 83, 0.45)'
       },
       {
         status: 'wackelig',
@@ -728,9 +729,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             }
           }}
           style={{
-            background: current === 'super' ? '#16a34a' : '#f0fdf4',
-            color: current === 'super' ? '#ffffff' : '#15803d',
-            border: current === 'super' ? '1.5px solid #15803d' : '1px solid #bbf7d0',
+            background: current === 'super' ? '#34a853' : 'rgba(52, 168, 83, 0.10)',
+            color: current === 'super' ? '#ffffff' : '#34a853',
+            border: 'none',
             borderRadius: '100px',
             padding: isMusicStandMode ? '8px 16px' : '6px 14px',
             minHeight: '44px',
@@ -768,9 +769,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             }
           }}
           style={{
-            background: current === 'wackelig' ? '#d97706' : '#fffbeb',
-            color: current === 'wackelig' ? '#ffffff' : '#b45309',
-            border: current === 'wackelig' ? '1.5px solid #b45309' : '1px solid #fde68a',
+            background: current === 'wackelig' ? '#facc15' : '#fef9c3',
+            color: current === 'wackelig' ? '#0f172a' : '#854d0e',
+            border: 'none',
             borderRadius: '100px',
             padding: isMusicStandMode ? '8px 16px' : '6px 14px',
             minHeight: '44px',
@@ -808,9 +809,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             }
           }}
           style={{
-            background: current === 'hilfe' ? '#dc2626' : '#fef2f2',
+            background: current === 'hilfe' ? '#ef4444' : '#fee2e2',
             color: current === 'hilfe' ? '#ffffff' : '#b91c1c',
-            border: current === 'hilfe' ? '1.5px solid #b91c1c' : '1px solid #fecaca',
+            border: 'none',
             borderRadius: '100px',
             padding: isMusicStandMode ? '8px 16px' : '6px 14px',
             minHeight: '44px',
@@ -1173,9 +1174,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     const strokeDashoffset = circumference * (1 - clampedPercent / 100);
 
     const gradientId = `ring-grad-${size}-${isGoalAchieved ? 'done' : 'prog'}`;
-    const startColor = isGoalAchieved ? '#22c55e' : '#6366f1';
-    const stopColor = isGoalAchieved ? '#16a34a' : '#8b5cf6';
-    const glowColor = isGoalAchieved ? 'rgba(34, 197, 94, 0.45)' : 'rgba(99, 102, 241, 0.4)';
+    const startColor = isGoalAchieved ? '#34a853' : '#6366f1';
+    const stopColor = isGoalAchieved ? '#34a853' : '#8b5cf6';
+    const glowColor = isGoalAchieved ? 'rgba(52, 168, 83, 0.45)' : 'rgba(99, 102, 241, 0.4)';
 
     return (
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1224,7 +1225,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
           pointerEvents: 'none'
         }}>
           {isGoalAchieved ? (
-            <Check size={size >= 120 ? 38 : size >= 90 ? 30 : 20} strokeWidth={3.5} color="#16a34a" />
+            <Check size={size >= 120 ? 38 : size >= 90 ? 30 : 20} strokeWidth={3.5} color="#34a853" />
           ) : size >= 90 ? (
             <div style={{ textAlign: 'center', lineHeight: 1.05 }}>
               <div style={{
@@ -1362,8 +1363,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       justifyContent: 'space-between',
                       gap: '16px',
                       padding: '16px 20px',
-                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                      border: '1.5px solid #bfdbfe',
+                      background: '#dbeafe',
+                      border: 'none',
                       borderRadius: '20px',
                       cursor: 'pointer',
                       boxShadow: 'none',
@@ -1429,18 +1430,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     {xpActive && (
                       <div style={{ 
                         position: 'relative', overflow: 'visible',
-                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        background: '#6366f1',
                         color: 'white',
                         borderRadius: '28px',
-                        boxShadow: isXpPulsing 
-                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 14px 30px -6px rgba(99, 102, 241, 0.35)'
-                          : '0 14px 30px -6px rgba(99, 102, 241, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '100px',
                         padding: '20px 24px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: isXpPulsing ? '2px solid #facc15' : '1.5px solid rgba(255, 255, 255, 0.25)'
+                        border: 'none'
                       }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
                         {floatingDepositAmount !== null && (
                           <div className="campus-xp-floating-badge">
@@ -1488,7 +1487,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     {flamesActive && (
                       <div style={{ 
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: 'white',
                         borderRadius: '28px',
                         boxShadow: 'none',
@@ -1497,7 +1496,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         padding: '20px 24px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1.5px solid rgba(255, 255, 255, 0.25)'
+                        border: 'none'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                           <span style={{ 
@@ -1552,15 +1551,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                     return (
                       <div style={{
-                        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.8) 100%)',
-                        backdropFilter: 'blur(24px) saturate(1.8)',
-                        WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                        border: '1.5px solid rgba(255, 255, 255, 0.8)',
+                        background: '#ffffff',
+                        backdropFilter: 'none',
+                        WebkitBackdropFilter: 'none',
+                        border: 'none',
                         borderRadius: '32px',
                         display: 'flex',
                         flexDirection: isMobile ? 'column' : 'row',
                         alignItems: 'stretch',
-                        boxShadow: '0 20px 45px rgba(15, 23, 42, 0.04)',
+                        boxShadow: 'none',
                         width: '100%',
                         boxSizing: 'border-box',
                         overflow: 'hidden',
@@ -1573,7 +1572,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         <div style={{
                           width: isMobile ? '100%' : '180px',
                           height: isMobile ? '150px' : 'auto',
-                          background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                          background: '#0f172a',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1588,7 +1587,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             width: '130px',
                             height: '130px',
                             borderRadius: '50%',
-                            background: 'radial-gradient(circle, rgba(52, 168, 83, 0.3) 0%, rgba(52, 168, 83, 0) 70%)',
+                            background: 'transparent',
                             filter: 'blur(12px)',
                             zIndex: 1
                           }} />
@@ -1616,8 +1615,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, zIndex: 2, padding: '24px 32px' }}>
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
                             <div style={{
-                              background: '#dcfce7',
-                              color: '#15803d',
+                              background: 'rgba(52, 168, 83, 0.10)',
+                              color: '#34a853',
                               fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
                               fontWeight: 950,
                               borderRadius: '100px',
@@ -1682,7 +1681,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '8px', 
-                                  background: 'linear-gradient(135deg, #fef3c7 0%, #fefce8 100%)', 
+                                  background: '#fef3c7', 
                                   color: '#854d0e', 
                                   padding: isMusicStandMode ? '10px 20px' : '8px 16px', 
                                   minHeight: isMusicStandMode ? '44px' : '38px', 
@@ -1690,7 +1689,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   borderRadius: '14px', 
                                   fontSize: isMusicStandMode ? '0.94rem' : '0.86rem', 
                                   fontWeight: 850, 
-                                  border: '1.5px solid #fde047',
+                                  border: 'none',
                                   cursor: 'pointer',
                                   boxShadow: 'none',
                                   transition: 'all 0.18s ease'
@@ -2203,10 +2202,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }
                           }}
                           style={{
-                            background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%)' : '#ffffff',
+                            background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'rgba(52, 168, 83, 0.10)' : '#ffffff',
                             borderRadius: '32px', padding: isMusicStandMode ? '32px' : '26px 20px',
-                            boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 16px 36px rgba(16, 185, 129, 0.20)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
-                            border: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '2px solid #10b981' : '2px solid #e2e8f0',
+                            boxShadow: 'none',
+                            border: 'none',
                             display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '20px',
                             cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                           }}
@@ -2214,7 +2213,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         >
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', width: '100%', flexWrap: 'nowrap' }}>
-                              <div style={{ background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)', color: '#34a853', width: isMusicStandMode ? '52px' : '42px', height: isMusicStandMode ? '52px' : '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none', flexShrink: 0 }}>
+                              <div style={{ background: 'rgba(52, 168, 83, 0.10)', color: '#34a853', width: isMusicStandMode ? '52px' : '42px', height: isMusicStandMode ? '52px' : '42px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none', flexShrink: 0 }}>
                                 <BookOpen size={isMusicStandMode ? 26 : 22} />
                               </div>
 
@@ -2245,8 +2244,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     }}
                                     style={{
                                       background: isTtsSpeaking && activeTtsKey === 'junior_box1' 
-                                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
-                                        : 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
+                                        ? '#dc2626' 
+                                        : '#34a853',
                                       border: 'none',
                                       borderRadius: '100px',
                                       padding: isMusicStandMode ? '8px 14px' : '6px 11px',
@@ -2259,9 +2258,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                       fontWeight: 950,
                                       whiteSpace: 'nowrap',
-                                      boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' 
-                                        ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
-                                        : '0 3px 0 #1e7037, 0 6px 14px rgba(52, 168, 83, 0.32)',
+                                      boxShadow: 'none',
                                       transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
                                     title={isTtsSpeaking && activeTtsKey === 'junior_box1' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
@@ -2289,8 +2286,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         props.setShowStudentToolbox(true);
                                       }}
                                       style={{
-                                        background: '#ffffff',
-                                        border: '1.5px solid #cbd5e1',
+                                        background: '#f1f5f9',
+                                        border: 'none',
                                         borderRadius: '100px',
                                         padding: isMusicStandMode ? '8px 14px' : '6px 10px',
                                         minHeight: '38px',
@@ -2302,7 +2299,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                         fontWeight: 900,
                                         whiteSpace: 'nowrap',
-                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                        boxShadow: 'none',
                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                       }}
                                       className="hover-scale-mini"
@@ -2369,7 +2366,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 borderRadius: '32px',
                                 padding: isMusicStandMode ? '32px' : '28px',
                                 boxShadow: 'none',
-                                border: isGoalAchieved ? '2px solid rgba(129, 140, 248, 0.45)' : '2px solid rgba(99, 102, 241, 0.25)',
+                                border: 'none',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'space-between',
@@ -2383,7 +2380,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 {/* 1. Header: Squircle-Icon + Kombinierte Status-Synapse (Serie & Schilde) */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <div style={{
-                                    background: isGoalAchieved ? 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)' : 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+                                    background: isGoalAchieved ? '#ede9fe' : '#e0e7ff',
                                     color: isGoalAchieved ? '#7c3aed' : '#4f46e5',
                                     width: isMusicStandMode ? '64px' : '56px',
                                     height: isMusicStandMode ? '64px' : '56px',
@@ -2404,18 +2401,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   {/* Kombinierte Status-Synapse: Flamme/Stern & Schilde vereint */}
                                   <div 
                                     style={{
-                                      background: isGoalAchieved ? '#f5f3ff' : '#f8fafc',
+                                      background: isGoalAchieved ? '#f5f3ff' : '#f1f5f9',
                                       color: isGoalAchieved ? '#6d28d9' : '#334155',
                                       fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
                                       fontWeight: 900,
                                       padding: isMusicStandMode ? '6px 14px' : '5px 12px',
                                       borderRadius: '100px',
-                                      border: isGoalAchieved ? '1.5px solid #ddd6fe' : '1.5px solid #e2e8f0',
+                                      border: 'none',
                                       whiteSpace: 'nowrap',
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '8px',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                      boxShadow: 'none'
                                     }}
                                     title={isGoalAchieved ? 'Tages-Stern gesichert • 3 Zauber-Schilde aktiv' : `${streak} Tag(e) Serie • 3 Zauber-Schilde aktiv`}
                                   >
@@ -2444,9 +2441,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '4px',
-                                      color: '#059669'
+                                      color: '#34a853'
                                     }}>
-                                      <Shield size={13} color="#059669" fill="#059669" style={{ flexShrink: 0 }} />
+                                      <Shield size={13} color="#34a853" fill="#34a853" style={{ flexShrink: 0 }} />
                                       <span>3</span>
                                     </span>
                                   </div>
@@ -2593,7 +2590,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   boxSizing: 'border-box',
                                   borderRadius: '20px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                  background: '#6366f1',
                                   color: '#ffffff',
                                   fontSize: isMusicStandMode ? '1.12rem' : '1.02rem',
                                   fontWeight: 900,
@@ -2676,7 +2673,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               }}
                               style={{
                                 background: '#ffffff', borderRadius: '32px', padding: isMusicStandMode ? '32px' : '28px',
-                                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)', border: '2px solid rgba(245, 158, 11, 0.35)',
+                                boxShadow: 'none', border: 'none',
                                 display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '20px',
                                 cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
                               }}
@@ -2684,11 +2681,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <div style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', color: '#d97706', width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
+                                  <div style={{ background: '#fef3c7', color: '#d97706', width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'none' }}>
                                     <Trophy size={isMusicStandMode ? 32 : 28} color="#d97706" />
                                   </div>
 
-                                  <span style={{ background: '#fef3c7', color: '#b45309', fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, padding: isMusicStandMode ? '6px 14px' : '5px 12px', borderRadius: '100px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                                  <span style={{ background: '#fef3c7', color: '#b45309', fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 900, padding: isMusicStandMode ? '6px 14px' : '5px 12px', borderRadius: '100px', border: 'none', whiteSpace: 'nowrap' }}>
                                     ★ {unlockedStickersCount} von {totalStickersCount} gesammelt
                                   </span>
                                 </div>
@@ -2709,7 +2706,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     <div style={{
                                       width: `${nextStickerProgressPercent}%`,
                                       height: '100%',
-                                      background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                                      background: '#d97706',
                                       borderRadius: '100px',
                                       transition: 'width 0.4s ease'
                                     }} />
@@ -2724,9 +2721,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   alignItems: 'center',
                                   gap: '12px',
                                   padding: '10px 14px',
-                                  background: 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)',
+                                  background: '#fef3c7',
                                   borderRadius: '18px',
-                                  border: '1.5px solid #fde68a',
+                                  border: 'none',
                                   boxShadow: 'none'
                                 }}>
                                   <div style={{
@@ -2796,7 +2793,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   boxSizing: 'border-box',
                                   borderRadius: '20px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                  background: '#d97706',
                                   color: '#ffffff',
                                   fontSize: isMusicStandMode ? '1.12rem' : '1.02rem',
                                   fontWeight: 950,
@@ -2912,7 +2909,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                               <div style={{
-                                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
+                                background: 'rgba(52, 168, 83, 0.10)',
                                 color: '#34a853',
                                 width: '44px',
                                 height: '44px',
@@ -2952,8 +2949,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   aria-label={isTtsSpeaking && activeTtsKey === 'junior_modal' ? 'Vorlesen anhalten' : 'Hausaufgaben vorlesen lassen'}
                                   style={{
                                     background: isTtsSpeaking && activeTtsKey === 'junior_modal'
-                                      ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                                      : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                      ? '#ef4444'
+                                      : '#34a853',
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '100px',
@@ -2966,9 +2963,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     fontSize: '0.80rem',
                                     fontWeight: 900,
                                     cursor: 'pointer',
-                                    boxShadow: isTtsSpeaking && activeTtsKey === 'junior_modal'
-                                      ? '0 3px 10px rgba(239, 68, 68, 0.35)'
-                                      : '0 3px 10px rgba(34, 197, 94, 0.30)',
+                                    boxShadow: 'none',
                                     transition: 'all 0.15s ease'
                                   }}
                                   className="hover-scale"
@@ -3058,10 +3053,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '8px',
-                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                    background: '#f8fafc',
                                     padding: '10px 14px',
                                     borderRadius: '14px',
-                                    border: '1.5px solid #e2e8f0',
+                                    border: 'none',
                                     boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.03)'
                                   }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.80rem', fontWeight: 850, color: '#334155' }}>
@@ -3084,11 +3079,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         border: '1px solid #bbf7d0',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
                                       }}>
-                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#16a34a', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#34a853', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                           <Check size={13} strokeWidth={3.2} />
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
-                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#15803d' }}>Vorspielen</span>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#34a853' }}>Vorspielen</span>
                                           <span style={{ fontSize: '0.66rem', fontWeight: 600, color: '#64748b' }}>„Kann ich! 🚀“</span>
                                         </div>
                                       </div>
@@ -3154,7 +3149,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             width: '26px',
                                             height: '26px',
                                             borderRadius: '7px',
-                                            background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                                            background: '#fee2e2',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
@@ -3173,13 +3168,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                           {bookItem.pageNums.map((pNum: any) => (
                                             <span key={`p-${pNum}`} style={{
-                                              background: '#dcfce7',
-                                              color: '#15803d',
+                                              background: 'rgba(52, 168, 83, 0.10)',
+                                              color: '#34a853',
                                               fontSize: '0.76rem',
                                               fontWeight: 900,
                                               padding: '2px 8px',
                                               borderRadius: '6px',
-                                              border: '1px solid #bbf7d0',
+                                              border: 'none',
                                               flexShrink: 0
                                             }}>
                                               S. {pNum}
@@ -3217,8 +3212,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             <div
                                               key={`j-page-row-${pNum}`}
                                               style={{
-                                                background: refl === 'super' ? '#ecfdf5' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#f8fafc',
-                                                border: refl === 'super' ? '1.5px solid #10b981' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                                                background: refl === 'super' ? 'rgba(52, 168, 83, 0.10)' : refl === 'wackelig' ? '#fef9c3' : refl === 'hilfe' ? '#fee2e2' : '#f8fafc',
+                                                border: 'none',
                                                 borderRadius: '12px',
                                                 padding: '7px 12px',
                                                 display: 'flex',
@@ -3239,7 +3234,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                                       fontWeight: 900,
                                                       padding: '2px 7px',
                                                       borderRadius: '6px',
-                                                      background: refl === 'super' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                                      background: refl === 'super' ? '#34a853' : refl === 'wackelig' ? '#fef9c3' : '#fee2e2',
                                                       color: refl === 'super' ? '#ffffff' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
                                                       display: 'inline-flex',
                                                       alignItems: 'center',
@@ -3280,8 +3275,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           flexDirection: 'column',
                                           gap: '8px',
                                           padding: '12px 14px',
-                                          background: refl === 'super' ? '#ecfdf5' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#ffffff',
-                                          border: refl === 'super' ? '1.5px solid #10b981' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
+                                          background: refl === 'super' ? 'rgba(52, 168, 83, 0.10)' : refl === 'wackelig' ? '#fef9c3' : refl === 'hilfe' ? '#fee2e2' : '#ffffff',
+                                          border: refl ? 'none' : '1px solid #f1f5f9',
                                           boxShadow: '0 2px 6px -2px rgba(0, 0, 0, 0.04)',
                                           borderRadius: '14px',
                                           transition: 'all 0.15s ease'
@@ -3312,8 +3307,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                                 fontWeight: 900,
                                                 padding: '2px 7px',
                                                 borderRadius: '6px',
-                                                background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
-                                                color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
+                                                background: refl === 'super' ? 'rgba(52, 168, 83, 0.10)' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                                color: refl === 'super' ? '#34a853' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
                                                 gap: '3px',
@@ -3374,16 +3369,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       color: '#334155',
                                       fontWeight: 600
                                     }}>
-                                      <FileText size={15} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                      <FileText size={15} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%' }}>
-                                        <strong style={{ color: '#15803d', fontWeight: 850, fontSize: '0.80rem' }}>
+                                        <strong style={{ color: '#34a853', fontWeight: 850, fontSize: '0.80rem' }}>
                                           {allTeacherNotes && allTeacherNotes.length > 1 ? 'Hinweise deiner Lehrkraft:' : 'Hinweis:'}
                                         </strong>
                                         {allTeacherNotes && allTeacherNotes.length > 0 ? (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                             {allTeacherNotes.map((noteItem: string, nIdx: number) => (
                                               <div key={nIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
-                                                {allTeacherNotes.length > 1 && <span style={{ color: '#15803d', fontWeight: 900 }}>•</span>}
+                                                {allTeacherNotes.length > 1 && <span style={{ color: '#34a853', fontWeight: 900 }}>•</span>}
                                                 <span>{noteItem}</span>
                                               </div>
                                             ))}
@@ -3402,7 +3397,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       <div style={{
                                         marginTop: '2px',
                                         background: '#fefce8',
-                                        border: '1px solid #fef08a',
+                                        border: 'none',
                                         borderRadius: '12px',
                                         padding: '9px 12px',
                                         boxShadow: 'none',
@@ -3416,7 +3411,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             alignItems: 'center',
                                             gap: '3px',
                                             background: '#fef08a',
-                                            border: '1px solid #fde047',
+                                            border: 'none',
                                             color: '#854d0e',
                                             fontSize: '0.68rem',
                                             fontWeight: 850,
@@ -3472,7 +3467,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           {/* 🌟 3. BOTTOM CLOSE BUTTON (Sticky Bottom: Always accessible and visible above PWA bar) */}
                           <div style={{
                             padding: isMobile ? '10px 16px 14px 16px' : '12px 24px 18px 24px',
-                            background: 'linear-gradient(to top, #ffffff 90%, rgba(255, 255, 255, 0) 100%)',
+                            background: '#ffffff',
                             borderTop: '1px solid #f1f5f9',
                             flexShrink: 0,
                             zIndex: 10
@@ -3498,7 +3493,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 minHeight: '48px',
                                 borderRadius: '16px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                background: '#34a853',
                                 color: '#ffffff',
                                 fontSize: '0.98rem',
                                 fontWeight: 950,
@@ -3608,8 +3603,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: isExtraTime ? '#dcfce7' : '#eef2ff',
-                            color: isExtraTime ? '#15803d' : '#4f46e5',
+                            background: isExtraTime ? 'rgba(52, 168, 83, 0.10)' : '#eef2ff',
+                            color: isExtraTime ? '#34a853' : '#4f46e5',
                             padding: '6px 18px',
                             borderRadius: '100px',
                             fontSize: '0.85rem',
@@ -3628,7 +3623,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         {isExtraTime && isGraceActive && (
                           <div style={{
                             background: '#fffbeb',
-                            border: '2px solid #f59e0b',
+                            border: 'none',
                             borderRadius: '18px',
                             padding: '10px 18px',
                             color: '#92400e',
@@ -3665,7 +3660,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 <>
                                   <span style={{ fontSize: '1.1rem' }}>{streak >= 9 ? '👑' : streak >= 4 ? '🔥🔥' : '🔥'}</span>
                                   <span>Flammen-Stufe {streak >= 9 ? '3 (Königsstufe)' : streak >= 4 ? '2 (Flammen-Stufe)' : '1 (Start-Stufe)'}:</span>
-                                  <span style={{ color: '#15803d', fontWeight: 950 }}>{targetMins} Min. Fokus-Ziel</span>
+                                  <span style={{ color: '#34a853', fontWeight: 950 }}>{targetMins} Min. Fokus-Ziel</span>
                                 </>
                               );
                             })()}
@@ -3701,7 +3696,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   cx="115"
                                   cy="115"
                                   r={circleRadius}
-                                  stroke={isExtraTime ? '#10b981' : '#6366f1'}
+                                  stroke={isExtraTime ? '#34a853' : '#6366f1'}
                                   strokeWidth="16"
                                   strokeDasharray={circumference}
                                   strokeDashoffset={strokeDashoffset}
@@ -3738,7 +3733,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 minHeight: '48px',
                                 borderRadius: '22px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                background: '#6366f1',
                                 color: '#ffffff',
                                 fontSize: '1.25rem',
                                 fontWeight: 950,
@@ -3767,7 +3762,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   minHeight: '48px',
                                   borderRadius: '20px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   fontSize: '1.15rem',
                                   fontWeight: 950,
@@ -3901,7 +3896,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               top: '24px',
                               left: '24px',
                               background: isJuniorPadActive ? '#0f172a' : '#f1f5f9',
-                              border: isJuniorPadActive ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
+                              border: 'none',
                               width: '44px',
                               height: '44px',
                               borderRadius: '12px',
@@ -3910,7 +3905,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               justifyContent: 'center',
                               cursor: 'pointer',
                               color: isJuniorPadActive ? '#ffffff' : '#64748b',
-                              boxShadow: isJuniorPadActive ? '0 2px 8px rgba(15, 23, 42, 0.25)' : 'none',
+                              boxShadow: 'none',
                               transition: 'all 0.15s ease'
                             }}
                             className="hover-scale-mini"
@@ -3993,8 +3988,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 <span style={{ 
                                   fontSize: '0.74rem', 
                                   fontWeight: 800, 
-                                  color: isCellular ? '#b45309' : '#15803d', 
-                                  background: isCellular ? '#fef3c7' : '#dcfce7', 
+                                  color: isCellular ? '#b45309' : '#34a853', 
+                                  background: isCellular ? '#fef3c7' : 'rgba(52, 168, 83, 0.10)', 
                                   padding: '3px 10px', 
                                   borderRadius: '12px',
                                   display: 'inline-flex',
@@ -4042,8 +4037,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 width: '68px',
                                 height: '68px',
                                 borderRadius: '22px',
-                                background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                                color: '#15803d',
+                                background: 'rgba(52, 168, 83, 0.10)',
+                                color: '#34a853',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -4077,7 +4072,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   width: '48px',
                                   height: '48px',
                                   borderRadius: '50%',
-                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                  background: '#34a853',
                                   border: 'none',
                                   color: '#ffffff',
                                   display: 'flex',
@@ -4096,7 +4091,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               {/* Progress Track & Time */}
                               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d' }}>
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#34a853' }}>
                                     {juniorPreviewPlaying ? '🔊 Spielt ab...' : 'Aufnahme anhören'}
                                   </span>
                                   <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', fontFamily: 'monospace' }}>
@@ -4145,7 +4140,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <div style={{
                                     width: `${Math.min(100, (juniorPreviewCurrentTime / (juniorPreviewDuration || juniorRecordDuration || 1)) * 100)}%`,
                                     height: '100%',
-                                    background: '#22c55e',
+                                    background: '#34a853',
                                     borderRadius: '6px',
                                     transition: 'width 0.1s linear'
                                   }} />
@@ -4156,7 +4151,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             {/* 3. Titel-Feld (Mit klarem Label & kinderleichter Editierbarkeit) */}
                             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
                               <label style={{ fontSize: '0.80rem', fontWeight: 900, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                <Pencil size={14} color="#16a34a" /> Name deiner Aufnahme:
+                                <Pencil size={14} color="#34a853" /> Name deiner Aufnahme:
                               </label>
                               <div style={{ width: '100%', position: 'relative' }}>
                                 <input
@@ -4181,7 +4176,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     transition: 'all 0.2s ease'
                                   }}
                                   onFocus={(e) => {
-                                    e.currentTarget.style.borderColor = '#22c55e';
+                                    e.currentTarget.style.borderColor = '#34a853';
                                     e.currentTarget.style.boxShadow = 'none';
                                   }}
                                   onBlur={(e) => {
@@ -4194,7 +4189,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   left: '15px',
                                   top: '50%',
                                   transform: 'translateY(-50%)',
-                                  color: '#16a34a',
+                                  color: '#34a853',
                                   display: 'flex',
                                   alignItems: 'center'
                                 }}>
@@ -4236,8 +4231,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             {/* 🛡️ 1% Goldstandard Mobile & Network Awareness Cardlet */}
                             <div style={{
                               width: '100%',
-                              background: isCellular ? '#fffbeb' : '#f0fdf4',
-                              border: isCellular ? '1.5px solid #fef3c7' : '1.5px solid #dcfce7',
+                              background: isCellular ? '#fef9c3' : 'rgba(52, 168, 83, 0.10)',
+                              border: 'none',
                               borderRadius: '16px',
                               padding: '12px 14px',
                               boxSizing: 'border-box',
@@ -4248,8 +4243,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <Shield size={16} color={isCellular ? '#d97706' : '#16a34a'} />
-                                  <span style={{ fontSize: '0.82rem', fontWeight: 850, color: isCellular ? '#92400e' : '#15803d' }}>
+                                  <Shield size={16} color={isCellular ? '#d97706' : '#34a853'} />
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 850, color: isCellular ? '#92400e' : '#34a853' }}>
                                     {isCellular ? 'Im lokalen Tresor gesichert' : 'WLAN • Bereit zur Synchronisation'}
                                   </span>
                                 </div>
@@ -4338,7 +4333,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   padding: '15px 18px',
                                   borderRadius: '18px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   fontSize: '1.02rem',
                                   fontWeight: 950,
@@ -4467,8 +4462,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               const isPlaying = juniorActivePlayingAudioId === rec.id;
                               return (
                                 <div key={rec.id} style={{
-                                  background: isPlaying ? '#f5f3ff' : '#f8fafc',
-                                  border: isPlaying ? '2px solid #a78bfa' : '2px solid #e2e8f0',
+                                  background: isPlaying ? '#f3e8ff' : '#f8fafc',
+                                  border: 'none',
                                   borderRadius: '24px',
                                   padding: '18px 22px',
                                   display: 'flex',
@@ -4480,7 +4475,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     <button
                                       onClick={() => togglePlayJuniorRecording(rec.id, rec.url, rec.blobKey)}
                                       style={{
-                                        background: isPlaying ? '#7c3aed' : '#16a34a',
+                                        background: isPlaying ? '#7c3aed' : '#34a853',
                                         color: '#ffffff',
                                         border: 'none',
                                         width: '50px',
@@ -4598,10 +4593,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
               {studentUiLevel === 'teen' && (
                 <>
                   {/* TEEN: 4 HARMONISCHE KPIS */}
-                  <div style={{ 
+                  <div className="student-kpi-grid" style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', 
-                    gap: isMobile ? '10px' : '16px', 
+                    gridTemplateColumns: (isMobile || isTabletPortrait) ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', 
+                    gap: isMobile ? '10px' : '14px', 
                     width: '100%',
                     minWidth: 0,
                     boxSizing: 'border-box'
@@ -4612,18 +4607,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'visible',
-                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        background: '#6366f1',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: isXpPulsing 
-                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 10px 25px -5px rgba(99, 102, 241, 0.35)'
-                          : '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: isXpPulsing ? '2px solid #facc15' : '1px solid rgba(255, 255, 255, 0.15)'
+                        border: 'none'
                       }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
                         {floatingDepositAmount !== null && (
                           <div className="campus-xp-floating-badge">
@@ -4672,7 +4665,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       flex: '1 1 0px',
                       minWidth: 0,
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      background: '#34a853',
                       color: 'white',
                       borderRadius: '20px',
                       boxShadow: 'none',
@@ -4681,7 +4674,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       padding: '16px',
                       boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ 
@@ -4723,7 +4716,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       flex: '1 1 0px',
                       minWidth: 0,
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                      background: '#facc15',
                       color: '#0f172a',
                       borderRadius: '20px',
                       boxShadow: 'none',
@@ -4732,7 +4725,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       padding: '16px',
                       boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.3)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ 
@@ -4801,7 +4794,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: 'white',
                         borderRadius: '20px',
                         boxShadow: 'none',
@@ -4810,7 +4803,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                        border: 'none'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
@@ -4870,15 +4863,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                   {/* TEEN: HERO-DECK */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0.65) 100%)',
-                    backdropFilter: 'blur(24px) saturate(1.8)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.8)',
+                    background: '#ffffff',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                    border: 'none',
                     borderRadius: '24px',
                     display: 'flex',
                     flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'stretch',
-                    boxShadow: '0 15px 40px rgba(15, 23, 42, 0.04)',
+                    boxShadow: 'none',
                     width: '100%',
                     boxSizing: 'border-box',
                     overflow: 'hidden',
@@ -4888,7 +4881,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     <div style={{
                       width: isMobile ? '100%' : '180px',
                       height: isMobile ? '150px' : 'auto',
-                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                      background: '#0f172a',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -4929,7 +4922,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           padding: '4px 12px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.05em',
-                          border: '1px solid #c7d2fe'
+                          border: 'none'
                         }}>
                           ⚡ TEEN LEVEL • 11–15 JAHRE
                         </div>
@@ -4944,15 +4937,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '8px',
-                              background: '#ffffff',
+                              background: '#f1f5f9',
                               color: '#0f172a',
                               padding: '7px 16px',
                               borderRadius: '12px',
                               fontSize: '0.84rem',
                               fontWeight: 850,
-                              border: '1.5px solid #e2e8f0',
+                              border: 'none',
                               cursor: 'pointer',
-                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                              boxShadow: 'none',
                               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                             }}
                             className="hover-scale"
@@ -4963,7 +4956,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <span>Termine & News</span>
                             {sidebarTotalAlertsCount > 0 && (
                               <span style={{
-                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                background: '#ef4444',
                                 color: '#ffffff',
                                 fontSize: '0.68rem',
                                 fontWeight: 950,
@@ -5049,7 +5042,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '8px',
-                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   padding: '8px 16px',
                                   minHeight: '38px',
@@ -5449,8 +5442,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: isMobile ? '18px' : '18px 20px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -5490,8 +5483,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                       return (
                         <div style={{
-                          background: 'linear-gradient(135deg, #ffffff 0%, #fffdf0 100%)',
-                          border: '1.5px solid #fde047',
+                          background: '#ffffff',
+                          border: 'none',
                           borderRadius: '20px',
                           padding: '16px 20px',
                           display: 'flex',
@@ -5505,11 +5498,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               width: '42px',
                               height: '42px',
                               borderRadius: '50%',
-                              background: 'linear-gradient(135deg, #fef08a 0%, #facc15 100%)',
+                              background: '#fef08a',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              border: '2px solid #eab308',
+                              border: 'none',
                               boxShadow: 'none',
                               flexShrink: 0
                             }}>
@@ -5522,7 +5515,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </span>
                                 <span style={{
                                   background: '#fef08a',
-                                  border: '1px solid #fde047',
+                                  border: 'none',
                                   borderRadius: '6px',
                                   padding: '1px 6px',
                                   fontSize: '0.66rem',
@@ -5545,11 +5538,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             type="button"
                             onClick={() => handleTabChangeLocal('homework_book')}
                             style={{
-                              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                              background: '#facc15',
                               border: 'none',
                               borderRadius: '12px',
                               padding: '8px 14px',
-                              color: '#ffffff',
+                              color: '#0f172a',
                               fontSize: '0.78rem',
                               fontWeight: 900,
                               cursor: 'pointer',
@@ -5561,7 +5554,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }}
                             className="hover-scale"
                           >
-                            <Play size={13} fill="#ffffff" />
+                            <Play size={13} fill="#0f172a" />
                             <span>Jetzt spielen</span>
                           </button>
                         </div>
@@ -5599,8 +5592,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: isMobile ? '18px' : '18px 20px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: isGoalAchieved ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -5611,8 +5604,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(124, 58, 237, 0.12)', 
-                                  color: isGoalAchieved ? '#16a34a' : '#7c3aed', 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.10)' : '#ede9fe', 
+                                  color: isGoalAchieved ? '#34a853' : '#7c3aed', 
                                   width: '34px', 
                                   height: '34px', 
                                   borderRadius: '11px', 
@@ -5632,9 +5625,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '5px',
-                                background: isGoalAchieved ? '#dcfce7' : '#f8fafc',
-                                color: isGoalAchieved ? '#15803d' : '#475569',
-                                border: isGoalAchieved ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                background: isGoalAchieved ? 'rgba(52, 168, 83, 0.10)' : '#f1f5f9',
+                                color: isGoalAchieved ? '#34a853' : '#475569',
+                                border: 'none',
                                 padding: '4px 10px',
                                 borderRadius: '100px',
                                 fontSize: '0.72rem',
@@ -5661,7 +5654,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 <div style={{ fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                   {isGoalAchieved ? 'Tagesziel erreicht' : 'Tagesfokus'}
                                 </div>
-                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#15803d' : '#64748b', lineHeight: 1.35 }}>
+                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#34a853' : '#64748b', lineHeight: 1.35 }}>
                                   {isGoalAchieved ? 'Serie für heute gesichert' : `${Math.max(1, requiredMins - todayMins)} Min. bis zum Streak-Schutz`}
                                 </div>
                               </div>
@@ -5674,8 +5667,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             onClick={() => setActiveTab('practice_board')}
                             style={{ 
                               background: isGoalAchieved 
-                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                                : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                                ? '#34a853' 
+                                : '#4f46e5', 
                               color: '#ffffff', 
                               border: 'none', 
                               borderRadius: '14px', 
@@ -5689,9 +5682,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               justifyContent: 'center', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              boxShadow: isGoalAchieved 
-                                ? '0 8px 20px rgba(16, 185, 129, 0.25)' 
-                                : '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              boxShadow: 'none', 
                               transition: 'all 0.2s', 
                               width: '100%' 
                             }}
@@ -5734,8 +5725,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: isMobile ? '18px' : '18px 20px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -5746,7 +5737,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isTier3Unlocked ? 'rgba(239, 68, 68, 0.12)' : 'rgba(249, 115, 22, 0.12)', 
+                                  background: isTier3Unlocked ? '#fee2e2' : '#ffedd5', 
                                   color: isTier3Unlocked ? '#dc2626' : '#ea580c', 
                                   width: '34px', 
                                   height: '34px', 
@@ -5777,13 +5768,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               <span style={{ 
                                 background: streak === 0 
                                   ? '#fef3c7' 
-                                  : 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)', 
+                                  : '#dc2626', 
                                 color: streak === 0 ? '#92400e' : '#ffffff', 
                                 fontSize: '0.72rem', 
                                 fontWeight: 950, 
                                 padding: '3px 10px', 
                                 borderRadius: '100px',
-                                border: streak === 0 ? '1px solid #fde68a' : '1px solid rgba(255, 255, 255, 0.3)',
+                                border: 'none',
                                 boxShadow: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -5800,8 +5791,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             {/* FERIEN-FREEZE ODER SCHLANKE INLINE-SCHUTZSCHILDE */}
                             {isTodayHoliday ? (
                               <div style={{
-                                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                                border: '1px solid #a7f3d0',
+                                background: 'rgba(52, 168, 83, 0.10)',
+                                border: 'none',
                                 borderRadius: '12px',
                                 padding: '6px 10px',
                                 display: 'flex',
@@ -5810,15 +5801,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 gap: '6px'
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Palmtree size={14} color="#059669" />
-                                  <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#065f46' }}>
+                                  <Palmtree size={14} color="#34a853" />
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#34a853' }}>
                                     Ferienpause: Flamme gesichert
                                   </span>
                                 </div>
                                 <span style={{
                                   fontSize: '0.66rem',
                                   fontWeight: 900,
-                                  background: '#059669',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   padding: '2px 8px',
                                   borderRadius: '100px'
@@ -5828,10 +5819,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               </div>
                             ) : (
                               <div style={{
-                                background: 'linear-gradient(135deg, #f8f7ff 0%, #f1f0fb 100%)',
+                                background: '#f5f3ff',
                                 borderRadius: '12px',
                                 padding: '6px 10px',
-                                border: '1px solid #e0e7ff',
+                                border: 'none',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
@@ -5860,8 +5851,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         gap: '3px',
                                         padding: '2px 7px',
                                         borderRadius: '6px',
-                                        background: isConsumed ? '#f1f5f9' : '#ffffff',
-                                        border: isConsumed ? '1px solid #cbd5e1' : '1px solid #8b5cf6',
+                                        background: isConsumed ? '#e2e8f0' : '#ffffff',
+                                        border: 'none',
                                         boxShadow: 'none',
                                         fontSize: '0.66rem',
                                         fontWeight: 900,
@@ -5889,9 +5880,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 : isPower 
                                 ? <Zap size={16} color="#ea580c" fill="#f97316" /> 
                                 : <Flame size={16} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#f59e0b' : 'none'} />;
-                              const tierIconBg = isMeister ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : isPower ? 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)' : isTier1Unlocked ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' : '#e2e8f0';
-                              const tierBorder = isMeister ? '1.5px solid rgba(239, 68, 68, 0.45)' : isPower ? '1.5px solid rgba(249, 115, 22, 0.45)' : isTier1Unlocked ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(0,0,0,0.06)';
-                              const tierShadow = isMeister ? '0 3px 12px rgba(239, 68, 68, 0.15)' : isPower ? '0 3px 12px rgba(249, 115, 22, 0.15)' : isTier1Unlocked ? '0 3px 12px rgba(245, 158, 11, 0.12)' : 'none';
+                              const tierIconBg = isMeister ? '#fee2e2' : isPower ? '#ffedd5' : isTier1Unlocked ? '#fef3c7' : '#e2e8f0';
+                              const tierBorder = 'none';
+                              const tierShadow = 'none';
                               const tierRequirement = isMeister ? `9+ Tage • ${heldenMins} Min. täglich` : isPower ? `4–8 Tage • ${mittlereMins} Min. täglich` : `1–3 Tage • ${kleineMins} Min. täglich`;
                               const tierStatus = isMeister 
                                 ? '👑 Meister-Level aktiv! Volle Power!' 
@@ -5912,7 +5903,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       gap: '12px', 
-                                      background: '#ffffff', 
+                                      background: '#f8fafc', 
                                       padding: '10px 14px', 
                                       borderRadius: '14px', 
                                       border: tierBorder, 
@@ -5957,7 +5948,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     background: '#f1f5f9',
                                     padding: '4px',
                                     borderRadius: '14px',
-                                    border: '1px solid #e2e8f0'
+                                    border: 'none'
                                   }}>
                                     {[
                                       { 
@@ -5966,9 +5957,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         active: streak >= 1, 
                                         done: streak >= 4,
                                         activeBg: '#facc15',
-                                        activeBorder: '#eab308',
+                                        activeBorder: '#ca8a04',
                                         activeColor: '#0f172a',
-                                        activeShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#fef08a',
                                         doneBorder: '#facc15',
                                         doneColor: '#713f12'
@@ -5981,7 +5972,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         activeBg: '#f97316',
                                         activeBorder: '#ea580c',
                                         activeColor: '#ffffff',
-                                        activeShadow: '0 2px 8px rgba(249, 115, 22, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#ffedd5',
                                         doneBorder: '#f97316',
                                         doneColor: '#9a3412'
@@ -5994,7 +5985,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         activeBg: '#ef4444',
                                         activeBorder: '#dc2626',
                                         activeColor: '#ffffff',
-                                        activeShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#fee2e2',
                                         doneBorder: '#ef4444',
                                         doneColor: '#991b1b'
@@ -6002,7 +5993,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     ].map((step, idx) => {
                                       const isCurrent = step.active && !step.done;
                                       const bg = step.done ? step.doneBg : step.active ? step.activeBg : 'transparent';
-                                      const border = step.done ? `1px solid ${step.doneBorder}` : step.active ? `1px solid ${step.activeBorder}` : '1px solid transparent';
+                                      const border = 'none';
                                       const textColor = step.done ? step.doneColor : step.active ? step.activeColor : '#64748b';
                                       const shadow = isCurrent ? step.activeShadow : 'none';
 
@@ -6080,10 +6071,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
               {(studentUiLevel === 'pro' || !studentUiLevel) && (
                 <>
                   {/* TOP 4 KPIs ROW */}
-                  <div style={{ 
+                  <div className="student-kpi-grid" style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', 
-                    gap: isMobile ? '10px' : '16px', 
+                    gridTemplateColumns: (isMobile || isTabletPortrait) ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', 
+                    gap: isMobile ? '10px' : '14px', 
                     width: '100%',
                     minWidth: 0
                   }}>
@@ -6093,18 +6084,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'visible',
-                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                        background: '#6366f1',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: isXpPulsing 
-                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 10px 25px -5px rgba(99, 102, 241, 0.35)'
-                          : '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
+                        boxShadow: 'none',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: isXpPulsing ? '2px solid #facc15' : '1px solid rgba(255, 255, 255, 0.15)'
+                        border: 'none'
                       }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
                         {floatingDepositAmount !== null && (
                           <div className="campus-xp-floating-badge">
@@ -6153,7 +6142,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       flex: '1 1 0px',
                       minWidth: 0,
                       position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      background: '#34a853',
                       color: 'white',
                       borderRadius: '20px',
                       boxShadow: 'none',
@@ -6162,7 +6151,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       padding: '16px',
                       boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ 
@@ -6205,7 +6194,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                        background: '#facc15',
                         color: '#0f172a',
                         borderRadius: '20px',
                         boxShadow: 'none',
@@ -6214,7 +6203,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)'
+                        border: 'none'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
@@ -6284,7 +6273,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         flex: '1 1 0px',
                         minWidth: 0,
                         position: 'relative', overflow: 'hidden',
-                        background: 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: 'white',
                         borderRadius: '20px',
                         boxShadow: 'none',
@@ -6293,7 +6282,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)'
+                        border: 'none'
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
@@ -6334,15 +6323,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                   {/* PRO WELCOME BLOCK */}
                   <div style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.6) 100%)',
-                    backdropFilter: 'blur(24px) saturate(1.8)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.7)',
+                    background: '#ffffff',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                    border: 'none',
                     borderRadius: '30px',
                     display: 'flex',
                     flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'stretch',
-                    boxShadow: '0 20px 50px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                    boxShadow: 'none',
                     width: '100%',
                     maxWidth: '100%',
                     boxSizing: 'border-box',
@@ -6356,7 +6345,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       width: isMobile ? '100%' : '190px',
                       height: isMobile ? '160px' : 'auto',
                       minHeight: isMobile ? '160px' : 'auto',
-                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                      background: '#0f172a',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -6371,7 +6360,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         width: '130px',
                         height: '130px',
                         borderRadius: '50%',
-                        background: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0) 70%)',
+                        background: 'transparent',
                         filter: 'blur(12px)',
                         zIndex: 1
                       }} />
@@ -6401,17 +6390,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
-                          background: 'rgba(255, 255, 255, 0.95)',
-                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          border: 'none',
                           borderRadius: '100px',
                           padding: '3px 12px 3px 6px',
-                          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.03)'
+                          boxShadow: 'none'
                         }}>
                           <div style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '5px',
-                            background: '#f1f5f9',
+                            background: '#ffffff',
                             padding: '3px 8px',
                             borderRadius: '100px'
                           }}>
@@ -6447,26 +6436,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               ? '#fef3c7'
                               : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
                                 ? '#fef9c3' 
-                                : 'rgba(52, 168, 83, 0.08)'),
-                            border: carrierGhostingDetected
-                              ? '1px solid #fde68a'
-                              : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
-                                ? '1px solid #fef08a' 
-                                : '1px solid rgba(52, 168, 83, 0.2)'),
+                                : 'rgba(52, 168, 83, 0.10)'),
+                            border: 'none',
                             borderRadius: '100px',
                             padding: '4px 12px',
                             color: carrierGhostingDetected
                               ? '#92400e'
                               : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
                                 ? '#854d0e' 
-                                : '#15803d'),
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                                : '#34a853'),
+                            boxShadow: 'none'
                           }}>
                             <div style={{
                               width: '6px',
                               height: '6px',
                               borderRadius: '50%',
-                              background: carrierGhostingDetected ? '#f59e0b' : '#eab308'
+                              background: carrierGhostingDetected ? '#f59e0b' : '#facc15'
                             }} />
                             <span style={{
                               fontSize: '0.65rem',
@@ -6490,15 +6475,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '5px',
-                              background: '#ffffff',
-                              border: '1px solid #cbd5e1',
+                              background: '#f1f5f9',
+                              border: 'none',
                               borderRadius: '100px',
                               padding: '4px 10px',
                               fontSize: '0.68rem',
                               fontWeight: 800,
                               color: '#334155',
                               cursor: 'pointer',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                              boxShadow: 'none',
                               touchAction: 'manipulation'
                             }}
                           >
@@ -6517,15 +6502,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '8px',
-                              background: '#ffffff',
+                              background: '#f1f5f9',
                               color: '#0f172a',
                               padding: '7px 16px',
                               borderRadius: '12px',
                               fontSize: '0.84rem',
                               fontWeight: 850,
-                              border: '1.5px solid #e2e8f0',
+                              border: 'none',
                               cursor: 'pointer',
-                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                              boxShadow: 'none',
                               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                             }}
                             className="hover-scale"
@@ -6536,7 +6521,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <span>Termine & News</span>
                             {sidebarTotalAlertsCount > 0 && (
                               <span style={{
-                                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                background: '#ef4444',
                                 color: '#ffffff',
                                 fontSize: '0.68rem',
                                 fontWeight: 950,
@@ -6608,7 +6593,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '8px',
-                                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                  background: '#f1f5f9',
                                   color: '#0f172a',
                                   padding: '8px 16px',
                                   minHeight: '38px',
@@ -6616,9 +6601,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   borderRadius: '12px',
                                   fontSize: '0.78rem',
                                   fontWeight: 800,
-                                  border: '1.5px solid #cbd5e1',
+                                  border: 'none',
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                                  boxShadow: 'none',
                                   transition: 'all 0.18s ease'
                                 }}
                                 className="hover-scale"
@@ -7024,8 +7009,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: '24px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -7080,8 +7065,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: '24px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: isGoalAchieved ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -7092,8 +7077,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(124, 58, 237, 0.12)', 
-                                  color: isGoalAchieved ? '#16a34a' : '#7c3aed', 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.10)' : '#ede9fe', 
+                                  color: isGoalAchieved ? '#34a853' : '#7c3aed', 
                                   width: '34px', 
                                   height: '34px', 
                                   borderRadius: '11px', 
@@ -7113,9 +7098,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '5px',
-                                background: isGoalAchieved ? '#dcfce7' : '#f8fafc',
-                                color: isGoalAchieved ? '#15803d' : '#475569',
-                                border: isGoalAchieved ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                background: isGoalAchieved ? 'rgba(52, 168, 83, 0.10)' : '#f1f5f9',
+                                color: isGoalAchieved ? '#34a853' : '#475569',
+                                border: 'none',
                                 padding: '4px 10px',
                                 borderRadius: '100px',
                                 fontSize: '0.72rem',
@@ -7142,7 +7127,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 <div style={{ fontSize: '1.10rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                                   {isGoalAchieved ? 'Tagesziel erreicht' : 'Tagesfokus'}
                                 </div>
-                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#15803d' : '#64748b', lineHeight: 1.35 }}>
+                                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: isGoalAchieved ? '#34a853' : '#64748b', lineHeight: 1.35 }}>
                                   {isGoalAchieved ? 'Serie für heute gesichert' : `${Math.max(1, requiredMins - todayMins)} Min. bis zum Streak-Schutz`}
                                 </div>
                               </div>
@@ -7155,8 +7140,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             onClick={() => handleTabChangeLocal('practice_board')}
                             style={{ 
                               background: isGoalAchieved 
-                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                                : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                                ? '#34a853' 
+                                : '#4f46e5', 
                               color: '#ffffff', 
                               border: 'none', 
                               borderRadius: '14px', 
@@ -7170,9 +7155,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               justifyContent: 'center', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              boxShadow: isGoalAchieved 
-                                ? '0 8px 20px rgba(16, 185, 129, 0.25)' 
-                                : '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              boxShadow: 'none', 
                               transition: 'all 0.2s', 
                               width: '100%' 
                             }}
@@ -7208,8 +7191,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: '24px', 
-                          boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          boxShadow: 'none',
+                          border: 'none',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -7220,7 +7203,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <div style={{ 
-                                  background: isTier3Unlocked ? 'rgba(239, 68, 68, 0.12)' : 'rgba(249, 115, 22, 0.12)', 
+                                  background: isTier3Unlocked ? '#fee2e2' : '#ffedd5', 
                                   color: isTier3Unlocked ? '#dc2626' : '#ea580c', 
                                   width: '34px', 
                                   height: '34px', 
@@ -7249,13 +7232,13 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
                               </div>
                               <span style={{ 
-                                background: streak === 0 ? '#f1f5f9' : '#ecfdf5', 
-                                color: streak === 0 ? '#475569' : '#047857', 
+                                background: streak === 0 ? '#f1f5f9' : 'rgba(52, 168, 83, 0.10)', 
+                                color: streak === 0 ? '#475569' : '#34a853', 
                                 fontSize: '0.74rem', 
                                 fontWeight: 950, 
                                 padding: '4px 12px', 
                                 borderRadius: '100px',
-                                border: streak === 0 ? '1px solid #e2e8f0' : '1px solid #a7f3d0',
+                                border: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px'
@@ -7267,8 +7250,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             {/* FERIEN-FREEZE ODER WOCHEN-PUFFER */}
                             {isTodayHoliday ? (
                               <div style={{
-                                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                                border: '1.5px solid #a7f3d0',
+                                background: 'rgba(52, 168, 83, 0.10)',
+                                border: 'none',
                                 borderRadius: '16px',
                                 padding: '12px 14px',
                                 display: 'flex',
@@ -7277,15 +7260,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Palmtree size={16} color="#059669" />
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#065f46' }}>
+                                    <Palmtree size={16} color="#34a853" />
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#34a853' }}>
                                       Ferienpause aktiv
                                     </span>
                                   </div>
                                   <span style={{
                                     fontSize: '0.68rem',
                                     fontWeight: 900,
-                                    background: '#059669',
+                                    background: '#34a853',
                                     color: '#ffffff',
                                     padding: '2px 9px',
                                     borderRadius: '100px'
@@ -7293,7 +7276,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     ✨ 2× XP-Booster
                                   </span>
                                 </div>
-                                <p style={{ margin: 0, fontSize: '0.72rem', color: '#047857', lineHeight: 1.35, fontWeight: 600 }}>
+                                <p style={{ margin: 0, fontSize: '0.72rem', color: '#34a853', lineHeight: 1.35, fontWeight: 600 }}>
                                   Ferienzeit: Deine Serie ist gesichert. Freiwilliges Üben bringt <strong>2× XP</strong>.
                                 </p>
                               </div>
@@ -7305,10 +7288,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', fontWeight: 900, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Shield size={14} color="#059669" fill="#059669" />
+                                    <Shield size={14} color="#34a853" fill="#34a853" />
                                     Wochen-Puffer (Ruhetage):
                                   </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 950, color: availableShields > 0 ? '#059669' : '#b91c1c' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 950, color: availableShields > 0 ? '#34a853' : '#b91c1c' }}>
                                     {availableShields}/3 Tage verfügbar
                                   </span>
                                 </div>
@@ -7329,16 +7312,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         gap: '3px',
                                         padding: '7px 4px',
                                         borderRadius: '10px',
-                                        background: isConsumed ? '#f1f5f9' : '#ffffff',
-                                        border: isConsumed ? '1px solid #cbd5e1' : '1.5px solid #10b981',
+                                        background: isConsumed ? '#f1f5f9' : 'rgba(52, 168, 83, 0.10)',
+                                        border: 'none',
                                         boxShadow: 'none',
                                         transition: 'all 0.2s ease'
                                       }}>
-                                        <Shield size={14} color={isConsumed ? '#64748b' : '#059669'} fill={isConsumed ? '#cbd5e1' : '#10b981'} />
+                                        <Shield size={14} color={isConsumed ? '#64748b' : '#34a853'} fill={isConsumed ? '#cbd5e1' : '#34a853'} />
                                         <span style={{
                                           fontSize: isMusicStandMode ? '0.74rem' : '0.68rem',
                                           fontWeight: 900,
-                                          color: isConsumed ? '#475569' : '#047857',
+                                          color: isConsumed ? '#475569' : '#34a853',
                                           letterSpacing: '0.02em',
                                           whiteSpace: 'nowrap'
                                         }}>
@@ -7367,14 +7350,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 ? <Zap size={16} color="#ea580c" fill="#f97316" /> 
                                 : <Flame size={16} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#facc15' : 'none'} />;
                               const tierIconBg = isMeister ? '#fee2e2' : isFlow ? '#ffedd5' : isTier1Unlocked ? '#fef9c3' : '#f1f5f9';
-                              const tierBorder = isMeister ? '1.5px solid #ef4444' : isFlow ? '1.5px solid #f97316' : isTier1Unlocked ? '1.5px solid #facc15' : '1px solid #e2e8f0';
-                              const tierShadow = isMeister 
-                                ? '0 4px 14px rgba(239, 68, 68, 0.16)' 
-                                : isFlow 
-                                ? '0 4px 14px rgba(249, 115, 22, 0.16)' 
-                                : isTier1Unlocked 
-                                ? '0 4px 14px rgba(250, 204, 21, 0.16)' 
-                                : 'none';
+                              const tierBorder = 'none';
+                              const tierShadow = 'none';
                               const tierRequirement = isMeister ? `9+ Tage • ${heldenMins} Min. täglich` : isFlow ? `4–8 Tage • ${mittlereMins} Min. täglich` : `1–3 Tage • ${kleineMins} Min. täglich`;
                               const tierStatus = isMeister 
                                 ? '★ Meister-Fokus aktiv • Volle Flamme' 
@@ -7396,7 +7373,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       gap: '12px', 
-                                      background: '#ffffff', 
+                                      background: '#f8fafc', 
                                       padding: '10px 14px', 
                                       borderRadius: '16px', 
                                       border: tierBorder, 
@@ -7441,7 +7418,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     background: '#f1f5f9',
                                     padding: '4px',
                                     borderRadius: '14px',
-                                    border: '1px solid #e2e8f0'
+                                    border: 'none'
                                   }}>
                                     {[
                                       { 
@@ -7450,9 +7427,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         active: streak >= 1, 
                                         done: streak >= 4,
                                         activeBg: '#facc15',
-                                        activeBorder: '#eab308',
+                                        activeBorder: '#ca8a04',
                                         activeColor: '#0f172a',
-                                        activeShadow: '0 2px 8px rgba(250, 204, 21, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#fef08a',
                                         doneBorder: '#facc15',
                                         doneColor: '#713f12'
@@ -7465,7 +7442,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         activeBg: '#f97316',
                                         activeBorder: '#ea580c',
                                         activeColor: '#ffffff',
-                                        activeShadow: '0 2px 8px rgba(249, 115, 22, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#ffedd5',
                                         doneBorder: '#f97316',
                                         doneColor: '#9a3412'
@@ -7478,7 +7455,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         activeBg: '#ef4444',
                                         activeBorder: '#dc2626',
                                         activeColor: '#ffffff',
-                                        activeShadow: '0 2px 8px rgba(239, 68, 68, 0.35)',
+                                        activeShadow: 'none',
                                         doneBg: '#fee2e2',
                                         doneBorder: '#ef4444',
                                         doneColor: '#991b1b'
@@ -7486,7 +7463,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     ].map((step, idx) => {
                                       const isCurrent = step.active && !step.done;
                                       const bg = step.done ? step.doneBg : step.active ? step.activeBg : 'transparent';
-                                      const border = step.done ? `1px solid ${step.doneBorder}` : step.active ? `1px solid ${step.activeBorder}` : '1px solid transparent';
+                                      const border = 'none';
                                       const textColor = step.done ? step.doneColor : step.active ? step.activeColor : '#64748b';
                                       const shadow = isCurrent ? step.activeShadow : 'none';
 

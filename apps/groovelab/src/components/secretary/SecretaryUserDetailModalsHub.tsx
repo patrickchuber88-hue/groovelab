@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { Key, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { normalizeCampusIdToNumeric } from '../../utils/campusIdHelper';
 import { deleteStudentFully } from '../../utils/studentDeletionService';
 import { TeacherManagementModal } from '../verwaltung/TeacherManagementModal';
 
@@ -240,13 +241,46 @@ export function SecretaryUserDetailModalsHub({
 
       {/* ─── Unassigned-Warning Modal ─── */}
       {showUnassignedWarning && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowUnassignedWarning(false);
+          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="unassigned-warning-title"
-            style={{ background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}
+            style={{ position: 'relative', background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}
           >
+            <button
+              type="button"
+              data-testid="modal-close-btn"
+              aria-label="Dialog schließen"
+              onClick={() => setShowUnassignedWarning(false)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                width: '44px',
+                height: '44px',
+                minWidth: '44px',
+                minHeight: '44px',
+                borderRadius: '50%',
+                border: 'none',
+                background: '#f1f5f9',
+                color: '#475569',
+                fontSize: '1rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                touchAction: 'manipulation'
+              }}
+            >
+              ✕
+            </button>
             <div style={{ fontSize: '2.4rem', marginBottom: 10 }} aria-hidden="true">⚠️</div>
             <h3 id="unassigned-warning-title" style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>Nicht alle Räume zugewiesen</h3>
             <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
@@ -261,7 +295,7 @@ export function SecretaryUserDetailModalsHub({
               </button>
               <button
                 onClick={() => { setShowUnassignedWarning(false); handleSaveAndApproveAll(true); }}
-                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #34a853, #22c55e)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
+                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: '#34a853', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
               >
                 Trotzdem freigeben
               </button>
@@ -311,8 +345,12 @@ export function SecretaryUserDetailModalsHub({
                 alignItems: 'center',
                 marginBottom: '4px'
               }}>
-                <span>Login-PIN:</span>
-                <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{activeContextMenu.student.ausweis_nummer || 'Keine'}</strong>
+                <span>Ausweis-ID:</span>
+                <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>
+                  {activeContextMenu.student.ausweis_nummer 
+                    ? normalizeCampusIdToNumeric(activeContextMenu.student.ausweis_nummer) 
+                    : 'Keine'}
+                </strong>
               </div>
             )}
 
@@ -384,6 +422,7 @@ export function SecretaryUserDetailModalsHub({
             }}>
               <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>Geburtstagstag:</span>
               <select
+                aria-label="Geburtstagstag auswählen"
                 value={activeContextMenu.student.day_of_birth || 1}
                 onChange={async (e) => {
                   const newDay = parseInt(e.target.value, 10);
@@ -404,7 +443,7 @@ export function SecretaryUserDetailModalsHub({
                     } else {
                       const { error: err } = await supabase
                         .from('activation_days')
-                        .insert({ student_id: s.id, day_of_birth: newDay });
+                        .insert({ student_id: s.id, school_id: s.school_id || schoolId, day_of_birth: newDay });
                       if (err) throw err;
                     }
 
@@ -415,6 +454,7 @@ export function SecretaryUserDetailModalsHub({
                         .eq('id', s.id);
                     }
 
+                    s.day_of_birth = newDay;
                     fetchDashboardData();
                   } catch (err: any) {
                     console.error('Fehler beim Ändern des Geburtstagstags:', err);

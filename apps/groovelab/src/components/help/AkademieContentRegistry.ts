@@ -379,7 +379,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     ],
     invariants: [
       'Zero-Leakage: Bank- und Kontodaten der Musikschule werden verschlüsselt gespeichert und nur auf offiziellen Infoblättern ausgegeben.',
-      'Brand-Integrität: Die Kernfarben Grün (#34a853), Gelb (#eab308) und Rot (#ea4335) bleiben für Modul-Logiken geschützt.'
+      'Brand-Integrität: Die Kernfarben Grün (#34a853), Gelb (#facc15) und Rot (#ea4335) bleiben für Modul-Logiken geschützt.'
     ],
     tags: ['profil', 'logo', 'branding', 'schulfarbe', 'iban', 'geofencing', 'oeffnungszeiten', 'standorte']
   },
@@ -413,7 +413,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       }
     ],
     proTips: [
-      '🟡 Gelbes Marken-Erlebnis: Im GrooveLab-Modul wechseln Buttons und Akzente auf das leuchtende Gelb (#eab308).',
+      '🟡 Gelbes Marken-Erlebnis: Im GrooveLab-Modul wechseln Buttons und Akzente auf das leuchtende Gelb (#facc15).',
       '🏛️ Neutrales Tafelbild: Schulleitung und Sekretariat tragen auch im GrooveLab das professionelle Tafelbild – keine Musiker-Avatare.',
       '🎤 Konzert-Setlists: Verfolge, welche Songs von wie vielen Ensembles bühnenreif geprobt wurden, um das nächste Schulfestival zu planen.'
     ],
@@ -698,7 +698,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       }
     ],
     proTips: [
-      '🟡 Gelbes Marken-Design: Im GrooveLab-Modul schalten alle Buttons auf Gelb (#eab308) – perfekte visuelle Orientierung.',
+      '🟡 Gelbes Marken-Design: Im GrooveLab-Modul schalten alle Buttons auf Gelb (#facc15) – perfekte visuelle Orientierung.',
       '🎸 Chords & Transposition: Ändere die Tonart eines Songs im Handumdrehen, damit die Tonlage perfekt zur Stimme deines Sängers passt.',
       '🎤 Setlist für Konzerte: Markiere fertige Songs als "Bühnenreif", um die Setlist für das Musikschul-Konzert automatisch zusammenzustellen.'
     ],

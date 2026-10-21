@@ -10,7 +10,7 @@ import { StudentModalHeader } from './shared/StudentModalHeader';
 import { StudentScheduleCard, getFormattedScheduleDayTime } from './shared/StudentScheduleCard';
 import { StudentAccessSection } from './shared/StudentAccessSection';
 import { StudentConsentProtocol } from './shared/StudentConsentProtocol';
-import { IDBadgeCard } from '../../IDBadgeCard';
+import { StudentIdCardPrintModal } from './modals/StudentIdCardPrintModal';
 import { resolveUserCampusId } from '../../../utils/campusIdHelper';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../../StudioAvatar';
@@ -96,30 +96,6 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
   const [schoolSubjects, setSchoolSubjects] = useState<string[]>([]);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
-  const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
-    const localLevel = typeof window !== 'undefined' && student.id ? localStorage.getItem(`campus_student_ui_level_${student.id}`) : null;
-    return (localLevel || student.campus_ui_level || 'junior') as any;
-  });
-
-  const handleUpdateStudentUiLevel = async (newLevel: 'junior' | 'teen' | 'pro') => {
-    if (newLevel === studentUiLevel) return;
-    setStudentUiLevel(newLevel);
-    const targetId = activeStudent?.id || student?.id;
-    if (targetId) {
-      localStorage.setItem(`campus_student_ui_level_${targetId}`, newLevel);
-      try {
-        await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', targetId);
-        try {
-          await supabase.from('students').update({ campus_ui_level: newLevel }).eq('id', targetId);
-        } catch {}
-      } catch (e) {
-        console.warn('Could not update student campus_ui_level:', e);
-      }
-      window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: targetId, uiLevel: newLevel } }));
-      window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-    }
-  };
-
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [lockedStudentPrice, setLockedStudentPrice] = useState<number | null>(student.locked_student_price ?? null);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
@@ -867,7 +843,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
           <div
             style={{
               background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-              border: '1.5px solid #fde68a',
+              border: 'none',
               borderRadius: '20px',
               padding: '16px 20px',
               marginBottom: '20px',
@@ -885,7 +861,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                   height: '42px',
                   borderRadius: '12px',
                   background: '#fef3c7',
-                  border: '1px solid #fde68a',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1049,7 +1025,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                       fontWeight: 800,
                       padding: '3px 10px',
                       borderRadius: '100px',
-                      border: '1px solid #fee2e2'
+                      border: 'none'
                     }}
                   >
                     {instrument || 'Nicht festgelegt'}
@@ -1299,7 +1275,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                       aria-pressed={isGroovelabActive}
                       onClick={() => handleToggleGroovelab(true)}
                       style={{
-                        background: isGroovelabActive ? '#eab308' : 'transparent',
+                        background: isGroovelabActive ? '#facc15' : 'transparent',
                         color: isGroovelabActive ? '#0f172a' : '#64748b',
                         border: 'none',
                         borderRadius: '8px',
@@ -1311,57 +1287,6 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                     >
                       Aktiv
                     </button>
-                  </div>
-                </div>
-
-                {/* Didaktische Altersstufe (Campus-Dashboard) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0 2px 0', borderTop: '1px solid #f1f5f9' }}>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>🎨 Altersstufe (Campus-Dashboard)</span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                      Legt die Benutzeroberfläche fest (Junior 6–10 J., Teen 11–15 J., Pro 16+ J.)
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '3px' }}>
-                    {[
-                      { key: 'junior', label: 'Junior', icon: '🐣' },
-                      { key: 'teen', label: 'Teen', icon: '🚀' },
-                      { key: 'pro', label: 'Pro', icon: '👑' }
-                    ].map((lvl) => {
-                      const isActive = studentUiLevel === lvl.key;
-                      return (
-                        <button
-                          key={lvl.key}
-                          type="button"
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Altersstufe auf ${lvl.label} setzen`}
-                          aria-pressed={isActive}
-                          onClick={() => handleUpdateStudentUiLevel(lvl.key as any)}
-                          style={{
-                            background: isActive ? '#34a853' : 'transparent',
-                            color: isActive ? '#ffffff' : '#64748b',
-                            border: 'none',
-                            borderRadius: '9px',
-                            padding: '6px 10px',
-                            fontSize: '0.74rem',
-                            fontWeight: isActive ? 850 : 650,
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            minHeight: '36px',
-                            transition: 'all 0.15s ease',
-                            touchAction: 'manipulation'
-                          }}
-                        >
-                          <span>{lvl.icon}</span>
-                          <span>{lvl.label}</span>
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
               </section>
@@ -1443,7 +1368,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                       style={{
                         background: '#fff1f2',
                         color: '#e11d48',
-                        border: '1px solid #fecdd3',
+                        border: 'none',
                         borderRadius: '8px',
                         padding: '4px 10px',
                         fontSize: '0.72rem',
@@ -1506,7 +1431,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                           fontWeight: 800,
                           padding: '2px 8px',
                           borderRadius: '8px',
-                          border: '1px solid #fee2e2',
+                          border: 'none',
                           whiteSpace: 'nowrap'
                         }}
                       >
@@ -1682,7 +1607,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                                 style={{
                                   background: '#eff6ff',
                                   color: '#2563eb',
-                                  border: '1px solid #bfdbfe',
+                                  border: 'none',
                                   borderRadius: '8px',
                                   padding: '5px 10px',
                                   fontSize: '0.72rem',
@@ -1921,7 +1846,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
               <section
                 style={{
                   background: '#fef2f2',
-                  border: '1.5px solid #fecdd3',
+                  border: 'none',
                   borderRadius: '24px',
                   padding: '20px 24px',
                   display: 'flex',
@@ -2026,7 +1951,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                       width: '100%',
                       background: '#fef2f2',
                       color: ADMIN_PRIMARY,
-                      border: '1.5px solid #fecdd3',
+                      border: 'none',
                       borderRadius: '14px',
                       padding: '12px 16px',
                       fontSize: '0.84rem',
@@ -2150,63 +2075,15 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
         </div>
       )}
 
-      {/* ID Card Overlay */}
+      {/* 🏛️ 0,1% Goldstandard Schülerausweis & Campus-Pass Print Modal */}
       {showIdCardOverlay && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Schülerausweis für ${firstName} ${lastName}`}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 11000,
-            background: 'rgba(15, 23, 42, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-          }}
-          onClick={() => setShowIdCardOverlay(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#ffffff',
-              borderRadius: '28px',
-              padding: '28px',
-              maxWidth: '380px',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-            }}
-          >
-            <IDBadgeCard
-              user={{ ...student, first_name: firstName, last_name: lastName }}
-              activePlatform="campus" schoolName={schoolName}
-            />
-            <button
-              type="button"
-              onClick={() => setShowIdCardOverlay(false)}
-              aria-label="Ausweis-Ansicht schließen"
-              style={{
-                marginTop: '18px',
-                width: '100%',
-                background: ADMIN_PRIMARY,
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '10px',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                cursor: 'pointer'
-              }}
-            >
-              Schließen
-            </button>
-          </div>
-        </div>
+        <StudentIdCardPrintModal
+          isOpen={showIdCardOverlay}
+          onClose={() => setShowIdCardOverlay(false)}
+          student={{ ...student, first_name: firstName, last_name: lastName }}
+          schoolName={schoolName}
+          activePlatform={activePlatform || 'campus'}
+        />
       )}
 
       {/* Duration Confirmation Modal */}

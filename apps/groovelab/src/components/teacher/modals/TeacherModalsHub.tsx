@@ -389,6 +389,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
             readOnly={teacherDunningStatus?.isTeacherReadOnly || false}
             uiLevel={modalDocStudent?.campus_ui_level || undefined}
             parentPermissions={modalDocStudent?.parent_permissions}
+            isTeacherTools={true}
             groupStudents={modalDocStudent?.groupStudents || (modalDocStudent?.students && modalDocStudent.students.length > 1 ? modalDocStudent.students : [])}
             onProfileClick={(student) => {
               setDocStudent(null);
@@ -725,7 +726,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            background: 'linear-gradient(135deg, #ca8a04, #eab308)',
+            background: '#facc15',
             color: '#0f172a',
             borderRadius: '16px',
             padding: '16px 24px',

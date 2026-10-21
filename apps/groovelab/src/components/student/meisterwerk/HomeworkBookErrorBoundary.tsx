@@ -44,7 +44,7 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
           textAlign: 'center'
         }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-            <BookOpen size={42} color="#15803d" strokeWidth={2} />
+            <BookOpen size={42} color="#059669" strokeWidth={2} />
           </div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>
             Hausaufgabenheft konnte nicht geladen werden
@@ -55,7 +55,7 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
           <button
             onClick={this.handleRetry}
             style={{
-              background: '#34a853',
+              background: '#059669',
               color: '#ffffff',
               border: 'none',
               padding: '12px 28px',
@@ -73,7 +73,7 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
               marginTop: '16px',
               padding: '10px 14px',
               background: '#fff1f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               borderRadius: '12px',
               fontSize: '0.74rem',
               color: '#991b1b',

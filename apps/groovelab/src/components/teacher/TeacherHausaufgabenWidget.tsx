@@ -3,6 +3,21 @@ import { getDailyQuote } from '@groovelab/shared';
 import { supabase } from '../../lib/supabase';
 import { getTeacherActiveBoards } from './hooks/useTeacherTagesplan';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
+import { resolveCampusStudentAvatar } from '../../utils/avatarResolutionEngine';
+
+const computeSlotStartAndEnd = (slot: any): { startStr: string; endStr: string } => {
+  const rawStart = slot?.startTime || slot?.start_time?.substring(0, 5) || slot?.timeSlot?.split('-')?.[0]?.trim() || '14:00';
+  const startStr = String(rawStart).substring(0, 5);
+  const explicitEnd = slot?.endTime || slot?.end_time?.substring(0, 5) || slot?.timeSlot?.split('-')?.[1]?.trim();
+  if (explicitEnd && String(explicitEnd).includes(':')) {
+    return { startStr, endStr: String(explicitEnd).substring(0, 5) };
+  }
+  const [sh, sm] = startStr.split(':').map(Number);
+  const durationMin = Number(slot?.duration || slot?.duration_minutes) || 30;
+  const totalMin = (Number.isFinite(sh) ? sh : 14) * 60 + (Number.isFinite(sm) ? sm : 0) + durationMin;
+  const endStr = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+  return { startStr, endStr };
+};
 import {
   parseHomeworkNotesPayload,
   buildHomeworkNotesPayload,
@@ -117,6 +132,8 @@ export function resolveNextTeachingDaySummary(
 export interface TeacherHausaufgabenWidgetProps {
   teacher: any;
   activeStudent: any;
+  activeTimelineSlot?: any;
+  currentTimeStr?: string;
   activeGroupStudents: any[];
   selectedGroupStudentId: string | null;
   setSelectedGroupStudentId: (id: string | null) => void;
@@ -154,6 +171,8 @@ export interface TeacherHausaufgabenWidgetProps {
 export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps> = ({
   teacher,
   activeStudent,
+  activeTimelineSlot,
+  currentTimeStr,
   activeGroupStudents,
   selectedGroupStudentId,
   setSelectedGroupStudentId,
@@ -200,11 +219,25 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   useEffect(() => {
     const handleHwUpdate = (e: any) => {
       const updatedStudentId = e?.detail?.studentId;
+      const isDeleted = Boolean(e?.detail?.deleted);
       if (updatedStudentId && (updatedStudentId === activeStudent?.id || updatedStudentId === prep?.studentId)) {
         const storageKey = `campus_homework_notes_${updatedStudentId}`;
         try {
           const raw = localStorage.getItem(storageKey);
-          if (raw) {
+          if (isDeleted || !raw) {
+            setDynamicPrepMirror((prev: any) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                currentWeekNotes: [],
+                currentWeekItems: [],
+                parsedCurrentLehrwerke: [],
+                parsedCurrentSongs: [],
+                currentRawSnapshotLwToken: undefined,
+                currentRawSnapshotSongsToken: undefined
+              };
+            });
+          } else {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
               setDynamicPrepMirror((prev: any) => {
@@ -226,8 +259,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
         bc = new BroadcastChannel('campus_homework_bus');
         bc.onmessage = (event) => {
           const updatedStudentId = event.data?.studentId;
+          const isDeleted = Boolean(event.data?.deleted || event.data?.type === 'HOMEWORK_DELETED');
           if (updatedStudentId && (updatedStudentId === activeStudent?.id || updatedStudentId === prep?.studentId)) {
-            handleHwUpdate({ detail: { studentId: updatedStudentId } });
+            handleHwUpdate({ detail: { studentId: updatedStudentId, deleted: isDeleted } });
           }
         };
       } catch {}
@@ -465,8 +499,8 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
           currentWeekItems: [],
           parsedCurrentLehrwerke: [],
           parsedCurrentSongs: [],
-          rawSnapshotLwToken: undefined,
-          rawSnapshotSongsToken: undefined
+          currentRawSnapshotLwToken: undefined,
+          currentRawSnapshotSongsToken: undefined
         };
       });
     } catch (err: any) {
@@ -569,6 +603,9 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
       const loopTokens = Array.isArray(currentPrep.prevWeekNotes)
         ? currentPrep.prevWeekNotes.filter((n: string) => typeof n === 'string' && n.startsWith('LOOP:'))
         : [];
+      const microScores = Array.isArray(currentPrep.prevWeekNotes)
+        ? currentPrep.prevWeekNotes.filter((n: string) => typeof n === 'string' && n.startsWith('MICROSCORE:'))
+        : [];
 
       const notesJson = buildHomeworkNotesPayload({
         didacticNotes: cleanPrevNotes,
@@ -577,7 +614,8 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
         lehrwerke: currentPrep.parsedPrevLehrwerke,
         songs: currentPrep.parsedPrevSongs,
         audioTokens,
-        loopTokens
+        loopTokens,
+        microScores
       });
 
       // Check if current week row exists in progress_matrix
@@ -664,12 +702,18 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
     const sId = studentOrPrep?.id || studentOrPrep?.studentId;
     const foundStud = allStudents.find(s => s.id === sId);
     const sName = studentOrPrep?.studentName || (foundStud ? `${foundStud.first_name || ''} ${foundStud.last_name || ''}`.trim() : 'Schüler');
+    const safePhotoUrl = resolveCampusStudentAvatar({
+      ...(foundStud || studentOrPrep || {}),
+      role: 'student',
+      instrument: foundStud?.instrument || studentOrPrep?.instrument || teacher?.instrument || 'Gitarre'
+    });
     setDocStudent({
       ...(foundStud || {}),
       id: sId,
       first_name: sName.split(' ')[0] || foundStud?.first_name || 'Schüler',
       last_name: sName.split(' ').slice(1).join(' ') || foundStud?.last_name || '',
-      photo_url: (foundStud?.photo_url && !foundStud.photo_url.includes('avatar_ghost')) ? foundStud.photo_url : (studentOrPrep?.photo_url && !studentOrPrep.photo_url.includes('avatar_ghost') ? studentOrPrep.photo_url : '/avatars/gitarre_avatar_new.png'),
+      photo_url: safePhotoUrl,
+      avatar_url: safePhotoUrl,
       is_campus_active: foundStud ? foundStud.is_campus_active : Boolean(studentOrPrep?.is_campus_active),
       school_id: foundStud?.school_id || teacher?.school_id,
       schoolId: foundStud?.school_id || teacher?.school_id,
@@ -682,28 +726,54 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
     const sId = studentOrPrep?.id || studentOrPrep?.studentId;
     const foundStud = allStudents.find(s => s.id === sId);
     const sName = studentOrPrep?.studentName || (foundStud ? `${foundStud.first_name || ''} ${foundStud.last_name || ''}`.trim() : 'Schüler');
+    const safePhotoUrl = resolveCampusStudentAvatar({
+      ...(foundStud || studentOrPrep || {}),
+      role: 'student',
+      instrument: foundStud?.instrument || studentOrPrep?.instrument || teacher?.instrument || 'Gitarre'
+    });
     setSelectedStudentProfile({
       id: sId,
       first_name: sName.split(' ')[0] || foundStud?.first_name || 'Schüler',
       last_name: sName.split(' ').slice(1).join(' ') || foundStud?.last_name || '',
-      photo_url: (foundStud?.photo_url && !foundStud.photo_url.includes('avatar_ghost')) ? foundStud.photo_url : (studentOrPrep?.photo_url && !studentOrPrep.photo_url.includes('avatar_ghost') ? studentOrPrep.photo_url : '/avatars/gitarre_avatar_new.png')
+      photo_url: safePhotoUrl,
+      avatar_url: safePhotoUrl
     });
   };
 
   // Derive active lesson numbers and room
   const { slotIdx, totalSlots, slotStartTime, slotEndTime, currentRoom } = useMemo(() => {
-    const slotsWithStudents = briefingData?.timeline?.filter((s: any) => s.student && !s.isBreak && s.status !== 'cancelled' && s.status !== 'canceled_by_student' && s.status !== 'canceled_by_teacher') || [];
-    const currentSlotIndex = slotsWithStudents.findIndex((s: any) => s.student?.id === activeStudent?.id || s.student?.name === activeStudent?.name);
-    const activeSlot = slotsWithStudents[currentSlotIndex] || slotsWithStudents[0];
+    const slotsWithStudents = briefingData?.timeline?.filter((s: any) =>
+      (s.student || (s.students && s.students.length > 0)) &&
+      !s.isBreak &&
+      !s.is_room_booking &&
+      !s.isRoomBooking &&
+      !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status)
+    ) || [];
+    let currentSlotIndex = -1;
+    if (activeTimelineSlot) {
+      currentSlotIndex = slotsWithStudents.findIndex((s: any) =>
+        (activeTimelineSlot.id && s.id === activeTimelineSlot.id) ||
+        (activeTimelineSlot.timeSlot && s.timeSlot === activeTimelineSlot.timeSlot)
+      );
+    }
+    if (currentSlotIndex < 0 && activeStudent) {
+      currentSlotIndex = slotsWithStudents.findIndex((s: any) =>
+        s.student?.id === activeStudent?.id ||
+        s.student?.name === activeStudent?.name ||
+        s.students?.some((st: any) => st.id === activeStudent?.id)
+      );
+    }
+    const activeSlot = slotsWithStudents[currentSlotIndex] || activeTimelineSlot || slotsWithStudents[0];
     const room = activeSlot?.room || activeSlot?.rooms?.name || 'Raum 4';
+    const { startStr, endStr } = computeSlotStartAndEnd(activeSlot);
     return {
       slotIdx: currentSlotIndex >= 0 ? currentSlotIndex + 1 : 1,
       totalSlots: Math.max(slotsWithStudents.length, 1),
-      slotStartTime: activeSlot?.start_time?.substring(0, 5) || activeSlot?.timeSlot?.split('-')?.[0]?.trim() || '13:45',
-      slotEndTime: activeSlot?.end_time?.substring(0, 5) || activeSlot?.timeSlot?.split('-')?.[1]?.trim() || '15:15',
+      slotStartTime: startStr,
+      slotEndTime: endStr,
       currentRoom: room
     };
-  }, [briefingData, activeStudent]);
+  }, [briefingData, activeStudent, activeTimelineSlot]);
 
   // Derive dynamic pause countdown and previous unfinished student
   const { pauseMinutesRemaining, nextPauseSlot, previousUnfinishedStudent } = useMemo(() => {
@@ -715,13 +785,19 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
     const now = typeof getSimulatedNow === 'function' ? getSimulatedNow() : new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    const activeSlots = timeline.filter((s: any) => s.student && !s.isBreak && s.status !== 'cancelled' && s.status !== 'canceled_by_student' && s.status !== 'canceled_by_teacher');
+    const activeSlots = timeline.filter((s: any) =>
+      (s.student || (s.students && s.students.length > 0)) &&
+      !s.isBreak &&
+      !s.is_room_booking &&
+      !s.isRoomBooking &&
+      !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status)
+    );
 
     let upcomingSlot: any = null;
     let minDiff = Infinity;
 
     for (const slot of activeSlots) {
-      const timeStr = slot.start_time?.substring(0, 5) || slot.timeSlot?.split('-')?.[0]?.trim();
+      const { startStr: timeStr } = computeSlotStartAndEnd(slot);
       if (timeStr && timeStr.includes(':')) {
         const [h, m] = timeStr.split(':').map(Number);
         const slotMinutes = h * 60 + m;
@@ -737,7 +813,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
     let maxPastMinutes = -1;
 
     for (const slot of activeSlots) {
-      const endStr = slot.end_time?.substring(0, 5) || slot.timeSlot?.split('-')?.[1]?.trim();
+      const { endStr } = computeSlotStartAndEnd(slot);
       if (endStr && endStr.includes(':')) {
         const [h, m] = endStr.split(':').map(Number);
         const endMinutes = h * 60 + m;
@@ -765,7 +841,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
       nextPauseSlot: upcomingSlot,
       previousUnfinishedStudent: unfinishedPrevStudent
     };
-  }, [briefingData, getSimulatedNow, prep]);
+  }, [briefingData, getSimulatedNow, prep, currentTimeStr]);
 
 
 

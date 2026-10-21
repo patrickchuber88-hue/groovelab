@@ -219,8 +219,8 @@ export function buildSecretaryModalsMasterHubProps(
       setShowUnassignedWarning,
       matrixAllocations: schedules.matrixAllocations,
       handleSaveAndApproveAll: schedules.handleSaveAndApproveAll,
-      activeContextMenu: schedules.activeContextMenu,
-      setActiveContextMenu: schedules.setActiveContextMenu,
+      activeContextMenu: studentsHook?.activeContextMenu ?? schedules?.activeContextMenu,
+      setActiveContextMenu: studentsHook?.setActiveContextMenu ?? schedules?.setActiveContextMenu,
       handleDeleteStudentCampus: studentsHook.handleDeleteStudentCampus,
       fetchDashboardData: dashboardData.fetchDashboardData
     },

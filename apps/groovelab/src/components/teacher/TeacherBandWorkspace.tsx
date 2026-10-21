@@ -36,11 +36,11 @@ const renderBandAvatar = (name: string, photoUrl?: string | null, size: string =
   }
   
   const gradients = [
-    'linear-gradient(135deg, #6366f1, #a855f7)',
-    'linear-gradient(135deg, #ec4899, #f43f5e)',
-    'linear-gradient(135deg, #3b82f6, #06b6d4)',
-    'linear-gradient(135deg, #34a853, #3b82f6)',
-    'linear-gradient(135deg, #f59e0b, #e11d48)'
+    '#6366f1',
+    '#ef4444',
+    '#3b82f6',
+    '#34a853',
+    '#f97316'
   ];
   
   let hash = 0;
@@ -179,8 +179,8 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '16px 28px',
-                        background: 'linear-gradient(90deg, #1e1b4b 0%, #110e3b 100%)',
-                        border: '1px solid rgba(165, 180, 252, 0.15)',
+                        background: '#0f172a',
+                        border: 'none',
                         borderRadius: '24px',
                         cursor: 'pointer',
                         boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
@@ -247,9 +247,9 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
 
                           return (
                             <div key={form.id} style={{ 
-                              background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
+                              background: '#0f172a', 
                               borderRadius: '28px', 
-                              border: '1px solid rgba(165, 180, 252, 0.1)',
+                              border: 'none',
                               boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
                               display: 'flex',
                               flexWrap: 'wrap',
@@ -283,7 +283,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
                                   <span style={{ 
                                     background: 'rgba(168, 85, 247, 0.15)', 
                                     color: '#c084fc', 
-                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    border: 'none',
                                     padding: '4px 10px', 
                                     borderRadius: '8px', 
                                     fontSize: '0.6rem', 
@@ -347,7 +347,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
                                             width: '64px', height: '64px', borderRadius: '18px', 
                                             background: member ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)', 
                                             border: (isMe || member?.isMastered) ? `3px solid #ef4444` : (member ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)'),
-                                            boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
+                                            boxShadow: 'none',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                                             filter: member && !member.isMastered ? 'grayscale(100%)' : 'none',
                                             opacity: member && !member.isMastered ? 0.6 : 1
@@ -461,7 +461,7 @@ export const TeacherBandWorkspace: React.FC<TeacherBandWorkspaceProps> = ({
               style={{ padding: '24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '12px', touchAction: 'manipulation' }}
             >
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#1e293b' }}>{band.name}</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: 'none' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Mitglieder</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0b57d0' }}>
                   {(() => { const ids = (band.band_members || []).map((m: any) => m.user_id || m.student_id || m.external_name).filter(Boolean); return new Set(ids).size; })()}

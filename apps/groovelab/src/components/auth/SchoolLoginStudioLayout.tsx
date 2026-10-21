@@ -167,8 +167,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
   const brandLaserGlow = isGroovelabKiosk ? 'rgba(250, 204, 21, 0.25)' : 'rgba(74, 222, 128, 0.25)';
   const brandTriAuthBorder = isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.45)' : '1px solid rgba(74, 222, 128, 0.25)';
   const brandTriAuthBg = isGroovelabKiosk 
-    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.88) 100%)' 
-    : 'linear-gradient(135deg, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.35) 100%)';
+    ? 'rgba(15, 23, 42, 0.90)' 
+    : 'rgba(0, 0, 0, 0.38)';
 
   // 🏫 Dynamische Schulnummer für Ausweis-Prefix (Default: '001')
   const currentSchoolNum = schoolData?.school_number
@@ -220,7 +220,6 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
         style={{
           position: 'absolute', inset: 0,
           background: '#0a361c',
-          backgroundImage: 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
           opacity: isGroovelabKiosk ? 0 : 1,
           transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
           pointerEvents: 'none', zIndex: 0
@@ -231,7 +230,6 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
         style={{
           position: 'absolute', inset: 0,
           background: '#ca8a04',
-          backgroundImage: 'radial-gradient(circle at 50% 50%, #fef08a 0%, #ca8a04 100%)',
           opacity: isGroovelabKiosk ? 1 : 0,
           transition: 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
           pointerEvents: 'none', zIndex: 0
@@ -260,8 +258,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
             background: (schoolData?.logo_url && !logoError)
               ? '#ffffff'
               : (isGroovelabKiosk 
-                  ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.25) 0%, rgba(202, 138, 4, 0.15) 100%)' 
-                  : 'linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 100%)'),
+                  ? 'rgba(250, 204, 21, 0.20)' 
+                  : 'rgba(255, 255, 255, 0.08)'),
             border: (schoolData?.logo_url && !logoError)
               ? '1px solid rgba(255, 255, 255, 0.5)'
               : (isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.45)' : '1px solid rgba(255, 255, 255, 0.15)'),
@@ -371,8 +369,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           style={{
             width: '100%', maxWidth: '460px', marginBottom: '12px', padding: '10px 14px', borderRadius: '22px',
             background: isGroovelabKiosk 
-              ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.88) 0%, rgba(15, 23, 42, 0.82) 100%)'
-              : 'linear-gradient(135deg, rgba(0, 0, 0, 0.38) 0%, rgba(0, 0, 0, 0.28) 100%)',
+              ? 'rgba(15, 23, 42, 0.86)'
+              : 'rgba(0, 0, 0, 0.34)',
             border: isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.35)' : '1px solid rgba(74, 222, 128, 0.25)',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
             backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
@@ -559,7 +557,7 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               Passkey
-              {scopedBiometricProfiles.length > 0 && <span style={{ color: '#22c55e', fontSize: '10px' }}>✓</span>}
+              {scopedBiometricProfiles.length > 0 && <span style={{ color: '#34a853', fontSize: '10px' }}>✓</span>}
             </span>
             <span style={{ fontSize: '10px', fontWeight: 600, opacity: 0.8 }}>
               {scopedBiometricProfiles.length > 0 ? 'Bereit' : 'Face / Touch ID'}
@@ -573,8 +571,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
         style={{
           width: '100%', maxWidth: '460px',
           background: isGroovelabKiosk 
-            ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.88) 0%, rgba(15, 23, 42, 0.84) 45%, rgba(10, 15, 26, 0.92) 100%)' 
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 0.085) 0%, rgba(255, 255, 255, 0.065) 100%)',
+            ? 'rgba(15, 23, 42, 0.88)' 
+            : 'rgba(255, 255, 255, 0.075)',
           borderRadius: '40px', padding: '20px',
           backdropFilter: isGroovelabKiosk 
             ? 'blur(36px) saturate(200%) contrast(110%)' 
@@ -753,19 +751,58 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                             )}
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCameraHasError(false);
-                              setIsCameraActive(true);
-                            }}
-                            style={{
-                              padding: '10px 20px', borderRadius: '12px', border: 'none',
-                              background: brandPrimaryColor, color: brandTextColor, fontWeight: 800, fontSize: '12.5px', cursor: 'pointer', marginTop: '6px'
-                            }}
-                          >
-                            Erneut versuchen
-                          </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '240px', marginTop: '6px' }}>
+                            {/* 1-Tap Umschaltung zur PIN-Eingabe */}
+                            <button
+                              type="button"
+                              onClick={() => onSelectMethod('pin')}
+                              style={{
+                                padding: '10px 16px', borderRadius: '12px', border: 'none',
+                                background: brandPrimaryColor, color: brandTextColor, fontWeight: 800, fontSize: '12px', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                              }}
+                            >
+                              <KeyRound size={15} />
+                              <span>Mit Ausweis-Code / PIN anmelden</span>
+                            </button>
+
+                            {/* OS-Foto-Bypass: Öffnet die native iPhone/Android Kamera über System-Picker */}
+                            {onFileUpload && (
+                              <label
+                                style={{
+                                  padding: '8px 14px', borderRadius: '10px',
+                                  border: '1px solid rgba(255,255,255,0.25)',
+                                  background: 'rgba(255,255,255,0.10)', color: '#ffffff',
+                                  fontWeight: 700, fontSize: '11px', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                                }}
+                              >
+                                <Camera size={13} />
+                                <span>Ausweis fotografieren</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  onChange={onFileUpload}
+                                  style={{ display: 'none' }}
+                                />
+                              </label>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCameraHasError(false);
+                                setIsCameraActive(true);
+                              }}
+                              style={{
+                                padding: '6px 12px', borderRadius: '8px', border: 'none',
+                                background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: '11px', cursor: 'pointer'
+                              }}
+                            >
+                              Kamera erneut versuchen
+                            </button>
+                          </div>
                         )}
                       </>
                     ) : (
@@ -888,8 +925,8 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                   width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   padding: '11px 18px', borderRadius: '16px', 
                   background: isGroovelabKiosk 
-                    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.12) 0%, rgba(250, 204, 21, 0.08) 100%)' 
-                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.06) 100%)',
+                    ? 'rgba(250, 204, 21, 0.12)' 
+                    : 'rgba(255, 255, 255, 0.08)',
                   border: isGroovelabKiosk ? '1px solid rgba(250, 204, 21, 0.30)' : '1px solid rgba(255, 255, 255, 0.14)',
                   color: '#ffffff', fontSize: '13.5px',
                   fontWeight: 800, cursor: 'pointer', marginTop: '6px', 
@@ -898,13 +935,13 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = isGroovelabKiosk 
-                    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.20) 0%, rgba(250, 204, 21, 0.14) 100%)' 
-                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.10) 100%)';
+                    ? 'rgba(250, 204, 21, 0.20)' 
+                    : 'rgba(255, 255, 255, 0.14)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = isGroovelabKiosk 
-                    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.12) 0%, rgba(250, 204, 21, 0.08) 100%)' 
-                    : 'linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.06) 100%)';
+                    ? 'rgba(250, 204, 21, 0.12)' 
+                    : 'rgba(255, 255, 255, 0.08)';
                 }}
               >
                 {isGroovelabKiosk ? (
@@ -944,9 +981,11 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
           <CampusIdPinAuthCard
             isGroovelabKiosk={isGroovelabKiosk}
             schoolNumber={currentSchoolNum}
+            schoolId={schoolData?.id}
             pinLockoutSeconds={pinLockoutSeconds}
             loading={loading}
-            onSubmitId={(code) => handlePinLogin(code)}
+            onSubmitId={(codeOrUser) => handlePinLogin(codeOrUser)}
+            onSwitchToCamera={() => onSelectMethod('qr')}
             brandAccentColor={brandAccentColor}
             brandPrimaryColor={brandPrimaryColor}
             brandActiveTabColor={brandActiveTabColor}

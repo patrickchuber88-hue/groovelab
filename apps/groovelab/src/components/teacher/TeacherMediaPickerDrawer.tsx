@@ -298,7 +298,7 @@ export const TeacherMediaPickerDrawer: React.FC<TeacherMediaPickerDrawerProps> =
                 transition: 'all 0.15s ease'
               }}
             >
-              <Music size={16} color={activeTab === 'songs' ? '#eab308' : '#64748b'} />
+              <Music size={16} color={activeTab === 'songs' ? '#facc15' : '#64748b'} />
               <span>Songs</span>
               {mediaAssets?.songs && mediaAssets.songs.length > 0 && (
                 <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>({mediaAssets.songs.length})</span>
@@ -532,7 +532,7 @@ export const TeacherMediaPickerDrawer: React.FC<TeacherMediaPickerDrawerProps> =
                           style={{
                             padding: '14px 16px',
                             borderRadius: '14px',
-                            border: isAdded ? '1.5px solid #eab308' : '1px solid #e2e8f0',
+                            border: isAdded ? '1.5px solid #facc15' : '1px solid #e2e8f0',
                             backgroundColor: isAdded ? '#fefce8' : '#ffffff',
                             display: 'flex',
                             alignItems: 'center',
@@ -622,7 +622,7 @@ export const TeacherMediaPickerDrawer: React.FC<TeacherMediaPickerDrawerProps> =
                     padding: '10px 14px',
                     borderRadius: '12px',
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
@@ -653,7 +653,7 @@ export const TeacherMediaPickerDrawer: React.FC<TeacherMediaPickerDrawerProps> =
                           style={{
                             padding: '14px 16px',
                             borderRadius: '14px',
-                            border: isAdded ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                            border: isAdded ? '1.5px solid #34a853' : '1px solid #e2e8f0',
                             backgroundColor: isAdded ? '#f0fdf4' : '#ffffff',
                             display: 'flex',
                             alignItems: 'center',

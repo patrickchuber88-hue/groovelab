@@ -323,11 +323,11 @@ export const BankingSubTab: React.FC<BankingSubTabProps> = ({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-            <div style={{ background: '#f0fdf4', padding: '12px 16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+            <div style={{ background: '#f0fdf4', padding: '12px 16px', borderRadius: '12px', border: 'none' }}>
               <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>B2B Schulrechnungen</span>
               <strong style={{ display: 'block', fontSize: '1.2rem', color: '#14532d', marginTop: '2px' }}>{camtParsedResult.b2bMatches.length} Treffer</strong>
             </div>
-            <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '12px', border: '1px solid #bfdbfe' }}>
+            <div style={{ background: '#eff6ff', padding: '12px 16px', borderRadius: '12px', border: 'none' }}>
               <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>B2C Schüler-Aktivierungen</span>
               <strong style={{ display: 'block', fontSize: '1.2rem', color: '#1e3a8a', marginTop: '2px' }}>{camtParsedResult.b2cMatches.length} Treffer</strong>
             </div>

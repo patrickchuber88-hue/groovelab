@@ -90,6 +90,34 @@ export function parseAudioEntries(entries: string[], isCarriedOver = false): Unp
     .filter(a => !!a.url);
 }
 
+export function parseMicroScoreEntries(entries: string[]): any[] {
+  const results: any[] = [];
+  entries.forEach((n: any, idx: number) => {
+    if (typeof n !== 'string') return;
+    const trimmed = n.trim();
+    if (!trimmed.startsWith('MICROSCORE:')) return;
+    try {
+      const jsonStr = trimmed.substring('MICROSCORE:'.length).trim();
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed === 'object') {
+        const id = parsed.id || `ms-${idx}`;
+        const title = parsed.title || 'Notenschnipsel';
+        if (!results.some(r => (r.id && r.id === id) || (r.title && r.title.toLowerCase() === title.toLowerCase()))) {
+          results.push({
+            ...parsed,
+            id,
+            title,
+            rawToken: trimmed
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[MeisterwerkSnapshotUnpacker] Error parsing MICROSCORE:', err);
+    }
+  });
+  return results;
+}
+
 export function parseDidacticTextNotes(entries: string[]): string[] {
   return entries
     .filter((n: any) => {
@@ -98,6 +126,7 @@ export function parseDidacticTextNotes(entries: string[]): string[] {
              !n.startsWith('AUDIO:') &&
              !n.startsWith('STICKER:') &&
              !n.startsWith('LOOP:') &&
+             !n.startsWith('MICROSCORE:') &&
              !n.startsWith('SNAPSHOT_') &&
              !n.startsWith('FEEDBACK:') &&
              !n.startsWith('STUDENT_NOTE_') &&

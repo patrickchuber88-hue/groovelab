@@ -470,25 +470,25 @@ export function useAuthoritativeHomeworkPlan(
       }
     }
 
-    // 5.1 Falls noch keine Bücher oder Songs vorhanden sind, Vorwochen-Kandidaten durchsuchen (Pädagogischer Übertrag)
-    if (books.length === 0 || songs.length === 0) {
+    // 5.1 Falls für die aktuelle Woche noch keine Hausaufgaben (Bücher, Songs oder Notenschnipsel) vorhanden sind, Vorwochen-Kandidaten durchsuchen (Pädagogischer Übertrag)
+    if (books.length === 0 && songs.length === 0 && microScores.length === 0) {
       for (const snapItem of candidates) {
         if (snapItem === latestSnapshot) continue;
         const rawNotes = snapItem.homework_notes || snapItem.teacher_notes;
         if (!rawNotes) continue;
-        const bCount = books.length, sCount = songs.length;
+        const bCount = books.length, sCount = songs.length, mCount = microScores.length;
         parseSnapshotPayload(rawNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);
-        if (books.length > bCount || songs.length > sCount) {
+        if (books.length > bCount || songs.length > sCount || microScores.length > mCount) {
           isCarriedOver = true;
           if (!carriedOverWeek) {
             const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
             if (kwMatch) carriedOverWeek = `KW ${kwMatch[1]}`;
           }
         }
-        if (books.length > 0 && songs.length > 0) break;
+        if (books.length > 0 || songs.length > 0 || microScores.length > 0) break;
       }
 
-      if (books.length === 0 && songs.length === 0 && typeof window !== 'undefined') {
+      if (books.length === 0 && songs.length === 0 && microScores.length === 0 && typeof window !== 'undefined') {
         const cachedNotes = localStorage.getItem(`campus_homework_notes_${effectiveStudentId}`);
         if (cachedNotes) {
           parseSnapshotPayload(cachedNotes, books, songs, audioTracks, generalNotes, microScores, handleSnapshotQuestion);

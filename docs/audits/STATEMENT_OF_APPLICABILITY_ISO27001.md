@@ -40,7 +40,7 @@ Zusätzlich integriert dieses SoA die Anforderungen der **ISO/IEC 27701:2019** f
 | **A.5.16** | Identitätsmanagement | Angewendet | Vergabe kryptografischer UUIDs, Schulausweis-Tokens und Passkeys; keine geteilten Accounts. |
 | **A.5.17** | Authentifizierungsinformationen | Angewendet | Zero Secret Exposure: PINs/Passwörter niemals im Klartext; PBKDF2-SHA512 und Argon2id. |
 | **A.5.18** | Zugangsrechte | Angewendet | Prinzip des geringsten Privilegs (Least Privilege) über PostgreSQL Role Based Access Control (RBAC). |
-| **A.5.19** | Informationssicherheit in Lieferantenbeziehungen | Angewendet | Hetzner Online GmbH als Haupt-Lieferant (AVV Art. 28 + ISO 27001 Zertifikat Falkenstein/Nürnberg). |
+| **A.5.19** | Informationssicherheit in Lieferantenbeziehungen | Angewendet | IONOS SE als primärer Produktions-Infrastruktur-Partner (Berlin/Frankfurt, AVV Art. 28 + ISO 27001) sowie Hetzner Online GmbH (Falkenstein/Nürnberg, DR & Storage Box). |
 | **A.5.20** | Behandlung der Sicherheit in Lieferantenvereinbarungen | Angewendet | Strikte Auftragsverarbeitungsverträge mit Verbot von Sub-Auftragsverarbeitern außerhalb der EU. |
 | **A.5.21** | Steuerung der Informationssicherheit in der IKT-Lieferkette | Angewendet | Strict Dependency Auditing, Lockfile-Pinning und `license_compliance_guard.mjs`. |
 | **A.5.22** | Überwachung und Überprüfung von Lieferantendiensten | Angewendet | Wöchentliche Prüfung von Hetzner Status, SLA-Einhaltung (99,5%) und Monitoring-Metriken. |
@@ -79,7 +79,7 @@ Zusätzlich integriert dieses SoA die Anforderungen der **ISO/IEC 27701:2019** f
 
 ### A.7 Physische Sicherheitsmaßnahmen (14 Controls)
 
-*Hinweis: Physische Kontrollen werden zu 100% über den zertifizierten Rechenzentrumspartner **Hetzner Online GmbH** (Falkenstein/Vogtland & Nürnberg) bereitgestellt.*
+*Hinweis: Physische Kontrollen werden zu 100% über die zertifizierten deutschen Rechenzentrumspartner **IONOS SE** (Montabaur/Deutschland – Primärer Produktionscluster) und **Hetzner Online GmbH** (Falkenstein/Vogtland & Nürnberg – Georedundantes Backup & Failover) bereitgestellt.*
 
 | Control | Bezeichnung | Status | Begründung & Technischer Nachweis / Evidenz |
 | :--- | :--- | :---: | :--- |

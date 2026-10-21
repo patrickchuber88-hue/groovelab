@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { getSimulatedNow } from '../../../hooks/useSimulatedTime';
 import { 
@@ -101,10 +101,12 @@ export function useTeacherAbsence({
 
   // 📞 Optimistic teacher-contacted state for 0ms instant feedback
   const [optimisticContacted, setOptimisticContacted] = useState<Record<string, { status: string; at: string }>>({});
+  const hasHydratedUrgentRef = useRef(false);
+  const hasHydratedMakeupRef = useRef(false);
 
   const fetchUrgentCancellations = useCallback(async () => {
     const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
-    if (!userId || isStudent || activeTab === 'live') return;
+    if (!userId || isStudent) return;
     try {
       const { data, error } = await supabase.rpc('get_urgent_unacknowledged_cancellations', {
         p_teacher_id: userId
@@ -113,6 +115,7 @@ export function useTeacherAbsence({
         console.warn('Error fetching urgent cancellations:', error);
         return;
       }
+      hasHydratedUrgentRef.current = true;
       const list = (data || []) as UrgentCancellationItem[];
       setUrgentCancellations(list);
 
@@ -129,7 +132,7 @@ export function useTeacherAbsence({
     } catch (err) {
       console.warn('Exception in fetchUrgentCancellations:', err);
     }
-  }, [userId, urgentSnoozeUntil, teacher?.role, viewMode, activeTab, hideHeader]);
+  }, [userId, urgentSnoozeUntil, teacher?.role, viewMode]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -143,7 +146,9 @@ export function useTeacherAbsence({
   }, []);
 
   useEffect(() => {
-    fetchUrgentCancellations();
+    if (!hasHydratedUrgentRef.current && activeTab !== 'live') {
+      fetchUrgentCancellations();
+    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -154,7 +159,7 @@ export function useTeacherAbsence({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [fetchUrgentCancellations]);
+  }, [fetchUrgentCancellations, activeTab]);
 
   const handleUrgentSnooze = useCallback((minutes: number) => {
     const snoozeTime = Date.now() + minutes * 60 * 1000;
@@ -175,22 +180,25 @@ export function useTeacherAbsence({
 
   const fetchActiveMakeupTokens = useCallback(async () => {
     const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
-    if (!userId || isStudent || activeTab === 'live') return;
+    if (!userId || isStudent) return;
     try {
       const { data, error } = await supabase.rpc('get_teacher_active_makeup_tokens', {
         p_teacher_id: userId
       });
       if (!error && data) {
+        hasHydratedMakeupRef.current = true;
         setActiveMakeupTokens(data as ActiveMakeupTokenItem[]);
       }
     } catch (err) {
       console.warn('Exception in fetchActiveMakeupTokens:', err);
     }
-  }, [userId, teacher?.role, viewMode, activeTab, hideHeader]);
+  }, [userId, teacher?.role, viewMode]);
 
   useEffect(() => {
-    fetchActiveMakeupTokens();
-  }, [fetchActiveMakeupTokens]);
+    if (!hasHydratedMakeupRef.current && activeTab !== 'live') {
+      fetchActiveMakeupTokens();
+    }
+  }, [fetchActiveMakeupTokens, activeTab]);
 
   // Active absence cancellations calculation
   const activeAbsenceCancellations = useMemo(() => {

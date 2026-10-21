@@ -102,19 +102,56 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
           position: 'relative'
         }}
       >
-        {/* Zurück zum Taktanfang */}
+        {/* 1. HERO TIER-1: Play / Stopp Prominent */}
+        <button
+          type="button"
+          role="button"
+          tabIndex={0}
+          onClick={onTogglePlay}
+          aria-label={isPlaying ? 'Wiedergabe anhalten' : 'Noten-Schnipsel abspielen'}
+          title={isPlaying ? 'Stopp (Leertaste)' : 'Abspielen (Leertaste)'}
+          style={{
+            border: 'none',
+            background: isPlaying ? '#dc2626' : '#4f46e5',
+            color: '#ffffff',
+            borderRadius: '11px',
+            height: '38px',
+            padding: '0 18px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '7px',
+            fontSize: '0.82rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: isPlaying 
+              ? '0 4px 12px rgba(220, 38, 38, 0.4)' 
+              : '0 4px 14px rgba(79, 70, 229, 0.38)',
+            transition: 'all 0.15s ease',
+            outline: 'none'
+          }}
+          className="hover-scale-mini"
+        >
+          {isPlaying ? (
+            <Square size={13} fill="#ffffff" strokeWidth={0} />
+          ) : (
+            <Play size={15} fill="#ffffff" strokeWidth={0} style={{ marginLeft: '1px' }} />
+          )}
+          <span>{isPlaying ? 'Stopp' : 'Abspielen'}</span>
+        </button>
+
+        {/* Zurück zum Taktanfang (Tier 3 kompakt) */}
         <button
           type="button"
           onClick={onRewind}
           aria-label="Zurück zum Anfang"
           title="Zurück zum Taktanfang (Takt 1)"
           style={{
-            border: 'none',
-            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            background: '#ffffff',
             color: '#475569',
             borderRadius: '10px',
-            width: '32px',
-            height: '32px',
+            width: '34px',
+            height: '34px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -126,61 +163,24 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
           <RotateCcw size={14} strokeWidth={2.4} />
         </button>
 
-        {/* Play / Stopp Prominent */}
-        <button
-          type="button"
-          role="button"
-          tabIndex={0}
-          onClick={onTogglePlay}
-          aria-label={isPlaying ? 'Wiedergabe anhalten' : 'Noten-Schnipsel abspielen'}
-          title={isPlaying ? 'Stopp (Leertaste)' : 'Abspielen (Leertaste)'}
-          style={{
-            border: 'none',
-            background: isPlaying ? '#dc2626' : theme.primary,
-            color: '#ffffff',
-            borderRadius: '10px',
-            height: '32px',
-            padding: '0 12px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.74rem',
-            fontWeight: 800,
-            cursor: 'pointer',
-            boxShadow: isPlaying 
-              ? '0 2px 8px rgba(220, 38, 38, 0.4)' 
-              : `0 2px 10px ${theme.glow}`,
-            transition: 'all 0.15s ease',
-            outline: 'none'
-          }}
-          className="hover-scale-mini"
-        >
-          {isPlaying ? (
-            <Square size={12} fill="#ffffff" strokeWidth={0} />
-          ) : (
-            <Play size={13} fill="#ffffff" strokeWidth={0} style={{ marginLeft: '1px' }} />
-          )}
-          <span>{isPlaying ? 'Stopp' : 'Abspielen'}</span>
-        </button>
-
-        {/* Loop Toggle */}
+        {/* Loop Toggle (Tier 2) */}
         <button
           type="button"
           onClick={onToggleLoop}
           aria-label={isLooping ? 'Loop aktiv' : 'Loop inaktiv'}
           aria-pressed={isLooping}
-          title={isLooping ? 'Endlosschleife aktiv' : 'Endlosschleife einschalten'}
+          title={isLooping ? 'Endlosschleife aktiv (Taste L)' : 'Endlosschleife einschalten (Taste L)'}
           style={{
-            border: 'none',
-            background: isLooping ? theme.lightBg : '#f8fafc',
+            border: isLooping ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+            background: isLooping ? theme.lightBg : '#ffffff',
             color: isLooping ? theme.textColor : '#64748b',
             borderRadius: '10px',
-            height: '32px',
-            padding: '0 10px',
+            height: '34px',
+            padding: '0 11px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '5px',
-            fontSize: '0.72rem',
+            fontSize: '0.74rem',
             fontWeight: 800,
             cursor: 'pointer',
             transition: 'all 0.15s ease'
@@ -191,24 +191,24 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
           <span>Loop</span>
         </button>
 
-        {/* Metronom-Klick Toggle */}
+        {/* Metronom-Klick Toggle (Tier 2) */}
         <button
           type="button"
           onClick={onToggleMetronome}
           aria-label={isMetronomeActive ? 'Metronom-Klick an' : 'Metronom-Klick aus'}
           aria-pressed={isMetronomeActive}
-          title={isMetronomeActive ? 'Metronom-Klick eingeschaltet' : 'Metronom-Klick stumm'}
+          title={isMetronomeActive ? 'Metronom-Klick eingeschaltet (Taste M)' : 'Metronom-Klick stumm (Taste M)'}
           style={{
-            border: 'none',
-            background: isMetronomeActive ? '#f0fdf4' : '#f8fafc',
+            border: isMetronomeActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+            background: isMetronomeActive ? '#f0fdf4' : '#ffffff',
             color: isMetronomeActive ? '#15803d' : '#64748b',
             borderRadius: '10px',
-            height: '32px',
-            padding: '0 10px',
+            height: '34px',
+            padding: '0 11px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '5px',
-            fontSize: '0.72rem',
+            fontSize: '0.74rem',
             fontWeight: 800,
             cursor: 'pointer',
             transition: 'all 0.15s ease'
@@ -219,7 +219,7 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
           <span>Klick</span>
         </button>
 
-        {/* YouTube Speed Pill */}
+        {/* YouTube Speed Pill (Tier 2) */}
         <div style={{ position: 'relative' }}>
           <button
             type="button"
@@ -227,18 +227,18 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
             aria-haspopup="true"
             aria-expanded={showSpeedMenu}
             aria-label={`Wiedergabe-Geschwindigkeit: ${currentSpeed.shortLabel}`}
-            title="Tempo anpassen (WSOLA Verlangsamung)"
+            title="Übe-Tempo anpassen (WSOLA Verlangsamung)"
             style={{
-              border: 'none',
-              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              background: '#ffffff',
               color: '#0f172a',
               borderRadius: '10px',
-              height: '32px',
-              padding: '0 9px',
+              height: '34px',
+              padding: '0 10px',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px',
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               fontWeight: 800,
               cursor: 'pointer',
               transition: 'all 0.15s ease'
@@ -246,7 +246,7 @@ export const MicroScorePlayerBar: React.FC<MicroScorePlayerBarProps> = ({
             className="hover-scale-mini"
           >
             <span>{currentSpeed.shortLabel}</span>
-            <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#94a3b8' }}>
+            <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b' }}>
               {Math.round(tempoBpm * speedRate)} BPM
             </span>
             <ChevronDown size={11} color="#64748b" />

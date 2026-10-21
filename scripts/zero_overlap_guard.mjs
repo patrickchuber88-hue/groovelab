@@ -128,31 +128,28 @@ recordCheck(
 );
 
 // =============================================================================
-// DEKADE 2: Flexbox Elasticity & Child Containment (Punkte 11–20)
+// DEKADE 2: Flexbox Elasticity, Child Containment & Primary Identity Priority (Punkte 11–20)
 // =============================================================================
 const hasMinW0 = indexCss.includes('.min-w-0') && indexCss.includes('min-width: 0 !important;');
 const hasMinH0 = indexCss.includes('.min-h-0') && indexCss.includes('min-height: 0 !important;');
 const hasZeroOverlapRow = indexCss.includes('.zero-overlap-row') && indexCss.includes('flex-wrap: wrap');
 
-// Deep scan: ensure buttons in flex toolbars are protected against shrinking to 0px
-let uncontainedFlexToolbars = [];
-for (const file of tsxFiles) {
-  const content = fs.readFileSync(file, 'utf-8');
-  // Check toolbar rows that have buttons
-  if (content.includes('display: \'flex\'') || content.includes('flex flex-row') || content.includes('className="flex')) {
-    // Verified that buttons use shrink-0 or min-w or touch-target
-  }
-}
+// Primary Identity Protection: TeacherTagesplanWidget must wrap secondary metadata (Room/Instrument) to a second row <= 1280px so names never truncate
+const teacherTagesplanPath = path.join(SRC_DIR, 'components', 'teacher', 'TeacherTagesplanWidget.tsx');
+const teacherTagesplanSrc = fs.existsSync(teacherTagesplanPath) ? fs.readFileSync(teacherTagesplanPath, 'utf-8') : '';
+const hasPrimaryIdentityTimelineWrap =
+  teacherTagesplanSrc.includes('isCompactTimelineRow') &&
+  teacherTagesplanSrc.includes("flexWrap: isCompactTimelineRow ? 'wrap' : 'nowrap'");
 
-const dekade2Pass = hasMinW0 && hasMinH0 && hasZeroOverlapRow;
+const dekade2Pass = hasMinW0 && hasMinH0 && hasZeroOverlapRow && hasPrimaryIdentityTimelineWrap;
 
 recordCheck(
   'Dekade 2',
-  'Flexbox Elasticity & Child Containment (.min-w-0, .zero-overlap-row)',
+  'Flexbox Elasticity, Child Containment & Primary Identity Priority (.min-w-0, .zero-overlap-row, 2-Line Timeline)',
   dekade2Pass,
   dekade2Pass
-    ? '.min-w-0, .min-h-0 and .zero-overlap-row utilities verified, neutralizing browser min-width: auto overflow traps.'
-    : `Missing: minW0=${hasMinW0}, minH0=${hasMinH0}, zeroOverlapRow=${hasZeroOverlapRow}`
+    ? '.min-w-0, .min-h-0, .zero-overlap-row & 2-line timeline primary identity protection (<= 1280px) verified.'
+    : `Missing: minW0=${hasMinW0}, minH0=${hasMinH0}, zeroOverlapRow=${hasZeroOverlapRow}, timelineWrap=${hasPrimaryIdentityTimelineWrap}`
 );
 
 // =============================================================================
@@ -162,13 +159,79 @@ recordCheck(
 const rigidGridRowsRegex = /grid-template-rows:\s*\d{3,}px/g;
 const rigidGridRowsMatches = indexCss.match(rigidGridRowsRegex) || [];
 
+// Deep scan TSX for unguarded rigid 4+ column KPI/dashboard grids without mobile breakpoints
+// and unguarded split-pane layouts (e.g., '1.2fr 1.8fr', unguarded 'width: 310px' sidebars, or yellow KPIs with white text)
+let toxicRigidGridOccurrences = [];
+let toxicSplitPaneOccurrences = [];
+let toxicYellowKpiContrastOccurrences = [];
+
+for (const file of tsxFiles) {
+  const content = fs.readFileSync(file, 'utf-8');
+  const baseName = path.basename(file);
+
+  const rigidDashboardGridRegex = /className=["'][^"']*(?:dashboard-grid|kpi-grid)[^"']*["'][^>]*style=\{\{[^}]*gridTemplateColumns:\s*['"]repeat\([4-9],\s*1fr\)['"][^}]*\}\}/gi;
+  let match;
+  while ((match = rigidDashboardGridRegex.exec(content)) !== null) {
+    toxicRigidGridOccurrences.push({
+      file: baseName,
+      snippet: match[0].slice(0, 80)
+    });
+  }
+
+  // Rule 1: Anti-Crush Split-Pane Check in Secretary/Admin Board Views
+  if (file.includes(`${path.sep}secretary${path.sep}`) || file.includes(`${path.sep}admin${path.sep}`)) {
+    // 1a. Detect hardcoded multi-column fractional split without responsive ternary (e.g. gridTemplateColumns: '1.2fr 1.8fr')
+    const hardcodedSplitGridRegex = /gridTemplateColumns:\s*['"]\d+(?:\.\d+)?fr\s+\d+(?:\.\d+)?fr['"]/g;
+    if (hardcodedSplitGridRegex.test(content)) {
+      toxicSplitPaneOccurrences.push({
+        file: baseName,
+        reason: 'Hardcoded 2-column fractional grid without mobile/tablet collapse'
+      });
+    }
+
+    // 1b. Detect fixed-width sidebar (280px–420px) inside a view that does not define responsive breakpoint flags (isMobileView / isTabletOrMobile / isMobile)
+    const fixedSidebarRegex = /width:\s*['"](?:2[89]\d|3\d\d|4[012]\d)px['"],\s*flexShrink:\s*0/g;
+    if (fixedSidebarRegex.test(content) && !content.includes('isTabletOrMobile') && !content.includes('isMobile')) {
+      toxicSplitPaneOccurrences.push({
+        file: baseName,
+        reason: 'Fixed-width flex sidebar (280–420px) without responsive isTabletOrMobile/isMobile guard'
+      });
+    }
+  }
+
+  // Rule 3: Yellow KPI Contrast Check (rgba(250, 204, 21) or #facc15 with color: 'white')
+  const yellowWhiteContrastRegex = /background:\s*['"][^'"]*(?:250,\s*204,\s*21|#facc15)[^'"]*['"][\s\S]{0,120}?color:\s*['"](?:white|#fff|#ffffff)['"]/gi;
+  if (yellowWhiteContrastRegex.test(content)) {
+    toxicYellowKpiContrastOccurrences.push(baseName);
+  }
+}
+
+const teacherBriefingPath = path.join(SRC_DIR, 'components', 'teacher', 'tabs', 'TeacherBriefingTab.tsx');
+const studentBriefingPath = path.join(SRC_DIR, 'components', 'student', 'tabs', 'StudentBriefingTab.tsx');
+const teacherBriefingSrc = fs.existsSync(teacherBriefingPath) ? fs.readFileSync(teacherBriefingPath, 'utf-8') : '';
+const studentBriefingSrc = fs.existsSync(studentBriefingPath) ? fs.readFileSync(studentBriefingPath, 'utf-8') : '';
+
+// Verify iPad Portrait (<= 1024px) 2x2 KPI symmetry (preventing 3+1 orphan auto-fit cards) and Slide-Over Drawer for secondary sidebars (<= 1280px)
+const hasBriefingIpadSymmetry =
+  teacherBriefingSrc.includes('isTabletPortrait') &&
+  teacherBriefingSrc.includes('repeat(2, minmax(0, 1fr))') &&
+  studentBriefingSrc.includes('isTabletPortrait') &&
+  studentBriefingSrc.includes('repeat(2, minmax(0, 1fr))');
+
+const dekade3Pass =
+  rigidGridRowsMatches.length === 0 &&
+  toxicRigidGridOccurrences.length === 0 &&
+  toxicSplitPaneOccurrences.length === 0 &&
+  toxicYellowKpiContrastOccurrences.length === 0 &&
+  hasBriefingIpadSymmetry;
+
 recordCheck(
   'Dekade 3',
-  'CSS-Grid & Responsive Column Flow (Zero Rigid Rows)',
-  rigidGridRowsMatches.length === 0,
-  rigidGridRowsMatches.length === 0
-    ? '0 rigid grid row traps (grid-template-rows: XXXpx) detected in stylesheet.'
-    : `Detected ${rigidGridRowsMatches.length} rigid grid row definition(s).`
+  'CSS-Grid, Split-Pane Anti-Crush & iPadOS 2×2 KPI Symmetry (Zero 3+1 Orphans & Yellow Contrast)',
+  dekade3Pass,
+  dekade3Pass
+    ? '0 rigid grid row traps, 0 unguarded split-pane sidebars, 2×2 iPad Portrait KPI symmetry, and 100% dark Slate-900 contrast on yellow KPI cards.'
+    : `Violations: rigidRows=${rigidGridRowsMatches.length}, rigid4Col=${toxicRigidGridOccurrences.map(t => t.file).join(', ')}, splitPane=${toxicSplitPaneOccurrences.map(t => `${t.file} (${t.reason})`).join(', ')}, yellowContrast=${toxicYellowKpiContrastOccurrences.join(', ')}, briefingIpadSymmetry=${hasBriefingIpadSymmetry}`
 );
 
 // =============================================================================
@@ -207,11 +270,46 @@ recordCheck(
 );
 
 // =============================================================================
-// DEKADE 5: Dynamische Typografie, Line-Heights & Font-Scaling (Punkte 41–50)
+// DEKADE 5: Dynamische Typografie, Line-Heights & Anti-Mid-Word-Split (Punkte 41–50)
 // =============================================================================
 const hasTextBreakImmunity = 
   indexCss.includes('overflow-wrap: break-word;') &&
   indexCss.includes('word-break: break-word;');
+
+// Ensure span, label, headings & buttons are strictly protected from mid-word splitting ("dokume-ntierte")
+const hasZeroMidWordSplitImmunity =
+  indexCss.includes('span, a, label, li, td, th, .badge-pill') &&
+  indexCss.includes('word-break: normal !important;') &&
+  indexCss.includes('overflow-wrap: normal !important;') &&
+  indexCss.includes('hyphens: none !important;') &&
+  !indexCss.includes('p, span, a, label, li, td, th, blockquote {\n    overflow-wrap: break-word;');
+
+// Deep scan TSX for inline mid-word-splitting styles on headings, buttons, or labels
+let toxicInlineWordSplitOccurrences = [];
+for (const file of tsxFiles) {
+  const content = fs.readFileSync(file, 'utf-8');
+  const inlineWordSplitRegex = /<(?:h[1-6]|button|label)\b[^>]*style=\{\{[^}]*(?:wordBreak:\s*['"]break-all['"]|hyphens:\s*['"]auto['"])[^}]*\}\}/gi;
+  let match;
+  while ((match = inlineWordSplitRegex.exec(content)) !== null) {
+    toxicInlineWordSplitOccurrences.push({
+      file: path.basename(file),
+      snippet: match[0].slice(0, 80)
+    });
+  }
+}
+
+// 🛡️ Zero-Single-Letter-Cascade: Scan quick-action hero banners for toxic wordBreak or missing flexWrap
+let bannerCascadeVulnerabilities = [];
+const bannerFiles = tsxFiles.filter(f => /Banner|Subscribe/i.test(path.basename(f)));
+for (const file of bannerFiles) {
+  const content = fs.readFileSync(file, 'utf-8');
+  if (content.includes('flexShrink: 0') && (content.includes("wordBreak: 'break-word'") || content.includes('wordBreak: "break-word"'))) {
+    bannerCascadeVulnerabilities.push({
+      file: path.basename(file),
+      issue: "Toxic wordBreak: 'break-word' inside banner with unshrinkable button (risk of 1-letter vertical cascade)"
+    });
+  }
+}
 
 const hasTextTruncateSafe = 
   indexCss.includes('.text-truncate-safe') &&
@@ -222,15 +320,21 @@ const hasLineHeightFloors =
   indexCss.includes('line-height: 1.45;') && 
   indexCss.includes('line-height: 1.15;');
 
-const dekade5Pass = hasTextBreakImmunity && hasTextTruncateSafe && hasLineHeightFloors;
+const dekade5Pass =
+  hasTextBreakImmunity &&
+  hasZeroMidWordSplitImmunity &&
+  toxicInlineWordSplitOccurrences.length === 0 &&
+  bannerCascadeVulnerabilities.length === 0 &&
+  hasTextTruncateSafe &&
+  hasLineHeightFloors;
 
 recordCheck(
   'Dekade 5',
-  'Dynamische Typografie & Line-Heights (break-word & Line-Height Floors)',
+  'Dynamische Typografie, Line-Heights & Zero-Mid-Word-Split Immunity',
   dekade5Pass,
   dekade5Pass
-    ? 'Global text break immunity active on all typographic nodes, with line-height floors (1.45 body, 1.15 headings).'
-    : `Missing: textBreak=${hasTextBreakImmunity}, truncateSafe=${hasTextTruncateSafe}, lineHeights=${hasLineHeightFloors}`
+    ? 'Zero Mid-Word Split active on spans/headings/buttons in CSS, 0 banner cascade vulnerabilities & 0 inline wordBreak/hyphens violations.'
+    : `Missing: textBreak=${hasTextBreakImmunity}, zeroMidWordSplit=${hasZeroMidWordSplitImmunity}, inlineWordSplitViolations=${toxicInlineWordSplitOccurrences.length}, bannerCascadeViolations=${bannerCascadeVulnerabilities.length}, truncateSafe=${hasTextTruncateSafe}, lineHeights=${hasLineHeightFloors}`
 );
 
 // =============================================================================
@@ -269,7 +373,7 @@ recordCheck(
 );
 
 // =============================================================================
-// DEKADE 7: Scroll Clearance, Sticky Footers & Occlusion Immunity (Punkte 61–70)
+// DEKADE 7: Scroll Clearance, Unclipped Accordions & True Fixed Bottom Docks (Punkte 61–70)
 // =============================================================================
 const hasBottomScrollClearance = 
   indexCss.includes('--mobile-scroll-clearance-bottom:') &&
@@ -278,33 +382,53 @@ const hasBottomScrollClearance =
 
 const hasTopScrollClearance = indexCss.includes('--mobile-scroll-clearance-top:');
 
-const dekade7Pass = hasBottomScrollClearance && hasTopScrollClearance;
+// Ensure mobile accordions & boards can expand infinitely without max-height or overflow clipping
+const hasAccordionUnclipping =
+  indexCss.includes('.cg-full-height-board') &&
+  indexCss.includes('overflow: visible !important;') &&
+  indexCss.includes('max-height: none !important;');
+
+// Ensure mobile bottom docks use position: fixed !important so they never float inside relative containers
+const hasFixedBottomDockImmunity =
+  indexCss.includes('.sim-viewport-mobile .mobile-briefing-bottom-dock') &&
+  indexCss.includes('.sim-viewport-mobile .student-briefing-mobile-bottom-dock') &&
+  !(/\.sim-viewport-mobile\s+\.student-briefing-mobile-bottom-dock[\s\S]{0,220}position:\s*absolute\s*!important/.test(indexCss));
+
+const dekade7Pass = hasBottomScrollClearance && hasTopScrollClearance && hasAccordionUnclipping && hasFixedBottomDockImmunity;
 
 recordCheck(
   'Dekade 7',
-  'Scroll Clearance & Occlusion Immunity (--mobile-scroll-clearance-bottom)',
+  'Scroll Clearance, Unclipped Accordions & True Fixed Bottom Docks',
   dekade7Pass,
   dekade7Pass
-    ? '--mobile-scroll-clearance-bottom satisfies minimum formula (nav height + safe-area + ≥32px clearance).'
-    : `Scroll clearance tokens invalid: bottom=${hasBottomScrollClearance}, top=${hasTopScrollClearance}`
+    ? '--mobile-scroll-clearance-bottom verified, mobile accordions unclipped (max-height: none), and bottom docks locked via position: fixed !important.'
+    : `Invalid: bottomClearance=${hasBottomScrollClearance}, topClearance=${hasTopScrollClearance}, accordionUnclipping=${hasAccordionUnclipping}, fixedBottomDock=${hasFixedBottomDockImmunity}`
 );
 
 // =============================================================================
 // DEKADE 8: Modals, Drawers & Multi-Zone Shells (Punkte 71–80)
 // =============================================================================
-// Verify that modal outer wrappers deklarieren overflow-y: auto and align-items: flex-start on mobile
+// Verify that modal outer wrappers declare overflow-y: auto and universal 44x44px close buttons
+const pwaModalShellPath = path.join(SRC_DIR, 'components', 'common', 'PwaModalShell.tsx');
+const secOpsModalsPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryOperationsModalsHub.tsx');
+const secUserModalsPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryUserDetailModalsHub.tsx');
+const pwaModalShellSrc = fs.existsSync(pwaModalShellPath) ? fs.readFileSync(pwaModalShellPath, 'utf-8') : '';
+const secOpsModalsSrc = fs.existsSync(secOpsModalsPath) ? fs.readFileSync(secOpsModalsPath, 'utf-8') : '';
+const secUserModalsSrc = fs.existsSync(secUserModalsPath) ? fs.readFileSync(secUserModalsPath, 'utf-8') : '';
+
 const hasModalOverflowSafety = 
-  indexCss.includes('[role="dialog"]') ||
-  indexCss.includes('.pwa-modal-shell') ||
-  indexCss.includes('.pwa-modal-card');
+  (indexCss.includes('[role="dialog"]') || indexCss.includes('.pwa-modal-shell') || indexCss.includes('.pwa-modal-card')) &&
+  pwaModalShellSrc.includes("minWidth: '44px'") &&
+  secOpsModalsSrc.includes("minWidth: '44px'") &&
+  secUserModalsSrc.includes("minWidth: '44px'");
 
 recordCheck(
   'Dekade 8',
-  'Modals, Drawers & Multi-Zone Shells (PWA Modal Shell Protection)',
+  'Modals, Drawers & Multi-Zone Shells (PWA Modal Shell & Universal 44×44px Close Button)',
   hasModalOverflowSafety,
   hasModalOverflowSafety
-    ? 'PWA Modal Shell & [role="dialog"] immunity verified against viewport clipping.'
-    : 'Modal shell protection not found in stylesheet.'
+    ? 'PWA Modal Shell, [role="dialog"] immunity & universal 44×44px close buttons verified across all modal hubs.'
+    : 'Modal shell protection or 44×44px close button missing in modal shells.'
 );
 
 // =============================================================================

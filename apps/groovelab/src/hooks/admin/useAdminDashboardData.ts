@@ -29,6 +29,18 @@ export function useAdminDashboardData({
   userRole: propUserRole
 }: UseAdminDashboardDataParams) {
   const hasFetchedCoreRef = useRef<string>('');
+  const hasFetchedSubViewsRef = useRef<{ bands: boolean; songs: boolean; sessions: boolean; submissions: boolean }>({
+    bands: false,
+    songs: false,
+    sessions: false,
+    submissions: false
+  });
+  const rawTeachersRef = useRef<any[] | null>(null);
+  const rawRoomsRef = useRef<any[] | null>(null);
+  const rawStudentsRef = useRef<any[] | null>(null);
+  const rawSchoolRosterRef = useRef<any[] | null>(null);
+  const rawTeacherStudentsRef = useRef<any[] | null>(null);
+  const prevPlatformRef = useRef<string>(activePlatform);
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (forceTab) return forceTab;
     if (typeof window !== 'undefined') {
@@ -105,23 +117,56 @@ export function useAdminDashboardData({
       ? cachedSchoolRoster
       : await fetchSchoolRoster(schoolId, supabase);
     const rawTeacherInst = teacherProfile?.instrument || '';
-    const teacherInstruments = rawTeacherInst
-      ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)
-      : [];
-    let teacherStudents = getTeacherRoster(teacherId, schoolRoster, assignedStudentIds, teacherInstruments);
-
-    if (platform !== 'campus') {
-      teacherStudents = teacherStudents.filter(s => s.is_groovelab_active);
-    }
-
+    const teacherInstruments = (platform === 'groovelab' || !rawTeacherInst)
+      ? []
+      : rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean);
+    const teacherStudents = getTeacherRoster(teacherId, schoolRoster, assignedStudentIds, teacherInstruments);
     return teacherStudents;
   };
 
+  // 🚀 0ms In-Memory Platform Projection when switching between Campus and GrooveLab
+  useEffect(() => {
+    if (prevPlatformRef.current === activePlatform) return;
+    prevPlatformRef.current = activePlatform;
+
+    if (rawTeachersRef.current) {
+      const platformTeachers = activePlatform === 'groovelab'
+        ? rawTeachersRef.current.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
+        : rawTeachersRef.current.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false);
+      setTeachers(platformTeachers);
+    }
+    if (rawRoomsRef.current) {
+      const platformRooms = activePlatform === 'groovelab'
+        ? rawRoomsRef.current.filter((r: any) => Boolean(r.is_groovelab_active))
+        : rawRoomsRef.current.filter((r: any) => r.is_campus_active !== false);
+      setRooms(platformRooms);
+      setSetupRooms(platformRooms);
+    }
+    if (rawSchoolRosterRef.current) {
+      if (activePlatform === 'groovelab') {
+        const platformStudents = rawSchoolRosterRef.current.filter((s: any) => Boolean(s.is_groovelab_active || s.isGroovelabActive));
+        setStudents(platformStudents);
+      } else {
+        const isTeacher = propUserRole?.toLowerCase() === 'teacher' || (admin && admin.role?.toLowerCase() === 'teacher');
+        const platformStudents = isTeacher && rawTeacherStudentsRef.current
+          ? rawTeacherStudentsRef.current
+          : rawSchoolRosterRef.current;
+        setStudents(platformStudents);
+      }
+    } else if (rawStudentsRef.current) {
+      const platformStudents = activePlatform === 'groovelab'
+        ? rawStudentsRef.current.filter((s: any) => Boolean(s.is_groovelab_active))
+        : rawStudentsRef.current;
+      setStudents(platformStudents);
+    }
+  }, [activePlatform, propUserRole, admin]);
+
   const fetchData = async (force = false) => {
     let currentAdmin = admin;
-    let adminData: any = null;
+    let adminData: any = (!force && currentAdmin && currentAdmin.id === userId && currentAdmin.school_id) ? currentAdmin : null;
     let fetchError = null;
-    try {
+    if (!adminData) {
+      try {
       if (userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true')) {
         const ghostSchoolId = sessionStorage.getItem('groovelab_ghost_school_id') || '';
         const ghostSchoolName = sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule';
@@ -166,8 +211,9 @@ export function useAdminDashboardData({
           } catch (e) {}
         }
       }
-    } catch (e: any) {
-      fetchError = e;
+      } catch (e: any) {
+        fetchError = e;
+      }
     }
 
     if (!adminData) {
@@ -217,8 +263,22 @@ export function useAdminDashboardData({
       if (adminData.school_id) {
         const effectiveTab = forceTab || activeTab;
         const isRoomsOnly = effectiveTab === 'rooms';
-        const cacheKey = `${adminData.school_id}_${activePlatform}_${effectiveRole}`;
+        const cacheKey = `${adminData.school_id}_${effectiveRole}`;
         const shouldFetchCore = force || hasFetchedCoreRef.current !== cacheKey;
+        if (force) {
+          hasFetchedSubViewsRef.current = { bands: false, songs: false, sessions: false, submissions: false };
+        }
+
+        const needBands = !isRoomsOnly && (effectiveTab === 'bands' || effectiveTab === 'live') && !hasFetchedSubViewsRef.current.bands;
+        const needSongs = !isRoomsOnly && (effectiveTab === 'songs' || effectiveTab === 'live') && !hasFetchedSubViewsRef.current.songs;
+        const needSessions = !isRoomsOnly && activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup') && !hasFetchedSubViewsRef.current.sessions;
+        const needSubmissions = !isRoomsOnly && activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live') && !hasFetchedSubViewsRef.current.submissions;
+        const needAnySubView = needBands || needSongs || needSessions || needSubmissions;
+
+        if (!shouldFetchCore && !needAnySubView) {
+          setLoading(false);
+          return;
+        }
 
         const corePromise = shouldFetchCore
           ? Promise.all([
@@ -235,22 +295,22 @@ export function useAdminDashboardData({
             ])
           : Promise.resolve(null);
 
-        const subViewPromise = !isRoomsOnly
+        const subViewPromise = needAnySubView
           ? Promise.all([
-              effectiveTab === 'bands' || effectiveTab === 'live'
+              needBands
                 ? supabase
                     .from('bands')
                     .select('*, songs(id, title, artist, instrumentation), coach:users!coach_id(id, first_name, last_name, photo_url), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))')
                     .eq('school_id', adminData.school_id)
                     .order('name')
                 : Promise.resolve({ data: null }),
-              effectiveTab === 'songs' || effectiveTab === 'live'
+              needSongs
                 ? supabase.from('songs').select('*').or(`school_id.eq.${adminData.school_id},school_id.is.null`).order('title')
                 : Promise.resolve({ data: null }),
-              activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup')
+              needSessions
                 ? supabase.from('sessions').select('*, profiles:users!inner(*), stations(*)').eq('profiles.school_id', adminData.school_id).is('check_out_time', null)
                 : Promise.resolve({ data: null }),
-              activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live')
+              needSubmissions
                 ? supabase.from('user_song_skills').select('*, users!user_song_skills_user_id_fkey!inner(*), songs!inner(*)').eq('is_pending_approval', true)
                 : Promise.resolve({ data: null })
             ])
@@ -261,12 +321,14 @@ export function useAdminDashboardData({
         if (coreResults) {
           const [tRes, rRes, stRes, schoolRoster, schedRes] = coreResults;
           if (tRes.data) {
+            rawTeachersRef.current = tRes.data;
             const platformTeachers = activePlatform === 'groovelab'
               ? tRes.data.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
               : tRes.data.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false);
             setTeachers(platformTeachers);
           }
           if (rRes.data) {
+            rawRoomsRef.current = rRes.data;
             const platformRooms = activePlatform === 'groovelab'
               ? rRes.data.filter((r: any) => Boolean(r.is_groovelab_active))
               : rRes.data.filter((r: any) => r.is_campus_active !== false);
@@ -278,12 +340,22 @@ export function useAdminDashboardData({
             setSetupStations(stRes.data);
           }
           if (schoolRoster) {
+            rawSchoolRosterRef.current = schoolRoster;
             if (effectiveRole === 'teacher') {
               const teacherStudents = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform, adminData, schoolRoster);
-              setStudents(teacherStudents);
+              rawTeacherStudentsRef.current = teacherStudents;
+              rawStudentsRef.current = teacherStudents;
+              if (activePlatform === 'groovelab') {
+                // 🎸 0,1% Goldstandard: Im GrooveLab-Bandlabor sieht jede Lehrkraft alle aktiven GrooveLab-Schüler der Schule (Parität mit Sekretariat)
+                const activeStudents = schoolRoster.filter((s: any) => Boolean(s.is_groovelab_active || s.isGroovelabActive));
+                setStudents(activeStudents);
+              } else {
+                setStudents(teacherStudents);
+              }
             } else {
+              rawStudentsRef.current = schoolRoster;
               const activeStudents = activePlatform === 'groovelab' 
-                ? schoolRoster.filter(s => s.is_groovelab_active) 
+                ? schoolRoster.filter((s: any) => Boolean(s.is_groovelab_active || s.isGroovelabActive)) 
                 : schoolRoster;
               setStudents(activeStudents);
             }
@@ -295,12 +367,20 @@ export function useAdminDashboardData({
         if (subViewResults) {
           const [bRes, sngRes, sessRes, subRes] = subViewResults;
           if (bRes.data) {
+            hasFetchedSubViewsRef.current.bands = true;
             const realBands = bRes.data.filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_'));
             setAllBands(realBands);
           }
-          if (sngRes.data) setSongs(sngRes.data);
-          if (sessRes.data) setActiveSessions(sessRes.data);
+          if (sngRes.data) {
+            hasFetchedSubViewsRef.current.songs = true;
+            setSongs(sngRes.data);
+          }
+          if (sessRes.data) {
+            hasFetchedSubViewsRef.current.sessions = true;
+            setActiveSessions(sessRes.data);
+          }
           if (subRes.data) {
+            hasFetchedSubViewsRef.current.submissions = true;
             const mapped = subRes.data.map((s: any) => ({
               ...s,
               users: Array.isArray(s.users) ? s.users[0] : s.users,

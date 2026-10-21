@@ -50,16 +50,36 @@ export function useSecretaryNavigation({ onLogout }: UseSecretaryNavigationProps
   // Mobile drawer state
   const [mobileSecretaryDrawerOpen, setMobileSecretaryDrawerOpen] = useState(false);
 
-  // Viewport dimensions
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const [windowHeight, setWindowHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 800);
+  // Viewport dimensions (Simulator & Real Device aware)
+  const resolveSecWidth = () => {
+    if (typeof window === 'undefined') return 1200;
+    if (typeof document !== 'undefined') {
+      const simW = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simW > 0) return simW;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    }
+    return window.innerWidth;
+  };
+  const resolveSecHeight = () => {
+    if (typeof window === 'undefined') return 800;
+    if (typeof document !== 'undefined') {
+      const simH = Number(document.documentElement.getAttribute('data-sim-height'));
+      if (simH > 0) return simH;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientHeight > 0) return simEl.clientHeight;
+    }
+    return window.innerHeight;
+  };
+  const [windowWidth, setWindowWidth] = useState(resolveSecWidth);
+  const [windowHeight, setWindowHeight] = useState(resolveSecHeight);
   const [containerWidth, setContainerWidth] = useState(1000);
 
   // Window resize & orientation listeners
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
+      setWindowWidth(resolveSecWidth());
+      setWindowHeight(resolveSecHeight());
     };
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);

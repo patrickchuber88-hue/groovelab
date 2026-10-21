@@ -126,7 +126,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
               setEditingSong(null);
             }}
             style={{
-              background: "linear-gradient(135deg, #facc15 0%, #eab308 100%)",
+              background: "linear-gradient(135deg, #facc15 0%, #facc15 100%)",
               color: "#0f172a",
               border: "none",
               padding: "10px 20px",
@@ -181,7 +181,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                   boxSizing: "border-box",
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "#eab308";
+                  e.currentTarget.style.borderColor = "#facc15";
                   e.currentTarget.style.background = "#ffffff";
                   e.currentTarget.style.boxShadow = "0 0 0 3px rgba(234, 179, 8, 0.15)";
                 }}
@@ -241,7 +241,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ fontSize: "1.1rem", fontWeight: 950, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Plus size={18} color="#eab308" strokeWidth={3} />
+                <Plus size={18} color="#facc15" strokeWidth={3} />
                 <span>Neuen Song hinzufügen</span>
               </h3>
 
@@ -427,7 +427,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                             gap: "10px",
                             padding: "10px 16px",
                             borderRadius: "16px",
-                            border: isSelected ? "2px solid #eab308" : "1.5px solid #e2e8f0",
+                            border: isSelected ? "2px solid #facc15" : "1.5px solid #e2e8f0",
                             background: isSelected ? "rgba(254, 240, 138, 0.35)" : "#ffffff",
                             cursor: "pointer",
                             transition: "all 0.2s ease",
@@ -443,7 +443,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                           {isSelected && (
                             <span
                               style={{
-                                background: "#eab308",
+                                background: "#facc15",
                                 color: "#0f172a",
                                 fontSize: "0.72rem",
                                 fontWeight: 950,
@@ -498,7 +498,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                 type="submit"
                 style={{
                   flex: 2,
-                  background: "linear-gradient(135deg, #facc15 0%, #eab308 100%)",
+                  background: "linear-gradient(135deg, #facc15 0%, #facc15 100%)",
                   color: "#0f172a",
                   border: "none",
                   padding: "12px 20px",
@@ -548,7 +548,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
               gap: "20px",
               background: "#fffbeb",
               borderRadius: "20px",
-              border: "1.5px solid #fef08a",
+              border: 'none',
               boxShadow: "none",
             }}
           >
@@ -737,7 +737,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                 type="submit"
                 style={{
                   flex: 2,
-                  background: "linear-gradient(135deg, #facc15 0%, #eab308 100%)",
+                  background: "linear-gradient(135deg, #facc15 0%, #facc15 100%)",
                   color: "#0f172a",
                   border: "none",
                   padding: "12px 20px",
@@ -774,7 +774,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
         {/* Songs Count Indicator */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Music size={18} color="#eab308" />
+            <Music size={18} color="#facc15" />
             <h3 style={{ fontSize: "1.05rem", fontWeight: 950, color: "#0f172a", margin: 0 }}>
               Songs ({filteredSongs.length})
             </h3>
@@ -858,7 +858,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                     alignItems: "center",
                     background: "white",
                     borderRadius: "20px",
-                    border: editingSong?.id === song.id ? "2px solid #eab308" : "1px solid rgba(0, 0, 0, 0.06)",
+                    border: editingSong?.id === song.id ? "2px solid #facc15" : "1px solid rgba(0, 0, 0, 0.06)",
                     borderLeft: `6px solid ${songColor.from}`,
                     boxShadow:
                       editingSong?.id === song.id
@@ -977,7 +977,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                           height: "36px",
                           borderRadius: "10px",
                           background: "#eff6ff",
-                          border: "1px solid #bfdbfe",
+                          border: 'none',
                           color: "#2563eb",
                           display: "flex",
                           alignItems: "center",
@@ -1028,7 +1028,7 @@ export const GrooveLabSongsView: React.FC<GrooveLabSongsViewProps> = ({
                         width: "36px",
                         height: "36px",
                         borderRadius: "10px",
-                        border: "1px solid #fecaca",
+                        border: 'none',
                         background: "#fff1f2",
                         color: "#ef4444",
                         cursor: "pointer",

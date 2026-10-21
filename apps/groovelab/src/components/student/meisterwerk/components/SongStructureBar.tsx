@@ -44,12 +44,12 @@ export const SECTION_COLOR_MAP: Record<string, { bg: string; border: string; tex
   'Strophe': { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8', activeBg: '#dbeafe', badgeBg: '#3b82f6' },
   'Verse': { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8', activeBg: '#dbeafe', badgeBg: '#3b82f6' },
   'Pre-Chorus': { bg: '#fff7ed', border: '#fed7aa', text: '#c2410c', activeBg: '#ffedd5', badgeBg: '#f97316' },
-  'Refrain': { bg: '#fefce8', border: '#fde047', text: '#854d0e', activeBg: '#fef08a', badgeBg: '#eab308' },
-  'Chorus': { bg: '#fefce8', border: '#fde047', text: '#854d0e', activeBg: '#fef08a', badgeBg: '#eab308' },
+  'Refrain': { bg: '#fefce8', border: '#fde047', text: '#854d0e', activeBg: '#fef08a', badgeBg: '#facc15' },
+  'Chorus': { bg: '#fefce8', border: '#fde047', text: '#854d0e', activeBg: '#fef08a', badgeBg: '#facc15' },
   'Bridge': { bg: '#faf5ff', border: '#e9d5ff', text: '#7e22ce', activeBg: '#f3e8ff', badgeBg: '#a855f7' },
   'Solo': { bg: '#fff1f2', border: '#fecdd3', text: '#be123c', activeBg: '#ffe4e6', badgeBg: '#f43f5e' },
   'Outro': { bg: '#f8fafc', border: '#cbd5e1', text: '#334155', activeBg: '#e2e8f0', badgeBg: '#64748b' },
-  'Interlude': { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d', activeBg: '#dcfce7', badgeBg: '#22c55e' }
+  'Interlude': { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d', activeBg: '#dcfce7', badgeBg: '#34a853' }
 };
 
 export const getSectionColors = (name?: string | null) => {
@@ -382,7 +382,7 @@ export const SongStructureBar: React.FC<SongStructureBarProps> = ({
             gap: '6px',
             padding: '6px 14px',
             borderRadius: '12px',
-            border: '1.5px solid #6366f1',
+            border: 'none',
             background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
             color: '#4338ca',
             fontSize: '0.78rem',

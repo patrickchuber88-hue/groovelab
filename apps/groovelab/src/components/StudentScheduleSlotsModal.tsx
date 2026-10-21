@@ -535,10 +535,10 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
   const isGroove = activePlatform === 'groovelab';
   const isAdminOrSec = activePlatform === 'admin' || activePlatform === 'secretariat';
 
-  const brandColor = isGroove ? '#eab308' : (isAdminOrSec ? '#ea4335' : '#34a853');
-  const brandBgLight = isGroove ? '#fefce8' : (isAdminOrSec ? '#fff1f2' : '#f0fdf4');
-  const brandBorder = isGroove ? '#fef08a' : (isAdminOrSec ? '#fecaca' : '#bbf7d0');
-  const brandText = isGroove ? '#854d0e' : (isAdminOrSec ? '#991b1b' : '#166534');
+  const brandColor = isGroove ? '#facc15' : (isAdminOrSec ? '#ea4335' : '#34a853');
+  const brandBgLight = isGroove ? '#fef9c3' : (isAdminOrSec ? '#fff1f2' : '#e6f4ea');
+  const brandBorder = 'none';
+  const brandText = isGroove ? '#854d0e' : (isAdminOrSec ? '#991b1b' : '#137333');
   const brandButtonTextColor = isGroove ? '#1e293b' : '#ffffff';
 
   return (
@@ -694,7 +694,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       padding: '4px 10px',
                       borderRadius: '8px',
                       background: '#eff6ff',
-                      border: '1px solid #bfdbfe',
+                      border: 'none',
                       color: '#1e40af',
                       fontSize: '0.78rem',
                       fontWeight: 700
@@ -715,7 +715,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       padding: '4px 10px',
                       borderRadius: '8px',
                       background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
+                      border: 'none',
                       color: '#166534',
                       fontSize: '0.78rem',
                       fontWeight: 700
@@ -838,7 +838,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                           boxShadow: activeBrush === 'wunsch' ? '0 1px 4px rgba(22, 163, 74, 0.15)' : 'none'
                         }}
                       >
-                        <Star size={12} fill="#22c55e" color="#16a34a" /> Wunschzeit
+                        <Star size={12} fill="#34a853" color="#137333" /> Wunschzeit
                       </button>
                       <button
                         type="button"
@@ -906,7 +906,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Zap size={11} color="#eab308" /> Schnellauswahl:
+                      <Zap size={11} color="#facc15" /> Schnellauswahl:
                     </span>
                     <button
                       type="button"
@@ -976,7 +976,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       style={{
                         padding: '4px 8px',
                         borderRadius: '6px',
-                        border: '1px solid #fecaca',
+                        border: 'none',
                         background: '#fff1f2',
                         color: '#b91c1c',
                         fontSize: '0.70rem',
@@ -1004,11 +1004,11 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.74rem', fontWeight: 600, color: '#64748b', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#15803d' }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#137333' }} />
                 <span>Gebucht</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853' }} />
                 <span>Wunsch</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -1132,11 +1132,11 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                       labelText = exactTime || 'Gebucht';
                       icon = <Check size={11} color="white" />;
                     } else if (status === 'wunsch') {
-                      bg = '#f0fdf4';
-                      border = '1px solid #bbf7d0';
-                      textColor = '#166534';
+                      bg = '#e6f4ea';
+                      border = 'none';
+                      textColor = '#137333';
                       labelText = 'Wunsch';
-                      icon = <Star size={11} fill="#22c55e" color="#16a34a" />;
+                      icon = <Star size={11} fill="#34a853" color="#137333" />;
                     } else if (status === 'moeglich') {
                       bg = '#ffffff';
                       border = '1px solid #f1f5f9';
@@ -1267,7 +1267,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
                 padding: '4px 10px',
                 borderRadius: '8px',
                 background: '#fef3c7',
-                border: '1px solid #fde68a',
+                border: 'none',
                 color: '#92400e',
                 fontSize: '0.74rem',
                 fontWeight: 750

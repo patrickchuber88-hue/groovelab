@@ -269,6 +269,10 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
 
 
   const isSubViewActive = activePlatform === 'campus' && activeTab === 'homework_book' && subViewNavState.isActive;
+  const isNonHomeBoard =
+    !isSubViewActive &&
+    ((activePlatform === 'campus' && activeTab !== 'briefing') ||
+      (activePlatform === 'groovelab' && activeTab !== 'live'));
 
   const getAvatarSrc = () => {
     if (isStaff) return '/campus_login_hero.png';
@@ -287,13 +291,15 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
       <style>{`
         .cg-gemini-header {
           position: sticky; top: 0; left: 0; right: 0; height: 48px; min-height: 48px; max-height: 48px;
+          flex-shrink: 0;
           padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
           box-sizing: content-box;
           transition: background 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, backdrop-filter 0.25s ease, -webkit-backdrop-filter 0.25s ease;
           display: flex; align-items: center; justify-content: space-between;
           padding-left: max(8px, env(safe-area-inset-left, 8px));
           padding-right: max(10px, env(safe-area-inset-right, 10px));
-          z-index: 900;
+          z-index: 950;
+          pointer-events: auto;
         }
         .cg-gemini-touch-btn {
           width: 44px; height: 44px; min-width: 44px; min-height: 44px;
@@ -301,6 +307,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
           display: flex; align-items: center; justify-content: center;
           color: #1e293b; cursor: pointer; touch-action: manipulation;
           -webkit-tap-highlight-color: transparent; outline: none;
+          flex-shrink: 0; pointer-events: auto; position: relative; z-index: 960;
         }
         .cg-gemini-pill-btn {
           display: inline-flex; align-items: center; gap: 6px; height: 34px; min-height: 34px;
@@ -315,7 +322,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
         .cg-gemini-interactive-tile:active { transform: scale(0.98); }
       `}</style>
 
-      {/* ── Minimalist Top Header (48px Height, Scroll-Aware Transparenz -> Frosted Glass) ── */}
+      {/* ── Minimalist Top Header (48px Height, Always-Visible Frosted Glass & Clickable Main Menu Trigger) ── */}
       <header
         role="banner"
         aria-label="Hauptnavigation Oben"
@@ -324,20 +331,22 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
           background: (isSubViewActive && subViewNavState.isStickerAlbum)
             ? 'rgba(15, 23, 42, 0.92)'
             : isScrolled
-            ? 'rgba(255, 255, 255, 0.85)'
-            : 'transparent',
-          backdropFilter: (isSubViewActive && subViewNavState.isStickerAlbum) || isScrolled ? 'blur(20px)' : 'none',
-          WebkitBackdropFilter: (isSubViewActive && subViewNavState.isStickerAlbum) || isScrolled ? 'blur(20px)' : 'none',
+            ? 'rgba(255, 255, 255, 0.94)'
+            : 'rgba(255, 255, 255, 0.88)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           borderBottom: (isSubViewActive && subViewNavState.isStickerAlbum)
             ? '1px solid rgba(255, 255, 255, 0.12)'
             : isScrolled
-            ? '1px solid rgba(226, 232, 240, 0.8)'
-            : '1px solid transparent'
+            ? '1px solid rgba(226, 232, 240, 0.85)'
+            : '1px solid rgba(226, 232, 240, 0.45)'
         }}
       >
-        {/* Left: ☰ Hamburger Button (44×44px Touch Target) in GrooveLab Gelb */}
+        {/* Left: ☰ Hamburger Button (44×44px Touch Target, Permanently Visible & Clickable on Every Board) */}
         <button
           ref={triggerBtnRef}
+          id="mobile-main-menu-trigger"
+          data-testid="mobile-main-menu-btn"
           type="button"
           onClick={() => setIsDrawerOpen(true)}
           aria-label="Hauptmenü öffnen"
@@ -451,8 +460,43 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
           </div>
         )}
 
-        {/* Right: Parental status, Cloud sync, iCal Action, Bell & Avatar (>=44×44px touch targets) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+        {/* Right: Back-to-Cockpit Pill (on sub-boards), Parental status, Cloud sync, Bell & Avatar (>=44×44px touch targets) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {isNonHomeBoard && (
+            <button
+              type="button"
+              data-testid="gemini-mobile-back-btn"
+              onClick={() => {
+                const homeTab = activePlatform === 'groovelab' ? 'live' : 'briefing';
+                setActiveTab(homeTab);
+                if (activePlatform === 'campus') {
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
+                }
+              }}
+              aria-label="Zurück zum Cockpit"
+              title="Zurück zum Cockpit"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                height: '34px',
+                minHeight: '34px',
+                padding: '0 10px',
+                borderRadius: '100px',
+                border: 'none',
+                background: '#f1f5f9',
+                color: '#0f172a',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                flexShrink: 0
+              }}
+            >
+              <ArrowLeft size={14} strokeWidth={2.5} color="#0f172a" />
+              <span>Cockpit</span>
+            </button>
+          )}
           {parentUnlocked && isStudent && (
             <button
               type="button"
@@ -465,7 +509,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
                 height: '30px',
                 padding: '0 8px',
                 borderRadius: '100px',
-                border: '1px solid #bae6fd',
+                border: 'none',
                 background: '#f0f9ff',
                 color: '#0284c7',
                 fontSize: '11px',
@@ -551,7 +595,7 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
                     ? '2px solid #34a853'
                     : activePlatform === 'admin'
                     ? '2px solid #ef4444'
-                    : '2px solid #eab308',
+                    : '2px solid #facc15',
                 background: '#f1f5f9',
                 display: 'flex',
                 alignItems: 'center',

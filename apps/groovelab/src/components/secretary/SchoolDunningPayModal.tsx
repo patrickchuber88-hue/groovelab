@@ -342,7 +342,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                 </span>
               </div>
               {isTrustActive && (
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '3px 10px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                   Aktiv ({dunningStatus.trustRemainingHours || 48} Std. verbleibend)
                 </span>
               )}

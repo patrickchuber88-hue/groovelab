@@ -41,7 +41,7 @@ export const formatGermanDictation = (text: string): string => {
   res = res.replace(/([(])\s+/g, '$1');
 
   // 3. Auto-capitalize character at start and after sentence terminators [.!?\n]
-  res = res.replace(/(^|[.!?\n]\s+)([a-zäöü])/g, (_, prefix, char) => prefix + char.toUpperCase());
+  res = res.replace(/(^|[.!?\n]\s*)([a-zäöü])/g, (_, prefix, char) => prefix + char.toUpperCase());
 
   // 4. Capitalize very first character of the string if it's a letter
   if (res.length > 0 && /^[a-zäöü]/.test(res)) {
@@ -377,6 +377,7 @@ export interface UseDictationInputOptions {
   value: string;
   onChange: (newValue: string) => void;
   lang?: string;
+  joinWithNewline?: boolean;
   onStart?: () => void;
   onEnd?: () => void;
   onError?: (error: string) => void;
@@ -396,6 +397,7 @@ export const useDictationInput = ({
   value,
   onChange,
   lang = 'de-DE',
+  joinWithNewline = false,
   onStart,
   onEnd,
   onError,
@@ -435,7 +437,9 @@ export const useDictationInput = ({
     onResult: (liveFormattedSpoken) => {
       const base = baseTextRef.current;
       const cleanSpoken = liveFormattedSpoken.trim();
-      const combined = base ? `${base} ${cleanSpoken}` : cleanSpoken;
+      if (!cleanSpoken) return;
+      const separator = base ? (joinWithNewline || base.endsWith('\n') ? '\n' : ' ') : '';
+      const combined = base ? `${base}${separator}${cleanSpoken}` : cleanSpoken;
       onChangeRef.current(combined);
     },
     onError: (err) => {

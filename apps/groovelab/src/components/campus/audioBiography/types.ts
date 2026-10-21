@@ -84,7 +84,7 @@ export const SCHOOL_YEAR_COVERS: SchoolYearCoverConfig[] = [
   { vol: 7, volLabel: 'VOL. 07', themeTitle: 'HARMONY VIBES', subTitle: '7. Lernjahr • Mehrstimmigkeit & Tiefe', gradient: 'linear-gradient(135deg, #0d9488 0%, #14b8a6 50%, #5eead4 100%)', accentColor: '#14b8a6', badge: '7. LERNJAHR', iconName: 'headphones' },
   { vol: 8, volLabel: 'VOL. 08', themeTitle: 'VIRTUOSO TRACKS', subTitle: '8. Lernjahr • Virtuoses Repertoire', gradient: 'linear-gradient(135deg, #4338ca 0%, #6366f1 50%, #a855f7 100%)', accentColor: '#6366f1', badge: '8. LERNJAHR', iconName: 'flame' },
   { vol: 9, volLabel: 'VOL. 09', themeTitle: 'MASTERWORKS', subTitle: '9. Lernjahr • Große Werke & Soli', gradient: 'linear-gradient(135deg, #1e293b 0%, #334155 50%, #64748b 100%)', accentColor: '#94a3b8', badge: '9. LERNJAHR', iconName: 'award' },
-  { vol: 10, volLabel: 'VOL. 10', themeTitle: 'DECADE LEGEND', subTitle: '10. Lernjahr • Meisterklasse & Jubiläum', gradient: 'linear-gradient(135deg, #18181b 0%, #ca8a04 50%, #fef08a 100%)', accentColor: '#eab308', badge: '10. JUBILÄUM', iconName: 'trophy' }
+  { vol: 10, volLabel: 'VOL. 10', themeTitle: 'DECADE LEGEND', subTitle: '10. Lernjahr • Meisterklasse & Jubiläum', gradient: 'linear-gradient(135deg, #18181b 0%, #ca8a04 50%, #fef08a 100%)', accentColor: '#facc15', badge: '10. JUBILÄUM', iconName: 'trophy' }
 ];
 
 export interface UniversalPlaylistCoverConfig {
@@ -147,8 +147,8 @@ export const UNIVERSAL_PLAYLIST_COVERS: UniversalPlaylistCoverConfig[] = [
     categoryLabel: 'Musik-Geschenke',
     defaultTitle: 'Für Oma & Opa zum Geburtstag',
     subTitle: 'Liebevolle Ständchen & musikalische Grüße',
-    gradient: 'linear-gradient(135deg, #854d0e 0%, #ca8a04 50%, #eab308 100%)',
-    accentColor: '#eab308',
+    gradient: 'linear-gradient(135deg, #854d0e 0%, #ca8a04 50%, #facc15 100%)',
+    accentColor: '#facc15',
     badge: 'OMA & OPA',
     iconName: 'gift',
     emoji: '🎂',

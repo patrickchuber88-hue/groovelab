@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, queryCache } from '../../../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../../../utils/nameHelper';
 import { StudentToDelete } from '../../ConfirmDeleteStudentModal';
@@ -44,10 +44,12 @@ export function useTeacherStudents({
   const [modalDocStudent, setDocStudent] = useState<any | null>(null);
 
   // 🏛️ Authoritative Supabase Student Hydration for Teacher Dashboard
+  const hydratedKeyRef = useRef<string>('');
+
   const loadStudents = useCallback(async () => {
     const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
-    if (isStudent || activeTab === 'live') {
-      if (isStudent) setAllStudents([]);
+    if (isStudent) {
+      setAllStudents([]);
       return;
     }
     const effectiveSchoolId = schoolData?.id || teacher?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
@@ -77,20 +79,30 @@ export function useTeacherStudents({
       assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]));
 
       const rawTeacherInst = teacher?.instrument || '';
-      const teacherInstruments = rawTeacherInst
-        ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)
-        : [];
-      const teacherStudents = getTeacherRoster(effectiveTeacherId, schoolRoster, assignedStudentIds, teacherInstruments);
+      const teacherInstruments = (activePlatform === 'groovelab' || !rawTeacherInst)
+        ? []
+        : rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean);
+      const teacherStudents = (activePlatform === 'groovelab')
+        ? schoolRoster.filter((s: any) => Boolean(s.is_groovelab_active || s.isGroovelabActive))
+        : getTeacherRoster(effectiveTeacherId, schoolRoster, assignedStudentIds, teacherInstruments);
 
+      hydratedKeyRef.current = `${effectiveTeacherId}_${effectiveSchoolId}_${activePlatform}`;
       setAllStudents(teacherStudents);
     } catch (err) {
       console.error('[useTeacherStudents] Failed to load students from Supabase:', err);
     }
-  }, [schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id, activePlatform, viewMode, activeTab, hideHeader]);
+  }, [schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id, teacher?.role, teacher?.instrument, viewMode, activePlatform]);
 
   useEffect(() => {
+    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
+    if (isStudent || activeTab === 'live') return;
+    const effectiveSchoolId = schoolData?.id || teacher?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
+    const effectiveTeacherId = userId || teacher?.id;
+    if (!effectiveSchoolId || !effectiveTeacherId) return;
+    const cacheKey = `${effectiveTeacherId}_${effectiveSchoolId}`;
+    if (hydratedKeyRef.current === cacheKey) return;
     loadStudents();
-  }, [loadStudents]);
+  }, [loadStudents, activeTab, viewMode, teacher?.role, schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id]);
 
   const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [inviteFirstName, setInviteFirstName] = useState('');

@@ -544,8 +544,8 @@ export function deriveActiveHomeworkSummary({
     }
   }
 
-  // 6. Snapshot Fallback Hydration für Vorwochen
-  if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
+  // 6. Snapshot Fallback Hydration für Vorwochen (nur wenn aktuelle Woche weder Bücher noch Songs hat)
+  if (Object.keys(activeLehrwerkeMap).length === 0 && otherActiveHWItems.length === 0) {
     const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
       if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
       if (!currentWeekStr) return true;

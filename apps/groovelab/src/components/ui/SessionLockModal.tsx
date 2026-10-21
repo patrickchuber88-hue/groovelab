@@ -540,7 +540,7 @@ export const SessionLockModal: React.FC<SessionLockModalProps> = ({
                   borderRadius: '14px',
                   background: '#f0fdf4',
                   color: '#15803d',
-                  border: '1px solid #bbf7d0',
+                  border: 'none',
                   fontSize: '0.88rem',
                   fontWeight: 800,
                   cursor: loading ? 'not-allowed' : 'pointer',

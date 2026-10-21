@@ -479,7 +479,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
   const presetColors = [
     '#3b82f6', // Blue
     '#34a853', // Green
-    '#eab308', // Yellow
+    '#facc15', // Yellow
     '#ef4444', // Red
     '#8b5cf6', // Purple
     '#f97316'  // Orange
@@ -606,7 +606,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
         )}
 
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: 'none', padding: '14px', borderRadius: '16px', color: '#b91c1c', fontSize: '13px', fontWeight: 700, marginBottom: '20px', textAlign: 'left' }}>
             {error}
           </div>
         )}
@@ -913,7 +913,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             <div 
               ref={cardRef}
               style={{
-                background: 'linear-gradient(135deg, #34a853 0%, #15803d 60%, #eab308 100%)',
+                background: 'linear-gradient(135deg, #34a853 0%, #15803d 60%, #facc15 100%)',
                 borderRadius: '20px',
                 padding: '16px',
                 width: '100%',
@@ -962,7 +962,7 @@ export function SignupWizard({ onBackToLogin, onSignupSuccess }: SignupWizardPro
             {/* Credentials Note Box (Monochrome Icon + Copy Support) */}
             <div style={{
               background: '#fffbeb',
-              border: '1.5px solid #fef3c7',
+              border: 'none',
               borderRadius: '16px',
               padding: '12px 16px',
               textAlign: 'left',

@@ -210,11 +210,11 @@ export function StudioRecordingPlayer({
         <div style={{
           fontSize: '0.74rem',
           fontWeight: 900,
-          color: '#15803d',
-          background: '#dcfce7',
+          color: '#34a853',
+          background: 'rgba(52, 168, 83, 0.10)',
           padding: '3px 10px',
           borderRadius: '100px',
-          border: '1px solid #bbf7d0',
+          border: 'none',
           whiteSpace: 'nowrap'
         }}>
           {formatTime(currentTime)} / {formatTime(totalDuration)}
@@ -383,10 +383,10 @@ export function StudioRecordingPlayer({
                         height: `${heightPct}%`,
                         borderRadius: '9999px',
                         background: isFilled
-                          ? (isStudentAuthor ? 'linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%)' : 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)')
+                          ? (isStudentAuthor ? 'linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%)' : 'linear-gradient(180deg, #34a853 0%, #16a34a 100%)')
                           : (isStudentAuthor ? 'rgba(124, 58, 237, 0.14)' : 'rgba(22, 163, 74, 0.14)'),
                         boxShadow: isHead && isPlaying
-                          ? (isStudentAuthor ? '0 0 8px rgba(124, 58, 237, 0.75)' : '0 0 8px rgba(34, 197, 94, 0.75)')
+                          ? (isStudentAuthor ? '0 0 8px rgba(124, 58, 237, 0.75)' : '0 0 8px rgba(52, 168, 83, 0.75)')
                           : 'none',
                         transition: 'background 0.1s ease, height 0.15s ease'
                       }}

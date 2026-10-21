@@ -246,7 +246,7 @@ export const QuarterlyAccessReportModal: React.FC<QuarterlyAccessReportModalProp
           {/* Section 4: Student & Data Minimization Compliance */}
           <div style={{
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             borderRadius: '16px',
             padding: '18px 20px',
             fontSize: '0.85rem',

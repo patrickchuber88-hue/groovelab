@@ -2,8 +2,10 @@ import React from 'react';
 import {
   LayoutDashboard, DoorOpen, Users, Award, Calendar,
   Monitor, GraduationCap, Settings, Menu, X, ShieldAlert,
-  FileText, BookOpen, UserPlus, Sliders, QrCode, Lightbulb, LogOut, Clock
+  FileText, BookOpen, UserPlus, Sliders, QrCode, Lightbulb, LogOut, Clock,
+  School, User, Shield, Music, ArrowLeftRight
 } from 'lucide-react';
+import { SecretaryUserProfile } from './SecretarySidebar';
 
 export interface SecretaryMobileNavigationProps {
   activeTab: 'campus' | 'secretary' | 'groovelab';
@@ -15,6 +17,7 @@ export interface SecretaryMobileNavigationProps {
   groovelabSubTab: string;
   setGroovelabSubTab: (subTab: any) => void;
   hasCampusSub: boolean;
+  hasGroovelabSub?: boolean;
   crisisNotifications: any[];
   enabledCampusSubjects: boolean;
   enabledCampusRooms: boolean;
@@ -27,6 +30,15 @@ export interface SecretaryMobileNavigationProps {
   setIsFeedbackModalOpen: (show: boolean) => void;
   onLogout?: () => void;
   handleSecretaryLogout: () => void;
+  schoolName?: string;
+  currentUserProfile?: SecretaryUserProfile | null;
+  isCurrentUserTeacher?: boolean;
+  onRoleSwitched?: (role: string) => void;
+  onOpenPersonalSecurity?: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenAgb?: () => void;
+  onOpenImpressum?: () => void;
+  onOpenAccessibility?: () => void;
 }
 
 export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps> = ({
@@ -50,17 +62,69 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
   setShowOwnQrModal,
   setIsFeedbackModalOpen,
   onLogout,
-  handleSecretaryLogout
+  handleSecretaryLogout,
+  schoolName,
+  currentUserProfile,
+  isCurrentUserTeacher = false,
+  onRoleSwitched,
+  onOpenPersonalSecurity,
+  onOpenPrivacy,
+  onOpenAgb,
+  onOpenImpressum,
+  onOpenAccessibility
 }) => {
+  const unreadCrisisCount = (() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return (crisisNotifications || []).filter(n => {
+      if (n.status !== 'UNREAD') return false;
+      const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+      if (!n.teacher || !untilVal) return false;
+      const absenceUntilTime = new Date(untilVal).getTime();
+      if (absenceUntilTime < todayStart.getTime()) return false;
+      const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
+      return !isPast;
+    }).length;
+  })();
+
+  const userDisplayName = currentUserProfile
+    ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim()
+    : (schoolName ? `${schoolName} Schulleitung` : 'Verwaltung');
+
   return (
     <>
-      {/* ─── Apple Glass Mobile Bottom Navigation for Administration & Secretariat ─── */}
-      <nav className="cg-mobile-bottom-nav">
+      {/* ─── Apple Glass Mobile Bottom Navigation for Administration & Secretariat (5 Thumb-Zone Tabs) ─── */}
+      <nav
+        className="secretary-mobile-bottom-dock student-briefing-mobile-bottom-dock"
+        aria-label="Verwaltung Schnellnavigation"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          zIndex: 900,
+          height: 'calc(56px + max(20px, env(safe-area-inset-bottom, 20px)))',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+          paddingTop: '6px',
+          background: 'rgba(255, 255, 255, 0.94)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '0.5px solid rgba(0, 0, 0, 0.10)',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          boxSizing: 'border-box'
+        }}
+      >
         {activeTab === 'secretary' && (
           <>
             <button
               type="button"
+              aria-current={secretarySubTab === 'briefing' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${secretarySubTab === 'briefing' ? 'active-admin' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => {
                 React.startTransition(() => {
                   setSecretarySubTab('briefing');
@@ -68,11 +132,13 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
               }}
             >
               <LayoutDashboard size={20} color="currentColor" />
-              <span>Briefing</span>
+              <span>Cockpit</span>
             </button>
             <button
               type="button"
+              aria-current={secretarySubTab === 'rooms' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${secretarySubTab === 'rooms' ? 'active-admin' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => {
                 React.startTransition(() => {
                   setSecretarySubTab('rooms');
@@ -82,9 +148,60 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
               <DoorOpen size={20} color="currentColor" />
               <span>Räume</span>
             </button>
+            {hasCampusSub ? (
+              <button
+                type="button"
+                aria-current={secretarySubTab === 'crisis' ? 'page' : undefined}
+                className={`cg-bottom-nav-item ${secretarySubTab === 'crisis' ? 'active-admin' : ''}`}
+                style={{ minHeight: '44px' }}
+                onClick={() => {
+                  React.startTransition(() => {
+                    setSecretarySubTab('crisis');
+                  });
+                }}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShieldAlert size={20} color="currentColor" />
+                  {unreadCrisisCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-8px',
+                      background: '#ea4335',
+                      color: '#ffffff',
+                      borderRadius: '999px',
+                      padding: '1px 5px',
+                      fontSize: '9px',
+                      fontWeight: 900,
+                      lineHeight: 1
+                    }}>
+                      {unreadCrisisCount}
+                    </span>
+                  )}
+                </div>
+                <span>Ausfälle</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-current={secretarySubTab === 'announcements' ? 'page' : undefined}
+                className={`cg-bottom-nav-item ${secretarySubTab === 'announcements' ? 'active-admin' : ''}`}
+                style={{ minHeight: '44px' }}
+                onClick={() => {
+                  React.startTransition(() => {
+                    setSecretarySubTab('announcements');
+                  });
+                }}
+              >
+                <FileText size={20} color="currentColor" />
+                <span>Infos</span>
+              </button>
+            )}
             <button
               type="button"
+              aria-current={secretarySubTab === 'employees' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${secretarySubTab === 'employees' ? 'active-admin' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => {
                 React.startTransition(() => {
                   setSecretarySubTab('employees');
@@ -96,7 +213,9 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
+              aria-current={secretarySubTab === 'licenses' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${secretarySubTab === 'licenses' ? 'active-admin' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => {
                 React.startTransition(() => {
                   setSecretarySubTab('licenses');
@@ -113,15 +232,19 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
           <>
             <button
               type="button"
+              aria-current={campusSubTab === 'briefing' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${campusSubTab === 'briefing' ? 'active-campus' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setCampusSubTab('briefing')}
             >
               <LayoutDashboard size={20} color="currentColor" />
-              <span>Start</span>
+              <span>Zentrale</span>
             </button>
             <button
               type="button"
+              aria-current={campusSubTab === 'schedules' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${campusSubTab === 'schedules' ? 'active-campus' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setCampusSubTab('schedules')}
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -147,7 +270,9 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
+              aria-current={campusSubTab === 'students' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${campusSubTab === 'students' ? 'active-campus' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setCampusSubTab('students')}
             >
               <Users size={20} color="currentColor" />
@@ -155,12 +280,37 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
-              className={`cg-bottom-nav-item ${campusSubTab === 'rooms' ? 'active-campus' : ''}`}
-              onClick={() => setCampusSubTab('rooms')}
+              aria-current={campusSubTab === 'onboarding' ? 'page' : undefined}
+              className={`cg-bottom-nav-item ${campusSubTab === 'onboarding' ? 'active-campus' : ''}`}
+              style={{ minHeight: '44px' }}
+              onClick={() => setCampusSubTab('onboarding')}
             >
-              <DoorOpen size={20} color="currentColor" />
-              <span>Räume</span>
+              <UserPlus size={20} color="currentColor" />
+              <span>Lehrer</span>
             </button>
+            {enabledCampusEvents ? (
+              <button
+                type="button"
+                aria-current={campusSubTab === 'events' ? 'page' : undefined}
+                className={`cg-bottom-nav-item ${campusSubTab === 'events' ? 'active-campus' : ''}`}
+                style={{ minHeight: '44px' }}
+                onClick={() => setCampusSubTab('events')}
+              >
+                <Clock size={20} color="currentColor" />
+                <span>Termine</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-current={campusSubTab === 'rooms' ? 'page' : undefined}
+                className={`cg-bottom-nav-item ${campusSubTab === 'rooms' ? 'active-campus' : ''}`}
+                style={{ minHeight: '44px' }}
+                onClick={() => setCampusSubTab('rooms')}
+              >
+                <DoorOpen size={20} color="currentColor" />
+                <span>Räume</span>
+              </button>
+            )}
           </>
         )}
 
@@ -168,7 +318,9 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
           <>
             <button
               type="button"
+              aria-current={groovelabSubTab === 'live' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${groovelabSubTab === 'live' ? 'active-groovelab' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setGroovelabSubTab('live')}
             >
               <Monitor size={20} color="currentColor" />
@@ -176,7 +328,9 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
+              aria-current={groovelabSubTab === 'coaches' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${groovelabSubTab === 'coaches' ? 'active-groovelab' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setGroovelabSubTab('coaches')}
             >
               <GraduationCap size={20} color="currentColor" />
@@ -184,7 +338,9 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
+              aria-current={groovelabSubTab === 'students' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${groovelabSubTab === 'students' ? 'active-groovelab' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setGroovelabSubTab('students')}
             >
               <Users size={20} color="currentColor" />
@@ -192,185 +348,302 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
             </button>
             <button
               type="button"
+              aria-current={groovelabSubTab === 'settings' ? 'page' : undefined}
               className={`cg-bottom-nav-item ${groovelabSubTab === 'settings' ? 'active-groovelab' : ''}`}
+              style={{ minHeight: '44px' }}
               onClick={() => setGroovelabSubTab('settings')}
             >
               <Settings size={20} color="currentColor" />
               <span>Setup</span>
             </button>
+            <button
+              type="button"
+              className="cg-bottom-nav-item"
+              style={{ minHeight: '44px' }}
+              onClick={() => {
+                React.startTransition(() => {
+                  setActiveTab('secretary');
+                  setSecretarySubTab('briefing');
+                });
+              }}
+            >
+              <Shield size={20} color="currentColor" />
+              <span>Verwaltung</span>
+            </button>
           </>
         )}
-
-        {/* Universal Menü Drawer Button */}
-        <button
-          type="button"
-          className={`cg-bottom-nav-item ${mobileSecretaryDrawerOpen ? (activeTab === 'secretary' ? 'active-admin' : activeTab === 'campus' ? 'active-campus' : 'active-groovelab') : ''}`}
-          onClick={() => setMobileSecretaryDrawerOpen(true)}
-        >
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Menu size={20} color="currentColor" />
-          </div>
-          <span>Menü</span>
-        </button>
       </nav>
 
-      {/* ─── Mobile Slide-Over Drawer for Administration & Secretariat ─── */}
+      {/* ─── 0,1% Goldstandard: Left Slide-Over Sidebar Drawer (1:1 Parity with SecretarySidebar & CampusMobileSidebarDrawer) ─── */}
       {mobileSecretaryDrawerOpen && (
-        <div 
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Hauptmenü Schulsekretariat & Verwaltung"
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
+            background: 'rgba(15, 23, 42, 0.50)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
             zIndex: 99999,
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'flex-start',
             animation: 'fadeIn 0.2s ease'
           }}
           onClick={() => setMobileSecretaryDrawerOpen(false)}
         >
-          <div 
+          <aside
             style={{
-              width: '88%',
-              maxWidth: '380px',
-              height: '100%',
+              width: 'min(320px, 86vw)',
+              maxWidth: '340px',
+              height: '100dvh',
               background: '#ffffff',
-              boxShadow: '-10px 0 30px rgba(0,0,0,0.2)',
-              padding: '24px 20px',
+              boxShadow: '12px 0 40px rgba(15, 23, 42, 0.22)',
+              padding: 'max(18px, env(safe-area-inset-top, 18px)) 16px max(20px, env(safe-area-inset-bottom, 20px))',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '12px',
               overflowY: 'auto',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              fontFamily: "'Plus Jakarta Sans', sans-serif"
             }}
             onClick={e => e.stopPropagation()}
           >
-            {/* Drawer Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Verwaltung Menü</span>
-                <span style={{
-                  padding: '2px 8px',
-                  borderRadius: '100px',
-                  background: activeTab === 'secretary' ? '#fce8e6' : (activeTab === 'campus' ? '#e6f4ea' : '#fefce8'),
-                  color: activeTab === 'secretary' ? '#ea4335' : (activeTab === 'campus' ? '#34a853' : '#ca8a04'),
-                  fontSize: '0.68rem',
-                  fontWeight: 800
+            {/* 1. School Identity Header + Tactile 44x44px 'X' Close Button */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              paddingBottom: '12px',
+              borderBottom: '1px solid #f1f5f9'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '11px',
+                  background: activeTab === 'campus'
+                    ? 'rgba(52, 168, 83, 0.12)'
+                    : activeTab === 'groovelab'
+                      ? 'rgba(234, 179, 8, 0.16)'
+                      : 'rgba(234, 67, 53, 0.10)',
+                  color: activeTab === 'campus'
+                    ? '#15803d'
+                    : activeTab === 'groovelab'
+                      ? '#b45309'
+                      : '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
                 }}>
-                  {activeTab === 'secretary' ? '🛡️ Verwaltung' : (activeTab === 'campus' ? '🎓 Campus' : '🎵 GrooveLab')}
-                </span>
+                  <School size={19} strokeWidth={2.2} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{
+                    fontSize: '0.88rem',
+                    fontWeight: 900,
+                    color: '#0f172a',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    letterSpacing: '-0.02em'
+                  }}>
+                    {schoolName || 'Meine Musikschule'}
+                  </span>
+                  <span style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 800,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em'
+                  }}>
+                    Schulleitung &amp; Sekretariat
+                  </span>
+                </div>
               </div>
-              <button 
+
+              <button
                 type="button"
                 onClick={() => setMobileSecretaryDrawerOpen(false)}
-                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                aria-label="Hauptmenü schließen"
+                title="Hauptmenü schließen"
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                  flexShrink: 0
+                }}
               >
-                <X size={18} />
+                <X size={20} strokeWidth={2.4} />
               </button>
             </div>
 
-            {/* 1-Tap Module Switcher */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modul wechseln:</span>
-              <div role="tablist" aria-label="Schnellwechsel Modul" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'secretary'}
-                  id="quick-tab-secretary"
-                  onClick={() => {
-                    setActiveTab('secretary');
-                    sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                  }}
-                  style={{
-                    padding: '8px 4px',
-                    borderRadius: '10px',
-                    border: activeTab === 'secretary' ? '1.5px solid #ea4335' : '1px solid #e2e8f0',
-                    background: activeTab === 'secretary' ? '#ea4335' : '#f8fafc',
-                    color: activeTab === 'secretary' ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  🛡️ Verwaltung
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'campus'}
-                  id="quick-tab-campus"
-                  onClick={() => {
-                    setActiveTab('campus');
-                    sessionStorage.setItem('groovelab_active_workspace', 'campus');
-                  }}
-                  style={{
-                    padding: '8px 4px',
-                    borderRadius: '10px',
-                    border: activeTab === 'campus' ? '1.5px solid #34a853' : '1px solid #e2e8f0',
-                    background: activeTab === 'campus' ? '#34a853' : '#f8fafc',
-                    color: activeTab === 'campus' ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  🎓 Campus
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'groovelab'}
-                  id="quick-tab-groovelab"
-                  onClick={() => {
-                    setActiveTab('groovelab');
-                    sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
-                  }}
-                  style={{
-                    padding: '8px 4px',
-                    borderRadius: '10px',
-                    border: activeTab === 'groovelab' ? '1.5px solid #ca8a04' : '1px solid #e2e8f0',
-                    background: activeTab === 'groovelab' ? '#ca8a04' : '#f8fafc',
-                    color: activeTab === 'groovelab' ? '#ffffff' : '#475569',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                  }}
-                >
-                  🎵 GrooveLab
-                </button>
-              </div>
+            {/* 2. Dual-Role Switcher Pill ("Zum Lehrerpult") */}
+            {isCurrentUserTeacher && onRoleSwitched && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setMobileSecretaryDrawerOpen(false);
+                  onRoleSwitched('teacher');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  minHeight: '44px',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  background: '#f0fdf4',
+                  border: 'none',
+                  color: '#15803d',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <ArrowLeftRight size={15} color="#16a34a" />
+                <GraduationCap size={16} color="#16a34a" />
+                <span>Zum Lehrerpult wechseln</span>
+              </button>
+            )}
+
+            {/* 3. Apple Segmented Control: 3-Modul Switcher [Verwaltung | Campus | GrooveLab] */}
+            <div
+              role="tablist"
+              aria-label="Modulauswahl Verwaltung, Campus und GrooveLab"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: '4px',
+                background: '#f1f5f9',
+                padding: '4px',
+                borderRadius: '12px',
+                boxSizing: 'border-box',
+                flexShrink: 0
+              }}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'secretary'}
+                id="quick-tab-secretary"
+                onClick={() => {
+                  setActiveTab('secretary');
+                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  minHeight: '38px',
+                  padding: '6px 4px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: activeTab === 'secretary' ? '#ea4335' : 'transparent',
+                  color: activeTab === 'secretary' ? '#ffffff' : '#64748b',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <Shield size={13} color={activeTab === 'secretary' ? '#ffffff' : '#64748b'} />
+                <span>Verwaltung</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'campus'}
+                id="quick-tab-campus"
+                onClick={() => {
+                  setActiveTab('campus');
+                  sessionStorage.setItem('groovelab_active_workspace', 'campus');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  minHeight: '38px',
+                  padding: '6px 4px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: activeTab === 'campus' ? '#34a853' : 'transparent',
+                  color: activeTab === 'campus' ? '#ffffff' : '#64748b',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <GraduationCap size={13} color={activeTab === 'campus' ? '#ffffff' : '#64748b'} />
+                <span>Campus</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'groovelab'}
+                id="quick-tab-groovelab"
+                onClick={() => {
+                  setActiveTab('groovelab');
+                  sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  minHeight: '38px',
+                  padding: '6px 4px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: activeTab === 'groovelab' ? '#facc15' : 'transparent',
+                  color: activeTab === 'groovelab' ? '#0f172a' : '#64748b',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                <Music size={13} color={activeTab === 'groovelab' ? '#0f172a' : '#64748b'} />
+                <span>GrooveLab</span>
+              </button>
             </div>
 
-            {/* Subtabs list for active module */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '6px' }}>Funktionen &amp; Boards:</span>
-              
+            {/* 4. Scrollable Pill Navigation List for Active Module */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 6px 2px' }}>
+                {activeTab === 'secretary' ? 'Verwaltung & Governance' : activeTab === 'campus' ? 'Campus Steuerung' : 'GrooveLab Steuerung'}
+              </span>
+
               {activeTab === 'secretary' && [
-                { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-                hasCampusSub && { 
-                  id: 'crisis', 
-                  label: 'Ausfall-Cockpit', 
-                  icon: ShieldAlert, 
-                  count: (() => {
-                    const todayStart = new Date();
-                    todayStart.setHours(0,0,0,0);
-                    return crisisNotifications.filter(n => {
-                      if (n.status !== 'UNREAD') return false;
-                      const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
-                      if (!n.teacher || !untilVal) return false;
-                      const absenceUntilTime = new Date(untilVal).getTime();
-                      if (absenceUntilTime < todayStart.getTime()) return false;
-                      const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-                      return !isPast;
-                    }).length;
-                  })()
+                { id: 'briefing', label: 'Briefing & Cockpit', icon: LayoutDashboard },
+                hasCampusSub && {
+                  id: 'crisis',
+                  label: 'Ausfall-Cockpit',
+                  icon: ShieldAlert,
+                  count: unreadCrisisCount
                 },
-                hasCampusSub && { id: 'announcements', label: 'Mitteilungen & Informationen', icon: FileText },
-                { id: 'rooms', label: 'Räume', icon: DoorOpen },
+                hasCampusSub && { id: 'announcements', label: 'Mitteilungen & Infos', icon: FileText },
+                { id: 'rooms', label: 'Räume & Belegung', icon: DoorOpen },
                 hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
-                { id: 'employees', label: 'Mitarbeiter', icon: Users },
+                { id: 'employees', label: 'Mitarbeiter & Rollen', icon: Users },
                 { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
                 { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
                 { id: 'setup', label: 'Einstellungen', icon: Settings }
@@ -391,15 +664,17 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      padding: '10px 12px',
+                      minHeight: '42px',
+                      padding: '9px 12px',
                       borderRadius: '12px',
                       border: 'none',
                       background: isSelected ? '#fce8e6' : 'transparent',
-                      color: isSelected ? '#ea4335' : '#334155',
+                      color: isSelected ? '#b91c1c' : '#334155',
                       fontWeight: isSelected ? 800 : 600,
-                      fontSize: '0.86rem',
+                      fontSize: '0.84rem',
                       cursor: 'pointer',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      boxSizing: 'border-box'
                     }}
                   >
                     <Icon size={18} color={isSelected ? '#ea4335' : '#64748b'} />
@@ -421,7 +696,7 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
               })}
 
               {activeTab === 'campus' && [
-                { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
+                { id: 'briefing', label: 'Campus-Zentrale', icon: LayoutDashboard },
                 enabledCampusSubjects && { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
                 { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
                 { id: 'students', label: 'Schüler', icon: Users },
@@ -444,15 +719,17 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      padding: '10px 12px',
+                      minHeight: '42px',
+                      padding: '9px 12px',
                       borderRadius: '12px',
                       border: 'none',
                       background: isSelected ? '#e6f4ea' : 'transparent',
-                      color: isSelected ? '#34a853' : '#334155',
+                      color: isSelected ? '#15803d' : '#334155',
                       fontWeight: isSelected ? 800 : 600,
-                      fontSize: '0.86rem',
+                      fontSize: '0.84rem',
                       cursor: 'pointer',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      boxSizing: 'border-box'
                     }}
                   >
                     <Icon size={18} color={isSelected ? '#34a853' : '#64748b'} />
@@ -493,15 +770,17 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
                       display: 'flex',
                       alignItems: 'center',
                       gap: '10px',
-                      padding: '10px 12px',
+                      minHeight: '42px',
+                      padding: '9px 12px',
                       borderRadius: '12px',
                       border: 'none',
                       background: isSelected ? '#fefce8' : 'transparent',
-                      color: isSelected ? '#ca8a04' : '#334155',
+                      color: isSelected ? '#a16207' : '#334155',
                       fontWeight: isSelected ? 800 : 600,
-                      fontSize: '0.86rem',
+                      fontSize: '0.84rem',
                       cursor: 'pointer',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      boxSizing: 'border-box'
                     }}
                   >
                     <Icon size={18} color={isSelected ? '#ca8a04' : '#64748b'} />
@@ -511,79 +790,196 @@ export const SecretaryMobileNavigation: React.FC<SecretaryMobileNavigationProps>
               })}
             </div>
 
-            {/* Quick Actions Footer in Drawer */}
-            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileSecretaryDrawerOpen(false);
-                  setShowOwnQrModal(true);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(234, 67, 53, 0.25)',
-                  background: 'rgba(234, 67, 53, 0.08)',
-                  color: '#ea4335',
-                  fontSize: '0.80rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                <QrCode size={16} /> <span>Ausweis zeigen</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileSecretaryDrawerOpen(false);
-                  setIsFeedbackModalOpen(true);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '9px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  background: '#f8fafc',
-                  color: '#475569',
-                  fontSize: '0.80rem',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                <Lightbulb size={16} /> <span>Feedback &amp; Ideen</span>
-              </button>
-
-              {onLogout && (
+            {/* 5. Bottom User Hub Dock (Verwaltungs-Pass, Profile & Personal Security, Logout, Legal) */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Verwaltungs-Pass Card */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(254, 242, 242, 0.7) 0%, rgba(254, 226, 226, 0.35) 100%)',
+                borderRadius: '14px',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a' }}>Verwaltungs-Pass</span>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>QR-Zugangsausweis</span>
+                </div>
                 <button
                   type="button"
-                  onClick={handleSecretaryLogout}
+                  onClick={() => {
+                    setMobileSecretaryDrawerOpen(false);
+                    setShowOwnQrModal(true);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#ea4335',
+                    color: '#ffffff',
+                    fontSize: '0.74rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <QrCode size={14} />
+                  <span>Ausweis</span>
+                </button>
+              </div>
+
+              {/* User Profile + Personal Security + Logout Row */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                background: '#f8fafc',
+                borderRadius: '12px',
+                padding: '8px 10px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileSecretaryDrawerOpen(false);
+                    if (onOpenPersonalSecurity) onOpenPersonalSecurity();
+                  }}
+                  title="Persönliches Profil & Sicherheit öffnen"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    padding: '9px 12px',
-                    borderRadius: '10px',
-                    border: '1px solid #fee2e2',
-                    background: '#fef2f2',
-                    color: '#ef4444',
-                    fontSize: '0.80rem',
-                    fontWeight: 800,
-                    cursor: 'pointer'
+                    minWidth: 0,
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left'
                   }}
                 >
-                  <LogOut size={16} /> <span>Abmelden</span>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '9px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <User size={16} strokeWidth={2.3} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                    <span style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {userDisplayName}
+                    </span>
+                    <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700 }}>
+                      Sicherheit &amp; PIN →
+                    </span>
+                  </div>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileSecretaryDrawerOpen(false);
+                    setIsFeedbackModalOpen(true);
+                  }}
+                  title="Feedback & Ideen"
+                  aria-label="Feedback & Ideen"
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '9px',
+                    border: 'none',
+                    background: '#ffffff',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0
+                  }}
+                >
+                  <Lightbulb size={16} />
+                </button>
+
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={handleSecretaryLogout}
+                    title="Sicher abmelden"
+                    aria-label="Abmelden"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      height: '34px',
+                      padding: '0 10px',
+                      borderRadius: '9px',
+                      border: 'none',
+                      background: '#fee2e2',
+                      color: '#b91c1c',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <LogOut size={14} />
+                    <span>Abmelden</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Legal Links Footer */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                gap: '8px',
+                paddingTop: '2px'
+              }}>
+                {onOpenPrivacy && (
+                  <button type="button" onClick={() => { setMobileSecretaryDrawerOpen(false); onOpenPrivacy(); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                    Datenschutz
+                  </button>
+                )}
+                {onOpenAgb && (
+                  <button type="button" onClick={() => { setMobileSecretaryDrawerOpen(false); onOpenAgb(); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                    • AGB
+                  </button>
+                )}
+                {onOpenImpressum && (
+                  <button type="button" onClick={() => { setMobileSecretaryDrawerOpen(false); onOpenImpressum(); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                    • Impressum
+                  </button>
+                )}
+                {onOpenAccessibility && (
+                  <button type="button" onClick={() => { setMobileSecretaryDrawerOpen(false); onOpenAccessibility(); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600, cursor: 'pointer' }}>
+                    • Barrierefreiheit
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          </aside>
         </div>
       )}
     </>
   );
 };
+

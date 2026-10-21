@@ -92,7 +92,7 @@ export const CopyrightUploadConfirmModal: React.FC<CopyrightUploadConfirmModalPr
               height: '40px',
               borderRadius: '12px',
               background: '#fef3c7',
-              border: '1px solid #fde68a',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -134,7 +134,7 @@ export const CopyrightUploadConfirmModal: React.FC<CopyrightUploadConfirmModalPr
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             borderRadius: '14px',
             padding: '14px',
             display: 'flex',
@@ -164,7 +164,7 @@ export const CopyrightUploadConfirmModal: React.FC<CopyrightUploadConfirmModalPr
 
           <div style={{
             background: '#fffbeb',
-            border: '1px solid #fef3c7',
+            border: 'none',
             borderRadius: '12px',
             padding: '10px 14px',
             fontSize: '0.75rem',

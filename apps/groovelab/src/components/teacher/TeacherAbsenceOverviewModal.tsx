@@ -234,7 +234,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
           {/* Card 2: Read / Acknowledged */}
           <div style={{
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             borderRadius: '14px',
             padding: isMobile ? '10px 10px' : '12px 14px',
             display: 'flex',
@@ -554,7 +554,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                                     alignItems: 'center',
                                     gap: '5px',
                                     background: '#f0fdf4',
-                                    border: '1px solid #bbf7d0',
+                                    border: 'none',
                                     padding: '5px 9px',
                                     borderRadius: '8px',
                                     color: '#166534',
@@ -570,7 +570,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                                     alignItems: 'center',
                                     gap: '5px',
                                     background: '#eff6ff',
-                                    border: '1px solid #bfdbfe',
+                                    border: 'none',
                                     padding: '5px 9px',
                                     borderRadius: '8px',
                                     color: '#1d4ed8',
@@ -587,7 +587,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                                       alignItems: 'center',
                                       gap: '4px',
                                       background: '#fffbeb',
-                                      border: '1px solid #fef08a',
+                                      border: 'none',
                                       padding: '5px 9px',
                                       borderRadius: '8px',
                                       color: '#854d0e',
@@ -606,7 +606,7 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                                       }}
                                       style={{
                                         background: '#eff6ff',
-                                        border: '1px solid #bfdbfe',
+                                        border: 'none',
                                         color: '#1d4ed8',
                                         padding: '5px 9px',
                                         borderRadius: '8px',

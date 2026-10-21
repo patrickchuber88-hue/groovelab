@@ -208,7 +208,7 @@ export const CampusGroovelabBrand: React.FC<CampusGroovelabBrandProps> = ({
   iconColor = '#34a853',
   campusColor = '#34a853',
   hyphenColor = '#94a3b8',
-  groovelabColor = '#eab308',
+  groovelabColor = '#facc15',
   asBadge = false
 }) => {
   const calculatedFontSize = fontSize || (typeof size === 'string' ? size : (size ? `${size}px` : 'inherit'));

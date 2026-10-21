@@ -187,7 +187,7 @@ div:hover > .photo-overlay {
   padding: 4px 12px;
   border-radius: 100px;
   text-transform: uppercase;
-  border: 1px solid #e2e8f0;
+  border: none;
 }
 
 .xp-bar-container {
@@ -197,7 +197,7 @@ div:hover > .photo-overlay {
 
 .xp-bar-bg {
   height: 8px;
-  background: rgba(0, 0, 0, 0.05);
+  background: #e2e8f0;
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -205,7 +205,7 @@ div:hover > .photo-overlay {
 
 .xp-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary-color), #fcd34d);
+  background: var(--primary-color);
   border-radius: 4px;
   width: 65%;
 }
@@ -316,8 +316,8 @@ div:hover > .photo-overlay {
 
 /* Stage Ready Wall */
 .stage-ready-wall {
-  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #f1f5f9;
+  border: none;
   padding: 20px;
 }
 
@@ -339,14 +339,14 @@ div:hover > .photo-overlay {
 }
 
 .song-match-card {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border: none;
   padding: 16px;
   border-radius: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+  box-shadow: none;
 }
 
 .song-match-header {
@@ -439,9 +439,9 @@ div:hover > .photo-overlay {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f43f5e, #e11d48) !important;
+  background: #e11d48 !important;
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -469,8 +469,8 @@ div:hover > .photo-overlay {
 
 .picker-part {
   flex: 1;
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  border: none;
   padding: 12px;
   border-radius: 16px;
   display: flex;
@@ -478,12 +478,11 @@ div:hover > .photo-overlay {
   align-items: center;
   gap: 2px;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 .picker-part:hover {
-  border-color: var(--primary-color);
-  background: #fffbeb;
+  background: #fef3c7;
 }
 
 .picker-part span {
@@ -620,10 +619,14 @@ div:hover > .photo-overlay {
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 16px 14px;
+  padding: 14px 12px;
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: hidden;
   z-index: 100;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -632,13 +635,18 @@ div:hover > .photo-overlay {
 
 .sidebar-nav.is-collapsed {
   --sidebar-width: var(--sidebar-width-collapsed);
-  padding: 14px 8px;
+  width: var(--sidebar-width-collapsed);
+  min-width: var(--sidebar-width-collapsed);
+  max-width: var(--sidebar-width-collapsed);
+  flex: 0 0 var(--sidebar-width-collapsed);
+  padding: 10px 6px;
   align-items: center;
+  overflow-x: hidden;
 }
 
 /* Collapsed Platform Switcher & Logo */
 .sidebar-nav.is-collapsed .sidebar-logo {
-  margin-bottom: 16px;
+  margin-bottom: 6px;
   justify-content: center;
 }
 
@@ -647,11 +655,11 @@ div:hover > .photo-overlay {
   display: flex !important;
   flex-direction: column !important;
   padding: 3px !important;
-  width: 48px !important;
+  width: 46px !important;
 }
 
 .sidebar-nav.is-collapsed .sidebar-logo [role="tablist"] button {
-  height: 38px !important;
+  height: 34px !important;
   width: 40px !important;
   padding: 0 !important;
   justify-content: center !important;
@@ -666,18 +674,49 @@ div:hover > .photo-overlay {
 .sidebar-nav.is-collapsed .sidebar-menu {
   width: 100%;
   align-items: center;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
 
 .sidebar-nav.is-collapsed .sidebar-item {
-  width: 48px !important;
-  height: 48px !important;
-  min-height: 48px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-height: 44px !important;
   padding: 0 !important;
-  margin: 0 auto 3px auto !important;
+  margin: 0 auto 2px auto !important;
   justify-content: center !important;
   border-radius: 12px !important;
   position: relative !important;
   overflow: visible !important;
+  flex-shrink: 0 !important;
+}
+
+@media (max-height: 860px) {
+  .sidebar-nav {
+    padding-top: 8px !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px)) !important;
+  }
+  .sidebar-nav.is-collapsed .sidebar-logo {
+    margin-bottom: 4px !important;
+    padding: 2px 0 4px 0 !important;
+  }
+  .sidebar-nav.is-collapsed .sidebar-logo [role="tablist"] button {
+    height: 30px !important;
+  }
+  .sidebar-nav.is-collapsed .sidebar-item {
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    margin: 0 auto 1px auto !important;
+  }
+  .sidebar-nav.is-collapsed .sidebar-bottom-btn,
+  .sidebar-nav.is-collapsed .sidebar-collapsed-avatar-btn {
+    width: 38px !important;
+    height: 38px !important;
+  }
 }
 
 /* Accessible Collapsed Rail Tooltips */
@@ -809,14 +848,19 @@ div:hover > .photo-overlay {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 32px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .sidebar-menu {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
 
 .sidebar-item {
@@ -1163,19 +1207,19 @@ div:hover > .photo-overlay {
   box-shadow: none !important;
 }
 
-/* Active background states based on specific sub-platform tags */
+/* Active background states based on specific sub-platform tags (Material 3 Solid Tonal Pills) */
 .google-sidebar-item.active.campus, .sidebar-item.active.campus {
-  background: rgba(52, 168, 83, 0.08) !important;
+  background: rgba(52, 168, 83, 0.12) !important;
   color: #34a853 !important;
   font-weight: 700 !important;
 }
 .google-sidebar-item.active.briefing, .sidebar-item.active.briefing {
-  background: rgba(234, 67, 53, 0.08) !important;
-  color: #ea4335 !important;
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
   font-weight: 700 !important;
 }
 .google-sidebar-item.active.groovelab, .sidebar-item.active.groovelab {
-  background: rgba(251, 188, 5, 0.12) !important;
+  background: #fef3c7 !important;
   color: #b45309 !important;
   font-weight: 700 !important;
 }

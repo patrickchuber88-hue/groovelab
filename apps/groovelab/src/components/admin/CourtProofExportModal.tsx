@@ -280,7 +280,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
           <div
             style={{
               backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               borderRadius: '12px',
               padding: '14px 16px',
               fontSize: '13px',
@@ -307,7 +307,7 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
             <div
               style={{
                 backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
+                border: 'none',
                 color: '#991b1b',
                 padding: '12px 14px',
                 borderRadius: '10px',
@@ -346,12 +346,12 @@ export const CourtProofExportModal: React.FC<CourtProofExportModalProps> = ({
                 <div>Unterrichtseinheiten: <strong>{exportResult.data.summary.schedule_occurrences_count}</strong></div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: 'none', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
                 <CheckCircle2 size={13} aria-hidden="true" />
                 <span>Pädagogisches Dispositions-Protokoll (BSG B 12 R 3/20 R / § 3 RDG) im Dossier integriert</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#166534', backgroundColor: '#dcfce7', border: 'none', padding: '4px 8px', borderRadius: '6px', width: 'fit-content' }}>
                 <CheckCircle2 size={13} aria-hidden="true" />
                 <span>Personalrats-Konformität (BetrVG 87): 100% Profiling-Freiheit attestiert</span>
               </div>

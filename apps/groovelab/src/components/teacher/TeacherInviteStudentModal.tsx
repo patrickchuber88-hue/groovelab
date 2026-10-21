@@ -92,7 +92,7 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
           </form>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ background: '#e6f4ea', border: '1.5px solid #e6f4ea', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ background: '#e6f4ea', border: 'none', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', background: '#34a853', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ color: 'white', fontSize: '1rem' }}>✓</span>

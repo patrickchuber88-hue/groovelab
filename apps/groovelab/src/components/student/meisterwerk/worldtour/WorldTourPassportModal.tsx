@@ -499,7 +499,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   padding: '4px 10px',
                   borderRadius: '100px',
                   background: '#fef3c7',
-                  border: '1px solid #fde68a',
+                  border: 'none',
                   color: '#92400e',
                   fontSize: '0.74rem',
                   fontWeight: 900
@@ -707,12 +707,12 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                     {/* Status-Badge je nach Zustand */}
                     {isMastered ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px' }}>
-                        <div style={{ display: 'flex', gap: '2px', color: '#eab308' }}>
+                        <div style={{ display: 'flex', gap: '2px', color: '#facc15' }}>
                           {Array.from({ length: 3 }).map((_, i) => (
                             <Star
                               key={i}
                               size={11}
-                              fill={i < stars ? '#eab308' : '#e2e8f0'}
+                              fill={i < stars ? '#facc15' : '#e2e8f0'}
                               stroke={i < stars ? '#ca8a04' : '#cbd5e1'}
                               strokeWidth={1.5}
                             />
@@ -743,7 +743,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                           padding: '2px 6px',
                           borderRadius: '100px',
                           background: '#e0f2fe',
-                          border: '1px solid #bae6fd'
+                          border: 'none'
                         }}
                       >
                         <Plane size={10} strokeWidth={2.6} />
@@ -797,7 +797,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   padding: '9px 12px',
                   borderRadius: '10px',
                   background: '#eff6ff',
-                  border: '1.5px solid #bfdbfe',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -855,7 +855,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   padding: '10px 14px',
                   borderRadius: '10px',
                   background: '#fef3c7',
-                  border: '1.5px solid #fde68a',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -898,7 +898,7 @@ export const WorldTourPassportModal: React.FC<WorldTourPassportModalProps> = ({
                   }}
                   className="hover-scale"
                 >
-                  <Award size={13} color="#eab308" />
+                  <Award size={13} color="#facc15" />
                   <span>Diplom anzeigen</span>
                 </button>
               </div>

@@ -1,58 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase, queryCache } from '../lib/supabase';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronDown,
-  Calendar as CalendarIcon, 
-  Clock, 
-  AlertCircle,
-  CheckCircle,
-  X,
-  Send,
-  Trash2,
-  Palmtree,
-  Users,
-  Link2Off,
-  Search,
-  Copy,
-  Clipboard,
-  Download,
-  Eye,
-  EyeOff,
-  Info,
-  CheckCheck,
-  ShieldCheck,
-  RotateCcw,
-  MoreVertical,
-  ArrowLeftRight,
-  RefreshCw,
-  UserCheck,
-  Settings,
-  Lock,
-  MessageSquare,
-  BookOpen,
-  Edit3,
-  Sparkles,
-  MapPin,
-  Star,
-  Plus,
-  Loader2
-} from 'lucide-react';
-import { 
-  useRealNamesVisibility, 
-  maskLastName, 
-  formatSingleStudentAnonymized, 
-  formatGroupStudentsAnonymized, 
-  formatCombinedStudentNames, 
-  getGroupTypeLabel, 
-  formatTeacherFullName, 
-  formatDisplaySubjectOrInstrument,
-  matchStudentNameOrInitial,
-  extractStudentTokensFromName,
-  resolveCanonicalStudentFromList
-} from '../utils/nameHelper';
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, Clock, AlertCircle, CheckCircle, X, Send, Trash2, Palmtree, Users, Link2Off, Search, Copy, Clipboard, Download, Eye, EyeOff, Info, CheckCheck, ShieldCheck, RotateCcw, MoreVertical, ArrowLeftRight, RefreshCw, UserCheck, Settings, Lock, MessageSquare, BookOpen, Edit3, Sparkles, MapPin, Star, Plus, Loader2 } from 'lucide-react';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, matchStudentNameOrInitial, extractStudentTokensFromName, resolveCanonicalStudentFromList } from '../utils/nameHelper';
 import { checkIsAudioTresorActive } from '../domain/stickersAndTresor';
 const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal'));
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
@@ -363,14 +313,32 @@ export function ScheduleCalendarView({
     return [15, 30].includes(parsed) ? parsed : 15;
   }); // Default grid snap to 15 mins or saved preference (5 min option removed)
   const [viewMode, setViewMode] = useState<'week' | 'day' | 'month'>(() => {
-    if (typeof window !== 'undefined' && (window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null)) {
-      return 'day';
+    if (typeof window !== 'undefined') {
+      const isTabletSim = typeof document !== 'undefined' && (
+        document.documentElement.getAttribute('data-sim-category') === 'tablet' ||
+        document.querySelector('.sim-viewport-tablet') !== null
+      );
+      const isMobileSim = typeof document !== 'undefined' && (
+        document.documentElement.getAttribute('data-sim-category') === 'mobile' ||
+        document.querySelector('.sim-viewport-mobile') !== null
+      );
+      if (isMobileSim || (!isTabletSim && window.innerWidth <= 768)) {
+        return 'day';
+      }
     }
     return 'week';
   });
 
   useEffect(() => {
-    const isMobileView = window.innerWidth <= 768 || document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null;
+    const isTabletSim = typeof document !== 'undefined' && (
+      document.documentElement.getAttribute('data-sim-category') === 'tablet' ||
+      document.querySelector('.sim-viewport-tablet') !== null
+    );
+    const isMobileSim = typeof document !== 'undefined' && (
+      document.documentElement.getAttribute('data-sim-category') === 'mobile' ||
+      document.querySelector('.sim-viewport-mobile') !== null
+    );
+    const isMobileView = isMobileSim || (!isTabletSim && window.innerWidth <= 768);
     if (isMobileView) {
       setViewMode('day');
     }
@@ -531,12 +499,22 @@ export function ScheduleCalendarView({
   const [showMobileToolsSheet, setShowMobileToolsSheet] = useState(false);
   const [editModalCardIndex, setEditModalCardIndex] = useState<number>(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const resolveCalendarViewportWidth = () => {
+    if (typeof window === 'undefined') return 1200;
+    if (typeof document !== 'undefined') {
+      const simW = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simW > 0) return simW;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    }
+    return window.innerWidth;
+  };
+  const [windowWidth, setWindowWidth] = useState(resolveCalendarViewportWidth);
   const [orientationTick, setOrientationTick] = useState(0);
 
   useEffect(() => {
     const handleOrientationChange = () => {
-      setWindowWidth(window.innerWidth);
+      setWindowWidth(resolveCalendarViewportWidth());
       setOrientationTick(t => t + 1);
     };
     window.addEventListener('resize', handleOrientationChange);
@@ -551,20 +529,20 @@ export function ScheduleCalendarView({
 
   // Memoized Orientation & Viewport Detection for 60fps Instant Switching
   const { isLandscapeMode, isMobilePortrait } = useMemo(() => {
-    const isInsideSim = typeof document !== 'undefined' && (
-      document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null ||
-      document.querySelector('.sim-viewport-tablet') !== null
-    );
+    const simCat = typeof document !== 'undefined' ? document.documentElement.getAttribute('data-sim-category') : null;
+    const isSimMobile = simCat === 'mobile' || (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile') !== null);
+    const isSimTablet = simCat === 'tablet' || (typeof document !== 'undefined' && document.querySelector('.sim-viewport-tablet') !== null);
+    const isInsideSim = isSimMobile || isSimTablet;
 
     const isSimLandscape = typeof document !== 'undefined' && document.querySelector('.sim-viewport-landscape') !== null;
 
-    const isLandscapeMode = isSimLandscape || (
-      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > window.innerHeight && window.innerWidth > 768
+    const isLandscapeMode = isSimLandscape || isSimTablet || (
+      !isInsideSim && typeof window !== 'undefined' && window.innerWidth > 768
     );
 
-    const isMobilePortrait = !isLandscapeMode && (
-      (typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait') !== null && !isSimLandscape) ||
-      (!isInsideSim && typeof window !== 'undefined' && window.innerWidth <= 768)
+    const isMobilePortrait = !isSimTablet && (
+      (isSimMobile && !isSimLandscape) ||
+      (!isInsideSim && typeof window !== 'undefined' && windowWidth <= 768)
     );
 
     return { isLandscapeMode, isMobilePortrait };
@@ -598,10 +576,10 @@ export function ScheduleCalendarView({
     hoverBg = 'rgba(234, 67, 53, 0.12)';
     textAccentColor = '#ea4335';
   } else if (isGroovelab) {
-    brandColor = '#eab308'; // GrooveLab Yellow
-    lightBg = 'rgba(234, 179, 8, 0.06)';
-    hoverBg = 'rgba(234, 179, 8, 0.12)';
-    textAccentColor = '#ca8a04'; // Dark yellow text
+    brandColor = '#facc15'; // GrooveLab Yellow
+    lightBg = '#fef9c3';
+    hoverBg = 'rgba(250, 204, 21, 0.16)';
+    textAccentColor = '#854d0e'; // Dark yellow text
   }
 
   useEffect(() => {
@@ -5377,7 +5355,7 @@ export function ScheduleCalendarView({
       case 'canceled_by_teacher_ausfall':
         return { bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(245, 158, 11, 0.08)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(234, 179, 8, 0.12)', border: '#eab308', text: '#854d0e' };
+      case 'rescheduled_confirmed': return { bg: '#fef9c3', border: 'none', text: '#854d0e' };
       default: return { bg: 'rgba(148, 163, 184, 0.08)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -5930,7 +5908,7 @@ export function ScheduleCalendarView({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '10px' }}>
           {/* Left: Röntgen selector & View filters */}
           <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f8fafc', padding: '3px 8px', borderRadius: '8px', border: 'none' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
               </span>
@@ -5945,7 +5923,6 @@ export function ScheduleCalendarView({
                       const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
                       const activeBg = isCampus ? '#34a853' : (isGroovelab ? '#facc15' : '#ea4335');
                       const activeColor = isGroovelab ? '#0f172a' : '#ffffff';
-                      const activeBorder = isCampus ? '#2e7d32' : (isGroovelab ? '#eab308' : '#dc2626');
 
                       return (
                         <div
@@ -5955,9 +5932,9 @@ export function ScheduleCalendarView({
                             alignItems: 'center',
                             background: isActive ? activeBg : '#ffffff',
                             color: isActive ? activeColor : '#0f172a',
-                            border: `1px solid ${isActive ? activeBorder : '#cbd5e1'}`,
+                            border: isActive ? 'none' : '1px solid #e2e8f0',
                             borderRadius: '6px',
-                            boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+                            boxShadow: 'none',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -6076,7 +6053,7 @@ export function ScheduleCalendarView({
                           >
                             {remainingRooms.length > 6 && (
                               <div style={{ padding: '4px 4px 6px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: 'none' }}>
                                   <Search size={11} strokeWidth={2.5} style={{ color: '#94a3b8' }} />
                                   <input
                                     type="text"
@@ -6208,14 +6185,14 @@ export function ScheduleCalendarView({
                   }
                 }}
                 className={`apple-btn ${isSwapModeActive ? 'active' : ''}`}
-                style={isSwapModeActive ? { color: '#854d0e', background: '#fefce8', borderColor: '#fde047', fontWeight: 800 } : {}}
+                style={isSwapModeActive ? { color: '#854d0e', background: '#fef9c3', border: 'none', fontWeight: 800 } : {}}
                 title="Wochenübergreifender 2-Klick-Tausch: Klicke 2 Termine an, um sie direkt zu tauschen"
               >
                 <ArrowLeftRight size={13} style={{ color: isSwapModeActive ? '#854d0e' : undefined }} />
                 <span>Tauschen</span>
                 {swapSourceOcc && (
                   <span style={{
-                    background: '#eab308',
+                    background: '#facc15',
                     color: '#0f172a',
                     fontSize: '0.62rem',
                     fontWeight: 900,
@@ -6234,10 +6211,10 @@ export function ScheduleCalendarView({
                   setSelectedForGroup([]);
                 }}
                 className={`apple-btn ${isGroupModeActive ? 'active' : ''}`}
-                style={isGroupModeActive ? { color: '#2563eb', background: '#eff6ff', borderColor: '#bfdbfe', fontWeight: 700 } : {}}
+                style={isGroupModeActive ? { color: '#1d4ed8', background: '#dbeafe', border: 'none', fontWeight: 700 } : {}}
                 title="Gruppenunterricht organisieren"
               >
-                <Users size={13} style={{ color: isGroupModeActive ? '#2563eb' : undefined }} />
+                <Users size={13} style={{ color: isGroupModeActive ? '#1d4ed8' : undefined }} />
                 <span>Gruppen</span>
               </button>
 
@@ -6352,8 +6329,8 @@ export function ScheduleCalendarView({
         if (!hasAnySchedules) {
           return (
             <div style={{
-              background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.85) 100%)',
-              border: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              border: 'none',
               color: '#475569',
               borderRadius: '16px',
               padding: '12px 20px',
@@ -6363,7 +6340,7 @@ export function ScheduleCalendarView({
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+              boxShadow: 'none',
               flexWrap: 'wrap'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -6409,9 +6386,9 @@ export function ScheduleCalendarView({
         if (!hasSubmittedSchedule && (currentUserRole === 'admin' || currentUserRole === 'secretary' || isSelfView)) {
           return (
             <div style={{
-              background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.18)',
-              color: '#b45309',
+              background: '#fef9c3',
+              border: 'none',
+              color: '#854d0e',
               borderRadius: '16px',
               padding: '12px 20px',
               fontSize: '0.82rem',
@@ -6491,7 +6468,7 @@ export function ScheduleCalendarView({
                 width: '32px',
                 height: '32px',
                 borderRadius: '10px',
-                background: swapSourceOcc ? '#eab308' : 'rgba(255, 255, 255, 0.15)',
+                background: swapSourceOcc ? '#facc15' : 'rgba(255, 255, 255, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -6607,8 +6584,8 @@ export function ScheduleCalendarView({
         {/* Pending Revision Info Banner */}
         {(((scheduleStatus as string) === 'ready_for_admin_review' || scheduleStatus === 'pending') || (hasSubmittedSchedule && (scheduleStatus as string) !== 'approved')) && (
           <div style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #3b82f6',
+            background: '#dbeafe',
+            border: 'none',
             borderRadius: '16px',
             padding: '12px 18px',
             display: 'flex',
@@ -6636,14 +6613,14 @@ export function ScheduleCalendarView({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(240, 253, 244, 0.85)',
-              border: '1px solid #bbf7d0',
+              background: '#dcfce7',
+              border: 'none',
               borderRadius: '100px',
               padding: '4px 12px',
               fontSize: '0.72rem',
               color: '#166534',
               fontWeight: 650,
-              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
+              boxShadow: 'none'
             }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                 <RotateCcw size={11} strokeWidth={2.4} />
@@ -7832,17 +7809,17 @@ export function ScheduleCalendarView({
                     // Exclusive Golden-Yellow Palette for Tausch-Termine (OWASP / Goldstandard):
                     // Clearly separated from Gruppentermine (#0284c7 Blau)
                     cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
-                    finalColors.border = '#eab308';
+                    finalColors.border = '#facc15';
                     finalColors.text = '#854d0e';
                   } else if (!isBreak && !isVacant) {
                     if (isGroovelab) {
                       if (isWaiting) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#713f12';
                       } else {
                         cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#713f12';
                       }
                     } else if (isGroupLesson) {
@@ -7868,12 +7845,12 @@ export function ScheduleCalendarView({
                       if (isWaiting) {
                         // Gelb gestrichelt = Einzeltermin verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
                         cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       } else if (isConfirmedReschedule) {
                         // Vollton Gelb = Einzeltermin verschoben und durch Schüler bestätigt
                         cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       } else {
                         // Vollton Grün = Unveränderter Stammtermin Einzeltermin aus dem Stundenplan-Designer
@@ -7972,7 +7949,7 @@ export function ScheduleCalendarView({
                   const isSelectedForSwap = Boolean(isSwapModeActive && swapSourceOcc && occ.id && swapSourceOcc.id === occ.id);
                   if (isSelectedForSwap) {
                     cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
-                    finalColors.border = '#eab308';
+                    finalColors.border = '#facc15';
                     finalColors.text = '#854d0e';
                   }
                   
@@ -8007,7 +7984,7 @@ export function ScheduleCalendarView({
                     );
                     if (!isChanged || !curRName) return null;
                     return (
-                      <span style={{ marginLeft: '3px', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '0.5px 4px', borderRadius: '4px', fontSize: '0.65rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Raum geändert zu ${curRName}`}>
+                      <span style={{ marginLeft: '3px', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: 'none', padding: '0.5px 4px', borderRadius: '4px', fontSize: '0.65rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Raum geändert zu ${curRName}`}>
                         <MapPin size={10} strokeWidth={2} style={{ opacity: 0.9, flexShrink: 0 }} />
                         <span>{curRName}</span>
                       </span>
@@ -8033,9 +8010,9 @@ export function ScheduleCalendarView({
                           gap: '2px',
                           textTransform: 'uppercase',
                           letterSpacing: '0.02em',
-                          background: isConfirmed ? '#fef3c7' : '#fefce8',
-                          color: isConfirmed ? '#854d0e' : '#b45309',
-                          border: isConfirmed ? '1px solid #eab308' : '1px dashed #f59e0b',
+                          background: '#fef9c3',
+                          color: '#854d0e',
+                          border: 'none',
                           flexShrink: 0,
                           whiteSpace: 'nowrap',
                           cursor: isConfirmed ? 'default' : 'pointer'
@@ -8167,11 +8144,11 @@ export function ScheduleCalendarView({
                           border: isGap 
                             ? undefined
                             : isSelectedForSwap
-                              ? '2px solid #eab308'
+                              ? '2px solid #facc15'
                               : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                                 ? '2px solid #2563eb'
                                 : (isRescheduled 
-                                  ? (isConfirmedReschedule ? '1px solid #eab308' : `2px dashed ${finalColors.border}`) 
+                                  ? (isConfirmedReschedule ? '1px solid #facc15' : `2px dashed ${finalColors.border}`) 
                                   : isVacant 
                                     ? `1px dashed ${brandColor}` 
                                     : isBreak 
@@ -8337,7 +8314,7 @@ export function ScheduleCalendarView({
                                           justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
-                                          border: '1px solid #fde047',
+                                          border: 'none',
                                           boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
@@ -8434,7 +8411,7 @@ export function ScheduleCalendarView({
                                         justifyContent: 'center',
                                         background: '#fef08a',
                                         color: '#854d0e',
-                                        border: '1px solid #fde047',
+                                        border: 'none',
                                         boxShadow: 'none',
                                         cursor: 'pointer',
                                         marginTop: '2px',
@@ -8449,14 +8426,14 @@ export function ScheduleCalendarView({
                                     </button>
                                  )}
                                  {isSelectedForSwap && (
-                                   <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#854d0e', background: '#fef08a', border: '1px solid #fde047', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                   <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#854d0e', background: '#fef08a', border: 'none', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                      <ArrowLeftRight size={9} />
                                      <span>1. Partner</span>
                                    </div>
                                  )}
 
                                  {(occ.substitute_teacher_id || occ.is_substitute) && (
-                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: 'none', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Lehrkraft'}
                                   </div>
                                 )}
@@ -8548,7 +8525,7 @@ export function ScheduleCalendarView({
                                           justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
-                                          border: '1px solid #fde047',
+                                          border: 'none',
                                           boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
@@ -8572,7 +8549,7 @@ export function ScheduleCalendarView({
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid #fde047',
+                                        border: 'none',
                                         flexShrink: 0
                                       }}>
                                         <ArrowLeftRight size={9} />
@@ -8590,7 +8567,7 @@ export function ScheduleCalendarView({
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid rgba(239,68,68,0.25)',
+                                        border: 'none',
                                         whiteSpace: 'nowrap'
                                       }} title="Zeit-Kollision: Dieser Termin überlappt sich mit einem parallelen Termin">
                                         <AlertCircle size={9} strokeWidth={2.8} />
@@ -8598,22 +8575,22 @@ export function ScheduleCalendarView({
                                       </span>
                                     )}
                                     {isAbsentSlot && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Entfällt
                                       </span>
                                     )}
                                     {isExcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(245,158,11,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Entschuldigt
                                       </span>
                                     )}
                                     {isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Fehlt
                                       </span>
                                     )}
                                     {isCancelled && !isExcused && !isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                                         Abgesagt
                                         {isCancelledAck && (
                                           <span 
@@ -8762,7 +8739,7 @@ return (
                                         justifyContent: 'center',
                                         background: '#fef08a',
                                         color: '#854d0e',
-                                        border: '1px solid #fde047',
+                                        border: 'none',
                                         boxShadow: 'none',
                                         cursor: 'pointer',
                                         flexShrink: 0,
@@ -8779,22 +8756,22 @@ return (
                                     <Users size={13} style={{ color: finalColors.text, opacity: 0.7 }} />
                                   )}
                                   {isAbsentSlot && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Entfällt
                                     </span>
                                   )}
                                   {isExcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(245,158,11,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Entschuldigt
                                     </span>
                                   )}
                                   {isUnexcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Fehlt
                                     </span>
                                   )}
                                   {isCancelled && !isExcused && !isUnexcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Abgesagt
                                     </span>
                                   )}
@@ -8888,13 +8865,13 @@ return (
                                     )
                                   )}
                                   {isOutsideSchedule && !roomBookingApproved && (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(124, 58, 237, 0.10)', border: '1px solid rgba(124, 58, 237, 0.25)', color: '#5b21b6', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#f3e8ff', border: 'none', color: '#5b21b6', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
                                       <Clock size={9} strokeWidth={2.4} />
                                       <span>Raumbuchung ausstehend</span>
                                     </span>
                                   )}
                                   {isParallelConflict && (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fee2e2', border: 'none', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
                                       <AlertCircle size={9} strokeWidth={2.4} />
                                       <span>Doppelbelegung</span>
                                     </span>
@@ -8962,7 +8939,7 @@ return (
                 {rescheduledOcc ? (
                   <div style={{ 
                     background: '#e6f4ea', 
-                    border: '1px solid #34a853', 
+                    border: 'none', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
                     width: '100%', 
@@ -8975,7 +8952,7 @@ return (
                 ) : (
                   <div style={{ 
                     background: '#fef2f2', 
-                    border: '1px solid #ef4444', 
+                    border: 'none', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
                     width: '100%', 
@@ -9294,8 +9271,8 @@ return (
               {/* Premium Green Header Banner */}
               <div style={{ 
                 background: isEnsembleOcc 
-                  ? 'linear-gradient(135deg, #007aff 0%, #0055d4 100%)' 
-                  : 'linear-gradient(135deg, #34a853 0%, #2e964b 100%)', 
+                  ? '#007aff' 
+                  : '#34a853', 
                 padding: '16px 20px', 
                 display: 'flex', 
                 flexDirection: isMobilePortrait ? 'column' : 'row',
@@ -9303,7 +9280,7 @@ return (
                 alignItems: isMobilePortrait ? 'flex-start' : 'center', 
                 gap: '12px',
                 color: '#ffffff',
-                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                borderBottom: 'none',
                 borderTopLeftRadius: '23px',
                 borderTopRightRadius: '0px'
               }}>
@@ -9363,7 +9340,7 @@ return (
                     style={{
                       background: 'rgba(255, 255, 255, 0.22)',
                       color: '#ffffff',
-                      border: '1px solid rgba(255, 255, 255, 0.4)',
+                      border: 'none',
                       borderRadius: '12px',
                       padding: '8px 14px',
                       fontSize: '0.82rem',
@@ -9374,7 +9351,7 @@ return (
                       justifyContent: 'center',
                       gap: '7px',
                       backdropFilter: 'blur(8px)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      boxShadow: 'none',
                       transition: 'all 0.2s ease',
                       width: isMobilePortrait ? '100%' : 'auto'
                     }}
@@ -9393,8 +9370,8 @@ return (
                   padding: '8px 16px',
                   display: 'flex',
                   gap: '8px',
-                  borderBottom: '1px solid #e2e8f0',
-                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+                  borderBottom: 'none',
+                  boxShadow: 'none'
                 }}>
                   <button
                     type="button"
@@ -9403,7 +9380,7 @@ return (
                       flex: 1,
                       padding: '9px 12px',
                       borderRadius: '12px',
-                      border: editModalCardIndex === 0 ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                      border: editModalCardIndex === 0 ? 'none' : '1px solid #e2e8f0',
                       background: editModalCardIndex === 0 ? '#34a853' : '#ffffff',
                       color: editModalCardIndex === 0 ? '#ffffff' : '#64748b',
                       fontWeight: editModalCardIndex === 0 ? 800 : 700,
@@ -9414,7 +9391,7 @@ return (
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: editModalCardIndex === 0 ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
+                      boxShadow: 'none'
                     }}
                   >
                     <Edit3 size={14} style={{ color: editModalCardIndex === 0 ? '#ffffff' : '#64748b' }} />
@@ -9427,7 +9404,7 @@ return (
                       flex: 1,
                       padding: '9px 12px',
                       borderRadius: '12px',
-                      border: editModalCardIndex === 1 ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                      border: editModalCardIndex === 1 ? 'none' : '1px solid #e2e8f0',
                       background: editModalCardIndex === 1 ? '#34a853' : '#ffffff',
                       color: editModalCardIndex === 1 ? '#ffffff' : '#64748b',
                       fontWeight: editModalCardIndex === 1 ? 800 : 700,
@@ -9438,7 +9415,7 @@ return (
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '6px',
-                      boxShadow: editModalCardIndex === 1 ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
+                      boxShadow: 'none'
                     }}
                   >
                     <MessageSquare size={14} style={{ color: editModalCardIndex === 1 ? '#ffffff' : '#64748b' }} />
@@ -9468,11 +9445,11 @@ return (
                     {/* Student Mini Profile Header Card */}
                     {occ && occ.student && !isEnsembleOcc && (
                       <div style={{
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        background: '#f8fafc',
                         borderRadius: '16px',
                         padding: '12px 14px',
                         marginBottom: '16px',
-                        border: '1px solid #e2e8f0',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
@@ -9489,7 +9466,7 @@ return (
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: '1.5px solid #a7f3d0'
+                            border: 'none'
                           }}>
                             {occ.student.first_name ? occ.student.first_name[0] : 'S'}
                           </div>
@@ -9505,7 +9482,7 @@ return (
                                 color: '#166534',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                border: '1px solid #bbf7d0'
+                                border: 'none'
                               }}>
                                 {formatDisplaySubjectOrInstrument(occ)}
                               </span>
@@ -9530,18 +9507,18 @@ return (
                             const isGoAusfall = go.status === 'teacher_ausfall' || go.status === 'canceled_by_teacher_ausfall';
                             const isConfirmed = go.student_acknowledged === true;
 
-                            let itemBg = 'rgba(0, 0, 0, 0.02)';
-                            let itemBorder = '1px solid rgba(0, 0, 0, 0.05)';
+                            let itemBg = '#f8fafc';
+                            let itemBorder = 'none';
                             let nameColor = '#1d1d1f';
 
                             if (isGoCancelled || isGoAusfall) {
-                              itemBg = 'rgba(239, 68, 68, 0.05)';
-                              itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
-                              nameColor = '#ef4444';
+                              itemBg = '#fee2e2';
+                              itemBorder = 'none';
+                              nameColor = '#b91c1c';
                             } else if (isConfirmed) {
-                              itemBg = '#e8f0fe';
-                              itemBorder = '1px solid #0b57d0';
-                              nameColor = '#174ea6';
+                              itemBg = '#dbeafe';
+                              itemBorder = 'none';
+                              nameColor = '#1d4ed8';
                             }
 
                             return (
@@ -9767,7 +9744,7 @@ return (
                             width: '100%',
                             padding: '10px 12px', 
                             borderRadius: '10px', 
-                            border: '1px solid rgba(239, 68, 68, 0.3)', 
+                            border: 'none', 
                             background: 'rgba(239, 68, 68, 0.08)', 
                             color: '#dc2626', 
                             fontSize: '0.82rem', 
@@ -9798,7 +9775,7 @@ return (
                               width: '100%',
                               padding: '10px 12px', 
                               borderRadius: '10px', 
-                              border: '1px solid rgba(245, 158, 11, 0.3)', 
+                              border: 'none', 
                               background: 'rgba(245, 158, 11, 0.08)', 
                               color: '#d97706', 
                               fontSize: '0.82rem', 
@@ -9932,9 +9909,9 @@ return (
 
                   return (
                     <div className="drawer-col drawer-col-2">
-                      {/* Shoutbox Header Card with Green Gradient & White Text */}
+                      {/* Shoutbox Header Card with Green Solid Fill & White Text */}
                       <div style={{
-                        background: 'linear-gradient(135deg, #34a853 0%, #137333 100%)',
+                        background: '#34a853',
                         borderRadius: '16px',
                         padding: '16px 20px',
                         color: '#ffffff',
@@ -9965,7 +9942,7 @@ return (
                             color: '#ffffff',
                             fontSize: '0.65rem',
                             fontWeight: 700,
-                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                            border: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
@@ -9981,7 +9958,7 @@ return (
                             color: '#ffffff',
                             fontSize: '0.65rem',
                             fontWeight: 700,
-                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                            border: 'none',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
@@ -10001,7 +9978,7 @@ return (
                         padding: '8px 12px',
                         borderRadius: '12px',
                         background: '#f0fdf4',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         fontSize: '0.71rem',
                         color: '#166534',
                         fontWeight: 650,
@@ -10015,7 +9992,7 @@ return (
                       </div>
 
                       {isMoved && (
-                        <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: '1px solid #fef3c7', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
+                        <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: '#fffbeb', border: 'none', padding: '6px 12px', borderRadius: '100px', alignSelf: 'flex-start' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Regulär:</span>
                           <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400e' }}>
                             {new Date(occ.original_date!).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}, {occ.original_start_time ? occ.original_start_time.substring(0, 5) : ''} Uhr
@@ -10036,13 +10013,13 @@ return (
                           padding: '14px', 
                           background: '#f8fafc', 
                           borderRadius: '16px',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           minHeight: '260px',
                           maxHeight: '440px'
                         }}
                       >
                         {isFrozen && (
-                          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center', justifyContent: 'center' }}>
+                          <div style={{ background: '#fef2f2', border: 'none', color: '#991b1b', padding: '8px 12px', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', textAlign: 'center', justifyContent: 'center' }}>
                             <Lock size={14} style={{ color: '#991b1b' }} />
                             <span>Shoutbox nach 48h eingefroren (Schreibschutz aktiv)</span>
                           </div>
@@ -10069,9 +10046,9 @@ return (
                                 justifyContent: 'center',
                                 padding: '24px 16px',
                                 textAlign: 'center',
-                                background: 'linear-gradient(185deg, #ffffff 0%, #f8fafc 100%)',
+                                background: '#ffffff',
                                 borderRadius: '14px',
-                                border: '1px dashed #cbd5e1',
+                                border: '1px solid #e2e8f0',
                                 margin: 'auto 0'
                               }}>
                                 <div style={{
@@ -10130,15 +10107,15 @@ return (
                                    </span>
                                  )}
                                 <div style={{ 
-                                  background: isMe ? '#e6f4ea' : '#ffffff', 
+                                  background: isMe ? '#dcfce7' : '#ffffff', 
                                   color: '#0f172a', 
                                   padding: '9px 13px', 
                                   borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px', 
                                   fontSize: '0.84rem',
                                   lineHeight: 1.4,
                                   wordBreak: 'break-word',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-                                  border: isMe ? '1px solid #a7f3d0' : '1px solid #e2e8f0'
+                                  boxShadow: 'none',
+                                  border: isMe ? 'none' : '1px solid #e2e8f0'
                                 }}>
                                   {displayedContent}
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
@@ -10300,6 +10277,7 @@ return (
                   uiLevel={docStudent?.campus_ui_level || undefined}
                   parentPermissions={docStudent?.parent_permissions}
                   hasTresorStorage={checkIsAudioTresorActive(docStudent)}
+                  isTeacherTools={true}
                 />
               </React.Suspense>
             )}
@@ -10429,7 +10407,7 @@ return (
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${primaryColor}33`
+                    boxShadow: 'none'
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
@@ -10611,7 +10589,7 @@ return (
                     height: '38px', 
                     borderRadius: '12px', 
                     background: '#fef9c3', 
-                    border: '1px solid #fde047',
+                    border: 'none',
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
@@ -10628,7 +10606,7 @@ return (
                   type="button"
                   onClick={() => setSwapDetailModalOcc(null)}
                   style={{
-                    background: 'rgba(0,0,0,0.05)',
+                    background: '#f1f5f9',
                     border: 'none',
                     borderRadius: '50%',
                     width: '28px',
@@ -10649,7 +10627,7 @@ return (
                 {/* Schüler 1 */}
                 <div style={{ 
                   background: '#f8fafc', 
-                  border: '1px solid #e2e8f0', 
+                  border: 'none', 
                   borderRadius: '14px', 
                   padding: '14px',
                   display: 'flex',
@@ -10665,7 +10643,7 @@ return (
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: 'none' }}>
                       Gewählter Termin
                     </span>
                   </div>
@@ -10690,7 +10668,7 @@ return (
                     width: '24px', 
                     height: '24px', 
                     borderRadius: '50%', 
-                    background: '#eab308', 
+                    background: '#facc15', 
                     color: '#0f172a',
                     display: 'flex', 
                     alignItems: 'center', 
@@ -10705,7 +10683,7 @@ return (
                 {/* Schüler 2 (Partner) */}
                 <div style={{ 
                   background: '#f8fafc', 
-                  border: '1px solid #e2e8f0', 
+                  border: 'none', 
                   borderRadius: '14px', 
                   padding: '14px',
                   display: 'flex',
@@ -10721,7 +10699,7 @@ return (
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#854d0e', background: '#fef9c3', padding: '2px 8px', borderRadius: '6px', border: 'none' }}>
                       Getauschter Partner
                     </span>
                   </div>
@@ -10744,7 +10722,7 @@ return (
               {occ.notes && (
                 <div style={{ 
                   background: '#fffbeb', 
-                  border: '1px solid #fef3c7', 
+                  border: 'none', 
                   borderRadius: '10px', 
                   padding: '10px 12px', 
                   fontSize: '0.76rem', 
@@ -10821,7 +10799,7 @@ return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
               <div style={{
                 background: '#fef3c7',
-                border: '1px solid #fde68a',
+                border: 'none',
                 borderRadius: '8px',
                 padding: '2px 7px',
                 display: 'flex',
@@ -10897,12 +10875,10 @@ return (
                 }}
                 onMouseOver={e => {
                   e.currentTarget.style.background = '#2e9549';
-                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(52, 168, 83, 0.45)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseOut={e => {
                   e.currentTarget.style.background = '#34a853';
-                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(52, 168, 83, 0.35)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
                 title="Änderungen speichern und Schüler per Push informieren"
@@ -11046,7 +11022,7 @@ return (
                   fontSize: '0.85rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  boxShadow: isCampus ? '0 4px 12px rgba(52, 168, 83, 0.2)' : '0 4px 12px rgba(234, 67, 53, 0.2)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -11206,7 +11182,7 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 onClick={() => { toggleRealNames(); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: showRealNames ? (isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fef2f2')) : '#f8fafc', color: showRealNames ? brandColor : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: showRealNames ? (isCampus ? '#dcfce7' : (isGroovelab ? '#fef9c3' : '#fee2e2')) : '#f8fafc', color: showRealNames ? brandColor : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
                 <span>{showRealNames ? 'Vorname N.' : 'Klarnamen'}</span>
@@ -11214,14 +11190,14 @@ return (
 
               <button
                 onClick={() => { setShowWeekend(prev => !prev); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: isWeekendVisible ? '#e6f4ea' : '#f8fafc', color: isWeekendVisible ? '#34a853' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: isWeekendVisible ? '#dcfce7' : '#f8fafc', color: isWeekendVisible ? '#34a853' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 <CalendarIcon size={16} />
                 <span>{isWeekendVisible ? 'Wochenende aus' : 'Wochenende ein'}</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '14px', border: '1px solid #cbd5e1', background: '#f8fafc' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '14px', border: 'none', background: '#f8fafc' }}>
               <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>Raster-Auflösung:</span>
               <select
                 value={gridSnapMinutes}
@@ -11245,7 +11221,7 @@ return (
             <select
               value={selectedRoomIdForXRay || ''}
               onChange={(e) => { setSelectedRoomIdForXRay(e.target.value || null); setShowMobileToolsSheet(false); }}
-              style={{ padding: '12px', borderRadius: '14px', border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', width: '100%' }}
+              style={{ padding: '12px', borderRadius: '14px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', width: '100%' }}
             >
               <option value="">Alle Räume anzeigen</option>
               {rooms.map(r => (
@@ -11265,13 +11241,13 @@ return (
                   if (!nextActive) setSwapSourceOcc(null);
                   setShowMobileToolsSheet(false);
                 }}
-                style={{ padding: '12px', borderRadius: '14px', border: isSwapModeActive ? '1.5px solid #eab308' : '1px solid #fde047', background: isSwapModeActive ? '#fefce8' : '#f8fafc', color: isSwapModeActive ? '#854d0e' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: isSwapModeActive ? '#fef9c3' : '#f8fafc', color: isSwapModeActive ? '#854d0e' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 <ArrowLeftRight size={16} />
                 <span>Tauschen</span>
                 {swapSourceOcc && (
                   <span style={{
-                    background: '#eab308',
+                    background: '#facc15',
                     color: '#0f172a',
                     fontSize: '0.62rem',
                     fontWeight: 900,
@@ -11286,7 +11262,7 @@ return (
 
               <button
                 onClick={() => { setIsGroupModeActive(prev => !prev); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #bfdbfe', background: isGroupModeActive ? '#eff6ff' : '#f8fafc', color: isGroupModeActive ? '#2563eb' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: isGroupModeActive ? '#dbeafe' : '#f8fafc', color: isGroupModeActive ? '#1d4ed8' : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 <Users size={16} />
                 <span>Gruppenunterricht</span>
@@ -11300,7 +11276,7 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
                 onClick={() => { handleCopyWeek(); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
               >
                 <Copy size={16} />
                 <span>Woche kopieren</span>
@@ -11309,7 +11285,7 @@ return (
               <button
                 onClick={() => { handlePasteWeek(); setShowMobileToolsSheet(false); }}
                 disabled={!localStorage.getItem('groovelab_copied_week_data')}
-                style={{ padding: '12px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5, cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: '#f8fafc', color: '#0f172a', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', opacity: localStorage.getItem('groovelab_copied_week_data') ? 1 : 0.5, cursor: 'pointer' }}
               >
                 <Clipboard size={16} />
                 <span>Woche einfügen</span>
@@ -11318,7 +11294,7 @@ return (
 
             <button
               onClick={() => { handleOpenResetModal(); setShowMobileToolsSheet(false); }}
-              style={{ padding: '12px', borderRadius: '14px', border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', marginTop: '4px', cursor: 'pointer' }}
+              style={{ padding: '12px', borderRadius: '14px', border: 'none', background: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', marginTop: '4px', cursor: 'pointer' }}
             >
               <RotateCcw size={16} />
               <span>Stundenplan zurücksetzen</span>
@@ -11377,7 +11353,7 @@ return (
                   height: '46px',
                   borderRadius: '16px',
                   background: '#fef2f2',
-                  border: '1px solid #fee2e2',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -11422,7 +11398,7 @@ return (
             <div
               style={{
                 background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '10px 14px',
                 display: 'flex',
@@ -11442,7 +11418,7 @@ return (
             <div
               style={{
                 background: '#eff6ff',
-                border: '1px solid #bfdbfe',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '10px 14px',
                 display: 'flex',
@@ -11462,7 +11438,7 @@ return (
             <div
               style={{
                 background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '16px 20px',
                 display: 'flex',
@@ -11501,7 +11477,7 @@ return (
                   style={{
                     height: '100%',
                     width: `${resetProgress.percent}%`,
-                    background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+                    background: '#dc2626',
                     borderRadius: '9999px',
                     transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: 'none'
@@ -11525,7 +11501,7 @@ return (
               }}
               style={{
                 background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '16px 18px',
                 display: 'flex',
@@ -11591,7 +11567,7 @@ return (
               }}
               style={{
                 background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '16px 18px',
                 display: 'flex',
@@ -11669,7 +11645,7 @@ return (
               fontSize: '0.75rem',
               color: '#64748b',
               background: '#f8fafc',
-              border: '1px solid #f1f5f9',
+              border: 'none',
               borderRadius: '14px',
               padding: '10px 14px',
               display: 'flex',

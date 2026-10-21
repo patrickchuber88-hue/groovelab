@@ -158,7 +158,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const getBrandColor = () => {
     switch (activePlatform) {
       case 'campus': return '#34a853';
-      case 'groovelab': return '#eab308';
+      case 'groovelab': return '#facc15';
       case 'admin': return '#ea4335';
       default: return '#34a853';
     }
@@ -499,9 +499,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     style={{
                       padding: '10px 6px',
                       borderRadius: '14px',
-                      border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid transparent',
-                      background: activePlatform === 'groovelab' ? '#eab308' : '#ffffff',
-                      color: activePlatform === 'groovelab' ? '#ffffff' : '#64748b',
+                      border: activePlatform === 'groovelab' ? '2px solid #facc15' : '1px solid transparent',
+                      background: activePlatform === 'groovelab' ? '#facc15' : '#ffffff',
+                      color: activePlatform === 'groovelab' ? '#0f172a' : '#64748b',
                       fontWeight: 800,
                       fontSize: '0.78rem',
                       cursor: 'pointer',
@@ -638,7 +638,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                     width: activePlatform === 'groovelab' ? '22px' : '8px',
                     height: '8px',
                     borderRadius: '4px',
-                    background: activePlatform === 'groovelab' ? '#eab308' : '#cbd5e1',
+                    background: activePlatform === 'groovelab' ? '#facc15' : '#cbd5e1',
                     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 />

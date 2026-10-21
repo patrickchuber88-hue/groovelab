@@ -76,7 +76,7 @@ export const DigitalDetoxOverlay: React.FC<DigitalDetoxOverlayProps> = ({
                 height: '80px', 
                 borderRadius: '24px', 
                 background: 'rgba(239, 68, 68, 0.1)', 
-                border: '1px solid rgba(239, 68, 68, 0.2)', 
+                border: 'none', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',

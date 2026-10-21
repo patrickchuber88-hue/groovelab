@@ -258,20 +258,21 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
           </button>
         )}
       </div>
-      <div className="sidebar-logo" style={{ padding: '6px 0px 8px 0px', width: '100%' }}>
+      <div className="sidebar-logo" style={{ padding: isCollapsed ? '2px 0px 4px 0px' : '6px 0px 8px 0px', width: '100%', display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
         {isGrooveLabBooked && setActivePlatform ? (
           <div
             role="tablist"
             aria-label="Plattformauswahl"
             style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
+              display: isCollapsed ? 'flex' : 'grid',
+              flexDirection: isCollapsed ? 'column' : undefined,
+              gridTemplateColumns: isCollapsed ? undefined : '1fr 1fr',
               background: '#f1f5f9',
-              padding: '4px',
+              padding: isCollapsed ? '3px' : '4px',
               borderRadius: '13px',
               border: '1px solid #e2e8f0',
-              width: '100%',
-              gap: '4px',
+              width: isCollapsed ? '46px' : '100%',
+              gap: isCollapsed ? '3px' : '4px',
               boxSizing: 'border-box'
             }}
           >
@@ -283,14 +284,11 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               onClick={() => {
                 if (activePlatform !== 'campus') {
                   setActivePlatform('campus');
-                  const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-                  const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
-                  setActiveStudentTab(startTab);
-                  sessionStorage.setItem('campus_active_tab', startTab);
                 }
               }}
               style={{
-                height: '50px',
+                height: isCollapsed ? '32px' : '50px',
+                width: isCollapsed ? '38px' : '100%',
                 borderRadius: '10px',
                 border: 'none',
                 background: activePlatform === 'campus' ? '#34a853' : 'transparent',
@@ -319,7 +317,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 size={18} 
                 color={activePlatform === 'campus' ? '#ffffff' : 'rgba(52, 168, 83, 0.85)'} 
               />
-              <span>Campus</span>
+              {!isCollapsed && <span>Campus</span>}
             </button>
 
             {/* GrooveLab Segment - 2-zeilig (Icon über Text) */}
@@ -332,14 +330,11 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                   if (user?.role === 'teacher') {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
-                  setActivePlatform?.('groovelab');
                   const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
                   if (isStaff) {
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
-                  setActiveStudentTab('live');
-                  sessionStorage.setItem('groovelab_active_tab', 'live');
-                  localStorage.setItem('groovelab_active_tab', 'live');
+                  setActivePlatform?.('groovelab');
                 } else if (activeStudentTab !== 'live') {
                   // 🎵 0,1% Goldstandard: Klick auf aktives GrooveLab re-fokussiert autoritativ die Live Lab Startseite
                   setActiveStudentTab('live');
@@ -348,7 +343,8 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 }
               }}
               style={{
-                height: '50px',
+                height: isCollapsed ? '32px' : '50px',
+                width: isCollapsed ? '38px' : '100%',
                 borderRadius: '10px',
                 border: 'none',
                 background: activePlatform === 'groovelab' ? '#facc15' : 'transparent',
@@ -377,60 +373,66 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                 size={18} 
                 color={activePlatform === 'groovelab' ? '#0f172a' : 'rgba(202, 138, 4, 0.85)'} 
               />
-              <span>GrooveLab</span>
+              {!isCollapsed && <span>GrooveLab</span>}
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '8px' }}>
             {activePlatform === 'campus' ? (
               <>
                 <div style={{ 
-                  width: '42px', 
-                  height: '42px', 
+                  width: '40px', 
+                  height: '40px', 
                   background: '#f8fafc', 
                   border: '1.5px solid #e2e8f0',
                   borderRadius: '12px', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                  flexShrink: 0
                 }}>
-                  <GraduationCap size={24} color="#34a853" />
+                  <GraduationCap size={22} color="#34a853" />
                 </div>
-                <div style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: 900, 
-                  color: '#34a853',
-                  letterSpacing: '-0.02em'
-                }}>Campus</div>
+                {!isCollapsed && (
+                  <div style={{ 
+                    fontSize: '1.5rem', 
+                    fontWeight: 900, 
+                    color: '#34a853',
+                    letterSpacing: '-0.02em'
+                  }}>Campus</div>
+                )}
               </>
             ) : (
               <>
                 <div style={{ 
-                  width: '42px', 
-                  height: '42px', 
+                  width: '40px', 
+                  height: '40px', 
                   background: '#fefce8', 
                   borderRadius: '12px', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center',
-                  boxShadow: 'none'
+                  boxShadow: 'none',
+                  flexShrink: 0
                 }}>
-                  <CampusRibbonNoteIcon size={24} color="#eab308" />
+                  <CampusRibbonNoteIcon size={22} color="#facc15" />
                 </div>
-                <div style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: 900, 
-                  color: '#eab308',
-                  letterSpacing: '-0.02em'
-                }}>GrooveLab</div>
+                {!isCollapsed && (
+                  <div style={{ 
+                    fontSize: '1.5rem', 
+                    fontWeight: 900, 
+                    color: '#facc15',
+                    letterSpacing: '-0.02em'
+                  }}>GrooveLab</div>
+                )}
               </>
             )}
           </div>
         )}
       </div>
 
-      <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: isCollapsed ? '2px' : '4px', flex: '1 1 0%', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         {user.role?.toLowerCase() === 'student' ? (
           activePlatform === 'campus' ? (() => {
             const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
@@ -448,7 +450,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
               }
 
               if (campusStudentUiLevel === 'junior') {
-                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'messages', 'settings'];
                 return juniorAllowed.includes(boardId);
               }
               return true;
@@ -907,9 +909,10 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
       <div style={{ 
         marginTop: 'auto', 
         borderTop: '1px solid #f1f5f9', 
-        padding: isCollapsed ? '12px 6px' : '12px',
+        padding: isCollapsed ? '6px 4px' : '12px',
         width: '100%',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        flexShrink: 0
       }}>
         <CampusSidebarUserHub
           user={user}

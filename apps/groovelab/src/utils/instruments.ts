@@ -18,7 +18,7 @@ export const renderInstrumentIcon = (name: string, color?: string, size = 18): R
 
   if (isGuitar || isBass) {
     // Original Twemoji crimson red for Gitarre, or branding yellow for Bass
-    const guitarColor = color || (isBass ? '#eab308' : '#BB1A34');
+    const guitarColor = color || (isBass ? '#facc15' : '#BB1A34');
 
     return React.createElement(
       'svg',

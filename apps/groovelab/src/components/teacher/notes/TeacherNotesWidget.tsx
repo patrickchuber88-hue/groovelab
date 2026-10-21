@@ -923,7 +923,7 @@ export const TeacherNotesWidget: React.FC<TeacherNotesWidgetProps> = ({
                   padding: '10px',
                   borderRadius: '10px',
                   background: '#ecfdf5',
-                  border: '1px solid #10b981',
+                  border: 'none',
                   color: '#059669',
                   fontSize: '0.80rem',
                   fontWeight: 800,

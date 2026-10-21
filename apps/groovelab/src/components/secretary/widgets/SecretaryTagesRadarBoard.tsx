@@ -115,8 +115,8 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
         background: '#ffffff',
         borderRadius: '24px',
         padding: '24px',
-        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
+        boxShadow: 'none',
+        border: 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: '20px'
@@ -126,15 +126,15 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            background: '#f0fdf4',
-            color: '#16a34a',
+            background: '#e6f4ea',
+            color: '#137333',
             width: '40px',
             height: '40px',
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid #dcfce7',
+            border: 'none',
             flexShrink: 0
           }}>
             <Calendar size={20} />
@@ -188,7 +188,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               letterSpacing: '-0.01em',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-              boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)'
+              boxShadow: 'none'
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#0f172a'; }}
@@ -204,7 +204,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
               setShowLogbookModal(true);
             }}
             style={{
-              background: '#f2f2f7',
+              background: '#f1f5f9',
               border: 'none',
               color: '#1c1c1e',
               padding: '7px 16px',
@@ -219,8 +219,8 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
               letterSpacing: '-0.01em',
               fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e5ea'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
           >
             <BookOpen size={14} style={{ color: '#1c1c1e' }} />
             <span>Logbuch öffnen</span>
@@ -241,7 +241,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
             padding: '4px',
             borderRadius: '12px',
             width: 'fit-content',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
+            border: 'none',
             flexWrap: 'wrap'
           }}
         >
@@ -268,13 +268,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  boxShadow: 'none',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <span>Alle</span>
                 <span style={{
-                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  background: isSelected ? '#f1f5f9' : '#e2e8f0',
                   color: isSelected ? '#0f172a' : '#64748b',
                   padding: '1px 6px',
                   borderRadius: '9999px',
@@ -324,13 +324,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  boxShadow: 'none',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <span>{b.name}</span>
                 <span style={{
-                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  background: isSelected ? '#f1f5f9' : '#e2e8f0',
                   color: isSelected ? '#0f172a' : '#64748b',
                   padding: '1px 6px',
                   borderRadius: '9999px',
@@ -379,13 +379,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.08)' : 'none',
+                  boxShadow: 'none',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <span>Ohne Zuordnung</span>
                 <span style={{
-                  background: isSelected ? '#f1f5f9' : 'rgba(15, 23, 42, 0.05)',
+                  background: isSelected ? '#f1f5f9' : '#e2e8f0',
                   color: isSelected ? '#0f172a' : '#64748b',
                   padding: '1px 6px',
                   borderRadius: '9999px',
@@ -422,7 +422,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
         }}
       >
         {displayRooms.length === 0 ? (
-          <div style={{ padding: '32px 24px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', gridColumn: '1 / -1', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
+          <div style={{ padding: '32px 24px', color: '#64748b', fontSize: '0.82rem', textAlign: 'center', gridColumn: '1 / -1', background: '#f8fafc', borderRadius: '16px', border: 'none' }}>
             {selectedBuildingId !== 'all' 
               ? 'Keine Räume für das ausgewählte Gebäude zugeordnet.' 
               : 'Keine Räume für diese Schule hinterlegt.'}
@@ -495,9 +495,9 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   }
                 }}
                 style={{
-                  background: isOccupied ? '#ffffff' : '#f8fafc',
-                  border: isOccupied ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
-                  borderLeft: isLiveNow ? '3px solid #f59e0b' : (isOccupied ? '1px solid #e2e8f0' : '1px dashed #cbd5e1'),
+                  background: isLiveNow ? '#fef3c7' : (isOccupied ? '#f8fafc' : '#f1f5f9'),
+                  border: 'none',
+                  borderLeft: isLiveNow ? '4px solid #f59e0b' : 'none',
                   borderRadius: '16px',
                   padding: isLiveNow ? '12px 14px 12px 12px' : '12px 14px',
                   display: 'flex',
@@ -506,9 +506,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   minHeight: '102px',
                   cursor: 'pointer',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                  boxShadow: isLiveNow 
-                    ? '0 4px 16px -2px rgba(245, 158, 11, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04)' 
-                    : (isOccupied ? '0 2px 6px rgba(15, 23, 42, 0.02)' : 'none')
+                  boxShadow: 'none'
                 }}
                 className="hover-scale"
               >
@@ -531,13 +529,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                   {isOccupied ? (
                     isLiveNow ? (
                       <span style={{
-                        background: '#fffbeb',
+                        background: '#ffffff',
                         color: '#b45309',
                         padding: '2px 8px',
                         borderRadius: '6px',
                         fontSize: '0.66rem',
                         fontWeight: 800,
-                        border: '1px solid #fde68a',
+                        border: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '5px',
@@ -557,13 +555,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                       </span>
                     ) : (
                       <span style={{
-                        background: '#fffbeb',
+                        background: '#fef3c7',
                         color: '#b45309',
                         padding: '2px 8px',
                         borderRadius: '6px',
                         fontSize: '0.66rem',
                         fontWeight: 750,
-                        border: '1px solid #fde68a',
+                        border: 'none',
                         flexShrink: 0
                       }}>
                         {roomAllocs.length} {roomAllocs.length === 1 ? 'Slot' : 'Slots'}
@@ -571,13 +569,13 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                     )
                   ) : (
                     <span style={{
-                      background: '#f0fdf4',
-                      color: '#15803d',
+                      background: '#e6f4ea',
+                      color: '#137333',
                       padding: '2px 8px',
                       borderRadius: '6px',
                       fontSize: '0.66rem',
                       fontWeight: 750,
-                      border: '1px solid #dcfce7',
+                      border: 'none',
                       flexShrink: 0
                     }}>
                       Frei
@@ -608,7 +606,7 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                       position: 'relative', 
                       width: '100%', 
                       height: '4px', 
-                      background: '#f1f5f9', 
+                      background: '#e2e8f0', 
                       borderRadius: '4px', 
                       overflow: 'hidden' 
                     }}
@@ -634,11 +632,9 @@ export const SecretaryTagesRadarBoard: React.FC<SecretaryTagesRadarBoardProps> =
                             width: `${widthPct}%`,
                             top: 0,
                             bottom: 0,
-                            background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                            background: '#f59e0b',
                             borderRadius: '2px',
-                            boxShadow: isThisSlotLive 
-                              ? '0 0 8px rgba(245, 158, 11, 0.7), 0 1px 3px rgba(217, 119, 6, 0.4)' 
-                              : '0 1px 3px rgba(217, 119, 6, 0.28)'
+                            boxShadow: 'none'
                           }}
                         />
                       );

@@ -115,7 +115,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
                   fontWeight: 900,
                   color: '#15803d',
                   background: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
+                  border: 'none',
                   padding: '3px 10px',
                   borderRadius: '100px',
                   fontFamily: 'Urbanist'
@@ -405,7 +405,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
               {/* DSGVO Box */}
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                border: '1.5px solid #bbf7d0',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '18px 20px',
                 display: 'flex',
@@ -445,7 +445,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
             <>
               <div style={{
                 background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
-                border: '1px solid #bfdbfe',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '14px 18px',
                 display: 'flex',

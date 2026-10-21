@@ -328,8 +328,8 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                   {/* Badge row */}
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
                     <span style={{
-                      background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? 'linear-gradient(135deg, #eab308, #ca8a04)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                      color: 'white', padding: '4px 12px', borderRadius: '8px',
+                      background: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? '#facc15' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      color: (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') ? '#0f172a' : 'white', padding: '4px 12px', borderRadius: '8px',
                       fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em',
                       boxShadow: 'none'
                     }}>
@@ -428,16 +428,16 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                     fontSize: '0.82rem',
                                     fontWeight: isActive ? 900 : 700,
                                     border: isActive ? 'none' : '1.5px dashed #cbd5e1',
-                                    background: isActive ? 'linear-gradient(135deg, #eab308, #ca8a04)' : '#f8fafc',
-                                    color: isActive ? 'white' : '#64748b',
+                                    background: isActive ? '#facc15' : '#f8fafc',
+                                    color: isActive ? '#0f172a' : '#64748b',
                                     cursor: 'pointer',
-                                    boxShadow: isActive ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
+                                    boxShadow: isActive ? '0 4px 14px rgba(250, 204, 21, 0.35)' : 'none',
                                     transition: 'all 0.2s ease',
                                   }}
                                   onMouseOver={(e) => {
                                     if (!isActive) {
-                                      e.currentTarget.style.borderColor = '#eab308';
-                                      e.currentTarget.style.color = '#ca8a04';
+                                      e.currentTarget.style.borderColor = '#facc15';
+                                      e.currentTarget.style.color = '#854d0e';
                                     }
                                   }}
                                   onMouseOut={(e) => {
@@ -1193,9 +1193,9 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                   {/* Teaching Days & Coached Bands Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: width < 800 ? '1fr' : '1fr 1fr', gap: '24px' }}>
                     {/* Day Availability Calendar Planner */}
-                    <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
+                    <div style={{ background: 'white', border: '1px solid rgba(250, 204, 21, 0.2)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
                       <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Calendar size={20} style={{ color: '#eab308' }} />
+                        <Calendar size={20} style={{ color: '#facc15' }} />
                         Anwesenheitszeiten & Startzeiten
                       </h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1322,9 +1322,9 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                       const teacherBandsList = Array.from(map.values());
 
                       return (
-                        <div style={{ background: 'white', border: '1px solid rgba(234, 179, 8, 0.15)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
+                        <div style={{ background: 'white', border: '1px solid rgba(250, 204, 21, 0.2)', borderRadius: '32px', padding: '32px', boxShadow: 'none' }}>
                           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 20px 0', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Users size={20} style={{ color: '#eab308' }} />
+                            <Users size={20} style={{ color: '#facc15' }} />
                             Betreute Band-Projekte ({teacherBandsList.length})
                           </h3>
                           {teacherBandsList.length > 0 ? (
@@ -1344,14 +1344,14 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                                   }}>
                                     <div>
                                       <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.98rem', fontFamily: "'Urbanist', sans-serif", display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Users size={16} style={{ color: '#ca8a04' }} />
+                                        <Users size={16} style={{ color: '#854d0e' }} />
                                         <span>{band.name || band.band_name || 'Unbenannte Band'}</span>
                                       </div>
                                       <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Music size={12} style={{ color: '#eab308' }} /> {songTitle}
+                                        <Music size={12} style={{ color: '#facc15' }} /> {songTitle}
                                       </div>
                                     </div>
-                                    <span style={{ background: 'rgba(234, 179, 8, 0.12)', color: '#ca8a04', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800 }}>
+                                    <span style={{ background: '#fef9c3', color: '#854d0e', padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800 }}>
                                       {memberCount} {memberCount === 1 ? 'Mitglied' : 'Mitglieder'}
                                     </span>
                                   </div>

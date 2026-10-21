@@ -99,16 +99,37 @@ export function durationToSeconds(
   return sixteenths * sixteenthSec;
 }
 
+type StudioWaveType = 'recorder' | 'flute' | 'clarinet' | 'altosax' | 'brass' | 'strings' | 'vocals';
+
 export class MicroScoreAudioSynthesizer {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private metronomeGain: GainNode | null = null;
   private instrumentGain: GainNode | null = null;
+  private customDestination: AudioNode | null = null;
   private isMutedInstrument: boolean = false;
-  private scheduledSources: Array<{ stop: () => void; disconnect: () => void }> = [];
+  private scheduledSources: Set<{ stop: () => void; disconnect: () => void }> = new Set();
   private cachedNoiseBuffer: AudioBuffer | null = null;
+  private waveCache: WeakMap<AudioContext, Partial<Record<StudioWaveType, PeriodicWave>>> = new WeakMap();
 
   constructor() {}
+
+  /**
+   * 🏛️ 0,1% Goldstandard: Ausgangs-Routing für Sub-Graphen & Master-Bus-Limiter
+   */
+  public setOutputDestination(dest: AudioNode | null): void {
+    this.customDestination = dest;
+    if (this.masterGain && this.ctx) {
+      try {
+        this.masterGain.disconnect();
+      } catch {}
+      if (dest) {
+        this.masterGain.connect(dest);
+      } else {
+        this.masterGain.connect(this.ctx.destination);
+      }
+    }
+  }
 
   public init(): AudioContext {
     if (!this.ctx || this.ctx.state === 'closed') {
@@ -121,7 +142,11 @@ export class MicroScoreAudioSynthesizer {
     if (!this.masterGain) {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
-      this.masterGain.connect(this.ctx.destination);
+      if (this.customDestination) {
+        this.masterGain.connect(this.customDestination);
+      } else {
+        this.masterGain.connect(this.ctx.destination);
+      }
     }
 
     if (!this.instrumentGain) {
@@ -136,7 +161,58 @@ export class MicroScoreAudioSynthesizer {
       this.metronomeGain.connect(this.masterGain);
     }
 
+    StudioSampleLibrary.preloadRealSamples(this.ctx);
+    PhysicalModelingEngine.prewarmCommonNotes(this.ctx, 'acoustic_guitar');
+    PhysicalModelingEngine.prewarmCommonNotes(this.ctx, 'electric_bass');
     return this.ctx;
+  }
+
+  private getStudioWave(ctx: AudioContext, type: StudioWaveType): PeriodicWave {
+    let ctxWaves = this.waveCache.get(ctx);
+    if (!ctxWaves) {
+      ctxWaves = {};
+      this.waveCache.set(ctx, ctxWaves);
+    }
+    const existing = ctxWaves[type];
+    if (existing) return existing;
+
+    let imag: Float32Array;
+    switch (type) {
+      case 'recorder':
+        // Edle Birnbaum-Sopranblockflöte: Grundton + sanfte Oktave + zarte Duodezime
+        imag = new Float32Array([0, 1.0, 0.22, 0.14, 0.03, 0.015]);
+        break;
+      case 'flute':
+        // Silber-Querflöte: Klarer Grundton mit seidigem Obertonschimmer
+        imag = new Float32Array([0, 1.0, 0.34, 0.15, 0.06, 0.02]);
+        break;
+      case 'clarinet':
+        // Boehm-Klarinette: Dominante ungerade Teiltöne (1, 3, 5, 7) + weiche gerade Korpuswärme
+        imag = new Float32Array([0, 1.0, 0.07, 0.48, 0.05, 0.24, 0.03, 0.11]);
+        break;
+      case 'altosax':
+        // Konisches Altsaxophon: Warmer, tragfähiger Rohrblatt-Kern ohne Sägezahn-Schärfe
+        imag = new Float32Array([0, 1.0, 0.60, 0.40, 0.25, 0.15, 0.08, 0.04]);
+        break;
+      case 'brass':
+        // Orchester-Blechbläser (Trompete / Posaune): Runde harmonische Obertonreihe
+        imag = new Float32Array([0, 1.0, 0.76, 0.54, 0.36, 0.22, 0.13, 0.07, 0.035]);
+        break;
+      case 'strings':
+        // Akustischer Bogenstrich (Violine / Cello): Samtiges Helmholtz-Spektrum
+        imag = new Float32Array([0, 1.0, 0.50, 0.33, 0.22, 0.14, 0.09, 0.05]);
+        break;
+      case 'vocals':
+      default:
+        // Menschliche Glottis-Welle für warmen Chor-/Soloklang
+        imag = new Float32Array([0, 1.0, 0.56, 0.34, 0.20, 0.11, 0.06, 0.03]);
+        break;
+    }
+
+    const real = new Float32Array(imag.length);
+    const wave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    ctxWaves[type] = wave;
+    return wave;
   }
 
   public setInstrumentMuted(muted: boolean): void {
@@ -185,11 +261,9 @@ export class MicroScoreAudioSynthesizer {
     if (validPitches.length === 0) return;
 
     const ctx = this.init();
-    // Headroom-Gain-Skalierung für sauberen, verzerrungsfreien Klang
     const polyVolume = volume / Math.sqrt(Math.max(1, validPitches.length));
 
     validPitches.forEach((pitch, idx) => {
-      // Natürliches organisches Gitarren-Strumming (12ms Versatz pro Saite)
       const delay = instrument === 'guitar' ? idx * 0.012 : 0;
       this.scheduleToneAtTime(instrument, pitch, ctx.currentTime + delay, durationSec, polyVolume);
     });
@@ -202,7 +276,10 @@ export class MicroScoreAudioSynthesizer {
         s.disconnect();
       } catch {}
     });
-    this.scheduledSources = [];
+    this.scheduledSources.clear();
+    StudioKeyboardEngine.stopAll();
+    PhysicalModelingEngine.stopAll();
+    StudioSampleLibrary.stopAll();
   }
 
   /**
@@ -227,7 +304,8 @@ export class MicroScoreAudioSynthesizer {
     filter.Q.setValueAtTime(1.0, time);
 
     const targetGain = isAccent ? 0.95 : 0.75;
-    gain.gain.setValueAtTime(targetGain, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(targetGain, time + 0.001);
     gain.gain.exponentialRampToValueAtTime(0.0001, time + (isAccent ? 0.065 : 0.048));
 
     osc.connect(filter);
@@ -236,36 +314,23 @@ export class MicroScoreAudioSynthesizer {
 
     osc.start(time);
     osc.stop(time + 0.07);
-
-    const handle = {
-      stop: () => { try { osc.stop(); } catch {} },
-      disconnect: () => { try { osc.disconnect(); gain.disconnect(); filter.disconnect(); } catch {} }
-    };
-    this.scheduledSources.push(handle);
+    this.trackSource(osc, gain, filter);
   }
 
   /**
-   * Akustische Klangsynthese für das gewählte Instrument
+   * 🏛️ 0,1% Goldstandard: Direkte Tonhöhen-Wiedergabe nach physikalischer Frequenz (Concert Pitch)
+   * Perfekt für Gehörtraining, A/B-Klangvergleich und YIN Pitch-Matching
    */
-  public scheduleToneAtTime(
-    instrument: MicroScoreInstrument,
-    pitch: string,
+  public playFrequencyAtTime(
+    instrument: MicroScoreInstrument | string,
+    hz: number,
     time: number,
     durationSec: number,
     volume: number = 0.55
   ): void {
-    if (this.isMutedInstrument || !pitch || pitch === 'REST') return;
+    if (this.isMutedInstrument || hz <= 0) return;
     const ctx = this.init();
     if (!this.instrumentGain) return;
-
-    // Schlagzeug-Routing (PAS Drum Notation & Pad-IDs)
-    if (instrument === 'drums') {
-      this.synthDrum(ctx, pitch, time, volume);
-      return;
-    }
-
-    const hz = getSoundingHz(instrument, pitch);
-    if (hz <= 0) return;
 
     switch (instrument as string) {
       case 'recorder':
@@ -316,55 +381,91 @@ export class MicroScoreAudioSynthesizer {
     }
   }
 
-  // --- 1. Blockflöte (Recorder: C-Sopranblockflöte mit Fippel-Körper & 2. Harmonischer) ---
+  /**
+   * Akustische Klangsynthese für das gewählte Instrument
+   */
+  public scheduleToneAtTime(
+    instrument: MicroScoreInstrument,
+    pitch: string,
+    time: number,
+    durationSec: number,
+    volume: number = 0.55
+  ): void {
+    if (this.isMutedInstrument || !pitch || pitch === 'REST') return;
+    const ctx = this.init();
+    if (!this.instrumentGain) return;
+
+    if (instrument === 'drums') {
+      this.synthDrum(ctx, pitch, time, volume);
+      return;
+    }
+
+    const hz = getSoundingHz(instrument, pitch);
+    if (hz <= 0) return;
+
+    this.playFrequencyAtTime(instrument, hz, time, durationSec, volume);
+  }
+
+  /**
+   * Erzeugt einen subtilen, organischen Anblas-Luftimpuls (Air-Chiff) für Holzbläser
+   */
+  private triggerBreathChiff(ctx: AudioContext, hz: number, time: number, vol: number, dest: AudioNode): void {
+    const noiseSource = ctx.createBufferSource();
+    noiseSource.buffer = this.getNoiseBuffer(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(Math.min(3600, Math.max(900, hz * 2.2)), time);
+    bp.Q.setValueAtTime(3.2, time);
+
+    const chiffGain = ctx.createGain();
+    chiffGain.gain.setValueAtTime(0.0001, time);
+    chiffGain.gain.linearRampToValueAtTime(vol * 0.08, time + 0.006);
+    chiffGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.028);
+
+    noiseSource.connect(bp);
+    bp.connect(chiffGain);
+    chiffGain.connect(dest);
+
+    noiseSource.start(time);
+    noiseSource.stop(time + 0.032);
+    this.trackSource(noiseSource, bp, chiffGain);
+  }
+
+  // --- 1. Blockflöte (Recorder: Edle Birnbaum-Sopranblockflöte mit sanftem Anblas-Chiff) ---
   private synthRecorder(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
 
-    const oscFund = ctx.createOscillator();
-    const oscHarm2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const harmGain = ctx.createGain();
+    const osc = ctx.createOscillator();
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'recorder'));
+    osc.frequency.setValueAtTime(hz, time);
+
     const filter = ctx.createBiquadFilter();
-
-    oscFund.type = 'sine';
-    oscFund.frequency.setValueAtTime(hz, time);
-
-    // 2. Harmonische (Oktave) für warmen Holzflöten-Körper
-    oscHarm2.type = 'sine';
-    oscHarm2.frequency.setValueAtTime(hz * 2, time);
-
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(Math.min(6500, hz * 3.2), time);
+    filter.frequency.setValueAtTime(Math.min(4800, hz * 3.4), time);
+    filter.Q.setValueAtTime(0.707, time);
 
-    const attack = 0.022;
-    const release = 0.12;
+    const gain = ctx.createGain();
+    const attack = 0.020;
+    const release = Math.max(0.24, Math.min(0.48, dur * 0.35));
     const noteEndTime = time + dur;
 
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.82, time + attack);
-    gain.gain.setValueAtTime(vol * 0.78, Math.max(time + attack + 0.01, noteEndTime));
+    gain.gain.linearRampToValueAtTime(vol * 0.78, time + attack);
+    gain.gain.setValueAtTime(vol * 0.74, Math.max(time + attack + 0.01, noteEndTime));
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
-    harmGain.gain.setValueAtTime(0.0001, time);
-    harmGain.gain.linearRampToValueAtTime(vol * 0.16, time + attack);
-    harmGain.gain.setValueAtTime(vol * 0.12, Math.max(time + attack + 0.01, noteEndTime));
-    harmGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
-
-    oscFund.connect(filter);
-    oscHarm2.connect(harmGain);
-    harmGain.connect(filter);
+    osc.connect(filter);
     filter.connect(gain);
     gain.connect(this.instrumentGain);
 
-    oscFund.start(time);
-    oscHarm2.start(time);
-    oscFund.stop(noteEndTime + release + 0.02);
-    oscHarm2.stop(noteEndTime + release + 0.02);
-    this.trackSource(oscFund, gain, filter);
-    this.trackSource(oscHarm2, harmGain);
+    this.triggerBreathChiff(ctx, hz, time, vol * 0.75, this.instrumentGain);
+
+    osc.start(time);
+    osc.stop(noteEndTime + release + 0.02);
+    this.trackSource(osc, gain, filter);
   }
 
-  // --- 2. Querflöte (Flute): Transparenter Grundton, sanftes Atem-Vibrato ---
+  // --- 2. Querflöte (Flute): Seidiger Silberflöten-Klang mit korrektem LFO-Vibrato & Air-Chiff ---
   private synthFlute(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
 
@@ -374,93 +475,23 @@ export class MicroScoreAudioSynthesizer {
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
 
-    osc.type = 'triangle';
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'flute'));
     osc.frequency.setValueAtTime(hz, time);
 
-    // 5.5 Hz Vibrato setzt nach 100ms ein
-    lfo.frequency.setValueAtTime(5.5, time);
+    // 5.2 Hz Vibrato setzt sanft nach 110ms ein (korrektes Routing über lfoGain!)
+    lfo.frequency.setValueAtTime(5.2, time);
     lfoGain.gain.setValueAtTime(0, time);
-    lfoGain.gain.linearRampToValueAtTime(3.5, time + 0.12);
-    lfo.connect(osc.frequency);
+    lfoGain.gain.setValueAtTime(0, time + 0.09);
+    lfoGain.gain.linearRampToValueAtTime(2.6, time + 0.22);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
 
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(Math.min(3200, hz * 3.2), time);
+    filter.frequency.setValueAtTime(Math.min(3800, hz * 3.6), time);
+    filter.Q.setValueAtTime(0.707, time);
 
-    const attack = 0.035;
-    const release = 0.14;
-    const noteEndTime = time + dur;
-
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.9, time + attack);
-    gain.gain.setValueAtTime(vol * 0.82, Math.max(time + attack + 0.01, noteEndTime));
-    gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.instrumentGain!);
-
-    lfo.start(time);
-    osc.start(time);
-    lfo.stop(noteEndTime + release + 0.02);
-    osc.stop(noteEndTime + release + 0.02);
-    this.trackSource(osc, gain, filter);
-  }
-
-  // --- 3. Klarinette (Clarinet): Dominante ungerade Harmonische, holziger Zylinderkorpus ---
-  private synthClarinet(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
-    if (!this.instrumentGain) return;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const formant = ctx.createBiquadFilter();
-
-    // Rechteck-Welle für die ungeradzahligen Teiltöne der Klarinette
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(hz, time);
-
-    formant.type = 'bandpass';
-    formant.frequency.setValueAtTime(Math.max(800, Math.min(2200, hz * 2)), time);
-    formant.Q.setValueAtTime(2.2, time);
-
-    const attack = 0.02;
-    const release = 0.12;
-    const noteEndTime = time + dur;
-
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.72, time + attack);
-    gain.gain.setValueAtTime(vol * 0.68, Math.max(time + attack + 0.01, noteEndTime));
-    gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
-
-    osc.connect(formant);
-    formant.connect(gain);
-    gain.connect(this.instrumentGain);
-
-    osc.start(time);
-    osc.stop(noteEndTime + release + 0.02);
-    this.trackSource(osc, gain, formant);
-  }
-
-  // --- 4. Altsaxophon (Alto Sax): Konische Mensur, volles Spektrum, Biss im Attack ---
-  private synthAltoSax(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
-    if (!this.instrumentGain) return;
-
-    const oscSaw = ctx.createOscillator();
-    const oscTri = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    oscSaw.type = 'sawtooth';
-    oscSaw.frequency.setValueAtTime(hz, time);
-    oscTri.type = 'triangle';
-    oscTri.frequency.setValueAtTime(hz, time);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(hz * 2, time);
-    filter.frequency.exponentialRampToValueAtTime(Math.min(4200, hz * 4), time + 0.04);
-    filter.Q.setValueAtTime(2.0, time);
-
-    const attack = 0.025;
-    const release = 0.13;
+    const attack = 0.032;
+    const release = Math.max(0.28, Math.min(0.52, dur * 0.38));
     const noteEndTime = time + dur;
 
     gain.gain.setValueAtTime(0.0001, time);
@@ -468,50 +499,154 @@ export class MicroScoreAudioSynthesizer {
     gain.gain.setValueAtTime(vol * 0.78, Math.max(time + attack + 0.01, noteEndTime));
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
-    oscSaw.connect(filter);
-    oscTri.connect(filter);
+    osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.instrumentGain!);
+    gain.connect(this.instrumentGain);
 
-    oscSaw.start(time);
-    oscTri.start(time);
-    oscSaw.stop(noteEndTime + release + 0.02);
-    oscTri.stop(noteEndTime + release + 0.02);
-    this.trackSource(oscSaw, gain, filter);
+    this.triggerBreathChiff(ctx, hz, time, vol, this.instrumentGain);
+
+    lfo.start(time);
+    osc.start(time);
+    const stopTime = noteEndTime + release + 0.02;
+    lfo.stop(stopTime);
+    osc.stop(stopTime);
+    this.trackSource(osc, gain, filter, lfoGain);
+    this.trackSource(lfo);
   }
 
-  // --- 5. Trompete (Trumpet): Brillanter metallischer Attack & Sweep ---
-  private synthTrumpet(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
+  // --- 3. Klarinette (Clarinet): Warmes Grenadill-Holz-Spektrum statt harscher Rechteck-Welle ---
+  private synthClarinet(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
+    const bodyFilter = ctx.createBiquadFilter();
+    const bellFilter = ctx.createBiquadFilter();
 
-    osc.type = 'sawtooth';
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'clarinet'));
     osc.frequency.setValueAtTime(hz, time);
 
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, time);
-    filter.frequency.exponentialRampToValueAtTime(Math.min(5500, hz * 5), time + 0.05);
-    filter.Q.setValueAtTime(2.8, time);
+    bodyFilter.type = 'peaking';
+    bodyFilter.frequency.setValueAtTime(Math.max(650, Math.min(1800, hz * 2.2)), time);
+    bodyFilter.Q.setValueAtTime(1.4, time);
+    bodyFilter.gain.setValueAtTime(2.5, time);
 
-    const attack = 0.02;
-    const release = 0.12;
+    bellFilter.type = 'lowpass';
+    bellFilter.frequency.setValueAtTime(Math.min(3600, hz * 5.2), time);
+    bellFilter.Q.setValueAtTime(0.8, time);
+
+    const attack = 0.022;
+    const release = Math.max(0.26, Math.min(0.48, dur * 0.35));
     const noteEndTime = time + dur;
 
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.88, time + attack);
-    gain.gain.setValueAtTime(vol * 0.80, Math.max(time + attack + 0.01, noteEndTime));
+    gain.gain.linearRampToValueAtTime(vol * 0.78, time + attack);
+    gain.gain.setValueAtTime(vol * 0.72, Math.max(time + attack + 0.01, noteEndTime));
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
-    osc.connect(filter);
+    osc.connect(bodyFilter);
+    bodyFilter.connect(bellFilter);
+    bellFilter.connect(gain);
+    gain.connect(this.instrumentGain);
+
+    osc.start(time);
+    osc.stop(noteEndTime + release + 0.02);
+    this.trackSource(osc, gain, bodyFilter, bellFilter);
+  }
+
+  // --- 4. Altsaxophon (Alto Sax): Konisches Messing-Rohrblatt-Modell mit sanftem Vibrato ---
+  private synthAltoSax(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
+    if (!this.instrumentGain) return;
+
+    const osc = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    const formant = ctx.createBiquadFilter();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'altosax'));
+    osc.frequency.setValueAtTime(hz, time);
+
+    lfo.frequency.setValueAtTime(5.0, time);
+    lfoGain.gain.setValueAtTime(0, time);
+    lfoGain.gain.setValueAtTime(0, time + 0.10);
+    lfoGain.gain.linearRampToValueAtTime(2.4, time + 0.24);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    formant.type = 'peaking';
+    formant.frequency.setValueAtTime(1150, time);
+    formant.Q.setValueAtTime(1.6, time);
+    formant.gain.setValueAtTime(3.0, time);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(hz * 2.2, time);
+    filter.frequency.exponentialRampToValueAtTime(Math.min(3900, hz * 4.6), time + 0.045);
+    filter.Q.setValueAtTime(1.1, time);
+
+    const attack = 0.024;
+    const release = Math.max(0.28, Math.min(0.52, dur * 0.36));
+    const noteEndTime = time + dur;
+
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vol * 0.84, time + attack);
+    gain.gain.setValueAtTime(vol * 0.76, Math.max(time + attack + 0.01, noteEndTime));
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
+
+    osc.connect(formant);
+    formant.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.instrumentGain);
+
+    const stopTime = noteEndTime + release + 0.02;
+    lfo.start(time);
+    osc.start(time);
+    lfo.stop(stopTime);
+    osc.stop(stopTime);
+    this.trackSource(osc, gain, formant, filter, lfoGain);
+    this.trackSource(lfo);
+  }
+
+  // --- 5. Trompete (Trumpet): Edler Konzert-Blechbläser mit dynamischer Schallstück-Öffnung ---
+  private synthTrumpet(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
+    if (!this.instrumentGain) return;
+
+    const osc = ctx.createOscillator();
+    const formant = ctx.createBiquadFilter();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'brass'));
+    osc.frequency.setValueAtTime(hz, time);
+
+    formant.type = 'peaking';
+    formant.frequency.setValueAtTime(1450, time);
+    formant.Q.setValueAtTime(1.5, time);
+    formant.gain.setValueAtTime(2.8, time);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(Math.max(600, hz * 1.8), time);
+    filter.frequency.exponentialRampToValueAtTime(Math.min(4600, hz * 4.8), time + 0.042);
+    filter.Q.setValueAtTime(1.25, time);
+
+    const attack = 0.020;
+    const release = Math.max(0.26, Math.min(0.48, dur * 0.34));
+    const noteEndTime = time + dur;
+
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vol * 0.84, time + attack);
+    gain.gain.setValueAtTime(vol * 0.76, Math.max(time + attack + 0.01, noteEndTime));
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
+
+    osc.connect(formant);
+    formant.connect(filter);
     filter.connect(gain);
     gain.connect(this.instrumentGain);
 
     osc.start(time);
     osc.stop(noteEndTime + release + 0.02);
-    this.trackSource(osc, gain, filter);
+    this.trackSource(osc, gain, formant, filter);
   }
 
   // --- 6. Posaune (Trombone): Warmes, sonores Tief-Blech ---
@@ -519,36 +654,43 @@ export class MicroScoreAudioSynthesizer {
     if (!this.instrumentGain) return;
 
     const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const formant = ctx.createBiquadFilter();
     const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
 
-    osc.type = 'sawtooth';
+    osc.setPeriodicWave(this.getStudioWave(ctx, 'brass'));
     osc.frequency.setValueAtTime(hz, time);
 
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(400, time);
-    filter.frequency.exponentialRampToValueAtTime(Math.min(2600, hz * 3.5), time + 0.06);
-    filter.Q.setValueAtTime(1.8, time);
+    formant.type = 'peaking';
+    formant.frequency.setValueAtTime(620, time);
+    formant.Q.setValueAtTime(1.4, time);
+    formant.gain.setValueAtTime(2.5, time);
 
-    const attack = 0.035;
-    const release = 0.15;
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(Math.max(320, hz * 1.6), time);
+    filter.frequency.exponentialRampToValueAtTime(Math.min(2500, hz * 4.2), time + 0.055);
+    filter.Q.setValueAtTime(1.15, time);
+
+    const attack = 0.030;
+    const release = Math.max(0.32, Math.min(0.55, dur * 0.38));
     const noteEndTime = time + dur;
 
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.92, time + attack);
-    gain.gain.setValueAtTime(vol * 0.85, Math.max(time + attack + 0.01, noteEndTime));
+    gain.gain.linearRampToValueAtTime(vol * 0.88, time + attack);
+    gain.gain.setValueAtTime(vol * 0.80, Math.max(time + attack + 0.01, noteEndTime));
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
-    osc.connect(filter);
+    osc.connect(formant);
+    formant.connect(filter);
     filter.connect(gain);
-    gain.connect(this.instrumentGain!);
+    gain.connect(this.instrumentGain);
 
     osc.start(time);
     osc.stop(noteEndTime + release + 0.02);
-    this.trackSource(osc, gain, filter);
+    this.trackSource(osc, gain, formant, filter);
   }
 
-  // --- 🎼 Musik-Weltreise Standard: Cantabile Konzertflügel (0,1% Goldstandard) ---
+  // --- 🎼 Cantabile Konzertflügel (0,1% Goldstandard) ---
   private synthPiano(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
     StudioKeyboardEngine.playGrandPianoNote(ctx, hz, {
@@ -559,13 +701,12 @@ export class MicroScoreAudioSynthesizer {
     });
   }
 
-  // --- 🎸 Musik-Weltreise Standard: Akustik-Gitarre (Extended Karplus-Strong Waveguide) ---
+  // --- 🎸 Akustik-Gitarre (Extended Karplus-Strong Waveguide mit intelligenter Lauf-Dämpfung) ---
   private synthGuitar(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
-    const acousticDur = Math.max(dur * 2.2, 2.4);
     PhysicalModelingEngine.playNote(ctx, {
       pitchHz: hz,
-      durationSec: acousticDur,
+      durationSec: Math.max(dur, 2.4),
       velocity: vol,
       pluckType: 'acoustic_guitar'
     }, time, this.instrumentGain);
@@ -576,63 +717,62 @@ export class MicroScoreAudioSynthesizer {
     if (!this.instrumentGain) return;
     PhysicalModelingEngine.playNote(ctx, {
       pitchHz: hz,
-      durationSec: dur,
+      durationSec: Math.max(dur, 1.8),
       velocity: vol,
       pluckType: 'electric_bass'
     }, time, this.instrumentGain);
   }
 
-  // --- Streicher (Strings: Violine / Ensemble mit Holzdecken-Formant, Steg-Resonanz & Vibrato) ---
+  // --- Streicher (Strings: Violine / Ensemble mit Helmholtz-PeriodicWave & gefixtem Vibrato-Routing) ---
   private synthStrings(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
 
-    // Dreifach-Unisono-Saiten (Streicher-Chorus mit ±1.8 Cent Detuning)
+    const stringsWave = this.getStudioWave(ctx, 'strings');
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const osc3 = ctx.createOscillator();
 
-    osc1.type = 'sawtooth';
+    osc1.setPeriodicWave(stringsWave);
     osc1.frequency.setValueAtTime(hz, time);
     osc1.detune.setValueAtTime(-1.8, time);
 
-    osc2.type = 'sawtooth';
+    osc2.setPeriodicWave(stringsWave);
     osc2.frequency.setValueAtTime(hz, time);
 
-    osc3.type = 'sawtooth';
+    osc3.setPeriodicWave(stringsWave);
     osc3.frequency.setValueAtTime(hz, time);
     osc3.detune.setValueAtTime(1.8, time);
 
-    // Organischer 5.2 Hz Vibrato-LFO (setzt nach 75ms Bogenwechsel musikalisch ein)
+    // Organischer 5.2 Hz Vibrato-LFO (korrekt über lfoGain geroutet!)
     const lfo = ctx.createOscillator();
     const lfoGain = ctx.createGain();
     lfo.frequency.setValueAtTime(5.2, time);
     lfoGain.gain.setValueAtTime(0, time);
     lfoGain.gain.setValueAtTime(0, time + 0.075);
-    lfoGain.gain.linearRampToValueAtTime(3.2, time + 0.22);
-    lfo.connect(osc1.frequency);
-    lfo.connect(osc2.frequency);
-    lfo.connect(osc3.frequency);
+    lfoGain.gain.linearRampToValueAtTime(2.8, time + 0.22);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    lfoGain.connect(osc2.frequency);
+    lfoGain.connect(osc3.frequency);
 
-    // 1. Resonanz-Formant: Fichten-/Ahorn-Holzkorpus (Warmer Saitenkörper)
     const bodyFilter = ctx.createBiquadFilter();
     bodyFilter.type = 'lowpass';
-    bodyFilter.frequency.setValueAtTime(Math.min(4500, Math.max(1200, hz * 3.5)), time);
-    bodyFilter.Q.setValueAtTime(1.1, time);
+    bodyFilter.frequency.setValueAtTime(Math.min(4200, Math.max(1100, hz * 3.6)), time);
+    bodyFilter.Q.setValueAtTime(0.85, time);
 
-    // 2. Steg-Präsenz (Bridge Hill Formant bei 2.800 Hz für tragfähigen Bogenklang)
     const bridgeFilter = ctx.createBiquadFilter();
     bridgeFilter.type = 'peaking';
-    bridgeFilter.frequency.setValueAtTime(2800, time);
-    bridgeFilter.Q.setValueAtTime(1.8, time);
-    bridgeFilter.gain.setValueAtTime(2.5, time);
+    bridgeFilter.frequency.setValueAtTime(2600, time);
+    bridgeFilter.Q.setValueAtTime(1.5, time);
+    bridgeFilter.gain.setValueAtTime(2.2, time);
 
     const gain = ctx.createGain();
-    const attack = 0.065; // Organischer Bogenstrich-Attack (Helmholtz Slip-Stick)
-    const release = 0.18; // Geschmeidiger Bogen-Nachhall
+    const attack = 0.055;
+    const release = Math.max(0.38, Math.min(0.68, dur * 0.42));
     const noteEndTime = time + dur;
 
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.72, time + attack);
+    gain.gain.linearRampToValueAtTime(vol * 0.74, time + attack);
     gain.gain.setValueAtTime(vol * 0.68, Math.max(time + attack + 0.01, noteEndTime));
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
@@ -643,12 +783,12 @@ export class MicroScoreAudioSynthesizer {
     bridgeFilter.connect(gain);
     gain.connect(this.instrumentGain);
 
+    const stopTime = noteEndTime + release + 0.02;
     lfo.start(time);
     osc1.start(time);
     osc2.start(time);
     osc3.start(time);
 
-    const stopTime = noteEndTime + release + 0.02;
     lfo.stop(stopTime);
     osc1.stop(stopTime);
     osc2.stop(stopTime);
@@ -660,54 +800,90 @@ export class MicroScoreAudioSynthesizer {
     this.trackSource(lfo);
   }
 
-  // --- 7. Vokal / Gesang (Vocals: Warmer Menschlicher Vokal-Klangkörper "Ah" mit 2 Formanten) ---
+  // --- 7. Vokal / Gesang (Vocals: Warmer Glottis-Klangkörper mit 3 Vokal-Formanten & sanftem Vibrato) ---
   private synthVocals(ctx: AudioContext, hz: number, time: number, dur: number, vol: number): void {
     if (!this.instrumentGain) return;
 
-    const osc = ctx.createOscillator();
+    const vocalWave = this.getStudioWave(ctx, 'vocals');
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    osc1.setPeriodicWave(vocalWave);
+    osc1.frequency.setValueAtTime(hz, time);
+    osc1.detune.setValueAtTime(-1.2, time);
+
+    osc2.setPeriodicWave(vocalWave);
+    osc2.frequency.setValueAtTime(hz, time);
+    osc2.detune.setValueAtTime(1.2, time);
+
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.setValueAtTime(5.0, time);
+    lfoGain.gain.setValueAtTime(0, time);
+    lfoGain.gain.setValueAtTime(0, time + 0.09);
+    lfoGain.gain.linearRampToValueAtTime(2.2, time + 0.22);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    lfoGain.connect(osc2.frequency);
+
     const formant1 = ctx.createBiquadFilter();
     const formant2 = ctx.createBiquadFilter();
+    const formant3 = ctx.createBiquadFilter();
     const gain1 = ctx.createGain();
     const gain2 = ctx.createGain();
+    const gain3 = ctx.createGain();
     const masterGain = ctx.createGain();
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(hz, time);
-
-    // Formant 1 (F1: 800 Hz "Ah"-Vokalisation)
     formant1.type = 'bandpass';
-    formant1.frequency.setValueAtTime(800, time);
-    formant1.Q.setValueAtTime(3.6, time);
+    formant1.frequency.setValueAtTime(780, time);
+    formant1.Q.setValueAtTime(3.2, time);
 
-    // Formant 2 (F2: 1250 Hz Vokalfarbe)
     formant2.type = 'bandpass';
-    formant2.frequency.setValueAtTime(1250, time);
-    formant2.Q.setValueAtTime(4.0, time);
+    formant2.frequency.setValueAtTime(1220, time);
+    formant2.Q.setValueAtTime(3.8, time);
 
-    const attack = 0.045;
-    const release = 0.14;
+    formant3.type = 'bandpass';
+    formant3.frequency.setValueAtTime(2650, time);
+    formant3.Q.setValueAtTime(4.2, time);
+
+    const attack = 0.042;
+    const release = Math.max(0.32, Math.min(0.58, dur * 0.38));
     const noteEndTime = time + dur;
 
     masterGain.gain.setValueAtTime(0.0001, time);
-    masterGain.gain.linearRampToValueAtTime(vol * 0.82, time + attack);
-    masterGain.gain.setValueAtTime(vol * 0.76, Math.max(time + attack + 0.01, noteEndTime));
+    masterGain.gain.linearRampToValueAtTime(vol * 0.84, time + attack);
+    masterGain.gain.setValueAtTime(vol * 0.78, Math.max(time + attack + 0.01, noteEndTime));
     masterGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
 
-    gain1.gain.setValueAtTime(0.70, time);
-    gain2.gain.setValueAtTime(0.35, time);
+    gain1.gain.setValueAtTime(0.68, time);
+    gain2.gain.setValueAtTime(0.34, time);
+    gain3.gain.setValueAtTime(0.14, time);
 
-    osc.connect(formant1);
-    osc.connect(formant2);
+    osc1.connect(formant1);
+    osc1.connect(formant2);
+    osc1.connect(formant3);
+    osc2.connect(formant1);
+    osc2.connect(formant2);
+    osc2.connect(formant3);
+
     formant1.connect(gain1);
     formant2.connect(gain2);
+    formant3.connect(gain3);
     gain1.connect(masterGain);
     gain2.connect(masterGain);
+    gain3.connect(masterGain);
     masterGain.connect(this.instrumentGain);
 
-    osc.start(time);
-    osc.stop(noteEndTime + release + 0.02);
-    this.trackSource(osc, masterGain, formant1);
-    this.trackSource(gain1, formant2, gain2);
+    const stopTime = noteEndTime + release + 0.02;
+    lfo.start(time);
+    osc1.start(time);
+    osc2.start(time);
+    lfo.stop(stopTime);
+    osc1.stop(stopTime);
+    osc2.stop(stopTime);
+
+    this.trackSource(osc1, masterGain, formant1, gain1);
+    this.trackSource(osc2, formant2, gain2, formant3, gain3);
+    this.trackSource(lfo, lfoGain);
   }
 
   // --- Schlagzeug-Synthese (0,1% DSP Physical Modeling: Kick, Snare, Hi-Hat, Toms, Crash, Ride) ---
@@ -740,6 +916,8 @@ export class MicroScoreAudioSynthesizer {
       StudioSampleLibrary.trigger(ctx, 'hatPedal', { time, velocity: vol, destination: this.instrumentGain });
     } else if (p === 'crash' || p === 'a5' || p === 'c6') {
       StudioSampleLibrary.trigger(ctx, 'crash', { time, velocity: vol, destination: this.instrumentGain });
+    } else if (p === 'ride_bell' || p === 'ridebell' || p === 'bell' || p === 'glocke' || p === 'kuppe' || p === '53') {
+      StudioSampleLibrary.trigger(ctx, 'rideBell', { time, velocity: vol, destination: this.instrumentGain });
     } else if (p === 'ride' || p === 'f5') {
       StudioSampleLibrary.trigger(ctx, 'ride', { time, velocity: vol, destination: this.instrumentGain });
     } else if (p === 'rim') {
@@ -875,79 +1053,19 @@ export class MicroScoreAudioSynthesizer {
   }
 
   /**
-   * Crash Becken (16"): Breites Hochton-Rauschen mit natürlichem 1,3s Ausklang
+   * Crash Becken (16"): Authentisches B20-Bronze Akustikmodell via StudioSampleLibrary
    */
   private synthCrash(ctx: AudioContext, time: number, vol: number): void {
     if (!this.instrumentGain) return;
-    const noiseBuffer = this.getNoiseBuffer(ctx);
-    const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(4500, time);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.001, time);
-    gain.gain.linearRampToValueAtTime(vol * 0.9, time + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 1.25);
-
-    noiseSource.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.instrumentGain);
-
-    noiseSource.start(time);
-    noiseSource.stop(time + 1.26);
-    this.trackSource(noiseSource, gain, filter);
+    StudioSampleLibrary.trigger(ctx, 'crash', { time, velocity: vol, destination: this.instrumentGain });
   }
 
   /**
-   * Ride Becken (20"): Brillanter 580/870 Hz Glocken-Ping + samtiger 6 kHz Becken-Wash
+   * Ride Becken (20"): Authentisches Dark Flat Ride Akustikmodell via StudioSampleLibrary
    */
   private synthRide(ctx: AudioContext, time: number, vol: number): void {
     if (!this.instrumentGain) return;
-
-    // Ride Bell Tone (Doppelter Sinus-Ping)
-    const bell1 = ctx.createOscillator();
-    const bell2 = ctx.createOscillator();
-    const bellGain = ctx.createGain();
-    bell1.type = 'sine';
-    bell1.frequency.setValueAtTime(580, time);
-    bell2.type = 'sine';
-    bell2.frequency.setValueAtTime(872, time);
-
-    bellGain.gain.setValueAtTime(vol * 0.45, time);
-    bellGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.28);
-    bell1.connect(bellGain);
-    bell2.connect(bellGain);
-    bellGain.connect(this.instrumentGain);
-    bell1.start(time);
-    bell2.start(time);
-    bell1.stop(time + 0.30);
-    bell2.stop(time + 0.30);
-
-    // Ride Wash (Cymbal Shimmer)
-    const noiseBuffer = this.getNoiseBuffer(ctx);
-    const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(6200, time);
-    filter.Q.setValueAtTime(2.8, time);
-
-    const washGain = ctx.createGain();
-    washGain.gain.setValueAtTime(vol * 0.35, time);
-    washGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.75);
-
-    noiseSource.connect(filter);
-    filter.connect(washGain);
-    washGain.connect(this.instrumentGain);
-    noiseSource.start(time);
-    noiseSource.stop(time + 0.76);
-
-    this.trackSource(bell1, bellGain);
-    this.trackSource(bell2);
-    this.trackSource(noiseSource, washGain, filter);
+    StudioSampleLibrary.trigger(ctx, 'ride', { time, velocity: vol, destination: this.instrumentGain });
   }
 
   /**
@@ -978,8 +1096,8 @@ export class MicroScoreAudioSynthesizer {
     const handle = {
       stop: () => {
         try {
-          if ('stop' in node && typeof (node as any).stop === 'function') {
-            (node as any).stop();
+          if ('stop' in node && typeof (node as AudioScheduledSourceNode).stop === 'function') {
+            (node as AudioScheduledSourceNode).stop();
           }
         } catch {}
       },
@@ -990,6 +1108,13 @@ export class MicroScoreAudioSynthesizer {
         } catch {}
       }
     };
-    this.scheduledSources.push(handle);
+    this.scheduledSources.add(handle);
+
+    if ('onended' in node) {
+      (node as AudioScheduledSourceNode).onended = () => {
+        this.scheduledSources.delete(handle);
+        handle.disconnect();
+      };
+    }
   }
 }

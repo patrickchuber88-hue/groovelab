@@ -137,19 +137,19 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   // Real-Time Multi-Color Spectrum Stripe & Dashed Border Logic
   let spectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 16px)'; // Gestrichelter grüner Balken bei 0 Modulen
   if (hasVerwaltung && hasCampus && hasGrooveLab) {
-    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
+    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #facc15 66.6%, #facc15 100%)';
   } else if (hasVerwaltung && hasCampus) {
     spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #34a853 50%, #34a853 100%)';
   } else if (hasVerwaltung && hasGrooveLab) {
-    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #eab308 50%, #eab308 100%)';
+    spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #facc15 50%, #facc15 100%)';
   } else if (hasCampus && hasGrooveLab) {
-    spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)'; // Halb Grün / Halb Gelb
+    spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #facc15 50%, #facc15 100%)'; // Halb Grün / Halb Gelb
   } else if (hasVerwaltung) {
     spectrumGradient = '#ea4335';
   } else if (hasCampus) {
     spectrumGradient = '#34a853'; // Grüner Balken
   } else if (hasGrooveLab) {
-    spectrumGradient = '#eab308'; // Gelber Balken
+    spectrumGradient = '#facc15'; // Gelber Balken
   }
 
   const canonicalId = resolveUserCampusId(user);

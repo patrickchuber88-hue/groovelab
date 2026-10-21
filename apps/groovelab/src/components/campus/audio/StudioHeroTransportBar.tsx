@@ -55,9 +55,7 @@ export const StudioHeroTransportBar: React.FC<StudioHeroTransportBarProps> = ({
           style={{
             minHeight: '48px',
             minWidth: isMobile ? '100%' : '170px',
-            background: isPlaying
-              ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
-              : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            background: isPlaying ? '#0f172a' : '#ef4444',
             color: '#ffffff',
             border: 'none',
             borderRadius: '14px',
@@ -199,20 +197,20 @@ export const StudioHeroTransportBar: React.FC<StudioHeroTransportBarProps> = ({
           type="button"
           onClick={() => onOpenNoteAtTime(currentPlayTime)}
           style={{
-            minHeight: '44px',
-            background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+            minHeight: '48px',
+            background: '#ef4444',
             color: '#ffffff',
             border: 'none',
             borderRadius: '14px',
-            padding: '10px 16px',
-            fontSize: '0.84rem',
+            padding: '10px 18px',
+            fontSize: '0.86rem',
             fontWeight: 850,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            boxShadow: 'none',
+            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.28)',
             transition: 'all 0.15s ease',
             flex: isMobile ? 1 : 'none',
             touchAction: 'manipulation'
@@ -221,7 +219,7 @@ export const StudioHeroTransportBar: React.FC<StudioHeroTransportBarProps> = ({
           title="Marker an aktueller Position setzen (Pausiert automatisch · Shortcut: M)"
           aria-label="Marker an aktueller Position setzen"
         >
-          <Bookmark size={15} strokeWidth={2.4} fill="currentColor" />
+          <Bookmark size={16} strokeWidth={2.4} fill="currentColor" />
           <span>+ Marker</span>
         </button>
       </div>

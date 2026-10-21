@@ -168,7 +168,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           <div style={{
             width: '100%',
             background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-            border: '2px solid #f59e0b',
+            border: 'none',
             borderRadius: '20px',
             padding: '12px 16px',
             display: 'flex',
@@ -206,7 +206,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           <div
             style={{
               background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-              border: '1.5px solid #fde68a',
+              border: 'none',
               borderRadius: '20px',
               padding: '16px',
               display: 'flex',
@@ -231,7 +231,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           <div
             style={{
               background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              border: '1.5px solid #bbf7d0',
+              border: 'none',
               borderRadius: '20px',
               padding: '16px',
               display: 'flex',
@@ -316,7 +316,7 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
               style={{
                 width: '100%',
                 background: '#fffbeb',
-                border: '1.5px solid #fde68a',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '13px 20px',
                 color: '#92400e',

@@ -19,7 +19,7 @@ import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 import { TeacherMakeupTokenModal } from '../../teacher/TeacherMakeupTokenModal';
 
 const TEACHER_GREEN = '#34a853';
-const TEACHER_YELLOW = '#eab308';
+const TEACHER_YELLOW = '#facc15';
 
 export interface TeacherStudentDetailModalProps {
   student: any;
@@ -643,7 +643,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                 {/* Mastered Songs */}
                 <div
                   style={{
-                    background: 'linear-gradient(135deg, #34a853, #22c55e)',
+                    background: '#34a853',
                     color: '#ffffff',
                     borderRadius: '18px',
                     padding: '14px 18px',
@@ -1259,15 +1259,15 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   gap: '14px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
                         Altersstufe (Campus)
                       </span>
                       <span style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: '#ffffff',
+                        background: '#f0fdf4',
+                        color: '#15803d',
                         padding: '2px 8px',
                         borderRadius: '100px',
                         fontSize: '0.68rem',
@@ -1276,110 +1276,39 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        <Sparkles size={11} /> Pädagogisch anpassbar
+                        <ShieldCheck size={11} /> Elternverwaltung (BGB 1626)
                       </span>
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
-                      Didaktische Darstellung nach Altersstufe (1-Klick Anpassung)
+                      Didaktische Benutzeroberfläche des Schüler-Dashboards
                     </div>
+                  </div>
+
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    borderRadius: '12px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    color: '#0f172a'
+                  }}>
+                    <span>{studentUiLevel === 'pro' ? '👑' : studentUiLevel === 'teen' ? '🚀' : '🐣'}</span>
+                    <span>
+                      {studentUiLevel === 'pro'
+                        ? 'Pro (16+ J.)'
+                        : studentUiLevel === 'teen'
+                        ? 'Teen (11–15 J.)'
+                        : 'Junior (6–10 J.)'}
+                    </span>
                   </div>
                 </div>
 
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '8px',
-                  background: '#f8fafc',
-                  padding: '6px',
-                  borderRadius: '16px',
-                  border: '1px solid #f1f5f9'
-                }}>
-                  {[
-                    { key: 'junior', label: 'Junior', age: '6–10 J.', icon: '🐣' },
-                    { key: 'teen', label: 'Teen', age: '11–15 J.', icon: '🚀' },
-                    { key: 'pro', label: 'Pro', age: '16+ J.', icon: '👑' }
-                  ].map((lvl) => {
-                    const isActive = studentUiLevel === lvl.key;
-                    return (
-                      <button
-                        key={lvl.key}
-                        type="button"
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isActive}
-                        aria-label={`Didaktische Altersstufe auf ${lvl.label} einstellen`}
-                        onClick={() => {
-                          const newLvl = lvl.key as 'junior' | 'teen' | 'pro';
-                          setStudentUiLevel(newLvl);
-                          if (student.id) {
-                            localStorage.setItem(`campus_student_ui_level_${student.id}`, newLvl);
-                            (async () => {
-                              try {
-                                await supabase.from('users').update({ campus_ui_level: newLvl }).eq('id', student.id);
-                                try {
-                                  await supabase.from('students').update({ campus_ui_level: newLvl }).eq('id', student.id);
-                                } catch {}
-                              } catch (e) {
-                                console.warn('Could not update student campus_ui_level:', e);
-                              }
-                            })();
-                            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: student.id, uiLevel: newLvl } }));
-                            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLvl }));
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            const newLvl = lvl.key as 'junior' | 'teen' | 'pro';
-                            setStudentUiLevel(newLvl);
-                            if (student.id) {
-                              localStorage.setItem(`campus_student_ui_level_${student.id}`, newLvl);
-                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: student.id, uiLevel: newLvl } }));
-                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLvl }));
-                            }
-                          }
-                        }}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '10px 8px',
-                          minHeight: '44px',
-                          borderRadius: '12px',
-                          border: 'none',
-                          background: isActive ? TEACHER_GREEN : '#ffffff',
-                          color: isActive ? '#ffffff' : '#64748b',
-                          fontWeight: isActive ? 900 : 700,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          boxShadow: isActive ? '0 4px 12px rgba(52, 168, 83, 0.25)' : '0 1px 3px rgba(0,0,0,0.04)',
-                          opacity: isActive ? 1 : 0.85,
-                          touchAction: 'manipulation'
-                        }}
-                      >
-                        <span style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{lvl.icon}</span>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 900 }}>{lvl.label}</span>
-                        <span style={{ fontSize: '0.68rem', opacity: isActive ? 0.9 : 0.7 }}>{lvl.age}</span>
-                        {isActive && (
-                          <span style={{
-                            marginTop: '4px',
-                            fontSize: '0.62rem',
-                            background: 'rgba(255, 255, 255, 0.25)',
-                            padding: '1px 6px',
-                            borderRadius: '100px',
-                            fontWeight: 900
-                          }}>
-                            Aktiv
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{
-                  fontSize: '0.7rem',
+                  fontSize: '0.70rem',
                   color: '#475569',
                   lineHeight: 1.45,
                   background: '#f8fafc',
@@ -1390,9 +1319,9 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   gap: '8px',
                   alignItems: 'flex-start'
                 }}>
-                  <Sparkles size={15} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <ShieldCheck size={15} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
-                    <strong style={{ color: '#0f172a' }}>Pädagogische Didaktik:</strong> Die Lehrkraft und Schulleitung können das didaktische UI-Level (Junior, Teen, Pro) direkt anpassen. Änderungen synchronisieren sofort live mit der Schüler-App.
+                    <strong style={{ color: '#0f172a' }}>Parental Governance:</strong> Die didaktische Altersstufe und Schutzschranken (Chat, Audio-Freigabe, Storno-Rechte) werden ausnahmslos von den Erziehungsberechtigten über die Eltern-PIN festgelegt (Art. 8 DSGVO / BGB 1626).
                   </div>
                 </div>
               </section>
@@ -1490,7 +1419,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                     background: '#fefce8',
                     borderRadius: '24px',
                     padding: '20px 22px',
-                    border: '1.5px solid #fef08a',
+                    border: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '10px'
@@ -1669,6 +1598,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
             teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
             uiLevel={studentUiLevel || (student as any)?.campus_ui_level || undefined}
             parentPermissions={(student as any)?.parent_permissions}
+            isTeacherTools={true}
             onClose={() => setShowTageskompassModal(false)}
           />
         </React.Suspense>

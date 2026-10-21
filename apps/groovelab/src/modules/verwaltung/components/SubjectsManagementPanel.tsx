@@ -241,7 +241,7 @@ export const SubjectsManagementPanel: React.FC<SubjectsManagementPanelProps> = (
                   onClick={() => handleDeleteSubject(s.id, s.name)}
                   style={{
                     background: '#fff5f5',
-                    border: '1px solid #fee2e2',
+                    border: 'none',
                     color: '#ef4444',
                     cursor: 'pointer',
                     padding: '6px',

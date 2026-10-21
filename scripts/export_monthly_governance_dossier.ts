@@ -317,6 +317,34 @@ const mutationTests: MutationTest[] = [
     runCommand: { cmd: 'node', args: ['scripts/zero_overlap_guard.mjs'] }
   },
   {
+    id: 'MUT_MID_WORD_SPLIT',
+    name: 'Zero-Overlap Guard Mutation (Anti-Mid-Word-Split Heading Violation)',
+    targetGuard: 'scripts/zero_overlap_guard.mjs',
+    setup: () => {
+      const p = path.join(ROOT_DIR, 'apps', 'groovelab', 'src', '__scratch_mutation_wordsplit.tsx');
+      fs.writeFileSync(p, "import React from 'react'; export const BrokenHeading = () => <h2 style={{ wordBreak: 'break-all', hyphens: 'auto' }}>Übepfad</h2>;\n", 'utf-8');
+      return p;
+    },
+    cleanup: (p) => {
+      if (fs.existsSync(p)) fs.rmSync(p, { force: true });
+    },
+    runCommand: { cmd: 'node', args: ['scripts/zero_overlap_guard.mjs'] }
+  },
+  {
+    id: 'MUT_RIGID_GRID_MOBILE',
+    name: 'Zero-Overlap Guard Mutation (Unguarded 4-Column Mobile KPI Grid Violation)',
+    targetGuard: 'scripts/zero_overlap_guard.mjs',
+    setup: () => {
+      const p = path.join(ROOT_DIR, 'apps', 'groovelab', 'src', '__scratch_mutation_rigidgrid.tsx');
+      fs.writeFileSync(p, "import React from 'react'; export const BrokenGrid = () => <div className=\"dashboard-grid\" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' }}>Fail</div>;\n", 'utf-8');
+      return p;
+    },
+    cleanup: (p) => {
+      if (fs.existsSync(p)) fs.rmSync(p, { force: true });
+    },
+    runCommand: { cmd: 'node', args: ['scripts/zero_overlap_guard.mjs'] }
+  },
+  {
     id: 'MUT_RLS',
     name: 'RLS Catalog Invariant Mutation (Post-470 Unmanaged Table without RLS)',
     targetGuard: 'scripts/verify_rls_catalog_invariants.ts',
@@ -329,6 +357,60 @@ const mutationTests: MutationTest[] = [
       if (fs.existsSync(p)) fs.rmSync(p, { force: true });
     },
     runCommand: { cmd: 'npx', args: ['tsx', 'scripts/verify_rls_catalog_invariants.ts'] }
+  },
+  {
+    id: 'MUT_BSI_MATRIX',
+    name: 'BSI 360° Matrix Guard Mutation (SECURITY DEFINER current_user Privilege Bypass)',
+    targetGuard: 'scripts/bsi_360_cybersecurity_matrix_guard.mjs',
+    setup: () => {
+      const p = path.join(ROOT_DIR, 'supabase', 'migrations', '9999_scratch_mutation_bsi_matrix.sql');
+      fs.writeFileSync(
+        p,
+        "CREATE OR REPLACE FUNCTION public.get_master_schools_overview() RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ BEGIN IF current_user IN ('postgres') THEN RETURN '[]'::jsonb; END IF; RETURN '[]'::jsonb; END; $$;\n",
+        'utf-8'
+      );
+      return p;
+    },
+    cleanup: (p) => {
+      if (fs.existsSync(p)) fs.rmSync(p, { force: true });
+    },
+    runCommand: { cmd: 'node', args: ['scripts/bsi_360_cybersecurity_matrix_guard.mjs'] }
+  },
+  {
+    id: 'MUT_RLS_REBAC_DOWNGRADE',
+    name: 'BSI 360° Matrix Guard Mutation (§ 201 StGB Audio Policy Leadership Downgrade)',
+    targetGuard: 'scripts/bsi_360_cybersecurity_matrix_guard.mjs',
+    setup: () => {
+      const p = path.join(ROOT_DIR, 'supabase', 'migrations', '9999_scratch_mutation_rebac_downgrade.sql');
+      fs.writeFileSync(
+        p,
+        'CREATE POLICY "audio_recordings_policy" ON public.audio_recordings FOR ALL TO anon, authenticated USING (school_id = (SELECT public.get_current_user_school_id()) AND EXISTS (SELECT 1 FROM public.users_raw u WHERE u.id = (SELECT public.get_current_authenticated_user_id()) AND u.role IN (\'teacher\', \'admin\', \'secretary\')));\n',
+        'utf-8'
+      );
+      return p;
+    },
+    cleanup: (p) => {
+      if (fs.existsSync(p)) fs.rmSync(p, { force: true });
+    },
+    runCommand: { cmd: 'node', args: ['scripts/bsi_360_cybersecurity_matrix_guard.mjs'] }
+  },
+  {
+    id: 'MUT_BFF_UNVERIFIED_COOKIE',
+    name: 'Security Drift Guard BFF-01 Mutation (Unverified Cookie Existence Bypass)',
+    targetGuard: 'scripts/security_drift_guard.mjs',
+    setup: () => {
+      const p = path.join(ROOT_DIR, 'packages', 'bff-server', 'src', 'routes', '__scratch_mutation_bff_cookie.ts');
+      fs.writeFileSync(
+        p,
+        "export const badAuth = (req: any) => Boolean(req.cookies?.['__Host-session']);\n",
+        'utf-8'
+      );
+      return p;
+    },
+    cleanup: (p) => {
+      if (fs.existsSync(p)) fs.rmSync(p, { force: true });
+    },
+    runCommand: { cmd: 'node', args: ['scripts/security_drift_guard.mjs'] }
   }
 ];
 
@@ -417,7 +499,8 @@ const allGuards: GuardConfig[] = [
   { id: 'GUARD_12', name: 'RLS & Schema Catalog Invariants', standard: '22 Forensic Invariants (Migrations 471-519+)', cmd: 'npx', args: ['tsx', 'scripts/verify_rls_catalog_invariants.ts'] },
   { id: 'GUARD_13', name: 'World Tour Invariants Verifier', standard: 'Urtext & UrhG § 64 Gemeinfreiheit', cmd: 'npx', args: ['tsx', 'scripts/verify_world_tour_invariants.ts'] },
   { id: 'GUARD_14', name: 'Users View Security Leakage Audit', standard: 'OWASP ASVS L3 Zero-Secret Airgap', cmd: 'npx', args: ['tsx', 'tests/security/users-security-view-leakage.test.ts'] },
-  { id: 'GUARD_15', name: 'Perimeter Headers & Precache Smoke', standard: 'Tri-Observatory (Observatory/Qualys/SecHeaders)', cmd: 'node', args: ['scripts/verify_perimeter_headers.mjs'] }
+  { id: 'GUARD_15', name: 'Perimeter Headers & Precache Smoke', standard: 'Tri-Observatory (Observatory/Qualys/SecHeaders)', cmd: 'node', args: ['scripts/verify_perimeter_headers.mjs'] },
+  { id: 'GUARD_16', name: 'BSI 360° Cybersecurity Matrix Guard', standard: '6 Domänen / 24 Checks (BSI / OWASP ASVS L3)', cmd: 'node', args: ['scripts/bsi_360_cybersecurity_matrix_guard.mjs'] }
 ];
 
 // Dynamically register unlisted guards from scripts directory into Stage 3

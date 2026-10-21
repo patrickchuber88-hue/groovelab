@@ -475,7 +475,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                     {!isBillingBooked ? (
                       <div style={{ 
                         display: 'grid', 
-                        gridTemplateColumns: '1.7fr 1.3fr', 
+                        gridTemplateColumns: (typeof window !== 'undefined' && window.innerWidth <= 1024) ? '1fr' : '1.7fr 1.3fr', 
                         gap: '28px', 
                         alignItems: 'start', 
                         textAlign: 'left',
@@ -531,9 +531,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       border: isPassed || isCurrent 
                                         ? 'none' 
                                         : '1px solid #e2e8f0',
-                                      boxShadow: isCurrent 
-                                        ? '0 2px 8px rgba(52, 168, 83, 0.35)' 
-                                        : 'none',
+                                      boxShadow: 'none',
                                       boxSizing: 'border-box',
                                       transition: 'all 0.25s ease'
                                     }}>
@@ -583,8 +581,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                               {/* Kombi-Vorteil Promo Banner */}
                               <div style={{
-                                background: 'linear-gradient(135deg, #fef08a 0%, #fef9c3 100%)',
-                                border: '1.5px solid #eab308',
+                                background: '#fef9c3',
+                                border: 'none',
                                 borderRadius: '16px',
                                 padding: '12px 16px',
                                 display: 'flex',
@@ -601,7 +599,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </div>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px' }}>
                                 {/* Campus Card */}
                                 <div 
                                   onClick={() => handleToggleCampusSub(!hasCampusSub)}
@@ -613,9 +611,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     padding: '20px',
                                     borderRadius: '20px',
                                     border: '2px solid',
-                                    background: hasCampusSub ? '#f0fdf4' : '#ffffff',
-                                    borderColor: hasCampusSub ? '#34a853' : '#e2e8f0',
-                                    boxShadow: hasCampusSub ? '0 10px 25px rgba(52, 168, 83, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+                                    background: hasCampusSub ? '#dcfce7' : '#ffffff',
+                                    borderColor: hasCampusSub ? 'transparent' : '#e2e8f0',
+                                    boxShadow: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -668,9 +666,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     padding: '20px',
                                     borderRadius: '20px',
                                     border: '2px solid',
-                                    background: hasGroovelabSub ? '#fefce8' : '#ffffff',
-                                    borderColor: hasGroovelabSub ? '#eab308' : '#e2e8f0',
-                                    boxShadow: hasGroovelabSub ? '0 10px 25px rgba(234, 179, 8, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+                                    background: hasGroovelabSub ? '#fef9c3' : '#ffffff',
+                                    borderColor: hasGroovelabSub ? 'transparent' : '#e2e8f0',
+                                    boxShadow: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     minHeight: '170px'
@@ -679,7 +677,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   <div>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                       <strong style={{ fontSize: '0.9rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                                         GrooveLab
                                       </strong>
                                       <span style={{
@@ -687,12 +685,12 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         height: '20px',
                                         borderRadius: '50%',
                                         border: '2px solid',
-                                        borderColor: hasGroovelabSub ? '#eab308' : '#cbd5e1',
-                                        background: hasGroovelabSub ? '#eab308' : '#f8fafc',
+                                        borderColor: hasGroovelabSub ? '#facc15' : '#cbd5e1',
+                                        background: hasGroovelabSub ? '#facc15' : '#f8fafc',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#ffffff',
+                                        color: '#0f172a',
                                         fontSize: '0.7rem',
                                         fontWeight: 900
                                       }}>
@@ -700,10 +698,10 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       </span>
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Interaktives Live-Lab-Board</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Songs zum Meistern &amp; Übe-Tools</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Automatisiertes Band-Matching</span>
-                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#eab308' }}>•</span> Bandprofile &amp; coole Musiker-Avatare</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#facc15' }}>•</span> Interaktives Live-Lab-Board</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#facc15' }}>•</span> Songs zum Meistern &amp; Übe-Tools</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#facc15' }}>•</span> Automatisiertes Band-Matching</span>
+                                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ color: '#facc15' }}>•</span> Bandprofile &amp; coole Musiker-Avatare</span>
                                      </div>
                                   </div>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9', fontSize: '0.78rem' }}>
@@ -763,7 +761,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </p>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px' }}>
                                 {/* Option A: Schule Card */}
                                 <div 
                                   onClick={() => {
@@ -832,7 +830,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     borderRadius: '20px',
                                     border: '2px solid',
                                     background: '#ffffff',
-                                    borderColor: billingPayer === 'student' ? '#eab308' : 'rgba(0,0,0,0.06)',
+                                    borderColor: billingPayer === 'student' ? '#facc15' : 'rgba(0,0,0,0.06)',
                                     boxShadow: 'none',
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
@@ -849,12 +847,12 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         height: '18px',
                                         borderRadius: '50%',
                                         border: '2px solid',
-                                        borderColor: billingPayer === 'student' ? '#eab308' : '#cbd5e1',
-                                        background: billingPayer === 'student' ? '#eab308' : 'transparent',
+                                        borderColor: billingPayer === 'student' ? '#facc15' : '#cbd5e1',
+                                        background: billingPayer === 'student' ? '#facc15' : 'transparent',
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#ffffff',
+                                        color: '#0f172a',
                                         fontSize: '0.65rem'
                                       }}>
                                         {billingPayer === 'student' && '✓'}
@@ -864,7 +862,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       Eltern und Schüler zahlen ihren Beitrag direkt an Campus-Groovelab. Die Plattform übernimmt die komplette Zahlungsabwicklung vollautomatisch im Hintergrund und zeigt dir in Echtzeit in der Schülerliste, wer bereits bezahlt hat. Deine Musikschule wird finanziell maximal entlastet – ohne jeglichen Verwaltungsaufwand.
                                     </span>
                                   </div>
-                                  <div style={{ fontSize: '0.74rem', color: '#eab308', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
+                                  <div style={{ fontSize: '0.74rem', color: '#facc15', fontWeight: 800, textAlign: 'right', marginTop: '12px' }}>
                                     {billingPayer === 'student' ? 'Ausgewählt' : 'Auswählen'}
                                   </div>
                                 </div>
@@ -873,7 +871,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               {billingPayer === 'school' && (
                                 <div style={{
                                   background: '#e6f4ea',
-                                  border: '1.5px solid #34a853',
+                                  border: 'none',
                                   borderRadius: '20px',
                                   padding: '20px',
                                   marginTop: '8px',
@@ -987,7 +985,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               {billingPayer === 'student' && (
                                 <div style={{
                                   background: '#fffbeb',
-                                  border: '1.5px solid #f59e0b',
+                                  border: 'none',
                                   borderRadius: '20px',
                                   padding: '20px',
                                   marginTop: '8px',
@@ -1009,7 +1007,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       alignItems: 'flex-start',
                                       gap: '12px',
                                       background: '#ffffff',
-                                      border: '1.5px solid #f59e0b',
+                                      border: 'none',
                                       borderRadius: '14px',
                                       padding: '14px',
                                       boxShadow: 'none'
@@ -1019,7 +1017,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         height: '24px',
                                         borderRadius: '50%',
                                         background: '#fef3c7',
-                                        border: '1.5px solid #f59e0b',
+                                        border: 'none',
                                         color: '#d97706',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -1115,8 +1113,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 const pendingGb = currentSchoolProfile?.storage_addon_pending_gb || selectedStorageAddonGb || 10;
                                 return (
                                   <div style={{
-                                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                                    border: '1.5px solid #f59e0b',
+                                    background: '#fef9c3',
+                                    border: 'none',
                                     borderRadius: '16px',
                                     padding: '16px 20px',
                                     display: 'flex',
@@ -1128,11 +1126,11 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       width: '40px',
                                       height: '40px',
                                       borderRadius: '12px',
-                                      background: 'rgba(217, 119, 6, 0.15)',
+                                      background: '#ffedd5',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      border: '1px solid rgba(217, 119, 6, 0.25)',
+                                      border: 'none',
                                       flexShrink: 0
                                     }}>
                                       <Clock size={20} color="#b45309" />
@@ -1179,7 +1177,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       <div style={{
                                         height: '100%',
                                         width: `${usedBytes > 0 ? Math.max(5, (usedGb / currentTotalCapGb) * 100) : 0}%`,
-                                        background: usagePct > 80 ? '#ef4444' : 'linear-gradient(90deg, #34a853 0%, #10b981 100%)',
+                                        background: usagePct > 80 ? '#ef4444' : '#34a853',
                                         borderRadius: '6px',
                                         transition: 'width 0.3s ease'
                                       }} />
@@ -1229,8 +1227,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         padding: '16px 14px',
                                         borderRadius: '16px',
                                         border: '2px solid',
-                                        borderColor: isSel ? '#34a853' : isCurrentlyActive ? '#a7f3d0' : isDowngradeBlocked ? '#f1f5f9' : '#e2e8f0',
-                                        background: isSel ? '#f0fdf4' : isCurrentlyActive ? '#fafffd' : isDowngradeBlocked ? '#f8fafc' : '#ffffff',
+                                        borderColor: isSel ? 'transparent' : isCurrentlyActive ? 'transparent' : isDowngradeBlocked ? '#f1f5f9' : '#e2e8f0',
+                                        background: isSel ? '#dcfce7' : isCurrentlyActive ? '#dcfce7' : isDowngradeBlocked ? '#f8fafc' : '#ffffff',
                                         cursor: isDowngradeBlocked ? 'not-allowed' : 'pointer',
                                         textAlign: 'center',
                                         transition: 'all 0.2s',
@@ -1424,7 +1422,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 {hasCustomBillingAddress && (
                                   <div style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
+                                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                                     gap: '12px',
                                     background: '#f8fafc',
                                     border: '1px solid #e2e8f0',
@@ -1508,7 +1506,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               {billingPayer === 'school' ? (
                                 <div style={{
                                   background: '#ecfdf5',
-                                  border: '1.5px solid #10b981',
+                                  border: 'none',
                                   borderRadius: '16px',
                                   padding: '16px 20px',
                                   display: 'flex',
@@ -1528,7 +1526,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               ) : (
                                 <div style={{
                                   background: '#ecfdf5',
-                                  border: '1.5px solid #10b981',
+                                  border: 'none',
                                   borderRadius: '16px',
                                   padding: '18px 20px',
                                   display: 'flex',
@@ -1550,7 +1548,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   </div>
                                   <div style={{
                                     background: '#ffffff',
-                                    border: '1px solid #bbf7d0',
+                                    border: 'none',
                                     borderRadius: '12px',
                                     padding: '10px 14px',
                                     fontSize: '0.74rem',
@@ -1676,7 +1674,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                   {/* Invoice A Block */}
                                   <div style={{
-                                    border: '1.5px solid #34a853',
+                                    border: 'none',
                                     borderRadius: '16px',
                                     background: '#e6f4ea',
                                     padding: '16px',
@@ -1733,7 +1731,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                                   {/* Invoice B Block */}
                                   <div style={{
-                                    border: '1.5px solid #3b82f6',
+                                    border: 'none',
                                     borderRadius: '16px',
                                     background: '#eff6ff',
                                     padding: '16px',
@@ -2537,7 +2535,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               {activeBillingSubTab === 'overview' && (
                                 <div style={{
                                   display: 'grid',
-                                  gridTemplateColumns: '1.7fr 1.3fr',
+                                  gridTemplateColumns: (typeof window !== 'undefined' && window.innerWidth <= 1024) ? '1fr' : '1.7fr 1.3fr',
                                   gap: '28px',
                                   width: '100%',
                                   alignItems: 'start',
@@ -2557,7 +2555,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '12px' }}>
                                           {/* Campus Module */}
                                           {hasCampusSub ? (
-                                            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ background: '#f0fdf4', border: 'none', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                               <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#34a853', boxShadow: 'none' }} />
                                               <div>
                                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#166534' }}>Campus Modul</div>
@@ -2566,8 +2564,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             </div>
                                           ) : (
                                             <div style={{
-                                              background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)',
-                                              border: '1.5px dashed #10b981',
+                                              background: '#dcfce7',
+                                              border: 'none',
                                               padding: '14px 18px',
                                               borderRadius: '16px',
                                               display: 'flex',
@@ -2615,8 +2613,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                                           {/* GrooveLab Module */}
                                           {hasGroovelabSub ? (
-                                            <div style={{ background: '#fefce8', border: '1.5px solid #fef08a', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#eab308', boxShadow: 'none' }} />
+                                            <div style={{ background: '#fefce8', border: 'none', padding: '14px 18px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                              <div style={{ width: '10px', height: '10px', minWidth: '10px', borderRadius: '50%', background: '#facc15', boxShadow: 'none' }} />
                                               <div>
                                                 <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#854d0e' }}>GrooveLab Modul</div>
                                                 <div style={{ fontSize: '0.74rem', color: '#a16207', fontWeight: 500 }}>Live-Lab &amp; Bands aktiv</div>
@@ -2624,8 +2622,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             </div>
                                           ) : (
                                             <div style={{
-                                              background: 'linear-gradient(135deg, #fefce8 0%, #ffffff 100%)',
-                                              border: '1.5px dashed #fde047',
+                                              background: '#fef9c3',
+                                              border: 'none',
                                               padding: '14px 18px',
                                               borderRadius: '16px',
                                               display: 'flex',
@@ -2654,7 +2652,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                 onClick={() => { setUpgradeTargetModule('groovelab'); setShowModuleUpgradeModal(true); }}
                                                 className="hover-scale"
                                                 style={{
-                                                  background: '#eab308',
+                                                  background: '#facc15',
                                                   color: '#0f172a',
                                                   border: 'none',
                                                   borderRadius: '10px',
@@ -2788,8 +2786,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             <div style={{
                                               width: '100%',
                                               marginTop: '12px',
-                                              background: billingPayer === 'school' ? '#f0fdf4' : '#f0f9ff',
-                                              border: `1px solid ${billingPayer === 'school' ? '#bbf7d0' : '#bae6fd'}`,
+                                              background: billingPayer === 'school' ? '#dcfce7' : '#e0f2fe',
+                                              border: 'none',
                                               borderRadius: '11px',
                                               padding: '9px 12px',
                                               fontSize: '0.72rem',
@@ -2871,7 +2869,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                     <div style={{
                                                       width: `${usedBytes > 0 ? Math.max(3, usagePct) : 0}%`,
                                                       height: '100%',
-                                                      background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                                                      background: isCritical ? '#dc2626' : isWarning ? '#f59e0b' : '#10b981',
                                                       borderRadius: '100px',
                                                       transition: 'width 0.3s ease'
                                                     }} />
@@ -3064,7 +3062,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                             </div>
 
                                             {subscriptionBypass ? (
-                                              <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#faf5ff', border: '1px solid #f3e8ff', color: '#6b21a8', fontSize: '0.75rem', lineHeight: '1.4' }}>
+                                              <div style={{ padding: '12px 14px', borderRadius: '14px', background: '#faf5ff', border: 'none', color: '#6b21a8', fontSize: '0.75rem', lineHeight: '1.4' }}>
                                                 <div style={{ fontWeight: 800, marginBottom: '2px' }}>⚡ Kostenfreie Freistellung aktiv</div>
                                                 <span>Alle Server-Hosting-Flatrates &amp; Bereitstellungsgebühren sind 100% freigestellt (0,00 € / Mo.).</span>
                                               </div>
@@ -3178,7 +3176,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                                     </div>
 
                                                     {addonPendingGb > 0 && addonStatus === 'pending_activation' && (
-                                                      <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: '8px', padding: '4px 8px', fontSize: '0.65rem', color: '#92400e', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
+                                                      <div style={{ background: '#fef3c7', border: 'none', borderRadius: '8px', padding: '4px 8px', fontSize: '0.65rem', color: '#92400e', fontWeight: 700, textAlign: 'center', marginTop: '2px' }}>
                                                         ⏳ +{addonPendingGb} GB Warten auf Hetzner-Aktivierung
                                                       </div>
                                                     )}
@@ -3342,7 +3340,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </div>
                               </div>
 
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px' }}>
                                 {/* Lastschrift Spalte */}
                                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '16px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
@@ -3392,9 +3390,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               alignItems: 'center', 
                                               fontSize: '0.74rem', 
                                               padding: '8px 10px', 
-                                              background: isPaid ? '#e6f4ea' : '#ffffff', 
+                                              background: isPaid ? '#dcfce7' : '#ffffff', 
                                               borderRadius: '10px', 
-                                              border: isPaid ? '1px solid #e6f4ea' : '1px solid #e2e8f0', 
+                                              border: isPaid ? 'none' : '1px solid #e2e8f0', 
                                               boxShadow: '0 2px 6px rgba(0,0,0,0.01)',
                                               transition: 'all 0.2s'
                                             }}
@@ -3781,7 +3779,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   height: '42px',
                                   borderRadius: '12px',
                                   background: '#f0fdf4',
-                                  border: '1px solid #bbf7d0',
+                                  border: 'none',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -3823,7 +3821,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               fontSize: '0.72rem',
                               color: '#15803d',
                               background: '#f0fdf4',
-                              border: '1px solid #dcfce7',
+                              border: 'none',
                               padding: '10px 14px',
                               borderRadius: '14px',
                               display: 'flex',
@@ -4069,9 +4067,9 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                           {/* Hero Card 0: Amtliches B2B-Vertragszertifikat (Full-Width) */}
                           <div style={{
-                            background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                            background: '#dcfce7',
                             borderRadius: '20px',
-                            border: '1.5px solid #bbf7d0',
+                            border: 'none',
                             padding: '22px 24px',
                             display: 'flex',
                             alignItems: 'center',

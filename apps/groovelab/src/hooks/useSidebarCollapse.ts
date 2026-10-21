@@ -18,9 +18,29 @@ export interface UseSidebarCollapseReturn {
  * - Synchronizes across browser tabs via the `storage` event.
  * - Defaults to collapsed rail mode on tablets and compact screens (<= 1180px).
  */
+const resolveEffectiveViewportWidth = (fallbackWidth?: number): number => {
+  if (typeof window === 'undefined') return 1280;
+  if (typeof document !== 'undefined') {
+    const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
+    if (simWidth > 0) return simWidth;
+    const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+    if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    if (document.documentElement.getAttribute('data-sim-category') === 'tablet' || document.querySelector('.sim-viewport-tablet')) {
+      return 1024;
+    }
+  }
+  return typeof fallbackWidth === 'number' && fallbackWidth > 0 ? fallbackWidth : window.innerWidth;
+};
+
 export function useSidebarCollapse(windowWidth?: number): UseSidebarCollapseReturn {
   const [isCollapsed, setIsCollapsedState] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
+    const effectiveWidth = resolveEffectiveViewportWidth(windowWidth);
+    // On tablet & compact viewports (<= 1180px), always default to collapsed rail mode (68px)
+    // to prevent the 260px sidebar from overflowing the 68px rail on initial mount.
+    if (effectiveWidth <= 1180) {
+      return true;
+    }
     try {
       const stored = localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY);
       if (stored !== null) {
@@ -30,10 +50,6 @@ export function useSidebarCollapse(windowWidth?: number): UseSidebarCollapseRetu
       // localStorage security/quota error fallback
     }
 
-    // Default responsive behavior:
-    // On tablet & smaller desktop viewports (<= 1180px), default to rail mode (68px).
-    // On wide desktop screens (> 1180px), default to expanded (260px).
-    const effectiveWidth = typeof windowWidth === 'number' ? windowWidth : window.innerWidth;
     return effectiveWidth <= 1180;
   });
 
@@ -91,17 +107,32 @@ export function useSidebarCollapse(windowWidth?: number): UseSidebarCollapseRetu
     };
   }, []);
 
-  // Dynamically update responsive state on window resize when no manual preference is stored
+  // Dynamically update responsive state on window/simulator resize & orientation change
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      if (localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) !== null) {
+    const syncResponsiveCollapse = () => {
+      const effectiveWidth = resolveEffectiveViewportWidth(windowWidth);
+      if (effectiveWidth <= 1180) {
+        setIsCollapsedState(true);
         return;
       }
-    } catch {}
+      try {
+        if (localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) !== null) {
+          setIsCollapsedState(localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) === 'true');
+          return;
+        }
+      } catch {}
 
-    const effectiveWidth = typeof windowWidth === 'number' ? windowWidth : window.innerWidth;
-    setIsCollapsedState(effectiveWidth <= 1180);
+      setIsCollapsedState(false);
+    };
+
+    syncResponsiveCollapse();
+    window.addEventListener('groovelab_orientation_changed', syncResponsiveCollapse);
+    window.addEventListener('orientationchange', syncResponsiveCollapse);
+    return () => {
+      window.removeEventListener('groovelab_orientation_changed', syncResponsiveCollapse);
+      window.removeEventListener('orientationchange', syncResponsiveCollapse);
+    };
   }, [windowWidth]);
 
   return {

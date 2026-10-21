@@ -28,10 +28,11 @@ export const readInitialStudentPrepMirror = (studentId?: string, weekStr?: strin
       const hwNotesRaw = localStorage.getItem(`campus_homework_notes_${studentId}`);
       if (hwNotesRaw) {
         const parsedHw = parseHomeworkNotesPayload(hwNotesRaw);
-        if (parsedHw.didacticNotes.length > 0 || parsedHw.audioItems.length > 0) {
+        if (parsedHw.didacticNotes.length > 0 || parsedHw.audioItems.length > 0 || parsedHw.microScores.length > 0) {
           const notes = [
             ...parsedHw.audioItems.map(a => a.rawToken),
             ...parsedHw.loopItems.map(l => l.rawToken),
+            ...parsedHw.microScores.map(m => m.rawToken),
             ...parsedHw.didacticNotes
           ];
           if (result) {
@@ -251,23 +252,25 @@ export function useTeacherStudentPrep({
 
         const currentWeekNotesItem = matrixItems.find(item => 
           item.topic_name.startsWith('Hausaufgabe KW ') && 
+          item.is_current_homework !== false &&
+          Boolean(item.homework_notes && String(item.homework_notes).trim() !== '' && String(item.homework_notes).trim() !== '[]') &&
           (getItemWeek(item) === currentWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === currentWeekStr))
         );
 
         const prevWeekNotesItem = matrixItems.find(item => 
           item.topic_name.startsWith('Hausaufgabe KW ') && 
-          item.updated_at && 
-          getISOWeekRaw(item.updated_at, 1) === prevWeekStr
+          item.id !== currentWeekNotesItem?.id &&
+          (getItemWeek(item) === prevWeekStr || (item.updated_at && getISOWeekRaw(item.updated_at, 1) === prevWeekStr))
         );
 
-        // Parse Snapshots, Audios & Didactic Notes via SSOT Engine
+        // Parse Snapshots, Audios, MicroScores & Didactic Notes via SSOT Engine
         let currentWeekParsed = parseHomeworkNotesPayload(currentWeekNotesItem?.homework_notes);
-        if (!currentWeekNotesItem || (currentWeekParsed.didacticNotes.length === 0 && currentWeekParsed.audioItems.length === 0)) {
+        if (!currentWeekNotesItem || (currentWeekParsed.didacticNotes.length === 0 && currentWeekParsed.audioItems.length === 0 && currentWeekParsed.microScores.length === 0)) {
           try {
             const rawHw = localStorage.getItem(`campus_homework_notes_${studentId}`);
             if (rawHw) {
               const fallbackParsed = parseHomeworkNotesPayload(rawHw);
-              if (fallbackParsed.didacticNotes.length > 0 || fallbackParsed.audioItems.length > 0) {
+              if (fallbackParsed.didacticNotes.length > 0 || fallbackParsed.audioItems.length > 0 || fallbackParsed.microScores.length > 0) {
                 currentWeekParsed = fallbackParsed;
               }
             }
@@ -340,17 +343,19 @@ export function useTeacherStudentPrep({
           }))
         ];
 
-        // 3. Audio & Didactic Notes without technical JSON or snapshot leakage
+        // 3. Audio, MicroScores & Didactic Notes without technical JSON or snapshot leakage
         const prevWeekNotes = [
           ...prevWeekParsed.audioItems.map(a => a.rawToken),
           ...prevWeekParsed.loopItems.map(l => l.rawToken),
+          ...prevWeekParsed.microScores.map(m => m.rawToken),
           ...prevWeekParsed.didacticNotes
         ];
 
         const hasCurrentWeekContent = Boolean(
-          currentWeekNotesItem || 
           currentWeekParsed.didacticNotes.length > 0 || 
           currentWeekParsed.audioItems.length > 0 || 
+          currentWeekParsed.loopItems.length > 0 || 
+          currentWeekParsed.microScores.length > 0 || 
           currentWeekParsed.lehrwerke.length > 0 || 
           currentWeekParsed.songs.length > 0
         );
@@ -359,9 +364,10 @@ export function useTeacherStudentPrep({
           ? [
               ...currentWeekParsed.audioItems.map(a => a.rawToken),
               ...currentWeekParsed.loopItems.map(l => l.rawToken),
+              ...currentWeekParsed.microScores.map(m => m.rawToken),
               ...currentWeekParsed.didacticNotes
             ]
-          : (currentWeekItems.length > 0 && prevWeekNotes.length > 0 ? prevWeekNotes : []);
+          : [];
 
         // 🛡️ Privacy Invariant (DSGVO Art. 25): !showRealNames triggers privacy masking ("M.")
         const rawStudentName = activeStudent.first_name 
@@ -427,6 +433,20 @@ export function useTeacherStudentPrep({
       const targetStudentId = e?.detail?.studentId;
       if (!targetStudentId || String(targetStudentId) === String(studentId)) {
         prepCacheMemoryRef.current.delete(studentId);
+        if (e?.detail?.deleted) {
+          setDynamicPrepMirror((prev: any) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              currentWeekNotes: [],
+              currentWeekItems: [],
+              parsedCurrentLehrwerke: [],
+              parsedCurrentSongs: [],
+              currentRawSnapshotLwToken: undefined,
+              currentRawSnapshotSongsToken: undefined
+            };
+          });
+        }
         loadPrepForStudent();
       }
     };

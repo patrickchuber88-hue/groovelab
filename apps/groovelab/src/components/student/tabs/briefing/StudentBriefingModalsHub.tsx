@@ -596,7 +596,7 @@ export function StudentBriefingModalsHub({
               {showCancelConfirmStep ? (
                 <div style={{
                   background: '#fef2f2',
-                  border: '1.5px solid #fecaca',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '16px',
                   display: 'flex',
@@ -736,7 +736,7 @@ export function StudentBriefingModalsHub({
                         justifyContent: 'center',
                         gap: '8px',
                         background: '#fff1f2',
-                        border: '1.5px solid #fecdd3',
+                        border: 'none',
                         borderRadius: '14px',
                         padding: '12px',
                         color: '#dc2626',

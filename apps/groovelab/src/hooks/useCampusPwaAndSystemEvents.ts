@@ -31,7 +31,17 @@ export function useCampusPwaAndSystemEvents({
   isLocalhost,
   loggedInUserId
 }: UseCampusPwaAndSystemEventsParams): UseCampusPwaAndSystemEventsReturn {
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const resolveViewportWidth = () => {
+    if (typeof window === 'undefined') return 1200;
+    if (typeof document !== 'undefined') {
+      const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simWidth > 0) return simWidth;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    }
+    return window.innerWidth;
+  };
+  const [windowWidth, setWindowWidth] = useState(resolveViewportWidth);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
@@ -279,9 +289,16 @@ export function useCampusPwaAndSystemEvents({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => setWindowWidth(resolveViewportWidth());
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    handleResize();
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
 
   // Automated Audio Storage Janitor & Client Cache Janitor Background Task

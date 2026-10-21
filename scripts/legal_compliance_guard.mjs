@@ -1161,7 +1161,7 @@ let hasMinorProtection = false;
 
 if (fs.existsSync(avvModalPath)) {
   const avvCode = fs.readFileSync(avvModalPath, 'utf8');
-  hasAvvChecksum = avvCode.includes('avv_checksum') && avvCode.includes('Hetzner Online GmbH');
+  hasAvvChecksum = avvCode.includes('avv_checksum') && avvCode.includes('Hetzner Online GmbH') && avvCode.includes('IONOS SE');
 }
 
 if (fs.existsSync(avatarEnginePath) && fs.existsSync(consentGatePath)) {
@@ -1173,8 +1173,8 @@ recordCheck(
   'LEG-33: ISO/IEC 27701 Dual-Role Governance (Processor AVV Checksum & Controller Minor Protection)',
   hasAvvChecksum && hasMinorProtection,
   hasAvvChecksum && hasMinorProtection
-    ? 'Dual-Rolle verifiziert: PII Processor AVV-Checksumme mit Hetzner DE verankert; PII Controller KUG § 22 3D-Avatare aktiv.'
-    : 'Dual-Role Governance unvollständig: AVV-Checksumme oder 3D-Avatar-Schutz fehlt.'
+    ? 'Dual-Rolle verifiziert: PII Processor AVV-Checksumme mit IONOS SE & Hetzner DE verankert; PII Controller KUG § 22 3D-Avatare aktiv.'
+    : 'Dual-Role Governance unvollständig: AVV-Checksumme (IONOS SE / Hetzner) oder 3D-Avatar-Schutz fehlt.'
 );
 
 // LEG-34: StGB § 201 Vertraulichkeit des Wortes & Audio-Aufnahme-Transparenz

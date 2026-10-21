@@ -568,7 +568,7 @@ export function GroupedSongCard({
                         borderRadius: '12px',
                         background: '#eff6ff',
                         color: '#2563eb',
-                        border: '1px solid #bfdbfe',
+                        border: 'none',
                         fontSize: '0.82rem',
                         fontWeight: 800,
                         cursor: 'pointer',
@@ -593,7 +593,7 @@ export function GroupedSongCard({
                   display: 'flex', 
                   alignItems: 'center', 
                   gap: '16px', 
-                  border: '1px solid #fde047',
+                  border: 'none',
                   marginBottom: '20px'
                 }}>
                   <div style={{ 
@@ -633,7 +633,7 @@ export function GroupedSongCard({
                   }}>
                     {APP_INSTRUMENT_ICONS[activeSkill.instrument]}
                   </div>
-                  <div style={{ background: 'linear-gradient(135deg, #e6f4ea, #e6f4ea)', color: '#34a853', padding: '24px', borderRadius: '24px', flex: 1, display: 'flex', alignItems: 'center', gap: '20px', border: '1px solid #e6f4ea' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #e6f4ea, #e6f4ea)', color: '#34a853', padding: '24px', borderRadius: '24px', flex: 1, display: 'flex', alignItems: 'center', gap: '20px', border: 'none' }}>
                     <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                       <Award size={28} />
                     </div>
@@ -748,7 +748,7 @@ export function GroupedSongCard({
               {activeSkill.is_pending_approval && (
                 <div style={{ 
                   padding: '16px 20px', borderRadius: '18px', 
-                  background: '#fefce8', border: '1.5px solid #fef08a', 
+                  background: '#fefce8', border: 'none', 
                   display: 'flex', alignItems: 'center', gap: '12px', 
                   color: '#854d0e', fontSize: '0.88rem', fontWeight: 800,
                   boxShadow: 'none'
@@ -836,7 +836,7 @@ export function GroupedSongCard({
             }
 
             return (
-              <div style={{ marginTop: '32px', padding: '24px', background: isFullyStaffed ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', borderRadius: '24px', border: isFullyStaffed ? '2px solid #eab308' : '1px solid #e2e8f0' }}>
+              <div style={{ marginTop: '32px', padding: '24px', background: isFullyStaffed ? 'linear-gradient(135deg, #f8fafc, #f1f5f9)' : '#f8fafc', borderRadius: '24px', border: isFullyStaffed ? '2px solid #facc15' : '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ color: '#ec4899' }}><Users size={20} /></div>
@@ -846,7 +846,7 @@ export function GroupedSongCard({
                   </div>
                   
                   {isFullyStaffed ? (
-                    <div style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', color: '#0f172a', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: 'none', border: 'none' }}>
+                    <div style={{ background: '#facc15', color: '#0f172a', padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '6px', boxShadow: 'none', border: 'none' }}>
                       <Star size={14} fill="#0f172a" stroke="#0f172a" /> VOLLSTÄNDIG
                     </div>
                   ) : (
@@ -952,7 +952,7 @@ export function GroupedSongCard({
             style={{ 
               width: '52px', height: '52px', borderRadius: '18px', 
               background: '#fff1f2', 
-              border: '1px solid #ffe4e6', 
+              border: 'none', 
               color: '#f43f5e', 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
               cursor: 'pointer', transition: 'all 0.2s',

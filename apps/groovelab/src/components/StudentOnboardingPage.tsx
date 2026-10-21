@@ -576,7 +576,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
     const platformParam = urlParams.get('platform');
     const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
-    const themeColor = isCampus ? '#34a853' : '#eab308';
+    const themeColor = isCampus ? '#34a853' : '#facc15';
     const displayAvatar = isCampus 
       ? resolveCampusStudentAvatar(student)
       : (student.photo_url || getDefaultMusicianAvatarUrl(student.instrument, student.role));
@@ -747,7 +747,7 @@ Deine Vorteile auf einen Blick:
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#64748b', fontFamily: 'system-ui' }}>
-        <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#eab308', borderRadius: '50%', marginBottom: '16px' }}></div>
+        <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#facc15', borderRadius: '50%', marginBottom: '16px' }}></div>
         <p style={{ fontWeight: 700, fontSize: '0.9rem' }}>Dein Ausweis wird generiert...</p>
       </div>
     );
@@ -883,7 +883,7 @@ Deine Vorteile auf einen Blick:
   if (error || !student) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#09090b', color: '#ef4444', padding: '24px', textAlign: 'center', fontFamily: 'system-ui' }}>
-        <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '50%', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+        <div style={{ background: '#fef2f2', border: 'none', borderRadius: '50%', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
           <span style={{ fontSize: '2rem' }}>⚠️</span>
         </div>
         <h3 style={{ fontSize: '1.25rem', fontWeight: 900, marginBottom: '8px', color: '#fca5a5' }}>Fehler beim Laden</h3>
@@ -896,7 +896,7 @@ Deine Vorteile auf einen Blick:
   const urlParams = new URLSearchParams(window.location.search);
   const platformParam = urlParams.get('platform');
   const isCampus = platformParam === 'campus' || (platformParam !== 'groovelab' && student.is_campus_active && !student.is_groovelab_active);
-  const activeColor = isCampus ? '#34a853' : '#eab308';
+  const activeColor = isCampus ? '#34a853' : '#facc15';
   
   const displayAvatar = isCampus 
     ? resolveCampusStudentAvatar(student)
@@ -923,7 +923,7 @@ Deine Vorteile auf einen Blick:
         <Confetti
           numberOfPieces={160}
           recycle={false}
-          colors={['#15803d', '#22c55e', '#eab308', '#facc15', '#ffffff']}
+          colors={['#137333', '#34a853', '#facc15', '#fef9c3', '#ffffff']}
           style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9999, pointerEvents: 'none' }}
         />
       )}
@@ -1041,7 +1041,7 @@ Deine Vorteile auf einen Blick:
                       style={{
                         padding: '16px 12px',
                         borderRadius: '16px',
-                        border: `2px solid ${campusUsageMode === 'selbstnutzer' ? '#10b981' : '#e2e8f0'}`,
+                        border: `2px solid ${campusUsageMode === 'selbstnutzer' ? 'transparent' : '#e2e8f0'}`,
                         background: campusUsageMode === 'selbstnutzer' ? '#ecfdf5' : '#ffffff',
                         color: campusUsageMode === 'selbstnutzer' ? '#065f46' : '#475569',
                         cursor: 'pointer',
@@ -1080,7 +1080,7 @@ Deine Vorteile auf einen Blick:
                       style={{
                         padding: '16px 12px',
                         borderRadius: '16px',
-                        border: `2px solid ${campusUsageMode === 'eltern_geführt' ? '#10b981' : '#e2e8f0'}`,
+                        border: `2px solid ${campusUsageMode === 'eltern_geführt' ? 'transparent' : '#e2e8f0'}`,
                         background: campusUsageMode === 'eltern_geführt' ? '#ecfdf5' : '#ffffff',
                         color: campusUsageMode === 'eltern_geführt' ? '#065f46' : '#475569',
                         cursor: 'pointer',
@@ -1587,7 +1587,7 @@ Deine Vorteile auf einen Blick:
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Eltern-Master-PIN:</span>
-                          <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <Check size={11} strokeWidth={3} /> 6 Ziffern hinterlegt
                           </span>
                         </div>
@@ -1604,15 +1604,15 @@ Deine Vorteile auf einen Blick:
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Hausaufgabenheft &amp; Notizen:</span>
-                          <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Inklusive</span>
+                          <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Inklusive</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Alle Schuljahrestermine:</span>
-                          <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Inklusive</span>
+                          <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Inklusive</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>1:1 Eltern-Lehrer-Chat:</span>
-                          <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Aktiviert</span>
+                          <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>● Aktiviert</span>
                         </div>
                       </div>
                     </div>
@@ -1628,23 +1628,23 @@ Deine Vorteile auf einen Blick:
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Terminabsagen durch Kind:</span>
                           {parentAllowAbsences ? (
-                            <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Selbstständig</span>
+                            <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Selbstständig</span>
                           ) : (
-                            <span style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Eltern-PIN nötig</span>
+                            <span style={{ background: '#fef3c7', border: 'none', color: '#92400e', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Eltern-PIN nötig</span>
                           )}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Ausweichtermine annehmen:</span>
                           {parentAllowReschedule ? (
-                            <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Selbstständig</span>
+                            <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Selbstständig</span>
                           ) : (
-                            <span style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Eltern-PIN nötig</span>
+                            <span style={{ background: '#fef3c7', border: 'none', color: '#92400e', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Eltern-PIN nötig</span>
                           )}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: '#475569', fontWeight: 600 }}>Direkt-Chat Kind &amp; Lehrer:</span>
                           {parentAllowChat ? (
-                            <span style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Freigegeben</span>
+                            <span style={{ background: '#ecfdf5', border: 'none', color: '#059669', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>✦ Freigegeben</span>
                           ) : (
                             <span style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', fontSize: '0.70rem' }}>🔒 Nur über Eltern</span>
                           )}
@@ -1662,7 +1662,7 @@ Deine Vorteile auf einen Blick:
                     background: '#ecfdf5',
                     padding: '14px 16px',
                     borderRadius: '16px',
-                    border: '1.5px solid #10b981',
+                    border: 'none',
                     transition: 'border-color 0.2s ease'
                   }}>
                     <input
@@ -1718,7 +1718,7 @@ Deine Vorteile auf einen Blick:
                   {consentError && (
                     <div style={{
                       background: '#fef2f2',
-                      border: '1px solid #fecaca',
+                      border: 'none',
                       color: '#b91c1c',
                       padding: '10px 12px',
                       borderRadius: '12px',
@@ -1800,7 +1800,7 @@ Deine Vorteile auf einen Blick:
               background: '#ecfdf5',
               padding: '16px',
               borderRadius: '16px',
-              border: '1px solid #10b981',
+              border: 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -1862,7 +1862,7 @@ Deine Vorteile auf einen Blick:
                 }} 
                 className="hover-scale"
               >
-                {scheduleCompleted ? <CheckCircle2 size={18} color="#22c55e" /> : <Calendar size={18} />}
+                {scheduleCompleted ? <CheckCircle2 size={18} color="#34a853" /> : <Calendar size={18} />}
                 {scheduleCompleted ? 'Stundenplan-Zeiten übermittelt (bearbeiten)' : 'Wunschzeiten für Stundenplan eintragen'}
               </button>
             )}
@@ -2035,7 +2035,7 @@ Deine Vorteile auf einen Blick:
                 gap: '6px' 
               }}
             >
-              {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              {copied ? <Check size={14} color="#34a853" /> : <Copy size={14} />}
               {copied ? 'Zugangs-Einladung kopiert!' : 'Zugangs-Link kopieren'}
             </button>
 

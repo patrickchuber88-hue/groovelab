@@ -75,7 +75,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
                 <div key={idx} style={{
                   flex: 1,
                   height: '4px',
-                  background: idx < storySlide ? '#eab308' : idx === storySlide ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.2)',
+                  background: idx < storySlide ? '#facc15' : idx === storySlide ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.2)',
                   borderRadius: '100px',
                   overflow: 'hidden'
                 }}>
@@ -83,7 +83,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
                     <div style={{
                       width: '100%',
                       height: '100%',
-                      background: '#eab308',
+                      background: '#facc15',
                       animation: 'storyProgress 5s linear forwards'
                     }} />
                   )}
@@ -133,14 +133,14 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
               {storySlide === 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                   <div style={{ textAlign: 'center' }}>
-                    <span style={{ background: '#eab308', color: '#09090b', fontSize: '0.7rem', fontWeight: 900, padding: '4px 12px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus &amp; Übung</span>
+                    <span style={{ background: '#facc15', color: '#09090b', fontSize: '0.7rem', fontWeight: 900, padding: '4px 12px', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fokus &amp; Übung</span>
                     <h2 style={{ fontSize: '2rem', fontWeight: 900, marginTop: '12px' }}>Deine Meilensteine</h2>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {/* Focus Minutes Card */}
                     <div style={{ background: '#09090b', border: '1px solid #27272a', padding: '24px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <Clock size={36} color="#eab308" />
+                      <Clock size={36} color="#facc15" />
                       <div>
                         <div style={{ fontSize: '0.75rem', color: '#a1a1aa', textTransform: 'uppercase', fontWeight: 800 }}>Fokus-Zeit</div>
                         <div 
@@ -166,7 +166,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
                   </div>
 
                   {!wrappedData.isPremium && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px', borderRadius: '16px', color: '#ef4444', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239,68,68,0.1)', border: 'none', padding: '12px', borderRadius: '16px', color: '#ef4444', fontSize: '0.78rem' }}>
                       <EyeOff size={16} />
                       <span>Statistiken ausgeblendet. Upgrade auf Premium erforderlich!</span>
                     </div>
@@ -303,7 +303,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
                     setStorySlide(prev => Math.min(3, prev + 1));
                   }
                 }}
-                style={{ flex: 2, background: '#eab308', border: 'none', color: '#09090b', padding: '12px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 2, background: '#facc15', border: 'none', color: '#09090b', padding: '12px 16px', borderRadius: '10px', fontSize: '0.82rem', fontWeight: 900, cursor: 'pointer', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 {storySlide === 3 ? 'Schließen' : 'Weiter'}
               </button>

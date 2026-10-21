@@ -12,7 +12,7 @@
 import { ContinentDefinition, WorldTourCountry } from '../types/worldTour';
 
 export const CONTINENTS: ContinentDefinition[] = [
-  { id: 'africa', label: 'Afrika', emoji: '🌍', badgeId: 'wt-continent-africa', color: '#eab308', countriesCount: 3 },
+  { id: 'africa', label: 'Afrika', emoji: '🌍', badgeId: 'wt-continent-africa', color: '#facc15', countriesCount: 3 },
   { id: 'americas', label: 'Amerika', emoji: '🌎', badgeId: 'wt-continent-americas', color: '#f59e0b', countriesCount: 4 },
   { id: 'asia', label: 'Asien & Orient', emoji: '🌏', badgeId: 'wt-continent-asia', color: '#ec4899', countriesCount: 3 },
   { id: 'oceania', label: 'Ozeanien', emoji: '🦘', badgeId: 'wt-continent-oceania', color: '#10b981', countriesCount: 3 },

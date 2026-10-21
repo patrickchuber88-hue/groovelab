@@ -69,7 +69,7 @@ export const WorldTourDiplomaModal: React.FC<WorldTourDiplomaModalProps> = ({
           background: '#f8fafc'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Award size={22} color="#eab308" />
+            <Award size={22} color="#ca8a04" />
             <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>
               Offizielles Campus-Weltmusiker-Diplom
             </span>

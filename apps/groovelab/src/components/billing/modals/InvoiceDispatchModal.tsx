@@ -398,7 +398,7 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid #bbf7d0',
+                border: 'none',
               }}
             >
               <Mail size={22} />
@@ -648,7 +648,7 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
               padding: '10px 14px',
               borderRadius: '10px',
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               fontSize: '0.76rem',
               color: '#991b1b',
               lineHeight: 1.4,
@@ -665,7 +665,7 @@ export const InvoiceDispatchModal: React.FC<InvoiceDispatchModalProps> = ({
               padding: '12px 14px',
               borderRadius: '12px',
               background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               fontSize: '0.78rem',
               color: '#15803d',
               lineHeight: 1.4,

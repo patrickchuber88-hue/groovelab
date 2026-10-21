@@ -45,41 +45,56 @@ export const DESIGN_TOKENS = {
     adminGlow: 'none'
   },
 
-  // 🌈 Module Primary & Surface Colors (Apple 2-Farben-Standard: border: 'transparent' bei getönten Flächen)
+  // 🌈 Module Primary & Surface Colors (12-Ton Notenschnipsel / Boomwhacker Chromatic Standard)
   colors: {
     campus: {
-      primary: '#34a853',
-      primaryDark: '#15803d',
-      surface: 'rgba(52, 168, 83, 0.10)',
-      surfaceLight: '#f0fdf4',
+      primary: '#34a853',      // Autoritatives Campus-Grün (Screenshot 1)
+      primaryDark: '#137333',
+      surface: '#e6f4ea',       // Helle Tonal-Variante von Campus-Grün
+      surfaceLight: '#e6f4ea',
       border: 'transparent',
-      text: '#166534'
+      text: '#137333'
     },
     groovelab: {
-      primary: '#eab308',
-      primaryDark: '#ca8a04',
-      surface: 'rgba(234, 179, 8, 0.12)',
-      surfaceLight: '#fffbeb',
+      primary: '#facc15',      // Autoritatives GrooveLab-Gelb (Screenshot 2)
+      primaryDark: '#854d0e',
+      surface: '#fef9c3',       // Helle Tonal-Variante von GrooveLab-Gelb
+      surfaceLight: '#fef9c3',
       border: 'transparent',
       text: '#854d0e'
     },
     admin: {
-      primary: '#ea4335',
-      primaryDark: '#dc2626',
-      surface: 'rgba(234, 67, 53, 0.10)',
-      surfaceLight: '#fef2f2',
+      primary: '#ef4444',      // Note C (Rot)
+      primaryDark: '#b91c1c',
+      surface: '#fee2e2',
+      surfaceLight: '#fee2e2',
       border: 'transparent',
-      text: '#991b1b'
+      text: '#b91c1c'
     },
     neutral: {
-      bgMain: '#f8fafc',
+      bgMain: '#f8fafc',       // Note REST (Pause)
       cardBg: '#ffffff',
-      border: '#e2e8f0',
-      borderDark: '#cbd5e1',
+      border: 'transparent',
+      borderDark: '#94a3b8',
       textPrimary: '#0f172a',
       textSecondary: '#475569',
       textMuted: '#64748b',
       textDisabled: '#94a3b8'
+    },
+    notenschnipsel: {
+      C:  { solid: '#ef4444', bg: '#fee2e2', text: '#b91c1c' },
+      Cs: { solid: '#f87171', bg: '#fee2e2', text: '#b91c1c' },
+      D:  { solid: '#f97316', bg: '#ffedd5', text: '#c2410c' },
+      Ds: { solid: '#fb923c', bg: '#ffedd5', text: '#c2410c' },
+      E:  { solid: '#facc15', bg: '#fef9c3', text: '#854d0e' },
+      F:  { solid: '#34a853', bg: '#e6f4ea', text: '#137333' },
+      Fs: { solid: '#10b981', bg: '#d1fae5', text: '#047857' },
+      G:  { solid: '#06b6d4', bg: '#cffafe', text: '#0e7490' },
+      Gs: { solid: '#0ea5e9', bg: '#e0f2fe', text: '#0369a1' },
+      A:  { solid: '#3b82f6', bg: '#dbeafe', text: '#1d4ed8' },
+      As: { solid: '#6366f1', bg: '#e0e7ff', text: '#4338ca' },
+      B:  { solid: '#a855f7', bg: '#f3e8ff', text: '#7e22ce' },
+      REST: { solid: '#94a3b8', bg: '#f1f5f9', text: '#475569' }
     }
   },
 

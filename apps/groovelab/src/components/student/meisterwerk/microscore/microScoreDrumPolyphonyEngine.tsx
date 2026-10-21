@@ -101,13 +101,20 @@ export function analyzeDrumSlot(
 
     // Hands-Pause: Wenn Hände an diesem Beat schweigen, aber im Takt aktiv sind
     if (handsNotes.length === 0 && hasAnyHandsInBar && feetNotes.length > 0) {
-      handsRest = { duration: '4', y: 18.75 }; // Obere Hälfte (3. Zwischenraum)
+      const hasHandsOffbeatInSameBeat = allBarNotes.some(
+        n =>
+          n.barIndex === barIdx &&
+          n.pitch &&
+          n.pitch !== 'REST' &&
+          !isDrumFootPitch(n.pitch) &&
+          n.beatFraction > fractionIdx &&
+          n.beatFraction < fractionIdx + 4
+      );
+      handsRest = { duration: hasHandsOffbeatInSameBeat ? '8' : '4', y: 18.75 }; // Obere Hälfte (3. Zwischenraum)
     }
 
-    // Feet-Pause: Wenn Füße an diesem Beat schweigen, aber im Takt aktiv sind
-    if (feetNotes.length === 0 && hasAnyFeetInBar && handsNotes.length > 0) {
-      feetRest = { duration: '4', y: 43.75 }; // Untere Hälfte (1. Zwischenraum)
-    }
+    // 🥁 PAS / Gould Goldstandard: Für die Fuß-Stimme werden unter aktiven Händen KEINE künstlichen
+    // Viertelpausen generiert, um visuelle Überlagerungen und Notensatz-Kollisionen auszuschließen.
   }
 
   return {
@@ -116,6 +123,59 @@ export function analyzeDrumSlot(
     handsRest,
     feetRest
   };
+}
+
+export interface DrumPieceColorDef {
+  pieceId: string;
+  label: string;
+  shortBadge: string;
+  shortCode: string;
+  staffColor: string;
+  stageFill: string;
+  stageGlow: string;
+}
+
+// 🎨 0,1% Goldstandard 8-Sektoren-Maximal-Kontrast-Palette (100% disjunkt im Raum & auf den 5 Linien)
+export const CANONICAL_DRUM_COLOR_GUIDE: Record<string, DrumPieceColorDef> = {
+  snare: { pieceId: 'snare', label: 'Snare 14"', shortBadge: 'SNARE', shortCode: 'SN', staffColor: '#dc2626', stageFill: '#ef4444', stageGlow: '#f87171' },
+  kick: { pieceId: 'kick', label: 'Bass Drum 22"', shortBadge: 'KICK', shortCode: 'BD', staffColor: '#7c3aed', stageFill: '#8b5cf6', stageGlow: '#a78bfa' },
+  hihat: { pieceId: 'hihat', label: 'Hi-Hat 14"', shortBadge: 'HI-HAT', shortCode: 'HH', staffColor: '#0891b2', stageFill: '#06b6d4', stageGlow: '#22d3ee' },
+  crash: { pieceId: 'crash', label: 'Crash 16"', shortBadge: 'CRASH', shortCode: 'CR', staffColor: '#ea580c', stageFill: '#f97316', stageGlow: '#fb923c' },
+  ride: { pieceId: 'ride', label: 'Ride 20"', shortBadge: 'RIDE', shortCode: 'RD', staffColor: '#c026d3', stageFill: '#d946ef', stageGlow: '#e879f9' },
+  tom_hi: { pieceId: 'tom_hi', label: 'High Tom 10"', shortBadge: 'HI-TOM', shortCode: 'HT', staffColor: '#34a853', stageFill: '#34a853', stageGlow: '#4ade80' },
+  tom_mid: { pieceId: 'tom_mid', label: 'Mid Tom 12"', shortBadge: 'MID-TOM', shortCode: 'MT', staffColor: '#d97706', stageFill: '#facc15', stageGlow: '#facc15' },
+  tom_floor: { pieceId: 'tom_floor', label: 'Standtom 16"', shortBadge: 'STANDTOM', shortCode: 'ST', staffColor: '#2563eb', stageFill: '#3b82f6', stageGlow: '#60a5fa' },
+  hihat_pedal: { pieceId: 'hihat_pedal', label: 'Hi-Hat Fuß', shortBadge: 'HH-FUSS', shortCode: 'HF', staffColor: '#0891b2', stageFill: '#06b6d4', stageGlow: '#22d3ee' }
+};
+
+export function getCanonicalDrumPieceColor(pitch: string): DrumPieceColorDef {
+  const p = (pitch || '').trim().toUpperCase();
+  if (p === 'C5' || p === 'C4' || p === 'SD' || p === 'SNARE') return CANONICAL_DRUM_COLOR_GUIDE.snare;
+  if (p === 'F4' || p === 'C3' || p === 'B2' || p === 'BD' || p === 'KICK') return CANONICAL_DRUM_COLOR_GUIDE.kick;
+  if (p === 'A5' || p === 'C6' || p === 'CRASH') return CANONICAL_DRUM_COLOR_GUIDE.crash;
+  if (p === 'F5' || p === 'RIDE') return CANONICAL_DRUM_COLOR_GUIDE.ride;
+  if (p === 'E5' || p === 'E4' || p === 'TOM_HI' || p === 'TOM1') return CANONICAL_DRUM_COLOR_GUIDE.tom_hi;
+  if (p === 'D5' || p === 'TOM_MID' || p === 'TOM2') return CANONICAL_DRUM_COLOR_GUIDE.tom_mid;
+  if (p === 'A4' || p === 'A3' || p === 'G3' || p === 'TOM_FLOOR' || p === 'TOM3') return CANONICAL_DRUM_COLOR_GUIDE.tom_floor;
+  if (p === 'D3' || p === 'HIHAT_PEDAL' || p === 'PEDAL_HH' || p === 'HIHAT_FOOT') return CANONICAL_DRUM_COLOR_GUIDE.hihat_pedal;
+  return CANONICAL_DRUM_COLOR_GUIDE.hihat;
+}
+
+/**
+ * 🥁 0,1% Goldstandard: Klarschrift-Bezeichnung für das schwebende Apple-Callout-Badge beim Noteneintragen
+ */
+export function getCanonicalDrumCalloutName(pitch: string): string {
+  const p = (pitch || '').trim().toUpperCase();
+  if (p === 'C5' || p === 'C4' || p === 'SD' || p === 'SNARE') return 'Snare';
+  if (p === 'F4' || p === 'C3' || p === 'B2' || p === 'BD' || p === 'KICK') return 'Kick';
+  if (p === 'A5' || p === 'C6' || p === 'CRASH') return 'Crash';
+  if (p === 'F5' || p === 'RIDE') return 'Ride';
+  if (p === 'E5' || p === 'E4' || p === 'TOM_HI' || p === 'TOM1') return 'High Tom';
+  if (p === 'D5' || p === 'TOM_MID' || p === 'TOM2') return 'Mid Tom';
+  if (p === 'A4' || p === 'A3' || p === 'G3' || p === 'TOM_FLOOR' || p === 'TOM3') return 'Standtom';
+  if (p === 'D3' || p === 'HIHAT_PEDAL' || p === 'PEDAL_HH' || p === 'HIHAT_FOOT') return 'HH-Fuß';
+  if (p === 'G#5' || p.includes('OPEN') || p === 'A#4') return 'Hi-Hat (offen)';
+  return 'Hi-Hat';
 }
 
 export interface RenderDrumPolyphonySlotProps {
@@ -130,9 +190,17 @@ export interface RenderDrumPolyphonySlotProps {
   hitStatus?: 'hit' | 'near' | 'miss';
   isSelectedSlot: boolean;
   isPlaying: boolean;
+  readOnly?: boolean;
+  isDrumColorGuide?: boolean;
   getStaffY: (pitch: string, isBass: boolean, isDrum?: boolean) => number;
   measureWidth?: number;
   barStartX?: number;
+}
+
+interface DrumBeamColorSegment {
+  x1: number;
+  x2: number;
+  color: string;
 }
 
 interface DrumBeamGroup {
@@ -142,11 +210,17 @@ interface DrumBeamGroup {
   xStart: number;
   xEnd: number;
   hasSixteenth: boolean;
+  secXStart?: number;
+  secXEnd?: number;
+  uniformColor?: string;
+  primarySegments: DrumBeamColorSegment[];
+  secondarySegments: DrumBeamColorSegment[];
 }
 
 /**
  * 🎼 0,1% Goldstandard Beaming Engine für Schlagzeug (Elaine Gould / PAS Standard):
  * Berechnet automatische Notenbalken für zusammenhängende 8tel- und 16tel-Gruppen im Beat
+ * inklusive pro-Zählzeit farbcodierter Balkensegmente.
  */
 function calculateDrumBeamGroup(
   allBarNotes: MicroScoreNote[],
@@ -157,12 +231,16 @@ function calculateDrumBeamGroup(
   staffTopY: number,
   getStaffY: (pitch: string, isBass: boolean, isDrum?: boolean) => number,
   barStartX?: number,
-  measureWidth?: number
+  measureWidth?: number,
+  timeSignature: string = '4/4'
 ): DrumBeamGroup {
-  // In 4/4 Zeit: 4 Viertelschläge pro Takt (Beat 0: 0..3, Beat 1: 4..7, Beat 2: 8..11, Beat 3: 12..15)
-  const beatIndex = Math.floor(fractionIdx / 4);
-  const beatStart = beatIndex * 4;
-  const beatEnd = beatIndex * 4 + 3;
+  // Metrische Gruppierung nach Elaine Gould ("Behind Bars"):
+  // Im 6/8-Takt: 2 punktierte Viertelschläge à 3 Achtel (Gruppe 0: 0..5, Gruppe 1: 6..11)
+  // Im 4/4- & 3/4-Takt: Viertelschläge à 4 Sechzehntel (0..3, 4..7, 8..11, 12..15)
+  const groupSize = timeSignature === '6/8' ? 6 : 4;
+  const beatIndex = Math.floor(fractionIdx / groupSize);
+  const beatStart = beatIndex * groupSize;
+  const beatEnd = beatStart + groupSize - 1;
 
   // Noten dieses Taktes für diese Stimme im aktuellen Beat
   const beatNotes = allBarNotes.filter(n => {
@@ -175,31 +253,52 @@ function calculateDrumBeamGroup(
 
   const uniqueFractions = Array.from(new Set(beatNotes.map(n => n.beatFraction))).sort((a, b) => a - b);
 
-  // Balkung ist aktiv, wenn mindestens 2 rhythmische Zählzeiten im Beat vorhanden sind
-  // und alle Noten Achtel ('8') oder Sechzehntel ('16') sind
-  const allBeamable = beatNotes.length > 0 && beatNotes.every(n => n.duration === '8' || n.duration === '16');
-  const isBeamGroup = uniqueFractions.length >= 2 && allBeamable;
+  // 🎼 0,1% Goldstandard Beaming-Erkennung (Elaine Gould Behind Bars):
+  // Eine Balkengruppe formiert sich, wenn mindestens 2 rhythmische Zählzeiten im Beat vorhanden sind:
+  // Finde Zählzeiten mit schnellen Noten (Achtel '8' oder Sechzehntel '16')
+  const beamableNotes = beatNotes.filter(n => n.duration === '8' || n.duration === '16');
+  const beamableFractions = Array.from(new Set(beamableNotes.map(n => n.beatFraction))).sort((a, b) => a - b);
 
-  if (!isBeamGroup || !uniqueFractions.includes(fractionIdx)) {
+  // Wenn mindestens 2 Zählzeiten im Beat 8tel/16tel haben, oder alle Noten im Beat 8tel/16tel sind:
+  const isBeamGroup = (beamableFractions.length >= 2) || (uniqueFractions.length >= 2 && beatNotes.every(n => n.duration === '8' || n.duration === '16'));
+  const activeFractions = beamableFractions.length >= 2
+    ? uniqueFractions.filter(f => beamableFractions.includes(f) || (f >= beamableFractions[0] && f <= beamableFractions[beamableFractions.length - 1]))
+    : uniqueFractions;
+
+  if (!isBeamGroup || !activeFractions.includes(fractionIdx)) {
     return {
       isPartOfBeam: false,
       isFirstInBeam: false,
       beamY: 0,
       xStart: 0,
       xEnd: 0,
-      hasSixteenth: false
+      hasSixteenth: false,
+      primarySegments: [],
+      secondarySegments: []
     };
   }
 
+  const totalFractionsInBar = timeSignature === '3/4' || timeSignature === '6/8' ? 12 : timeSignature === '2/4' ? 8 : 16;
   const getFracX = (f: number): number => {
     if (barStartX !== undefined && measureWidth !== undefined) {
-      return barStartX + 12 + (f / 16) * (measureWidth - 24);
+      return barStartX + 12 + (f / totalFractionsInBar) * (measureWidth - 24);
     }
     return fractionX + (f - fractionIdx) * 22;
   };
 
-  const firstFrac = uniqueFractions[0];
-  const lastFrac = uniqueFractions[uniqueFractions.length - 1];
+  const getSlotAnchorColor = (f: number): string => {
+    const notesAtF = beatNotes.filter(n => Math.abs(n.beatFraction - f) < 0.2);
+    if (notesAtF.length === 0) return '#0891b2';
+    const sortedAtF = [...notesAtF].sort((a, b) =>
+      voice === 'hands'
+        ? getStaffY(a.pitch, false, true) - getStaffY(b.pitch, false, true)
+        : getStaffY(b.pitch, false, true) - getStaffY(a.pitch, false, true)
+    );
+    return getCanonicalDrumPieceColor(sortedAtF[0].pitch).staffColor;
+  };
+
+  const firstFrac = activeFractions[0];
+  const lastFrac = activeFractions[activeFractions.length - 1];
   const stemOffset = voice === 'hands' ? 6.0 : -6.0;
   const xStart = getFracX(firstFrac) + stemOffset;
   const xEnd = getFracX(lastFrac) + stemOffset;
@@ -213,7 +312,63 @@ function calculateDrumBeamGroup(
     beamY = staffTopY + maxStaffRelY + 26;
   }
 
-  const hasSixteenth = beatNotes.some(n => n.duration === '16');
+  const primarySegments: DrumBeamColorSegment[] = [];
+  for (let i = 0; i < activeFractions.length - 1; i++) {
+    const f1 = activeFractions[i];
+    const f2 = activeFractions[i + 1];
+    const sx1 = getFracX(f1) + stemOffset;
+    const sx2 = getFracX(f2) + stemOffset;
+    const c1 = getSlotAnchorColor(f1);
+    const c2 = getSlotAnchorColor(f2);
+    if (c1 === c2) {
+      primarySegments.push({ x1: sx1, x2: sx2, color: c1 });
+    } else {
+      const midX = (sx1 + sx2) / 2;
+      primarySegments.push({ x1: sx1, x2: midX + 0.25, color: c1 });
+      primarySegments.push({ x1: midX - 0.25, x2: sx2, color: c2 });
+    }
+  }
+
+  const sixteenthNotes = beatNotes.filter(n => n.duration === '16');
+  const sixteenthFractions = Array.from(new Set(sixteenthNotes.map(n => n.beatFraction))).sort((a, b) => a - b);
+  const hasSixteenth = sixteenthFractions.length > 0;
+  let secXStart: number | undefined;
+  let secXEnd: number | undefined;
+  const secondarySegments: DrumBeamColorSegment[] = [];
+
+  if (sixteenthFractions.length >= 2) {
+    secXStart = getFracX(sixteenthFractions[0]) + stemOffset;
+    secXEnd = getFracX(sixteenthFractions[sixteenthFractions.length - 1]) + stemOffset;
+    for (let i = 0; i < sixteenthFractions.length - 1; i++) {
+      const sf1 = sixteenthFractions[i];
+      const sf2 = sixteenthFractions[i + 1];
+      const sx1 = getFracX(sf1) + stemOffset;
+      const sx2 = getFracX(sf2) + stemOffset;
+      const c1 = getSlotAnchorColor(sf1);
+      const c2 = getSlotAnchorColor(sf2);
+      if (c1 === c2) {
+        secondarySegments.push({ x1: sx1, x2: sx2, color: c1 });
+      } else {
+        const midX = (sx1 + sx2) / 2;
+        secondarySegments.push({ x1: sx1, x2: midX + 0.25, color: c1 });
+        secondarySegments.push({ x1: midX - 0.25, x2: sx2, color: c2 });
+      }
+    }
+  } else if (sixteenthFractions.length === 1) {
+    const sFrac = sixteenthFractions[0];
+    const sX = getFracX(sFrac) + stemOffset;
+    const isAtEnd = sFrac === lastFrac;
+    secXStart = isAtEnd ? sX - 9 : sX;
+    secXEnd = isAtEnd ? sX : sX + 9;
+    secondarySegments.push({
+      x1: secXStart,
+      x2: secXEnd,
+      color: getSlotAnchorColor(sFrac)
+    });
+  }
+
+  const uniqueColors = Array.from(new Set(beatNotes.map(n => getCanonicalDrumPieceColor(n.pitch).staffColor)));
+  const uniformColor = uniqueColors.length === 1 ? uniqueColors[0] : undefined;
 
   return {
     isPartOfBeam: true,
@@ -221,7 +376,12 @@ function calculateDrumBeamGroup(
     beamY,
     xStart,
     xEnd,
-    hasSixteenth
+    hasSixteenth,
+    secXStart,
+    secXEnd,
+    uniformColor,
+    primarySegments,
+    secondarySegments
   };
 }
 
@@ -242,6 +402,8 @@ export const renderDrumPolyphonySlot = ({
   hitStatus,
   isSelectedSlot,
   isPlaying,
+  readOnly = false,
+  isDrumColorGuide = false,
   getStaffY,
   measureWidth,
   barStartX
@@ -249,13 +411,20 @@ export const renderDrumPolyphonySlot = ({
   const analysis = analyzeDrumSlot(slotNotes, allBarNotes, barIdx, fractionIdx, timeSignature);
   const { handsNotes, feetNotes, handsRest, feetRest } = analysis;
 
-  const noteColor = isCurrentlyPlaying
+  const baseNoteColor = isCurrentlyPlaying && !isDrumColorGuide
     ? '#6366f1'
     : hitStatus === 'hit'
     ? '#10b981'
     : hitStatus === 'near'
     ? '#f59e0b'
     : '#0f172a';
+
+  const getNoteHeadColor = (pitch: string): string => {
+    if (hitStatus === 'hit') return '#10b981';
+    if (hitStatus === 'near') return '#f59e0b';
+    if (isDrumColorGuide) return getCanonicalDrumPieceColor(pitch).staffColor;
+    return baseNoteColor;
+  };
 
   return (
     <g id={`drum-polyphony-${barIdx}-${fractionIdx}`}>
@@ -285,7 +454,8 @@ export const renderDrumPolyphonySlot = ({
         const staffYs = sorted.map(n => staffTopY + getStaffY(n.pitch, false, true));
         const minY = Math.min(...staffYs);
         const maxY = Math.max(...staffYs);
-        const duration = sorted[0].duration;
+        const durationRank = (d: string) => d === '16' ? 1 : d === '8' ? 2 : d === '4' ? 3 : d === '2' ? 4 : 5;
+        const duration = [...sorted].sort((a, b) => durationRank(a.duration) - durationRank(b.duration))[0]?.duration || sorted[0].duration;
 
         const beam = calculateDrumBeamGroup(
           allBarNotes,
@@ -296,40 +466,75 @@ export const renderDrumPolyphonySlot = ({
           staffTopY,
           getStaffY,
           barStartX,
-          measureWidth
+          measureWidth,
+          timeSignature
         );
 
         const stemTopY = beam.isPartOfBeam ? beam.beamY : (minY - 28);
+        const topHandNote = sorted[sorted.length - 1] || sorted[0];
+        const handsTopStemColor = isDrumColorGuide
+          ? getNoteHeadColor(topHandNote.pitch)
+          : baseNoteColor;
+        const useSegmentedBeamColors = isDrumColorGuide && hitStatus !== 'hit' && hitStatus !== 'near';
 
         return (
           <g id={`hands-voice-${barIdx}-${fractionIdx}`}>
-            {/* Primärer Notenbalken (Primary Beam) beim 1. Schlag der Gruppe */}
+            {/* Primärer Notenbalken (Primary Beam) beim 1. Schlag der Gruppe - pro Zählzeit farbcodiert */}
             {beam.isFirstInBeam && (
-              <rect
-                x={beam.xStart}
-                y={beam.beamY - 1.7}
-                width={beam.xEnd - beam.xStart}
-                height={3.4}
-                fill={noteColor}
-                rx={0.5}
-              />
+              useSegmentedBeamColors && beam.primarySegments.length > 0 ? (
+                beam.primarySegments.map((seg, sIdx) => (
+                  <rect
+                    key={`hands-pbeam-${sIdx}`}
+                    x={seg.x1}
+                    y={beam.beamY - 1.7}
+                    width={Math.max(0.5, seg.x2 - seg.x1)}
+                    height={3.4}
+                    fill={seg.color}
+                    rx={0.5}
+                  />
+                ))
+              ) : (
+                <rect
+                  x={beam.xStart}
+                  y={beam.beamY - 1.7}
+                  width={beam.xEnd - beam.xStart}
+                  height={3.4}
+                  fill={handsTopStemColor}
+                  rx={0.5}
+                />
+              )
             )}
-            {/* Sekundärer Notenbalken (16tel-Beam) */}
-            {beam.isFirstInBeam && beam.hasSixteenth && (
-              <rect
-                x={beam.xStart}
-                y={beam.beamY + 4.5}
-                width={beam.xEnd - beam.xStart}
-                height={3.0}
-                fill={noteColor}
-                rx={0.5}
-              />
+            {/* Sekundärer Notenbalken (16tel-Beam) - pro Zählzeit farbcodiert */}
+            {beam.isFirstInBeam && beam.hasSixteenth && beam.secXStart !== undefined && beam.secXEnd !== undefined && (
+              useSegmentedBeamColors && beam.secondarySegments.length > 0 ? (
+                beam.secondarySegments.map((seg, sIdx) => (
+                  <rect
+                    key={`hands-sbeam-${sIdx}`}
+                    x={seg.x1}
+                    y={beam.beamY + 4.5}
+                    width={Math.max(0.5, seg.x2 - seg.x1)}
+                    height={2.8}
+                    fill={seg.color}
+                    rx={0.5}
+                  />
+                ))
+              ) : (
+                <rect
+                  x={beam.secXStart}
+                  y={beam.beamY + 4.5}
+                  width={beam.secXEnd - beam.secXStart}
+                  height={2.8}
+                  fill={handsTopStemColor}
+                  rx={0.5}
+                />
+              )
             )}
 
             {sorted.map((n, idx) => {
               const nY = staffTopY + getStaffY(n.pitch, false, true);
               const isCymbal = isCymbalPitch(n.pitch);
               const isOpen = n.pitch === 'G#5' || n.pitch.includes('OPEN') || n.pitch === 'A#4';
+              const headColor = getNoteHeadColor(n.pitch);
 
               return (
                 <g key={`hands-note-${n.id || idx}`}>
@@ -353,8 +558,8 @@ export const renderDrumPolyphonySlot = ({
                         y1={nY - 5}
                         x2={fractionX + 5.5}
                         y2={nY + 5}
-                        stroke={noteColor}
-                        strokeWidth="2.4"
+                        stroke={headColor}
+                        strokeWidth={isDrumColorGuide ? '2.7' : '2.4'}
                         strokeLinecap="round"
                       />
                       <line
@@ -362,8 +567,8 @@ export const renderDrumPolyphonySlot = ({
                         y1={nY + 5}
                         x2={fractionX + 5.5}
                         y2={nY - 5}
-                        stroke={noteColor}
-                        strokeWidth="2.4"
+                        stroke={headColor}
+                        strokeWidth={isDrumColorGuide ? '2.7' : '2.4'}
                         strokeLinecap="round"
                       />
                       {isOpen && (
@@ -372,52 +577,123 @@ export const renderDrumPolyphonySlot = ({
                           cy={nY}
                           r="7.5"
                           fill="none"
-                          stroke={noteColor}
-                          strokeWidth="1.5"
+                          stroke={headColor}
+                          strokeWidth="1.6"
                         />
+                      )}
+                      {isDrumColorGuide && (
+                        <text
+                          x={fractionX}
+                          y={nY + 2.0}
+                          textAnchor="middle"
+                          fontSize="5.4"
+                          fontWeight="900"
+                          fill={headColor}
+                          stroke="#ffffff"
+                          strokeWidth="2.4"
+                          paintOrder="stroke"
+                          fontFamily="system-ui, -apple-system, sans-serif"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          {getCanonicalDrumPieceColor(n.pitch).shortCode}
+                        </text>
                       )}
                     </g>
                   ) : (
-                    <ellipse
-                      cx={fractionX}
+                    <g>
+                      <ellipse
+                        cx={fractionX}
+                        cy={nY}
+                        rx={isDrumColorGuide ? '7.8' : '7.0'}
+                        ry={isDrumColorGuide ? '5.5' : '5.0'}
+                        transform={`rotate(-22 ${fractionX} ${nY})`}
+                        fill={duration === '1' || duration === '2' ? '#ffffff' : headColor}
+                        stroke={headColor}
+                        strokeWidth={duration === '1' || duration === '2' ? '2.4' : '0.6'}
+                      />
+                      {isDrumColorGuide && (
+                        <text
+                          x={fractionX}
+                          y={nY + 2.1}
+                          textAnchor="middle"
+                          fontSize="5.8"
+                          fontWeight="900"
+                          fill={duration === '1' || duration === '2' ? headColor : '#ffffff'}
+                          fontFamily="system-ui, -apple-system, sans-serif"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          {getCanonicalDrumPieceColor(n.pitch).shortCode}
+                        </text>
+                      )}
+                    </g>
+                  )}
+
+                  {/* Augmentations-Punkt (Dotted Note) */}
+                  {n.isDotted && (
+                    <circle
+                      cx={fractionX + 11.5}
                       cy={nY}
-                      rx="7.0"
-                      ry="5.0"
-                      transform={`rotate(-22 ${fractionX} ${nY})`}
-                      fill={duration === '1' || duration === '2' ? '#ffffff' : noteColor}
-                      stroke={noteColor}
-                      strokeWidth={duration === '1' || duration === '2' ? '2.2' : '0.6'}
+                      r="2.2"
+                      fill={headColor}
                     />
                   )}
                 </g>
               );
             })}
 
-            {/* Hals nach OBEN (Stimme 1: Hände) */}
+            {/* Hals nach OBEN (Stimme 1: Hände) - pro Instrument segmentiert farbcodiert */}
             {duration !== '1' && (
-              <line
-                x1={fractionX + 6.0}
-                y1={maxY}
-                x2={fractionX + 6.0}
-                y2={stemTopY}
-                stroke={noteColor}
-                strokeWidth="1.5"
-              />
+              isDrumColorGuide && sorted.length > 1 ? (
+                <g>
+                  {sorted.slice(0, -1).map((noteSeg, segIdx) => {
+                    const ySegStart = staffTopY + getStaffY(noteSeg.pitch, false, true);
+                    const ySegEnd = staffTopY + getStaffY(sorted[segIdx + 1].pitch, false, true);
+                    return (
+                      <line
+                        key={`hands-stem-seg-${segIdx}`}
+                        x1={fractionX + 6.0}
+                        y1={ySegStart}
+                        x2={fractionX + 6.0}
+                        y2={ySegEnd}
+                        stroke={getNoteHeadColor(noteSeg.pitch)}
+                        strokeWidth="1.65"
+                      />
+                    );
+                  })}
+                  <line
+                    x1={fractionX + 6.0}
+                    y1={minY}
+                    x2={fractionX + 6.0}
+                    y2={stemTopY}
+                    stroke={handsTopStemColor}
+                    strokeWidth="1.65"
+                  />
+                </g>
+              ) : (
+                <line
+                  x1={fractionX + 6.0}
+                  y1={maxY}
+                  x2={fractionX + 6.0}
+                  y2={stemTopY}
+                  stroke={handsTopStemColor}
+                  strokeWidth="1.65"
+                />
+              )
             )}
 
-            {/* Nur wenn NICHT gebalkt: Einzel-Fähnchen nach oben rendern */}
+            {/* Nur wenn NICHT gebalkt: Einzel-Fähnchen nach oben rendern (feiner 0.032 Urtext-Maßstab) */}
             {!beam.isPartOfBeam && duration === '8' && (
               <path
                 d={SMUFL_GLYPHS.flag8thUp}
-                transform={`translate(${fractionX + 6.0}, ${stemTopY}) scale(0.040, -0.040)`}
-                fill={noteColor}
+                transform={`translate(${fractionX + 6.0}, ${stemTopY}) scale(0.032, -0.032)`}
+                fill={handsTopStemColor}
               />
             )}
             {!beam.isPartOfBeam && duration === '16' && (
               <path
                 d={SMUFL_GLYPHS.flag16thUp}
-                transform={`translate(${fractionX + 6.0}, ${stemTopY}) scale(0.040, -0.040)`}
-                fill={noteColor}
+                transform={`translate(${fractionX + 6.0}, ${stemTopY}) scale(0.032, -0.032)`}
+                fill={handsTopStemColor}
               />
             )}
           </g>
@@ -430,7 +706,8 @@ export const renderDrumPolyphonySlot = ({
         const staffYs = sorted.map(n => staffTopY + getStaffY(n.pitch, false, true));
         const minY = Math.min(...staffYs);
         const maxY = Math.max(...staffYs);
-        const duration = sorted[0].duration;
+        const durationRank = (d: string) => d === '16' ? 1 : d === '8' ? 2 : d === '4' ? 3 : d === '2' ? 4 : 5;
+        const duration = [...sorted].sort((a, b) => durationRank(a.duration) - durationRank(b.duration))[0]?.duration || sorted[0].duration;
 
         const beam = calculateDrumBeamGroup(
           allBarNotes,
@@ -441,39 +718,74 @@ export const renderDrumPolyphonySlot = ({
           staffTopY,
           getStaffY,
           barStartX,
-          measureWidth
+          measureWidth,
+          timeSignature
         );
 
         const stemBottomY = beam.isPartOfBeam ? beam.beamY : (maxY + 28);
+        const bottomFootNote = sorted[0];
+        const feetBottomStemColor = isDrumColorGuide
+          ? getNoteHeadColor(bottomFootNote.pitch)
+          : baseNoteColor;
+        const useSegmentedBeamColors = isDrumColorGuide && hitStatus !== 'hit' && hitStatus !== 'near';
 
         return (
           <g id={`feet-voice-${barIdx}-${fractionIdx}`}>
-            {/* Primärer Notenbalken (Primary Beam) beim 1. Schlag der Gruppe */}
+            {/* Primärer Notenbalken (Primary Beam) beim 1. Schlag der Gruppe - pro Zählzeit farbcodiert */}
             {beam.isFirstInBeam && (
-              <rect
-                x={beam.xStart}
-                y={beam.beamY - 1.7}
-                width={beam.xEnd - beam.xStart}
-                height={3.4}
-                fill={noteColor}
-                rx={0.5}
-              />
+              useSegmentedBeamColors && beam.primarySegments.length > 0 ? (
+                beam.primarySegments.map((seg, sIdx) => (
+                  <rect
+                    key={`feet-pbeam-${sIdx}`}
+                    x={seg.x1}
+                    y={beam.beamY - 1.7}
+                    width={Math.max(0.5, seg.x2 - seg.x1)}
+                    height={3.4}
+                    fill={seg.color}
+                    rx={0.5}
+                  />
+                ))
+              ) : (
+                <rect
+                  x={beam.xStart}
+                  y={beam.beamY - 1.7}
+                  width={beam.xEnd - beam.xStart}
+                  height={3.4}
+                  fill={feetBottomStemColor}
+                  rx={0.5}
+                />
+              )
             )}
-            {/* Sekundärer Notenbalken (16tel-Beam) */}
-            {beam.isFirstInBeam && beam.hasSixteenth && (
-              <rect
-                x={beam.xStart}
-                y={beam.beamY - 6.5}
-                width={beam.xEnd - beam.xStart}
-                height={3.0}
-                fill={noteColor}
-                rx={0.5}
-              />
+            {/* Sekundärer Notenbalken (16tel-Beam) - pro Zählzeit farbcodiert */}
+            {beam.isFirstInBeam && beam.hasSixteenth && beam.secXStart !== undefined && beam.secXEnd !== undefined && (
+              useSegmentedBeamColors && beam.secondarySegments.length > 0 ? (
+                beam.secondarySegments.map((seg, sIdx) => (
+                  <rect
+                    key={`feet-sbeam-${sIdx}`}
+                    x={seg.x1}
+                    y={beam.beamY - 6.5}
+                    width={Math.max(0.5, seg.x2 - seg.x1)}
+                    height={2.8}
+                    fill={seg.color}
+                    rx={0.5}
+                  />
+                ))
+              ) : (
+                <rect
+                  x={beam.secXStart}
+                  y={beam.beamY - 6.5}
+                  width={beam.secXEnd - beam.secXStart}
+                  height={2.8}
+                  fill={feetBottomStemColor}
+                  rx={0.5}
+                />
+              )
             )}
 
             {sorted.map((n, idx) => {
               const nY = staffTopY + getStaffY(n.pitch, false, true);
               const isPedalHat = isCymbalPitch(n.pitch);
+              const headColor = getNoteHeadColor(n.pitch);
 
               return (
                 <g key={`feet-note-${n.id || idx}`}>
@@ -496,8 +808,8 @@ export const renderDrumPolyphonySlot = ({
                         y1={nY - 5}
                         x2={fractionX + 5.5}
                         y2={nY + 5}
-                        stroke={noteColor}
-                        strokeWidth="2.4"
+                        stroke={headColor}
+                        strokeWidth={isDrumColorGuide ? '2.7' : '2.4'}
                         strokeLinecap="round"
                       />
                       <line
@@ -505,72 +817,149 @@ export const renderDrumPolyphonySlot = ({
                         y1={nY + 5}
                         x2={fractionX + 5.5}
                         y2={nY - 5}
-                        stroke={noteColor}
-                        strokeWidth="2.4"
+                        stroke={headColor}
+                        strokeWidth={isDrumColorGuide ? '2.7' : '2.4'}
                         strokeLinecap="round"
                       />
+                      {isDrumColorGuide && (
+                        <text
+                          x={fractionX}
+                          y={nY + 2.0}
+                          textAnchor="middle"
+                          fontSize="5.4"
+                          fontWeight="900"
+                          fill={headColor}
+                          stroke="#ffffff"
+                          strokeWidth="2.4"
+                          paintOrder="stroke"
+                          fontFamily="system-ui, -apple-system, sans-serif"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          {getCanonicalDrumPieceColor(n.pitch).shortCode}
+                        </text>
+                      )}
                     </g>
                   ) : (
-                    <ellipse
-                      cx={fractionX}
+                    <g>
+                      <ellipse
+                        cx={fractionX}
+                        cy={nY}
+                        rx={isDrumColorGuide ? '7.8' : '7.0'}
+                        ry={isDrumColorGuide ? '5.5' : '5.0'}
+                        transform={`rotate(-22 ${fractionX} ${nY})`}
+                        fill={duration === '1' || duration === '2' ? '#ffffff' : headColor}
+                        stroke={headColor}
+                        strokeWidth={duration === '1' || duration === '2' ? '2.4' : '0.6'}
+                      />
+                      {isDrumColorGuide && (
+                        <text
+                          x={fractionX}
+                          y={nY + 2.1}
+                          textAnchor="middle"
+                          fontSize="5.8"
+                          fontWeight="900"
+                          fill={duration === '1' || duration === '2' ? headColor : '#ffffff'}
+                          fontFamily="system-ui, -apple-system, sans-serif"
+                          style={{ pointerEvents: 'none' }}
+                        >
+                          {getCanonicalDrumPieceColor(n.pitch).shortCode}
+                        </text>
+                      )}
+                    </g>
+                  )}
+
+                  {/* Augmentations-Punkt (Dotted Note) */}
+                  {n.isDotted && (
+                    <circle
+                      cx={fractionX + 11.5}
                       cy={nY}
-                      rx="7.0"
-                      ry="5.0"
-                      transform={`rotate(-22 ${fractionX} ${nY})`}
-                      fill={duration === '1' || duration === '2' ? '#ffffff' : noteColor}
-                      stroke={noteColor}
-                      strokeWidth={duration === '1' || duration === '2' ? '2.2' : '0.6'}
+                      r="2.2"
+                      fill={headColor}
                     />
                   )}
                 </g>
               );
             })}
 
-            {/* Hals nach UNTEN (Stimme 2: Füße) */}
+            {/* Hals nach UNTEN (Stimme 2: Füße) - pro Instrument segmentiert farbcodiert */}
             {duration !== '1' && (
-              <line
-                x1={fractionX - 6.0}
-                y1={minY}
-                x2={fractionX - 6.0}
-                y2={stemBottomY}
-                stroke={noteColor}
-                strokeWidth="1.5"
-              />
+              isDrumColorGuide && sorted.length > 1 ? (
+                <g>
+                  {sorted.slice(1).map((noteSeg, segIdx) => {
+                    const ySegStart = staffTopY + getStaffY(noteSeg.pitch, false, true);
+                    const ySegEnd = staffTopY + getStaffY(sorted[segIdx].pitch, false, true);
+                    return (
+                      <line
+                        key={`feet-stem-seg-${segIdx}`}
+                        x1={fractionX - 6.0}
+                        y1={ySegStart}
+                        x2={fractionX - 6.0}
+                        y2={ySegEnd}
+                        stroke={getNoteHeadColor(noteSeg.pitch)}
+                        strokeWidth="1.65"
+                      />
+                    );
+                  })}
+                  <line
+                    x1={fractionX - 6.0}
+                    y1={maxY}
+                    x2={fractionX - 6.0}
+                    y2={stemBottomY}
+                    stroke={feetBottomStemColor}
+                    strokeWidth="1.65"
+                  />
+                </g>
+              ) : (
+                <line
+                  x1={fractionX - 6.0}
+                  y1={minY}
+                  x2={fractionX - 6.0}
+                  y2={stemBottomY}
+                  stroke={feetBottomStemColor}
+                  strokeWidth="1.65"
+                />
+              )
             )}
 
-            {/* Nur wenn NICHT gebalkt: Einzel-Fähnchen nach unten rendern */}
+            {/* Nur wenn NICHT gebalkt: Einzel-Fähnchen nach unten rendern (feiner 0.032 Urtext-Maßstab) */}
             {!beam.isPartOfBeam && duration === '8' && (
               <path
                 d={SMUFL_GLYPHS.flag8thDown}
-                transform={`translate(${fractionX - 6.0}, ${stemBottomY}) scale(0.040, -0.040)`}
-                fill={noteColor}
+                transform={`translate(${fractionX - 6.0}, ${stemBottomY}) scale(0.032, -0.032)`}
+                fill={feetBottomStemColor}
               />
             )}
             {!beam.isPartOfBeam && duration === '16' && (
               <path
                 d={SMUFL_GLYPHS.flag16thDown}
-                transform={`translate(${fractionX - 6.0}, ${stemBottomY}) scale(0.040, -0.040)`}
-                fill={noteColor}
+                transform={`translate(${fractionX - 6.0}, ${stemBottomY}) scale(0.032, -0.032)`}
+                fill={feetBottomStemColor}
               />
             )}
           </g>
         );
       })()}
 
-      {/* 4. Selektions-Rahmen bei aktivem Cursor */}
-      {isSelectedSlot && !isPlaying && (
-        <ellipse
-          cx={fractionX}
-          cy={staffTopY + 25}
-          rx="9.0"
-          ry="7.0"
-          transform={`rotate(-22 ${fractionX} ${staffTopY + 25})`}
-          fill="none"
-          stroke={noteColor}
-          strokeWidth="1.6"
-          strokeDasharray="2.5 2"
-        />
-      )}
+      {/* 4. Selektions-Rahmen bei aktivem Cursor (nur im Bearbeitungsmodus, exakt auf primärem Notenkopf zentriert) */}
+      {isSelectedSlot && !isPlaying && !readOnly && (() => {
+        const primaryNote = handsNotes[0] || feetNotes[0];
+        const targetY = primaryNote
+          ? staffTopY + getStaffY(primaryNote.pitch, false, true)
+          : staffTopY + 18.75; // Kanonischer Snare-Zwischenraum als Default
+        return (
+          <ellipse
+            cx={fractionX}
+            cy={targetY}
+            rx="9.0"
+            ry="7.0"
+            transform={`rotate(-22 ${fractionX} ${targetY})`}
+            fill="none"
+            stroke="#4f46e5"
+            strokeWidth="1.6"
+            strokeDasharray="2.5 2"
+          />
+        );
+      })()}
     </g>
   );
 };

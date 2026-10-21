@@ -1554,7 +1554,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                     : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)')
                 : (isPlaying 
                     ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
-                    : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'),
+                    : 'linear-gradient(135deg, #34a853 0%, #16a34a 100%)'),
             color: '#ffffff',
             border: 'none',
             cursor: 'pointer',
@@ -2327,15 +2327,16 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             setIsToolsOpen(prev => !prev);
           }}
           style={{
+            position: 'relative',
             border: isToolsOpen 
               ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #10b981') 
-              : '1px solid #cbd5e1',
+              : (notesCount > 0 ? '1.5px solid #fca5a5' : '1px solid #cbd5e1'),
             background: isToolsOpen 
               ? (isIndigoPurple ? '#f3e8ff' : '#ecfdf5') 
-              : '#ffffff',
+              : (notesCount > 0 ? '#fef2f2' : '#ffffff'),
             color: isToolsOpen 
               ? (isIndigoPurple ? '#6d28d9' : '#059669') 
-              : '#64748b',
+              : (notesCount > 0 ? '#dc2626' : '#64748b'),
             height: isMobile ? '30px' : '34px',
             width: isMobile ? '30px' : '34px',
             minWidth: isMobile ? '30px' : '34px',
@@ -2347,13 +2348,28 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             justifyContent: 'center',
             boxShadow: isToolsOpen 
               ? (isIndigoPurple ? '0 1px 3px rgba(109, 40, 217, 0.15)' : '0 1px 3px rgba(22, 163, 74, 0.15)') 
-              : '0 1px 2px rgba(0, 0, 0, 0.02)',
+              : (notesCount > 0 ? '0 1px 4px rgba(239, 68, 68, 0.18)' : '0 1px 2px rgba(0, 0, 0, 0.02)'),
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
-          title={isToolsOpen ? "Weitere Werkzeuge schließen" : "Weitere Werkzeuge & Aktionen anzeigen (...)"}
+          title={isToolsOpen ? "Weitere Werkzeuge schließen" : notesCount > 0 ? `${notesCount} Notizen vorhanden (...)` : "Weitere Werkzeuge & Aktionen anzeigen (...)"}
         >
           <MoreHorizontal size={isMobile ? 15 : 17} strokeWidth={isToolsOpen ? 2.6 : 2.2} />
+          {notesCount > 0 && !isToolsOpen && (
+            <span
+              style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                border: '1.5px solid #ffffff',
+                boxShadow: '0 0 6px rgba(239, 68, 68, 0.6)'
+              }}
+            />
+          )}
         </button>
       </div>
   );
@@ -2603,19 +2619,19 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               setIsNotesModalOpen(true);
             }}
             style={{
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#334155',
+              border: notesCount > 0 ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
+              background: notesCount > 0 ? '#ef4444' : '#ffffff',
+              color: notesCount > 0 ? '#ffffff' : '#334155',
               fontSize: '0.74rem',
-              fontWeight: 700,
+              fontWeight: 800,
               height: '32px',
-              padding: '0 9px',
+              padding: '0 10px',
               borderRadius: '9px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              gap: '5px',
+              boxShadow: notesCount > 0 ? '0 2px 8px rgba(239, 68, 68, 0.35)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease',
               flexShrink: 0,
               whiteSpace: 'nowrap'
@@ -2624,7 +2640,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
             aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
           >
-            <MessageSquareQuote size={13} strokeWidth={2.2} />
+            <MessageSquareQuote size={13} strokeWidth={2.4} fill={notesCount > 0 ? 'rgba(255,255,255,0.2)' : 'none'} />
             <span>{notesCount > 0 ? `Notizen (${notesCount})` : 'Notizen'}</span>
           </button>
 
@@ -3403,7 +3419,7 @@ export const RetroCassettePlayer: React.FC<{
           background: '#e6f4ea',
           padding: '4px 8px',
           borderRadius: '8px',
-          border: '1px solid #bbf7d0'
+          border: 'none'
         }}>
           <Check size={12} />
           <span>Vom Schüler für dich freigegeben</span>

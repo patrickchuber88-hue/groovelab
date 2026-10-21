@@ -39,7 +39,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
 
   const triggerProtectedRegistration = (targetEmail?: string) => {
     setPendingEmail(targetEmail);
-    setShowAccessModal(true);
+    onRegister(targetEmail);
   };
 
   const pricing = {
@@ -605,7 +605,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
           fontWeight: 700,
           letterSpacing: '0.02em',
           marginBottom: '20px',
-          border: '1px solid #ceead6'
+          border: 'none'
         }}>
           <span>☁️</span> Das All-in-One Cloud-System für moderne Musikschulen
         </div>
@@ -1065,7 +1065,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             color: '#000000',
             marginBottom: '16px'
           }}>
-            Warum Musikschulen <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span> lieben
+            Warum Musikschulen <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#facc15' }}>Groovelab</span> lieben
           </h2>
           <p style={{ fontSize: '16px', color: '#7d7d82', maxWidth: '600px', margin: '0 auto' }}>
             Erlebe die einzigartigen Funktionen, die unsere Plattform zum Standard für moderne Musikschulen machen.
@@ -1222,7 +1222,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
-              color: '#eab308',
+              color: '#facc15',
               backgroundColor: 'rgba(234, 179, 8, 0.1)',
               padding: '6px 12px',
               borderRadius: '100px',
@@ -1285,7 +1285,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               </div>
               <div>
                 <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <HardDrive size={17} style={{ color: '#eab308' }} />
+                  <HardDrive size={17} style={{ color: '#facc15' }} />
                   <span>Audio-Tresor &amp; Physische Sofort-Löschung</span>
                 </h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
@@ -1294,7 +1294,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               </div>
               <div>
                 <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MessageSquare size={17} style={{ color: '#22c55e' }} />
+                  <MessageSquare size={17} style={{ color: '#34a853' }} />
                   <span>Dienstaufsichts-konforme Schulkommunikation</span>
                 </h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
@@ -1318,7 +1318,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <ShieldCheck size={18} style={{ color: '#eab308' }} />
+                  <ShieldCheck size={18} style={{ color: '#facc15' }} />
                 </div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }}>100% deutsches Hosting in ISO 27001 Rechenzentren (Hetzner – Schrems-II-fest)</span>
               </div>
@@ -1332,7 +1332,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <ShieldCheck size={18} style={{ color: '#eab308' }} />
+                  <ShieldCheck size={18} style={{ color: '#facc15' }} />
                 </div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }}>Post-Quantum Cryptography (PQC) &amp; TLS 1.3 Transport-Verschlüsselung</span>
               </div>
@@ -1360,7 +1360,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <ShieldCheck size={18} style={{ color: '#eab308' }} />
+                  <ShieldCheck size={18} style={{ color: '#facc15' }} />
                 </div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }}>Token-Isolation &amp; JWE-Verschlüsselung via BFF-Gateway</span>
               </div>
@@ -1375,7 +1375,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   padding: '12px 20px',
                   borderRadius: '16px',
                   background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.15) 0%, rgba(52, 168, 83, 0.25) 100%)',
-                  border: '1px solid rgba(52, 168, 83, 0.3)',
+                  border: 'none',
                   color: '#e6f4ea',
                   cursor: 'pointer',
                   fontWeight: 750,
@@ -1416,7 +1416,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               <div style={{
                 alignSelf: 'flex-start',
                 backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                border: '1px solid rgba(234, 179, 8, 0.3)',
+                border: 'none',
                 borderRadius: '100px',
                 padding: '6px 14px',
                 fontSize: '11px',
@@ -1447,10 +1447,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   lineHeight: 1.5
                 }}>
                   <div style={{ color: '#71717a' }}>-- PostgreSQL Row-Level Security (RLS)</div>
-                  <div style={{ color: '#eab308' }}>CREATE POLICY</div> <span style={{ color: '#ffffff' }}>school_isolation_policy</span>
-                  <div>  <span style={{ color: '#eab308' }}>ON</span> <span style={{ color: '#ffffff' }}>public.users</span></div>
-                  <div>  <span style={{ color: '#eab308' }}>FOR ALL</span></div>
-                  <div>  <span style={{ color: '#eab308' }}>USING</span> (</div>
+                  <div style={{ color: '#facc15' }}>CREATE POLICY</div> <span style={{ color: '#ffffff' }}>school_isolation_policy</span>
+                  <div>  <span style={{ color: '#facc15' }}>ON</span> <span style={{ color: '#ffffff' }}>public.users</span></div>
+                  <div>  <span style={{ color: '#facc15' }}>FOR ALL</span></div>
+                  <div>  <span style={{ color: '#facc15' }}>USING</span> (</div>
                   <div style={{ color: '#ffffff' }}>    school_id = get_current_user_school_id()</div>
                   <div>  );</div>
                   <br />
@@ -1536,7 +1536,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             {/* Prominent Core Value Banner: Transparent Cloud Hosting */}
             <div style={{
               background: 'linear-gradient(135deg, #e6f4ea 0%, #f4fbf7 100%)',
-              border: '1.5px solid rgba(52, 168, 83, 0.25)',
+              border: 'none',
               borderRadius: '32px',
               padding: '40px 32px',
               textAlign: 'center',
@@ -1789,7 +1789,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 padding: '24px 28px',
                 borderRadius: '20px',
                 background: '#ecfdf5',
-                border: '1.5px solid #10b981',
+                border: 'none',
                 boxShadow: 'none',
                 display: 'flex',
                 alignItems: 'flex-start',
@@ -1814,7 +1814,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ fontSize: '16px', fontWeight: 900, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Das <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span> Preisversprechen: 100 % Bestandsschutz &amp; Garantie
+                    Das <span style={{ color: '#34a853' }}>Campus</span>-<span style={{ color: '#facc15' }}>Groovelab</span> Preisversprechen: 100 % Bestandsschutz &amp; Garantie
                   </div>
                   <div style={{ fontSize: '13.5px', color: '#166534', lineHeight: 1.5, fontWeight: 500 }}>
                     <strong>Sichere dir den Tarif von heute – inklusive aller Innovationen von morgen!</strong> Der gebuchte Grundtarif deiner Musikschule (Server-Flatrate) sowie bestehende Lehrkräfte- und Schüler-Profile sind dauerhaft vor Preiserhöhungen geschützt. Auch bei neuen KI-Funktionen, Raumplanern oder Modul-Updates steigt dein Sockelpreis um keinen Cent. Für neu angemeldete Schüler im neuen Schuljahr gilt transparent der jeweils aktuell gültige Schüler-Tarif.
@@ -1876,7 +1876,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ background: 'rgba(52, 168, 83, 0.04)', padding: '16px', borderRadius: '16px', border: '1px solid rgba(52, 168, 83, 0.15)' }}>
+                  <div style={{ background: 'rgba(52, 168, 83, 0.04)', padding: '16px', borderRadius: '16px', border: 'none' }}>
                     <div style={{ fontWeight: 800, fontSize: '15px', color: '#34a853', marginBottom: '4px' }}>A: Eltern-Direktabrechnung (Zahlungsüberwachung)</div>
                     <div style={{ fontSize: '13px', color: '#2d4d38', lineHeight: 1.4, marginBottom: '8px' }}>
                       Entlaste dein Schulbudget auf <strong>{isChf ? 'CHF 0.00' : '0,00 €'} Schülergebühren</strong> für das Campus-Modul. Die Eltern übernehmen den Kleinstbeitrag direkt über die Plattform als einmalige Jahreszahlung (zur Vermeidung von Bank- und Buchungsgebühren).
@@ -2059,8 +2059,8 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               style={{
                 padding: '14px 28px',
                 borderRadius: '9999px',
-                border: activeFaqTab === 'teachers' ? '2px solid #eab308' : '1px solid #cbd5e1',
-                background: activeFaqTab === 'teachers' ? '#eab308' : '#ffffff',
+                border: activeFaqTab === 'teachers' ? '2px solid #facc15' : '1px solid #cbd5e1',
+                background: activeFaqTab === 'teachers' ? '#facc15' : '#ffffff',
                 color: activeFaqTab === 'teachers' ? '#ffffff' : '#475569',
                 fontSize: '0.95rem',
                 fontWeight: 800,
@@ -2304,7 +2304,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🛡️ Das <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={900} /> Sicherheits- &amp; Vertrauenskonzept
+                  🛡️ Das <CampusGroovelabText campusColor="#34a853" groovelabColor="#facc15" fontWeight={900} /> Sicherheits- &amp; Vertrauenskonzept
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   5-Säulen Datenschutz- &amp; Freigabekonzept nach Stand der Technik (Art. 32 DSGVO)
@@ -2334,7 +2334,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               {/* Top Banner: Datensparsamkeit */}
               <div style={{
                 background: '#e6f4ea',
-                border: '1.5px solid #a7f3d0',
+                border: 'none',
                 borderRadius: '20px',
                 padding: '20px',
                 display: 'flex',

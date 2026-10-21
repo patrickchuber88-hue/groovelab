@@ -162,7 +162,7 @@ export const StudentRescheduleDecisionModal: React.FC<StudentRescheduleDecisionM
               height: '38px',
               borderRadius: '12px',
               background: '#fef3c7',
-              border: '1px solid #fde68a',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -231,7 +231,7 @@ export const StudentRescheduleDecisionModal: React.FC<StudentRescheduleDecisionM
           {/* Status Alert Banner */}
           <div style={{
             background: '#fffbeb',
-            border: '1.5px solid #fde68a',
+            border: 'none',
             borderRadius: '14px',
             padding: '12px 14px',
             display: 'flex',
@@ -269,7 +269,7 @@ export const StudentRescheduleDecisionModal: React.FC<StudentRescheduleDecisionM
               background: '#f0fdf4',
               borderRadius: '14px',
               padding: '14px',
-              border: '2px solid #86efac',
+              border: 'none',
               display: 'flex',
               flexDirection: 'column',
               gap: '6px'

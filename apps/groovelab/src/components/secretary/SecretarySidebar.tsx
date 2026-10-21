@@ -86,6 +86,7 @@ export interface SecretarySidebarProps {
   onOpenAgb?: () => void;
   onOpenImpressum?: () => void;
   onOpenAccessibility?: () => void;
+  onOpenPersonalSecurity?: () => void;
 }
 
 export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
@@ -120,7 +121,8 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
   onOpenPrivacy,
   onOpenAgb,
   onOpenImpressum,
-  onOpenAccessibility
+  onOpenAccessibility,
+  onOpenPersonalSecurity
 }) => {
   const userName = currentUserProfile?.nickname || currentUserProfile?.first_name || 'Verwaltung';
   const canonicalId = resolveUserCampusId(currentUserProfile);
@@ -271,7 +273,7 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
             padding: '0 12px',
             borderRadius: '9999px',
             background: '#f0fdf4',
-            border: '1px solid rgba(34, 197, 94, 0.35)',
+            border: 'none',
             color: '#15803d',
             fontWeight: 750,
             fontSize: '0.78rem',
@@ -659,11 +661,15 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
             <button
               type="button"
               onClick={() => {
-                setActiveTab?.('secretary');
-                setSecretarySubTab('settings');
+                if (onOpenPersonalSecurity) {
+                  onOpenPersonalSecurity();
+                } else {
+                  setActiveTab?.('secretary');
+                  setSecretarySubTab('settings');
+                }
               }}
-              title={`${userName} – Einstellungen & Schulprofil`}
-              aria-label="Einstellungen & Schulprofil öffnen"
+              title={`${userName} – Mein Profil & Sicherheit`}
+              aria-label="Mein Profil & Sicherheit öffnen"
               style={{
                 width: '42px',
                 height: '42px',
@@ -840,18 +846,26 @@ export const SecretarySidebar: React.FC<SecretarySidebarProps> = ({
                 role="button"
                 tabIndex={0}
                 onClick={() => {
-                  setActiveTab?.('secretary');
-                  setSecretarySubTab('settings');
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+                  if (onOpenPersonalSecurity) {
+                    onOpenPersonalSecurity();
+                  } else {
                     setActiveTab?.('secretary');
                     setSecretarySubTab('settings');
                   }
                 }}
-                title="Einstellungen & Schulprofil öffnen"
-                aria-label="Einstellungen & Schulprofil öffnen"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (onOpenPersonalSecurity) {
+                      onOpenPersonalSecurity();
+                    } else {
+                      setActiveTab?.('secretary');
+                      setSecretarySubTab('settings');
+                    }
+                  }
+                }}
+                title="Mein Profil &amp; Sicherheit öffnen"
+                aria-label="Mein Profil &amp; Sicherheit öffnen"
                 style={{
                   flex: 1,
                   minWidth: 0,

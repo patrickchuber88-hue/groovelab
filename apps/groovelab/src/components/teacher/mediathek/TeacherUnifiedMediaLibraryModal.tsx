@@ -28,7 +28,7 @@ import {
   DEFAULT_DIDACTIC_SNIPPETS
 } from './teacherLibrary.types';
 import { TeacherLibraryShareHomeworkModal } from './TeacherLibraryShareHomeworkModal';
-import { TeacherLibraryScoreSnippetsTab } from './tabs/TeacherLibraryScoreSnippetsTab';
+import { TeacherLibraryScoreSnippetsTab, mapInstrumentToFilter } from './tabs/TeacherLibraryScoreSnippetsTab';
 import { fetchTeacherMediaAssets, TeacherMediaAssets } from '../../../services/teacherStudioService';
 import { fetchTeacherScoreSnippets, saveTeacherScoreSnippet, deleteTeacherScoreSnippet } from '../../../services/teacherScoreSnippetService';
 import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
@@ -55,9 +55,10 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
   initialPillar = 'snippets',
   showRealNames = false
 }) => {
+  const teacherInst = teacher?.instrument || (teacher?.instruments && teacher.instruments[0]) || teacher?.groovelab_instrument?.split(',')[0];
   const [activePillar, setActivePillar] = useState<LibraryPillar>(initialPillar);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedInstrumentFilter, setSelectedInstrumentFilter] = useState('Alle');
+  const [selectedInstrumentFilter, setSelectedInstrumentFilter] = useState(() => mapInstrumentToFilter(teacherInst));
 
   // Media assets from DB / LocalStorage
   const [mediaAssets, setMediaAssets] = useState<TeacherMediaAssets | null>(null);
@@ -65,6 +66,8 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
   const [scoreSnippets, setScoreSnippets] = useState<MicroScoreSnippet[]>([]);
   const [showStudioModal, setShowStudioModal] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<MicroScoreSnippet | null>(null);
+  const [editingSnippetList, setEditingSnippetList] = useState<MicroScoreSnippet[] | undefined>(undefined);
+  const [editingSnippetIndex, setEditingSnippetIndex] = useState<number | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
   // New Snippet Creator Modal state
@@ -560,8 +563,10 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                   type: 'score_snippet'
                 });
               }}
-              onEdit={(snippet) => {
+              onEdit={(snippet, list, idx) => {
                 setEditingSnippet(snippet);
+                setEditingSnippetList(list);
+                setEditingSnippetIndex(idx);
                 setShowStudioModal(true);
               }}
               onDelete={async (snippetId) => {
@@ -1131,9 +1136,14 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
           onClose={() => {
             setShowStudioModal(false);
             setEditingSnippet(null);
+            setEditingSnippetList(undefined);
+            setEditingSnippetIndex(undefined);
           }}
           initialSnippet={editingSnippet}
+          snippetList={editingSnippetList}
+          initialSnippetIndex={editingSnippetIndex}
           studentId={null}
+          defaultInstrument={teacherInst || selectedInstrumentFilter}
           onSaveSnippet={async (saved: MicroScoreSnippet) => {
             const res = await saveTeacherScoreSnippet(teacher?.id || 'local', schoolId || teacher?.school_id || '', {
               ...saved,

@@ -303,7 +303,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                 height: '44px',
                 borderRadius: '14px',
                 background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                border: '1.5px solid #a7f3d0',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -320,7 +320,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
-                  background: '#22c55e',
+                  background: '#34a853',
                   border: 'none',
                   boxShadow: 'none'
                 }} />
@@ -334,7 +334,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                   <span style={{
                     background: '#e6f4ea',
                     color: '#047857',
-                    border: '1px solid #a7f3d0',
+                    border: 'none',
                     padding: '3px 10px',
                     borderRadius: '100px',
                     fontSize: '0.66rem',
@@ -572,7 +572,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: '100px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '5px', background: '#eff6ff', border: 'none', padding: '4px 10px', borderRadius: '100px' }}>
                       <Clock size={13} color="#3b82f6" /> Zeitzone: Deutschland (Europe/Berlin • MESZ / UTC+2)
                     </span>
                     <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', background: '#e6f4ea', padding: '4px 12px', borderRadius: '100px' }}>
@@ -1073,7 +1073,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                     ))}
                   </div>
 
-                  <div style={{ marginTop: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ marginTop: '16px', background: '#f0fdf4', border: 'none', borderRadius: '14px', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <CheckCircle2 size={24} color="#166534" />
                     <div>
                       <strong style={{ fontSize: '0.84rem', color: '#166534' }}>Formelles Prüfergebnis für den DSB:</strong>
@@ -1356,7 +1356,7 @@ export function DpoAuditPortal({ onClose, schoolName = 'Stadtmusikschule', schoo
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ background: '#e6f4ea', color: '#047857', border: '1px solid #a7f3d0', padding: '4px 12px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 900 }}>
+                  <span style={{ background: '#e6f4ea', color: '#047857', border: 'none', padding: '4px 12px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 900 }}>
                     ✓ RECHTSGÜLTIG GEZEICHNET
                   </span>
                   <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '6px', fontWeight: 600 }}>

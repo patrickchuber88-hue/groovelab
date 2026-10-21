@@ -1,8 +1,17 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { notesService, UserNote } from '../../../services/notesService';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { getSimulatedNow } from '../utils/teacherDashboardUtils';
+import { resolveCampusStudentAvatar } from '../../../utils/avatarResolutionEngine';
+import { useSimulatedTime } from '../../../hooks/useSimulatedTime';
+
+const computeSlotEndTimeStr = (startStr: string, durationMin: number = 30): string => {
+  const clean = (startStr || '14:00').substring(0, 5);
+  const [h, m] = clean.split(':').map(Number);
+  const totalMin = (Number.isFinite(h) ? h : 14) * 60 + (Number.isFinite(m) ? m : 0) + (Number(durationMin) || 30);
+  return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+};
 
 export interface UseTeacherTagesplanProps {
   userId: string;
@@ -165,21 +174,28 @@ export const projectTimelineFromBoard = (
           (m.first_name && st.first_name?.toLowerCase() === m.first_name.toLowerCase() && (!m.last_name || st.last_name?.toLowerCase() === m.last_name.toLowerCase() || st.last_name?.toLowerCase().startsWith(m.last_name[0].toLowerCase()))) ||
           (m.name && (st.name?.toLowerCase().includes(m.name.toLowerCase()) || m.name.toLowerCase().includes(st.first_name?.toLowerCase())))
         );
+        const memberInstrument = m.instrument || matched?.instrument || s.instrument || 'Gitarre';
+        const safeCampusAvatar = resolveCampusStudentAvatar({
+          ...(matched || {}),
+          role: 'student',
+          instrument: memberInstrument
+        });
 
         return {
           id: matched?.id || m.id || `group-member-${mIdx}-${todayStr}`,
           first_name: m.first_name || matched?.first_name || 'Schüler',
           last_name: m.last_name || matched?.last_name || '',
           name: `${m.first_name || matched?.first_name || ''} ${m.last_name || matched?.last_name || ''}`.trim() || 'Schüler',
-          avatar_url: matched?.avatar_url || matched?.photo_url || '/avatars/gitarre_avatar_new.png',
-          photo_url: matched?.photo_url || matched?.avatar_url || '/avatars/gitarre_avatar_new.png',
-          instrument: m.instrument || matched?.instrument || s.instrument || 'Gitarre',
+          avatar_url: safeCampusAvatar,
+          photo_url: safeCampusAvatar,
+          instrument: memberInstrument,
           birth_date: matched?.birth_date,
           day_of_birth: matched?.day_of_birth
         };
       });
 
       const firstMember = resolvedGroupStudents[0] || null;
+      const computedEnd = computeSlotEndTimeStr(timeShort, duration);
 
       slots.push({
         id: matchingDbOcc?.id || `proj-grp-${s.id || idx}-${todayStr}`,
@@ -187,6 +203,8 @@ export const projectTimelineFromBoard = (
         schedule_id: s.id,
         timeSlot: timeShort,
         startTime: timeShort,
+        endTime: computedEnd,
+        end_time: computedEnd,
         duration,
         date: todayStr,
         status: matchingDbOcc?.status || 'scheduled',
@@ -200,6 +218,8 @@ export const projectTimelineFromBoard = (
           id: matchingDbOcc?.id || `proj-grp-${s.id || idx}-${todayStr}`,
           timeSlot: timeShort,
           startTime: timeShort,
+          endTime: computedEnd,
+          end_time: computedEnd,
           duration,
           date: todayStr,
           status: matchingDbOcc?.status || 'scheduled',
@@ -217,18 +237,25 @@ export const projectTimelineFromBoard = (
         (s.student_id && st.id === s.student_id) ||
         (s.first_name && st.first_name?.toLowerCase() === s.first_name.toLowerCase() && (!s.last_name || st.last_name?.toLowerCase() === s.last_name.toLowerCase() || st.last_name?.toLowerCase().startsWith(s.last_name[0].toLowerCase())))
       );
+      const studentInstrument = s.instrument || dbStudent?.instrument || matched?.instrument || 'Gitarre';
+      const safeCampusAvatar = resolveCampusStudentAvatar({
+        ...(matched || dbStudent || {}),
+        role: 'student',
+        instrument: studentInstrument
+      });
 
       const studentObj = {
         id: dbStudent?.id || matched?.id || s.id || `proj-student-${idx}-${todayStr}`,
         first_name: dbStudent?.first_name || s.first_name || matched?.first_name || 'Schüler',
         last_name: dbStudent?.last_name || s.last_name || matched?.last_name || '',
         name: dbStudent?.name || `${s.first_name || matched?.first_name || ''} ${s.last_name || matched?.last_name || ''}`.trim() || 'Schüler',
-        avatar_url: dbStudent?.avatar_url || dbStudent?.photo_url || matched?.avatar_url || matched?.photo_url || '/avatars/gitarre_avatar_new.png',
-        photo_url: dbStudent?.photo_url || dbStudent?.avatar_url || matched?.photo_url || matched?.avatar_url || '/avatars/gitarre_avatar_new.png',
-        instrument: s.instrument || dbStudent?.instrument || matched?.instrument || 'Gitarre',
+        avatar_url: safeCampusAvatar,
+        photo_url: safeCampusAvatar,
+        instrument: studentInstrument,
         birth_date: dbStudent?.birth_date || matched?.birth_date,
         day_of_birth: dbStudent?.day_of_birth || matched?.day_of_birth
       };
+      const computedEnd = computeSlotEndTimeStr(timeShort, duration);
 
       slots.push({
         id: matchingDbOcc?.id || `proj-${s.id || idx}-${todayStr}`,
@@ -236,6 +263,8 @@ export const projectTimelineFromBoard = (
         schedule_id: s.id,
         timeSlot: timeShort,
         startTime: timeShort,
+        endTime: computedEnd,
+        end_time: computedEnd,
         duration,
         date: todayStr,
         status: matchingDbOcc?.status || 'scheduled',
@@ -311,6 +340,8 @@ export function useTeacherTagesplan({
     return readInitialBriefingTimeline(effectiveTeacherId, todayStr, teacher, allStudents, rooms);
   }, [effectiveTeacherId, teacher, allStudents, rooms]);
 
+  const { now: simulatedNow } = useSimulatedTime();
+
   const [briefingData, setBriefingData] = useState<any>(() => initialTimeline);
   const [selectedSlotOverride, setSelectedSlotOverride] = useState<any | null>(null);
   const [quickAudioStudent, setQuickAudioStudent] = useState<any | null>(null);
@@ -320,30 +351,38 @@ export function useTeacherTagesplan({
     if (selectedSlotOverride) return selectedSlotOverride;
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
     
-    const now = getSimulatedNow();
+    const now = simulatedNow || getSimulatedNow();
     const curTimeStr = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+    const isValidLessonSlot = (slot: any) =>
+      Boolean(slot && (slot.student || (slot.students && slot.students.length > 0))) &&
+      !slot.isBreak &&
+      !slot.is_room_booking &&
+      !slot.isRoomBooking &&
+      !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(slot.status);
 
     // 1. Slot that is currently active by time
     const activeSlot = briefingData.timeline.find((slot: any) => {
-      const slotStart = slot.timeSlot;
+      if (!isValidLessonSlot(slot)) return false;
+      const slotStart = (slot.timeSlot || slot.startTime || '').substring(0, 5);
       if (!slotStart) return false;
-      const [sh, sm] = slotStart.split(':').map(Number);
-      const totalMin = sh * 60 + sm + (slot.duration || 30);
-      const slotEnd = `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
-      return curTimeStr >= slotStart && curTimeStr < slotEnd && (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking;
+      const slotEnd = computeSlotEndTimeStr(slotStart, slot.duration || 30);
+      return curTimeStr >= slotStart && curTimeStr < slotEnd;
     });
     if (activeSlot) return activeSlot;
 
     // 2. Fallback to first upcoming student
     const upcomingSlot = briefingData.timeline.find((slot: any) => {
-      return curTimeStr < (slot.timeSlot || '') && (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking;
+      if (!isValidLessonSlot(slot)) return false;
+      const slotStart = (slot.timeSlot || slot.startTime || '').substring(0, 5);
+      return curTimeStr < slotStart;
     });
     if (upcomingSlot) return upcomingSlot;
 
     // 3. Fallback to first student of the day
-    const firstStudentSlot = briefingData.timeline.find((slot: any) => (slot.student || (slot.students && slot.students.length > 0)) && !slot.is_room_booking && !slot.isRoomBooking);
+    const firstStudentSlot = briefingData.timeline.find((slot: any) => isValidLessonSlot(slot));
     return firstStudentSlot || null;
-  }, [briefingData?.timeline, selectedSlotOverride]);
+  }, [briefingData?.timeline, selectedSlotOverride, simulatedNow]);
 
   const setActiveTimelineSlot = useCallback((slot: any) => {
     setSelectedSlotOverride(slot);
@@ -357,14 +396,27 @@ export function useTeacherTagesplan({
     setSelectedSlotOverride(null);
   }, [briefingData]);
 
+  const teacherRef = useRef(teacher);
+  teacherRef.current = teacher;
+  const allStudentsRef = useRef(allStudents);
+  allStudentsRef.current = allStudents;
+  const roomsRef = useRef(rooms);
+  roomsRef.current = rooms;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const hasHydratedTimelineRef = useRef(false);
+
   // 🏛️ Authoritative Supabase Hydration for Teacher Tagesplan & Briefing Timeline
   const loadBriefingTimeline = useCallback(async () => {
-    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
-    if (isStudent || activeTab === 'live') {
-      if (isStudent) setBriefingData({ timeline: [] });
+    const curTeacher = teacherRef.current;
+    const curStudents = allStudentsRef.current;
+    const curRooms = roomsRef.current;
+    const isStudent = viewMode === 'student' || curTeacher?.role?.toLowerCase() === 'student';
+    if (isStudent) {
+      setBriefingData({ timeline: [] });
       return;
     }
-    const effectiveTeacherId = userId || teacher?.id;
+    const effectiveTeacherId = userId || curTeacher?.id;
     if (!effectiveTeacherId) return;
 
     try {
@@ -469,23 +521,23 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         if (item.schedules?.room?.name) return item.schedules.room.name;
         if (item.schedule?.room?.name) return item.schedule.room.name;
         if (item.room?.name) return item.room.name;
-        if (item.room_override_id && rooms) {
-          const found = rooms.find((r: any) => r.id === item.room_override_id);
+        if (item.room_override_id && curRooms) {
+          const found = curRooms.find((r: any) => r.id === item.room_override_id);
           if (found?.name) return found.name;
         }
-        if (item.template_room_id && rooms) {
-          const found = rooms.find((r: any) => r.id === item.template_room_id);
+        if (item.template_room_id && curRooms) {
+          const found = curRooms.find((r: any) => r.id === item.template_room_id);
           if (found?.name) return found.name;
         }
-        if (item.room_id && rooms) {
-          const found = rooms.find((r: any) => r.id === item.room_id);
+        if (item.room_id && curRooms) {
+          const found = curRooms.find((r: any) => r.id === item.room_id);
           if (found?.name) return found.name;
         }
         if (item.schedule_id && schedules) {
           const sched = schedules.find((s: any) => s.id === item.schedule_id);
           if (sched?.room?.name) return sched.room.name;
-          if (sched?.room_id && rooms) {
-            const found = rooms.find((r: any) => r.id === sched.room_id);
+          if (sched?.room_id && curRooms) {
+            const found = curRooms.find((r: any) => r.id === sched.room_id);
             if (found?.name) return found.name;
           }
         }
@@ -506,7 +558,7 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
       const timelineSlots: any[] = [];
 
       // 🏛️ Tier-1 Template Boards Hydration (Single Source of Truth - 1:1 Parity with Stundenplan)
-      const boards = getTeacherActiveBoards(effectiveTeacherId, teacher);
+      const boards = getTeacherActiveBoards(effectiveTeacherId, curTeacher);
       const todayBoard = boards.find((b: any) => b.dayOfWeek === dbDayOfWeek);
 
       // Bruchkante 6 Fix: Reconcile secretariat-approved rooms into draft teacher board
@@ -520,7 +572,7 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
 
       if (todayBoard && Array.isArray(todayBoard.students) && todayBoard.students.length > 0) {
         // Project timeline slots from active designer board
-        const projected = projectTimelineFromBoard(todayBoard, todayStr, allStudents, rooms, occurrences);
+        const projected = projectTimelineFromBoard(todayBoard, todayStr, curStudents, curRooms, occurrences);
         timelineSlots.push(...projected);
 
         // Also merge any standalone occurrences not in todayBoard (e.g. ad-hoc rescheduled appointments)
@@ -531,15 +583,24 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
             (slot.timeSlot === occTime && (slot.student?.id === occ.student_id || slot.students?.some((st: any) => st.id === occ.student_id)))
           );
           if (!alreadyCovered) {
-            const resolvedStudent = occ.student || (allStudents && allStudents.find((s: any) => s.id === occ.student_id));
+            const resolvedStudent = occ.student || (curStudents && curStudents.find((s: any) => s.id === occ.student_id));
             const occRoom = getOccOrSchedRoom(occ) || todayBoard.roomName || '';
+            const occDuration = occ.duration || 30;
+            const occEndTime = computeSlotEndTimeStr(occTime, occDuration);
+            const safeCampusAvatar = resolvedStudent ? resolveCampusStudentAvatar({
+              ...resolvedStudent,
+              role: 'student',
+              instrument: resolvedStudent.instrument || 'Gitarre'
+            }) : '/avatars/gitarre_avatar_new.png';
             timelineSlots.push({
               id: occ.id,
               scheduleId: occ.schedule_id,
               schedule_id: occ.schedule_id,
               timeSlot: occTime,
               startTime: occTime,
-              duration: occ.duration || 30,
+              endTime: occEndTime,
+              end_time: occEndTime,
+              duration: occDuration,
               date: todayStr,
               status: occ.status || 'scheduled',
               is_virtual: false,
@@ -550,8 +611,8 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
                 first_name: resolvedStudent.first_name,
                 last_name: resolvedStudent.last_name,
                 name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
-                avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
-                photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+                avatar_url: safeCampusAvatar,
+                photo_url: safeCampusAvatar,
                 role: 'student',
                 instrument: resolvedStudent.instrument
               } : null,
@@ -564,12 +625,18 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         // Fallback to database schedules table if no template board exists
         schedules.forEach((sched: any) => {
           const occ = occBySchedId.get(sched.id);
-          const resolvedStudent = sched.student || (allStudents && allStudents.find((s: any) => s.id === sched.student_id));
+          const resolvedStudent = sched.student || (curStudents && curStudents.find((s: any) => s.id === sched.student_id));
           const slotTime = occ?.start_time || sched.time_slot || '14:00';
           const formattedTime = slotTime.substring(0, 5);
           const duration = occ?.duration || sched.duration_minutes || 30;
+          const computedEnd = computeSlotEndTimeStr(formattedTime, duration);
           const status = occ?.status || sched.status || 'scheduled';
-          const roomName = sched.room?.name || (sched.room_id && (rooms || []).find((r: any) => r.id === sched.room_id)?.name) || '';
+          const roomName = sched.room?.name || (sched.room_id && (curRooms || []).find((r: any) => r.id === sched.room_id)?.name) || '';
+          const safeCampusAvatar = resolvedStudent ? resolveCampusStudentAvatar({
+            ...resolvedStudent,
+            role: 'student',
+            instrument: sched.instrument || resolvedStudent.instrument || 'Gitarre'
+          }) : '/avatars/gitarre_avatar_new.png';
 
           timelineSlots.push({
             id: occ?.id || `sched-${sched.id}-${todayStr}`,
@@ -577,6 +644,8 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
             schedule_id: sched.id,
             timeSlot: formattedTime,
             startTime: formattedTime,
+            endTime: computedEnd,
+            end_time: computedEnd,
             duration: duration,
             date: todayStr,
             status: status,
@@ -588,8 +657,8 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
               first_name: resolvedStudent.first_name,
               last_name: resolvedStudent.last_name,
               name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
-              avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
-              photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+              avatar_url: safeCampusAvatar,
+              photo_url: safeCampusAvatar,
               role: 'student',
               instrument: resolvedStudent.instrument,
               birth_date: resolvedStudent.birth_date,
@@ -603,10 +672,17 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         // Add standalone occurrences not linked to a regular schedule
         occurrences.forEach((occ: any) => {
           if (!occ.schedule_id || !schedules.some((s: any) => s.id === occ.schedule_id)) {
-            const resolvedStudent = occ.student || (allStudents && allStudents.find((s: any) => s.id === occ.student_id));
+            const resolvedStudent = occ.student || (curStudents && curStudents.find((s: any) => s.id === occ.student_id));
             const slotTime = occ.start_time || '14:00';
             const formattedTime = slotTime.substring(0, 5);
+            const occDuration = occ.duration || 30;
+            const computedEnd = computeSlotEndTimeStr(formattedTime, occDuration);
             const occRoom = getOccOrSchedRoom(occ);
+            const safeCampusAvatar = resolvedStudent ? resolveCampusStudentAvatar({
+              ...resolvedStudent,
+              role: 'student',
+              instrument: resolvedStudent.instrument || 'Gitarre'
+            }) : '/avatars/gitarre_avatar_new.png';
 
             timelineSlots.push({
               id: occ.id,
@@ -614,7 +690,9 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
               schedule_id: occ.schedule_id,
               timeSlot: formattedTime,
               startTime: formattedTime,
-              duration: occ.duration || 30,
+              endTime: computedEnd,
+              end_time: computedEnd,
+              duration: occDuration,
               date: todayStr,
               status: occ.status || 'scheduled',
               is_virtual: false,
@@ -625,8 +703,8 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
                 first_name: resolvedStudent.first_name,
                 last_name: resolvedStudent.last_name,
                 name: `${resolvedStudent.first_name || ''} ${resolvedStudent.last_name || ''}`.trim(),
-                avatar_url: resolvedStudent.avatar_url || resolvedStudent.photo_url,
-                photo_url: resolvedStudent.photo_url || resolvedStudent.avatar_url,
+                avatar_url: safeCampusAvatar,
+                photo_url: safeCampusAvatar,
                 role: 'student',
                 instrument: resolvedStudent.instrument
               } : null,
@@ -679,7 +757,7 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
           relevantStudentIds.add(String(singleId));
         }
       });
-      (allStudents || []).forEach((st: any) => {
+      (curStudents || []).forEach((st: any) => {
         if (st.id) relevantStudentIds.add(String(st.id));
       });
 
@@ -715,6 +793,7 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         }
       }
 
+      hasHydratedTimelineRef.current = true;
       const newBriefingData = { timeline: timelineSlots, weeklyFocusMap };
       setBriefingData(newBriefingData);
       try {
@@ -724,12 +803,20 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
     } catch (err) {
       console.error('[useTeacherTagesplan] Failed to load briefing timeline:', err);
     }
-  }, [effectiveTeacherId, teacher, allStudents, rooms, viewMode, activeTab, hideHeader]);
+  }, [effectiveTeacherId, viewMode, userId]);
 
   useEffect(() => {
-    let syncTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    if (!hasHydratedTimelineRef.current && activeTab !== 'live') {
       loadBriefingTimeline();
-    }, 80);
+    }
+  }, [activeTab, loadBriefingTimeline]);
+
+  useEffect(() => {
+    let syncTimer: ReturnType<typeof setTimeout> | null = activeTabRef.current !== 'live'
+      ? setTimeout(() => {
+          loadBriefingTimeline();
+        }, 80)
+      : null;
     if (typeof window === 'undefined') return () => { if (syncTimer) clearTimeout(syncTimer); };
 
     const handleSync = () => {
@@ -739,7 +826,12 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
       }, 150);
     };
 
-    window.addEventListener('groovelab_simulated_date_changed', handleSync);
+    const handleSimulatedDateChange = () => {
+      setSelectedSlotOverride(null);
+      handleSync();
+    };
+
+    window.addEventListener('groovelab_simulated_date_changed', handleSimulatedDateChange);
     window.addEventListener('groovelab_schedule_changed', handleSync);
     window.addEventListener('campus_schedule_sync', handleSync);
     window.addEventListener('groovelab_chat_updated', handleSync);
@@ -762,7 +854,7 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
 
     return () => {
       if (syncTimer) clearTimeout(syncTimer);
-      window.removeEventListener('groovelab_simulated_date_changed', handleSync);
+      window.removeEventListener('groovelab_simulated_date_changed', handleSimulatedDateChange);
       window.removeEventListener('groovelab_schedule_changed', handleSync);
       window.removeEventListener('campus_schedule_sync', handleSync);
       window.removeEventListener('groovelab_chat_updated', handleSync);

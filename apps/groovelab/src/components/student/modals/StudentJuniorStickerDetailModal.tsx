@@ -121,7 +121,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               letterSpacing: '0.08em',
               padding: '6px 16px',
               borderRadius: '100px',
-              border: '1.5px solid #fecaca',
+              border: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px'

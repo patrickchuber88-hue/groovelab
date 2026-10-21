@@ -76,7 +76,7 @@ export function MasterAdminSidebar({
         {/* App Logo & Branding */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '44px', padding: '0 8px' }}>
           <div style={{
-            background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
+            background: 'linear-gradient(135deg, #34a853 0%, #facc15 100%)',
             width: '40px',
             height: '40px',
             borderRadius: '12px',

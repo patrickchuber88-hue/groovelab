@@ -670,7 +670,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               {/* Optimierung 5: DSGVO Info Banner */}
               <div style={{
                 background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '16px 20px',
                 display: 'flex',
@@ -802,7 +802,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
 
               {importErrors.length > 0 && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: '12px', color: '#dc2626', fontSize: '0.78rem' }}>
+                <div style={{ background: '#fef2f2', border: 'none', padding: '12px 16px', borderRadius: '12px', color: '#dc2626', fontSize: '0.78rem' }}>
                   <strong>Fehler beim Importversuch:</strong>
                   <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px' }}>
                     {importErrors.slice(0, 3).map((err, i) => <li key={i}>{err}</li>)}
@@ -848,7 +848,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                                 color: '#166534', 
                                 padding: '2px 8px', 
                                 borderRadius: '6px', 
-                                border: '1px solid #bbf7d0' 
+                                border: 'none' 
                               }}>
                                 {row.sanitizedName} ({row.instrument})
                               </span>
@@ -948,7 +948,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 height: '64px',
                 borderRadius: '50%',
                 background: '#f0fdf4',
-                border: '2px solid #bbf7d0',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

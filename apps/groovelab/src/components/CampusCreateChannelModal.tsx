@@ -294,7 +294,7 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
           {errorMessage && (
             <div style={{
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               color: '#dc2626',
               borderRadius: '12px',
               padding: '12px 16px',

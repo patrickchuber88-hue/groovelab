@@ -5,7 +5,7 @@ import { ADMIN_INSTRUMENT_ICONS } from "./AdminStatsView";
 
 const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
-  "Bass": "#eab308", "E-Bass": "#eab308", 
+  "Bass": "#facc15", "E-Bass": "#facc15", 
   "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
   "Vocals": "#34a853", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
@@ -78,7 +78,7 @@ export const AdminMissionsView: React.FC<AdminMissionsViewProps> = ({
   handleUpdateStudentLevel,
   resolveUserAvatar
 }) => {
-    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
     
     const filteredSubmissions = submissions.filter(sub => {
       const studentName = `${sub.users?.first_name || ''} ${sub.users?.last_name || ''}`.toLowerCase();
@@ -215,7 +215,7 @@ export const AdminMissionsView: React.FC<AdminMissionsViewProps> = ({
                                   style={{
                                     background: '#e6f4ea',
                                     color: '#34a853',
-                                    border: '1.5px solid #e6f4ea',
+                                    border: 'none',
                                     padding: '6px 12px',
                                     borderRadius: '10px',
                                     fontSize: '0.75rem',
@@ -582,7 +582,7 @@ export const AdminMissionsView: React.FC<AdminMissionsViewProps> = ({
                                 flex: 1,
                                 padding: '10px',
                                 borderRadius: '12px',
-                                border: '1.5px solid #fca5a5',
+                                border: 'none',
                                 background: '#fef2f2',
                                 color: '#ef4444',
                                 fontWeight: 800,

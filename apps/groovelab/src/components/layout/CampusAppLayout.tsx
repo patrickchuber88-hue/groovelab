@@ -342,14 +342,15 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
         const hasDedicatedSubDock = Boolean(
           isMobile && (
             activeStudentTab === 'homework_book' ||
+            activeStudentTab === 'homework' ||
             activeStudentTab === 'events' ||
-            (activeStudentTab === 'briefing' && activePlatform === 'campus')
+            activeStudentTab === 'briefing'
           )
         );
 
         return (
           <div className={`main-wrapper ${activeStudentTab === 'live' ? 'live-tab-active' : ''} ${isMobileActiveChat ? 'messages-chat-active' : ''} ${isMobileHomeworkBook ? 'homework-book-active' : ''} ${hasDedicatedSubDock ? 'has-mobile-sub-dock' : ''}`} style={{ paddingTop: '0' }}>
-            {isMobile && !isMobileActiveChat && (
+            {isMobile && (
               <GeminiMobileShell
                 user={user}
                 school={school}
@@ -365,22 +366,15 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
                       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                     }
                     setActivePlatform('campus');
-                    const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-                    const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
-                    setActiveStudentTab(startTab);
-                    sessionStorage.setItem('campus_active_tab', startTab);
                   } else if (p === 'groovelab') {
                     if (user?.role === 'teacher') {
                       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                     }
-                    setActivePlatform('groovelab');
-                    if (isStaff || user?.role === 'teacher') {
+                    if ((isStaff || user?.role === 'teacher') && locationMode !== 'lab') {
                       setLocationMode('lab');
                       sessionStorage.setItem('groovelab_location_mode', 'lab');
                     }
-                    setActiveStudentTab('live');
-                    sessionStorage.setItem('groovelab_active_tab', 'live');
-                    localStorage.setItem('groovelab_active_tab', 'live');
+                    setActivePlatform('groovelab');
                   } else {
                     setActivePlatform(p);
                   }

@@ -27,22 +27,22 @@ export interface TagDefinition {
 }
 
 export const STUDENT_SKILL_TAGS: TagDefinition[] = [
-  { key: 'technik', tag: '#Technik', label: 'Technik', desc: 'Motorik & Handhaltung', color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', iconName: 'zap' },
-  { key: 'rhythmus', tag: '#Rhythmus', label: 'Rhythmus', desc: 'Timing & Metronom', color: '#4338ca', bg: '#e0e7ff', border: '#c7d2fe', iconName: 'activity' },
-  { key: 'klang', tag: '#Klang', label: 'Klang', desc: 'Intonation & Tonkultur', color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', iconName: 'volume' },
-  { key: 'ausdruck', tag: '#Ausdruck', label: 'Ausdruck', desc: 'Dynamik & Phrasierung', color: '#6b21a8', bg: '#f3e8ff', border: '#e9d5ff', iconName: 'sparkles' },
-  { key: 'repertoire', tag: '#Repertoire', label: 'Repertoire', desc: 'Songs & Stücke', color: '#854d0e', bg: '#fef9c3', border: '#fef08a', iconName: 'music' },
-  { key: 'noten', tag: '#Noten', label: 'Noten / Lehrwerk', desc: 'Lehrwerk & Seitenzahlen', color: '#0369a1', bg: '#e0f2fe', border: '#bae6fd', iconName: 'book' },
-  { key: 'hausaufgabe', tag: '#Hausaufgabe', label: 'Hausaufgabe', desc: 'Wochenauftrag', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', iconName: 'book' },
+  { key: 'technik', tag: '#Technik', label: 'Technik', desc: 'Motorik & Handhaltung', color: '#1d4ed8', bg: '#dbeafe', border: 'transparent', iconName: 'zap' }, // Note A
+  { key: 'rhythmus', tag: '#Rhythmus', label: 'Rhythmus', desc: 'Timing & Metronom', color: '#4338ca', bg: '#e0e7ff', border: 'transparent', iconName: 'activity' }, // Note A#
+  { key: 'klang', tag: '#Klang', label: 'Klang', desc: 'Intonation & Tonkultur', color: '#047857', bg: '#d1fae5', border: 'transparent', iconName: 'volume' }, // Note F#
+  { key: 'ausdruck', tag: '#Ausdruck', label: 'Ausdruck', desc: 'Dynamik & Phrasierung', color: '#7e22ce', bg: '#f3e8ff', border: 'transparent', iconName: 'sparkles' }, // Note B
+  { key: 'repertoire', tag: '#Repertoire', label: 'Repertoire', desc: 'Songs & Stücke', color: '#854d0e', bg: '#fef9c3', border: 'transparent', iconName: 'music' }, // Note E
+  { key: 'noten', tag: '#Noten', label: 'Noten / Lehrwerk', desc: 'Lehrwerk & Seitenzahlen', color: '#0369a1', bg: '#e0f2fe', border: 'transparent', iconName: 'book' }, // Note G#
+  { key: 'hausaufgabe', tag: '#Hausaufgabe', label: 'Hausaufgabe', desc: 'Wochenauftrag', color: '#137333', bg: '#e6f4ea', border: 'transparent', iconName: 'book' }, // Note F (Campus-Grün)
 ];
 
 export const TEACHER_ORGANIZATION_TAGS: TagDefinition[] = [
-  { key: 'todo', tag: '#To-Do', label: 'To-Do', desc: 'Aufgabe & Erledigung', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', iconName: 'check-square' },
-  { key: 'verwaltung', tag: '#Verwaltung', label: 'Verwaltung', desc: 'Sekretariat & Orga', color: '#b45309', bg: '#fef3c7', border: '#fde68a', iconName: 'building' },
-  { key: 'raum', tag: '#Raum', label: 'Raum', desc: 'Equipment & Defekte', color: '#dc2626', bg: '#fee2e2', border: '#fecaca', iconName: 'door' },
-  { key: 'konzert', tag: '#Konzert', label: 'Konzert', desc: 'Vorspiel & Bühne', color: '#9a3412', bg: '#ffedd5', border: '#fed7aa', iconName: 'graduation' },
-  { key: 'idee', tag: '#Idee', label: 'Idee', desc: 'Methode & Material', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', iconName: 'lightbulb' },
-  { key: 'wichtig', tag: '#Wichtig', label: 'Wichtig', desc: 'Dringender Hinweis', color: '#9f1239', bg: '#ffe4e6', border: '#fecdd3', iconName: 'pin' },
+  { key: 'todo', tag: '#To-Do', label: 'To-Do', desc: 'Aufgabe & Erledigung', color: '#1d4ed8', bg: '#dbeafe', border: 'transparent', iconName: 'check-square' }, // Note A
+  { key: 'verwaltung', tag: '#Verwaltung', label: 'Verwaltung', desc: 'Sekretariat & Orga', color: '#854d0e', bg: '#fef9c3', border: 'transparent', iconName: 'building' }, // Note E
+  { key: 'raum', tag: '#Raum', label: 'Raum', desc: 'Equipment & Defekte', color: '#b91c1c', bg: '#fee2e2', border: 'transparent', iconName: 'door' }, // Note C
+  { key: 'konzert', tag: '#Konzert', label: 'Konzert', desc: 'Vorspiel & Bühne', color: '#c2410c', bg: '#ffedd5', border: 'transparent', iconName: 'graduation' }, // Note D
+  { key: 'idee', tag: '#Idee', label: 'Idee', desc: 'Methode & Material', color: '#0e7490', bg: '#cffafe', border: 'transparent', iconName: 'lightbulb' }, // Note G
+  { key: 'wichtig', tag: '#Wichtig', label: 'Wichtig', desc: 'Dringender Hinweis', color: '#b91c1c', bg: '#fee2e2', border: 'transparent', iconName: 'pin' }, // Note C
 ];
 
 export const COMMON_TAGS = ['Hausaufgabe', 'Technik', 'Repertoire', 'Theorie', 'Konzert', 'Wichtig', 'Audio'];

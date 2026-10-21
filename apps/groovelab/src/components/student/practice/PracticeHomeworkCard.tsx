@@ -12,6 +12,7 @@ import { useAuthoritativeHomeworkOptional } from '../context/AuthoritativeHomewo
 import { isWeeklySnapshotContainer, formatConsecutivePageRanges } from '../tabs/briefing/homeworkSummaryHelper';
 import { getSongColor } from '../studentDateUtils';
 import { StudentHomeworkStatusButton } from '../homework/StudentHomeworkStatusButton';
+import { MicroScoreSnippetButton } from '../meisterwerk/microscore';
 
 export interface PracticeHomeworkCardProps extends UseAuthoritativeHomeworkPlanParams {
   studentId?: string | null;
@@ -31,8 +32,10 @@ export interface PracticeHomeworkCardProps extends UseAuthoritativeHomeworkPlanP
 function sanitizeTeacherImpulse(raw?: string | string[] | null): string {
   if (!raw) return '';
   let text = Array.isArray(raw)
-    ? raw.filter(p => typeof p === 'string' && !p.startsWith('AUDIO:') && !p.startsWith('STICKER:')).join(' ')
+    ? raw.filter(p => typeof p === 'string' && !p.startsWith('AUDIO:') && !p.startsWith('STICKER:') && !p.startsWith('MICROSCORE:') && !p.startsWith('SNAPSHOT_')).join(' ')
     : String(raw).trim();
+
+  if (text.startsWith('MICROSCORE:') || text.startsWith('SNAPSHOT_')) return '';
 
   // JSON-Arrays sicher entpacken
   if (text.startsWith('[') || text.startsWith('{')) {
@@ -40,7 +43,7 @@ function sanitizeTeacherImpulse(raw?: string | string[] | null): string {
       const parsed = JSON.parse(text);
       if (Array.isArray(parsed)) {
         text = parsed
-          .filter(p => typeof p === 'string' && !p.startsWith('AUDIO:') && !p.startsWith('STICKER:'))
+          .filter(p => typeof p === 'string' && !p.startsWith('AUDIO:') && !p.startsWith('STICKER:') && !p.startsWith('MICROSCORE:') && !p.startsWith('SNAPSHOT_'))
           .join(' ');
       }
     } catch {}
@@ -105,10 +108,13 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
   const {
     books,
     songs,
+    microScores,
     generalNotes,
     audioTracks,
     studentQuestion,
-    hasActiveHomework
+    hasActiveHomework,
+    isCarriedOver,
+    carriedOverWeek
   } = plan;
 
   const safeSongs = useMemo(() => {
@@ -120,18 +126,19 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
   }, [songs]);
 
   const effectiveHasActiveHomework = Boolean(
-    hasActiveHomework && (books.length > 0 || safeSongs.length > 0 || generalNotes.length > 0)
+    hasActiveHomework && (books.length > 0 || safeSongs.length > 0 || (microScores && microScores.length > 0) || generalNotes.length > 0)
   );
 
   // 1. Wochen-Fokus Aufgaben-Liste (0,1% Goldstandard: Multi-Item Parität mit Aufgabenheft)
   interface WeeklyTaskItem {
     id: string;
-    type: 'book' | 'song';
+    type: 'book' | 'song' | 'microscore';
     title: string;
     subtitle: string | null;
     artist?: string | null;
     taskId: string;
     notes?: string | null;
+    snippet?: any;
   }
 
   const weeklyTasks = useMemo<WeeklyTaskItem[]>(() => {
@@ -144,7 +151,7 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
       const cleanPageBadge = rawPageRange
         ? (/^s(\.|\b)/i.test(rawPageRange.trim()) ? rawPageRange.trim() : `S. ${rawPageRange.trim()}`)
         : (b.title ? 'Lehrwerk' : null);
-      const rawNote = b.notes || (books.length === 1 && safeSongs.length === 0 && generalNotes.length > 0 ? generalNotes[0] : null);
+      const rawNote = b.notes || (books.length === 1 && safeSongs.length === 0 && (!microScores || microScores.length === 0) && generalNotes.length > 0 ? generalNotes[0] : null);
       items.push({
         id: `book-${b.title}-${idx}`,
         type: 'book',
@@ -174,8 +181,23 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
       });
     });
 
+    // Notenschnipsel (MicroScores)
+    (microScores || []).forEach((ms: any, idx: number) => {
+      const msId = ms.id || `ms-${idx}`;
+      const msTitle = ms.title || 'Notenschnipsel';
+      items.push({
+        id: `ms-${msId}-${idx}`,
+        type: 'microscore',
+        title: msTitle,
+        subtitle: `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`,
+        taskId: msId,
+        notes: null,
+        snippet: ms
+      });
+    });
+
     return items;
-  }, [books, safeSongs, generalNotes, effectiveHasActiveHomework]);
+  }, [books, safeSongs, microScores, generalNotes, effectiveHasActiveHomework]);
 
   // Standalone-Notizen (z. B. "Zusätzliche Bemerkung"), falls nicht bereits an Buch/Song gehängt
   const standaloneNotes = useMemo(() => {
@@ -244,13 +266,13 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
       className={`animation-fade-in ${className}`}
     >
       {/* 1. Header-Zeile (Clean, calm Apple Precision) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 }}>
           <div style={{
             width: '28px',
             height: '28px',
             borderRadius: '8px',
-            background: effectiveHasActiveHomework ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'rgba(245, 158, 11, 0.12)',
+            background: effectiveHasActiveHomework ? '#34a853' : 'rgba(245, 158, 11, 0.12)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -264,26 +286,33 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
               <Trophy size={15} color="#d97706" />
             )}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
             <h4 style={{
               margin: 0,
               fontSize: isMusicStandMode ? '1.08rem' : '0.96rem',
               fontWeight: 900,
               color: '#0f172a',
               letterSpacing: '-0.01em',
-              fontFamily: "'Plus Jakarta Sans', sans-serif"
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              whiteSpace: 'nowrap',
+              wordBreak: 'keep-all',
+              hyphens: 'none'
             }}>
-              {effectiveHasActiveHomework ? 'Wochen-Fokus' : 'Meisterwerk & Repertoire'}
+              {effectiveHasActiveHomework
+                ? (isCarriedOver ? `📌 Letzte Hausaufgabe (${carriedOverWeek ? `KW ${carriedOverWeek}` : 'Vorwoche'})` : 'Wochen\u2011Fokus')
+                : 'Meisterwerk & Repertoire'}
             </h4>
             {effectiveHasActiveHomework && weeklyTasks.length > 0 && (
               <span style={{
                 fontSize: '0.70rem',
                 fontWeight: 850,
-                color: '#15803d',
-                background: '#dcfce7',
+                color: '#137333',
+                background: '#e6f4ea',
                 padding: '2px 7px',
                 borderRadius: '100px',
-                lineHeight: 1
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}>
                 {weeklyTasks.length === 1 ? '1 Aufgabe' : `${weeklyTasks.length} Aufgaben`}
               </span>
@@ -299,7 +328,7 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
               background: 'transparent',
               border: 'none',
               padding: '4px 6px',
-              color: '#16a34a',
+              color: '#34a853',
               fontSize: '0.78rem',
               fontWeight: 800,
               cursor: 'pointer',
@@ -347,61 +376,83 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {visibleTasks.map((task) => {
               const isBook = task.type === 'book';
-              const songColor = isBook ? null : getSongColor(task.title);
+              const isMicroScore = task.type === 'microscore';
+              const songColor = (isBook || isMicroScore) ? null : getSongColor(task.title);
               const squircleBg = isBook
                 ? 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)'
-                : `linear-gradient(135deg, ${songColor!.from}, ${songColor!.to})`;
-              const iconColor = isBook ? '#e11d48' : (songColor!.text || '#0f172a');
+                : isMicroScore
+                  ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+                  : `linear-gradient(135deg, ${songColor!.from}, ${songColor!.to})`;
+              const iconColor = isBook ? '#e11d48' : isMicroScore ? '#ffffff' : (songColor!.text || '#0f172a');
               const shadow = isBook
                 ? '0 2px 6px rgba(225, 29, 72, 0.12)'
-                : `0 2px 6px ${songColor!.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`;
+                : isMicroScore
+                  ? '0 2px 6px rgba(15, 23, 42, 0.18)'
+                  : `0 2px 6px ${songColor!.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`;
 
               return (
                 <div key={task.id} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, flexWrap: 'wrap' }}>
-                      <div style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '7px',
-                        background: squircleBg,
-                        border: '1px solid rgba(255, 255, 255, 0.85)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: iconColor,
-                        boxShadow: shadow,
-                        flexShrink: 0
-                      }}>
-                        {isBook ? (
-                          <BookOpen size={12} strokeWidth={2.4} />
-                        ) : (
-                          <Music size={12} strokeWidth={2.4} />
-                        )}
-                      </div>
-                      <span style={{
-                        fontSize: isMusicStandMode ? '1.12rem' : '0.98rem',
-                        fontWeight: 950,
-                        color: '#0f172a',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif"
-                      }}>
-                        {task.title}
-                        {task.artist && (
-                          <span style={{ fontSize: '0.86rem', fontWeight: 650, color: '#64748b', marginLeft: '6px' }}>
-                            · {task.artist}
+                      {isMicroScore ? (
+                        <MicroScoreSnippetButton
+                          studentId={studentId || studentUser?.id}
+                          taskId={task.taskId}
+                          taskTitle={task.title}
+                          defaultInstrument={task.snippet?.instrument || studentUser?.instrument}
+                          initialSnippet={task.snippet}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '7px',
+                          background: squircleBg,
+                          border: '1px solid rgba(255, 255, 255, 0.85)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: iconColor,
+                          boxShadow: shadow,
+                          flexShrink: 0
+                        }}>
+                          {isBook ? (
+                            <BookOpen size={12} strokeWidth={2.4} />
+                          ) : (
+                            <Music size={12} strokeWidth={2.4} />
+                          )}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{
+                          fontSize: isMusicStandMode ? '1.12rem' : '0.98rem',
+                          fontWeight: 950,
+                          color: '#0f172a',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontFamily: "'Plus Jakarta Sans', sans-serif"
+                        }}>
+                          {task.title}
+                          {task.artist && (
+                            <span style={{ fontSize: '0.86rem', fontWeight: 650, color: '#64748b', marginLeft: '6px' }}>
+                              · {task.artist}
+                            </span>
+                          )}
+                        </span>
+                        {isMicroScore && task.subtitle && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 650, color: '#64748b' }}>
+                            {task.subtitle}
                           </span>
                         )}
-                      </span>
+                      </div>
                       {isBook && task.subtitle && (
                         <span style={{
                           fontSize: '0.74rem',
                           fontWeight: 850,
-                          color: '#15803d',
-                          background: '#dcfce7',
-                          border: '1px solid #bbf7d0',
+                          color: '#137333',
+                          background: '#e6f4ea',
+                          border: 'none',
                           padding: '2px 8px',
                           borderRadius: '99px',
                           whiteSpace: 'nowrap',
@@ -429,7 +480,7 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
                     padding: '6px 10px',
                     borderRadius: '8px',
                     background: '#f8fafc',
-                    borderLeft: '3px solid #10b981',
+                    borderLeft: '3px solid #34a853',
                     marginLeft: '32px'
                   }}>
                     <p style={{
@@ -461,9 +512,9 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
                 padding: '8px 12px',
                 borderRadius: '10px',
                 background: '#f8fafc',
-                borderLeft: '3px solid #10b981'
+                borderLeft: '3px solid #34a853'
               }}>
-                <FileText size={14} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} strokeWidth={2.4} />
+                <FileText size={14} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} strokeWidth={2.4} />
                 <p style={{
                   margin: 0,
                   fontSize: '0.80rem',
@@ -500,8 +551,8 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
                 <span style={{
                   fontSize: '0.74rem',
                   fontWeight: 850,
-                  color: '#15803d',
-                  background: '#dcfce7',
+                  color: '#137333',
+                  background: '#e6f4ea',
                   padding: '2px 8px',
                   borderRadius: '6px',
                   whiteSpace: 'nowrap',
@@ -530,15 +581,15 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
             gap: '10px',
             padding: '8px 12px',
             borderRadius: '12px',
-            background: isPlayingAudio ? '#ecfdf5' : '#f8fafc',
-            border: isPlayingAudio ? '1px solid #10b981' : '1px solid #f1f5f9',
+            background: isPlayingAudio ? '#e6f4ea' : '#f8fafc',
+            border: isPlayingAudio ? '1px solid #34a853' : '1px solid #f1f5f9',
             transition: 'all 0.2s ease'
           }}>
             <button
               type="button"
               onClick={() => toggleAudio(activeAudioTrack.url)}
               style={{
-                background: isPlayingAudio ? '#ef4444' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: isPlayingAudio ? '#ef4444' : '#34a853',
                 border: 'none',
                 borderRadius: '100px',
                 width: '32px',
@@ -573,12 +624,12 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
               }}>
                 {activeAudioTrack.label && !activeAudioTrack.label.startsWith('AUDIO:') ? activeAudioTrack.label : 'Lehrer-Aufnahme'}
               </span>
-              <span style={{ fontSize: '0.68rem', color: isPlayingAudio ? '#059669' : '#64748b', fontWeight: 650 }}>
+              <span style={{ fontSize: '0.68rem', color: isPlayingAudio ? '#137333' : '#64748b', fontWeight: 650 }}>
                 {isPlayingAudio ? 'Wiedergabe aktiv...' : 'Vorhören vor erstem Anschlag'}
               </span>
             </div>
 
-            <Headphones size={15} color={isPlayingAudio ? '#059669' : '#94a3b8'} style={{ flexShrink: 0 }} />
+            <Headphones size={15} color={isPlayingAudio ? '#34a853' : '#94a3b8'} style={{ flexShrink: 0 }} />
           </div>
         )}
       </div>
@@ -621,7 +672,7 @@ export const PracticeHomeworkCard: React.FC<PracticeHomeworkCardProps> = ({
                   : 'Alle Song-Projekte im Repertoire ansehen')}
           </span>
         </span>
-        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
           <span>Öffnen</span>
           <ChevronRight size={13} />
         </span>

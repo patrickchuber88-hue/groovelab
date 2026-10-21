@@ -368,7 +368,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
     }
   };
 
-  const activeColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
+  const activeColor = activePlatform === 'groovelab' ? '#facc15' : '#34a853';
 
   return (
     <div 
@@ -678,7 +678,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                             padding: '1px 3px', 
                             borderRadius: '4px',
                             fontWeight: 700,
-                            border: '1px solid rgba(52, 168, 83, 0.3)',
+                            border: 'none',
                             whiteSpace: 'nowrap'
                           }}>
                             {windowStr}
@@ -691,7 +691,7 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
                             padding: '1px 3px', 
                             borderRadius: '4px',
                             fontWeight: 800,
-                            border: '1px solid rgba(52, 168, 83, 0.2)'
+                            border: 'none'
                           }}>
                             Unterricht
                           </span>

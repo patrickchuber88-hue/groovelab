@@ -221,6 +221,219 @@ recordCheck(
 );
 
 // -----------------------------------------------------------------------------
+// CHECK 9: Permanente Hauptmenü-Button-Präsenz, Sticky Top-Bar & Universal Back-to-Cockpit
+// -----------------------------------------------------------------------------
+const campusAppLayoutPath = path.join(SRC_DIR, 'components', 'layout', 'CampusAppLayout.tsx');
+const geminiMobileShellPath = path.join(SRC_DIR, 'components', 'navigation', 'GeminiMobileShell.tsx');
+const campusDirectMessagesPath = path.join(SRC_DIR, 'components', 'CampusDirectMessages.tsx');
+const secretaryHeaderPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryHeader.tsx');
+
+const campusAppLayoutContent = fs.existsSync(campusAppLayoutPath) ? fs.readFileSync(campusAppLayoutPath, 'utf-8') : '';
+const geminiMobileShellContent = fs.existsSync(geminiMobileShellPath) ? fs.readFileSync(geminiMobileShellPath, 'utf-8') : '';
+const campusDirectMessagesContent = fs.existsSync(campusDirectMessagesPath) ? fs.readFileSync(campusDirectMessagesPath, 'utf-8') : '';
+const secretaryHeaderContent = fs.existsSync(secretaryHeaderPath) ? fs.readFileSync(secretaryHeaderPath, 'utf-8') : '';
+
+const hasPermanentMainMenuButton =
+  campusAppLayoutContent.includes('{isMobile && (\n              <GeminiMobileShell') &&
+  !campusAppLayoutContent.includes('{isMobile && !isMobileActiveChat && (') &&
+  geminiMobileShellContent.includes('data-testid="mobile-main-menu-btn"') &&
+  geminiMobileShellContent.includes('data-testid="gemini-mobile-back-btn"') &&
+  geminiMobileShellContent.includes('aria-label="Hauptmenü öffnen"') &&
+  geminiMobileShellContent.includes('z-index: 950') &&
+  geminiMobileShellContent.includes('pointer-events: auto') &&
+  campusDirectMessagesContent.includes('calc(48px + env(safe-area-inset-top, 0px))') &&
+  secretaryHeaderContent.includes('data-testid="secretary-mobile-top-bar"') &&
+  secretaryHeaderContent.includes('id="mobile-main-menu-trigger"') &&
+  secretaryHeaderContent.includes('data-testid="mobile-main-menu-btn"') &&
+  secretaryHeaderContent.includes('data-testid="secretary-mobile-board-title"') &&
+  secretaryHeaderContent.includes('data-testid="secretary-mobile-back-btn"') &&
+  secretaryHeaderContent.includes('zIndex: 950') &&
+  secretaryHeaderContent.includes("padding: windowWidth <= 768 ? '12px 16px 12px 66px'");
+
+recordCheck(
+  'Säule 9: Permanente Hauptmenü-Button-Präsenz, Sticky Top-Bar & Back-to-Cockpit über alle Boards',
+  hasPermanentMainMenuButton,
+  hasPermanentMainMenuButton
+    ? 'GeminiMobileShell & SecretaryHeader enforce full-width Frosted-Glass Top Bar with 44×44px ☰ Hauptmenü button, dynamic Board Title, and 1-tap ← Cockpit return button on all sub-boards.'
+    : 'Hauptmenü button, Sticky Frosted-Glass Top-Bar, or ← Cockpit return button is missing in GeminiMobileShell or SecretaryHeader.'
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 10: Hybrid-Navigations-Architektur, Spatial Memory 5-Slot Bottom-Dock & Briefing-Parität
+// -----------------------------------------------------------------------------
+const mobileBriefingCarouselPath = path.join(SRC_DIR, 'components', 'ui', 'MobileBriefingCarousel.tsx');
+const teacherBriefingTabPath = path.join(SRC_DIR, 'components', 'teacher', 'tabs', 'TeacherBriefingTab.tsx');
+const secretaryBriefingViewPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryBriefingView.tsx');
+const secretaryMobileNavPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryMobileNavigation.tsx');
+
+const mobileBriefingCarouselContent = fs.existsSync(mobileBriefingCarouselPath) ? fs.readFileSync(mobileBriefingCarouselPath, 'utf-8') : '';
+const teacherBriefingTabContent = fs.existsSync(teacherBriefingTabPath) ? fs.readFileSync(teacherBriefingTabPath, 'utf-8') : '';
+const secretaryBriefingViewContent = fs.existsSync(secretaryBriefingViewPath) ? fs.readFileSync(secretaryBriefingViewPath, 'utf-8') : '';
+const secretaryMobileNavContent = fs.existsSync(secretaryMobileNavPath) ? fs.readFileSync(secretaryMobileNavPath, 'utf-8') : '';
+
+const hasBriefingBoardParity =
+  mobileBriefingCarouselContent.includes('mobile-briefing-bottom-dock') &&
+  mobileBriefingCarouselContent.includes("position: 'fixed'") &&
+  mobileBriefingCarouselContent.includes('bottom: 0') &&
+  teacherBriefingTabContent.includes("gridTemplateColumns: 'repeat(2, minmax(0, 1fr))'") &&
+  (teacherBriefingTabContent.includes('linear-gradient(135deg, #1e293b 0%, #0f172a 100%)') || teacherBriefingTabContent.includes('#0f172a')) &&
+  teacherBriefingTabContent.includes('CAMPUS LEHRKRAFT') &&
+  secretaryBriefingViewContent.includes('data-testid="secretary-briefing-hero-deck"') &&
+  (secretaryBriefingViewContent.includes('linear-gradient(135deg, #1e293b 0%, #0f172a 100%)') || secretaryBriefingViewContent.includes('#0f172a')) &&
+  secretaryBriefingViewContent.includes("gridTemplateColumns: 'repeat(2, minmax(0, 1fr))'") &&
+  secretaryMobileNavContent.includes('secretary-mobile-bottom-dock') &&
+  secretaryMobileNavContent.includes("style={{ minHeight: '44px' }}") &&
+  !secretaryMobileNavContent.includes('<span>Menü</span>') &&
+  secretaryMobileNavContent.includes('Zum Lehrerpult wechseln');
+
+recordCheck(
+  'Säule 10: Hybrid-Navigation, Spatial Memory 5-Slot Bottom-Dock & Briefing-Board-Parität',
+  hasBriefingBoardParity,
+  hasBriefingBoardParity
+    ? 'Student, Teacher, and Secretary/Admin Briefing Boards match 1:1; Secretary Bottom Dock enforces 5 stable module slots (44px touch targets, 0 redundant Menü duplicates).'
+    : 'Missing 2×2 KPI grid, Split Hero Deck, or 5-Slot Spatial Memory Bottom Dock parity.'
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 11: Simulator-Aware Breakpoint Governance & Single Source of Scroll
+// -----------------------------------------------------------------------------
+const secretaryDashboardPath = path.join(SRC_DIR, 'components', 'SecretaryDashboard.tsx');
+const adminDashboardPath = path.join(SRC_DIR, 'components', 'AdminDashboard.tsx');
+const secretaryCampusTabPath = path.join(SRC_DIR, 'components', 'secretary', 'tabs', 'SecretaryCampusTab.tsx');
+const secretaryCrisisViewPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryCrisisView.tsx');
+const secretaryEquipmentViewPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryEquipmentView.tsx');
+const secretaryAnnouncementsViewPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryAnnouncementsView.tsx');
+
+const secretaryDashboardContent = fs.existsSync(secretaryDashboardPath) ? fs.readFileSync(secretaryDashboardPath, 'utf-8') : '';
+const adminDashboardContent = fs.existsSync(adminDashboardPath) ? fs.readFileSync(adminDashboardPath, 'utf-8') : '';
+const secretaryCampusTabContent = fs.existsSync(secretaryCampusTabPath) ? fs.readFileSync(secretaryCampusTabPath, 'utf-8') : '';
+const secretaryCrisisViewContent = fs.existsSync(secretaryCrisisViewPath) ? fs.readFileSync(secretaryCrisisViewPath, 'utf-8') : '';
+const secretaryEquipmentViewContent = fs.existsSync(secretaryEquipmentViewPath) ? fs.readFileSync(secretaryEquipmentViewPath, 'utf-8') : '';
+const secretaryAnnouncementsViewContent = fs.existsSync(secretaryAnnouncementsViewPath) ? fs.readFileSync(secretaryAnnouncementsViewPath, 'utf-8') : '';
+
+const hasSimulatorCssGridParity =
+  indexCssContent.includes('.sim-viewport-mobile .campus-grid') &&
+  indexCssContent.includes('.sim-viewport-tablet-portrait .campus-grid') &&
+  indexCssContent.includes('.sim-viewport-mobile .rooms-board-grid');
+
+const hasSingleSourceOfScrollAndSimAware =
+  // 1. SecretaryDashboard right pane uses overflow: 'hidden' and #secretary-main-scroll-container is the single scroll container
+  secretaryDashboardContent.includes('id="secretary-main-scroll-container"') &&
+  secretaryDashboardContent.includes("overflowY: 'auto'") &&
+  secretaryDashboardContent.includes("calc(58px + env(safe-area-inset-top, 0px))") &&
+  // 2. SecretaryBriefingView, SecretaryCrisisView, SecretaryEquipmentView & SecretaryAnnouncementsView use simulator-aware effectiveWidth
+  !secretaryBriefingViewContent.includes('window.innerWidth < 768') &&
+  !secretaryBriefingViewContent.includes('window.innerWidth < 1024') &&
+  secretaryCrisisViewContent.includes("isMobileView ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))'") &&
+  secretaryCrisisViewContent.includes("isTabletOrMobile ? '1fr' : 'minmax(0, 1fr) 310px'") &&
+  !secretaryEquipmentViewContent.includes('window.innerWidth < 1024') &&
+  secretaryEquipmentViewContent.includes("isTabletOrMobile ? '1fr' : 'minmax(0, 1fr) 340px'") &&
+  secretaryAnnouncementsViewContent.includes("isTabletOrMobile ? '1fr' : '1.2fr 1.8fr'") &&
+  // 3. AdminDashboard passes simulator-aware windowWidth to AdminTeachersView and uses overflowY: isMobile ? 'visible'
+  !adminDashboardContent.includes("windowWidth={typeof window !== 'undefined' ? window.innerWidth : 1200}") &&
+  adminDashboardContent.includes("overflowY: isMobile ? 'visible'") &&
+  // 4. SecretaryCampusTab KPI grid uses responsive 2/3/4 column breakpoints & CSS grids support .sim-viewport-*
+  !secretaryCampusTabContent.includes("gridTemplateColumns: 'repeat(4, 1fr)'") &&
+  secretaryCampusTabContent.includes("windowWidth <= 768\n                            ? 'repeat(2, minmax(0, 1fr))'") &&
+  hasSimulatorCssGridParity;
+
+recordCheck(
+  'Säule 11: Simulator-Aware Breakpoint Governance, Split-Board Collapse & Single Source of Scroll',
+  hasSingleSourceOfScrollAndSimAware,
+  hasSingleSourceOfScrollAndSimAware
+    ? 'All primary dashboards & Secretary boards (Briefing, Crisis, Equipment, Announcements, Rooms, Employees) enforce Single Source of Scroll and simulator-aware breakpoints (0 raw window.innerWidth JSX traps, 100% .sim-viewport-* CSS grid parity).'
+    : 'Detected nested scroll cage, uncollapsed split-board, or simulator-blind window.innerWidth inline breakpoint in primary dashboard components.'
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 12: Universal 44×44px Modal & Mask Close/Back Button Invariante
+// -----------------------------------------------------------------------------
+const secretaryOpsModalsPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryOperationsModalsHub.tsx');
+const secretaryUserModalsPath = path.join(SRC_DIR, 'components', 'secretary', 'SecretaryUserDetailModalsHub.tsx');
+const secretaryOpsModalsContent = fs.existsSync(secretaryOpsModalsPath) ? fs.readFileSync(secretaryOpsModalsPath, 'utf-8') : '';
+const secretaryUserModalsContent = fs.existsSync(secretaryUserModalsPath) ? fs.readFileSync(secretaryUserModalsPath, 'utf-8') : '';
+
+const hasUniversalModalClose44px =
+  pwaModalShellContent.includes('data-testid="modal-close-btn"') &&
+  pwaModalShellContent.includes("minWidth: '44px'") &&
+  pwaModalShellContent.includes("minHeight: '44px'") &&
+  !pwaModalShellContent.includes("minWidth: '36px'") &&
+  secretaryOpsModalsContent.includes('data-testid="modal-close-btn"') &&
+  !secretaryOpsModalsContent.includes("width: '32px'") &&
+  !secretaryOpsModalsContent.includes("width: '36px'") &&
+  secretaryUserModalsContent.includes('data-testid="modal-close-btn"');
+
+recordCheck(
+  'Säule 12: Universal 44×44px Modal & Mask Close/Back Button Invariante (PwaModalShell & Modal Hubs)',
+  hasUniversalModalClose44px,
+  hasUniversalModalClose44px
+    ? 'Every modal shell and dialog hub enforces a 44×44px touch-target close button (✕) and sub-board return button (← Cockpit).'
+    : 'Detected undersized (< 44×44px) or missing modal close button in PwaModalShell or Secretary Modal Hubs.'
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 13: iPadOS 360° Size Classes (Sidebar Rail Isolation, Vertical Scroll Safety, Zero Name-Truncation & Slide-Over Drawer)
+// -----------------------------------------------------------------------------
+const appCssPath = path.join(SRC_DIR, 'App.css');
+const campusDesktopSidebarPath = path.join(SRC_DIR, 'components', 'layout', 'CampusDesktopSidebar.tsx');
+const teacherTagesplanPath = path.join(SRC_DIR, 'components', 'teacher', 'TeacherTagesplanWidget.tsx');
+const teacherBriefingPath = path.join(SRC_DIR, 'components', 'teacher', 'tabs', 'TeacherBriefingTab.tsx');
+const studentRightSidebarPath = path.join(SRC_DIR, 'components', 'student', 'tabs', 'briefing', 'StudentBriefingRightSidebar.tsx');
+const appCssContent = fs.existsSync(appCssPath) ? fs.readFileSync(appCssPath, 'utf-8') : '';
+const campusDesktopSidebarContent = fs.existsSync(campusDesktopSidebarPath) ? fs.readFileSync(campusDesktopSidebarPath, 'utf-8') : '';
+const teacherTagesplanContent = fs.existsSync(teacherTagesplanPath) ? fs.readFileSync(teacherTagesplanPath, 'utf-8') : '';
+const teacherBriefingContent = fs.existsSync(teacherBriefingPath) ? fs.readFileSync(teacherBriefingPath, 'utf-8') : '';
+const studentRightSidebarContent = fs.existsSync(studentRightSidebarPath) ? fs.readFileSync(studentRightSidebarPath, 'utf-8') : '';
+
+const hasIpad360Parity =
+  // 1. CSS distinguishes .sidebar-nav.is-collapsed from .sidebar-nav:not(.is-collapsed) in App.css & index.css
+  appCssContent.includes('.sidebar-nav.is-collapsed') &&
+  appCssContent.includes('.sidebar-nav:not(.is-collapsed)') &&
+  indexCssContent.includes('.sim-viewport-tablet .sidebar-nav.is-collapsed') &&
+  indexCssContent.includes('.sim-viewport-tablet .sidebar-nav:not(.is-collapsed)') &&
+  indexCssContent.includes('.sim-viewport-landscape .sidebar-nav.is-collapsed') &&
+  // 2. CampusDesktopSidebar scrollable middle zone so bottom user hub never clips on 768px–820px height
+  campusDesktopSidebarContent.includes("flex: '1 1 0%'") &&
+  campusDesktopSidebarContent.includes('minHeight: 0') &&
+  campusDesktopSidebarContent.includes("overflowY: 'auto'") &&
+  // 3. TeacherTagesplanWidget protects student names with flexShrink: 0 and moves metadata to 2nd row on <= 1280px
+  teacherTagesplanContent.includes('(isMobileDevice || windowWidth <= 1280) && (slot.student || slot.isGroup)') &&
+  teacherTagesplanContent.includes('!isMobileDevice && windowWidth > 1280 && (slot.student || slot.isGroup)') &&
+  // 4. TeacherBriefingTab & StudentBriefingRightSidebar use iPad Portrait 2x2 KPIs / vertical stack and Slide-Over Drawer
+  teacherBriefingContent.includes('const isTabletPortrait = !isMobileDevice && windowWidth >= 768 && windowWidth <= 1024;') &&
+  teacherBriefingContent.includes("isTabletPortrait ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))'") &&
+  studentRightSidebarContent.includes('const isTabletSlideOver = !isMobileSheet');
+
+recordCheck(
+  'Säule 13: iPadOS 360° Adaptive Size Classes (Rail Isolation, Zero Name-Truncation & Slide-Over Drawer)',
+  hasIpad360Parity,
+  hasIpad360Parity
+    ? 'iPad Portrait (768–1024px) & Landscape (1025–1280px) enforce rail isolation, 2-line Tagesplan slots (0% name truncation), 2x2 Portrait KPIs, and Slide-Over Right Drawers.'
+    : 'Detected missing iPad Size Class adaptation in index.css, TeacherTagesplanWidget, TeacherBriefingTab, or StudentBriefingRightSidebar.'
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 14: Typografische Ganzwort-Integrität & Anti-Cascade Banner-Immunität
+// -----------------------------------------------------------------------------
+const subscribeBannerPath = path.join(SRC_DIR, 'components', 'events', 'CampusEventsSubscribeBanner.tsx');
+const subscribeBannerContent = fs.existsSync(subscribeBannerPath) ? fs.readFileSync(subscribeBannerPath, 'utf-8') : '';
+
+const hasBannerWordIntegrity =
+  subscribeBannerContent.includes("flexWrap: 'wrap'") &&
+  subscribeBannerContent.includes("minWidth: '190px'") &&
+  subscribeBannerContent.includes("wordBreak: 'normal'") &&
+  !subscribeBannerContent.includes("wordBreak: 'break-word'") &&
+  !subscribeBannerContent.includes("wordBreak: 'break-all'");
+
+recordCheck(
+  'Säule 14: Typografische Ganzwort-Integrität & Anti-Cascade Banner-Immunität (Zero Single-Letter Splitting)',
+  hasBannerWordIntegrity,
+  hasBannerWordIntegrity
+    ? 'QuickAction Banners enforce flexWrap: wrap, minWidth: 190px text containment & wordBreak: normal (0% vertical single-letter cascades).'
+    : 'CampusEventsSubscribeBanner lacks flexWrap: wrap, minWidth text containment, or contains toxic wordBreak mid-word splitting.'
+);
+
+// -----------------------------------------------------------------------------
 // SUMMARY REPORT
 // -----------------------------------------------------------------------------
 process.stdout.write(`\n${HR}\n`);
@@ -236,6 +449,7 @@ if (violationsCount > 0) {
   process.stderr.write(`❌ FAILED: 0,1% PWA Mobile Architecture Guard detected ${violationsCount} violation(s).\n\n`);
   process.exit(1);
 } else {
-  process.stdout.write('🏆 SUCCESS: All 8/8 0,1% PWA Mobile Architecture Invariants Satisfied.\n\n');
+  process.stdout.write('🏆 SUCCESS: All 14/14 0,1% PWA Mobile Architecture Invariants Satisfied.\n\n');
   process.exit(0);
 }
+

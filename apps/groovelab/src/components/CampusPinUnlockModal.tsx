@@ -486,7 +486,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
               width: '100%',
               padding: '12px 16px',
               borderRadius: '16px',
-              border: '1px solid #bae6fd',
+              border: 'none',
               background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
               color: '#0284c7',
               fontSize: '0.88rem',

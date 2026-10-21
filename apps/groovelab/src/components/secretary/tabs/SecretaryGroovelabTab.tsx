@@ -25,12 +25,12 @@ const getAlphabeticalColor = (name: string) => {
   const trimmed = (name || '').trim();
   if (trimmed.toLowerCase() === 'ohne zuweisung') {
     return {
-      avatarBg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+      avatarBg: '#f1f5f9',
       avatarColor: '#475569'
     };
   }
   const hue = getAlphabeticalHue(trimmed);
-  const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  const avatarBg = `hsl(${hue}, 85%, 94%)`;
   const avatarColor = `hsl(${hue}, 90%, 25%)`;
   return { avatarBg, avatarColor };
 };
@@ -59,7 +59,7 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   if (num === 1 || num === 2) return '#ef4444'; // Red
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
-  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  if (num === 7 || num === 8) return '#facc15'; // Yellow
   return '#64748b';
 };
 
@@ -187,7 +187,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
           flexDirection: 'column', 
           position: 'relative', 
           border: isActive ? `2.5px solid ${color}` : `1.5px solid ${color}40`,
-          boxShadow: isActive ? `0 12px 30px rgba(0,0,0,0.03), 0 2px 8px ${color}10` : `0 4px 12px ${color}08`,
+          boxShadow: 'none',
           borderRadius: '24px',
           cursor: isActive ? 'pointer' : 'default',
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -224,7 +224,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               onClick={(e) => { e.stopPropagation(); onLogout(sess.id); }}
               style={{ 
                 background: '#fef2f2', 
-                border: '1px solid #fee2e2', 
+                border: 'none', 
                 padding: '2px 6px', 
                 borderRadius: '6px', 
                 cursor: 'pointer', 
@@ -250,7 +250,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               borderRadius: '24px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
-              boxShadow: `0 10px 28px ${color}25`, 
+              boxShadow: 'none', 
               flexShrink: 0, 
               marginBottom: '4px',
               transition: 'all 0.3s ease'
@@ -530,20 +530,20 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
   bands,
   teachersManageStudents,
   setTeachersManageStudents,
-  groovelabStudentSearchQuery,
-  setGroovelabStudentSearchQuery,
-  groovelabStudentFilterInstrument,
-  setGroovelabStudentFilterInstrument,
+  groovelabStudentSearchQuery = '',
+  setGroovelabStudentSearchQuery = () => {},
+  groovelabStudentFilterInstrument = 'All',
+  setGroovelabStudentFilterInstrument = () => {},
   handleToggleStudentModule,
   setSelectedStudentForDetail,
   setShowAddStudentModal,
   setNewStudentIsGroovelabActive,
   showAddGroovelabStudentModal,
   setShowAddGroovelabStudentModal,
-  groovelabStudentModalSearchQuery,
-  setGroovelabStudentModalSearchQuery,
-  showManualCreateGroovelabStudent,
-  setShowManualCreateGroovelabStudent,
+  groovelabStudentModalSearchQuery = '',
+  setGroovelabStudentModalSearchQuery = () => {},
+  showManualCreateGroovelabStudent = false,
+  setShowManualCreateGroovelabStudent = () => {},
   newStudentFirstName,
   setNewStudentFirstName,
   newStudentLastName,
@@ -555,19 +555,19 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
   bypassTeachers,
   teachersManageTeachers,
   setTeachersManageTeachers,
-  coachSearchQuery,
-  setCoachSearchQuery,
-  coachFilterInstrument,
-  setCoachFilterInstrument,
+  coachSearchQuery = '',
+  setCoachSearchQuery = () => {},
+  coachFilterInstrument = 'All',
+  setCoachFilterInstrument = () => {},
   handleToggleTeacherModule,
   setManageTeacher,
-  setSelectedCoachProfile,
-  showAddCoachModal,
-  setShowAddCoachModal,
-  coachModalSearchQuery,
-  setCoachModalSearchQuery,
-  showManualCreateCoach,
-  setShowManualCreateCoach,
+  setSelectedCoachProfile = () => {},
+  showAddCoachModal = false,
+  setShowAddCoachModal = () => {},
+  coachModalSearchQuery = '',
+  setCoachModalSearchQuery = () => {},
+  showManualCreateCoach = false,
+  setShowManualCreateCoach = () => {},
   setShowAddTeacherModal,
   newTeacherFirstName,
   setNewTeacherFirstName,
@@ -671,7 +671,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                     {/* Mobile Room Switcher Row */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#eab308', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#facc15', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                           <CampusGroovelabLogo size={20} fontSize="1.25rem" /> Board
                         </h2>
                       </div>
@@ -688,7 +688,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                 }}
                                 style={{
                                   border: 'none',
-                                  background: isSelected ? '#eab308' : '#f1f5f9',
+                                  background: isSelected ? '#facc15' : '#f1f5f9',
                                   color: isSelected ? '#0f172a' : '#64748b',
                                   padding: '8px 14px',
                                   borderRadius: '12px',
@@ -697,7 +697,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   cursor: 'pointer',
                                   whiteSpace: 'nowrap',
                                   transition: 'all 0.2s',
-                                  boxShadow: isSelected ? '0 4px 10px rgba(234,179,8,0.2)' : 'none'
+                                  boxShadow: 'none'
                                 }}
                               >
                                 {(() => {
@@ -789,7 +789,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                 padding: '12px 16px',
                                 position: 'relative',
                                 gap: '12px',
-                                boxShadow: isActive ? `0 6px 16px ${instColor}08` : 'none',
+                                boxShadow: 'none',
                                 cursor: isActive ? 'pointer' : 'default',
                                 minWidth: 0
                               }}
@@ -873,7 +873,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   }}
                                   style={{
                                     background: '#fef2f2',
-                                    border: '1px solid #fee2e2',
+                                    border: 'none',
                                     width: '24px',
                                     height: '24px',
                                     borderRadius: '50%',
@@ -911,8 +911,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
               const renderLiveHeader = () => (
                 <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#eab308', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Music size={20} style={{ color: '#eab308' }} /> Live Lab Board
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#facc15', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Music size={20} style={{ color: '#facc15' }} /> Live Lab Board
                     </h3>
                     {groovelabRooms.length > 1 && (
                       <div style={{ display: 'flex', gap: '6px', background: '#f1f5f9', padding: '5px', borderRadius: '14px' }}>
@@ -1212,13 +1212,13 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                 const firstName = (s.first_name || '').toLowerCase();
                 const lastName = (s.last_name || '').toLowerCase();
                 const nick = (s.nickname || '').toLowerCase();
-                const query = groovelabStudentSearchQuery.toLowerCase().trim();
+                const query = (groovelabStudentSearchQuery || '').toLowerCase().trim();
                 
                 const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nick.includes(query);
                 
                 const instrument = (s.instrument || 'Nicht festgelegt').toLowerCase();
-                const filterInst = groovelabStudentFilterInstrument.toLowerCase();
-                const matchesInstrument = groovelabStudentFilterInstrument === 'All' || instrument === filterInst;
+                const filterInst = (groovelabStudentFilterInstrument || 'All').toLowerCase();
+                const matchesInstrument = (groovelabStudentFilterInstrument || 'All') === 'All' || instrument === filterInst;
                 
                 return matchesSearch && matchesInstrument;
               });
@@ -1227,9 +1227,9 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
               const nonGroovelabStudents = students.filter(s => 
                 !(s.is_groovelab_active || s.isGroovelabActive) &&
                 (
-                  (s.first_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
-                  (s.last_name || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim()) ||
-                  (s.nickname || '').toLowerCase().includes(groovelabStudentSearchQuery.toLowerCase().trim())
+                  (s.first_name || '').toLowerCase().includes((groovelabStudentSearchQuery || '').toLowerCase().trim()) ||
+                  (s.last_name || '').toLowerCase().includes((groovelabStudentSearchQuery || '').toLowerCase().trim()) ||
+                  (s.nickname || '').toLowerCase().includes((groovelabStudentSearchQuery || '').toLowerCase().trim())
                 )
               );
 
@@ -1314,7 +1314,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
 
                       {/* Intelligent Auto-suggest / Add Dropdown */}
-                      {groovelabStudentSearchQuery.trim() !== '' && (
+                      {(groovelabStudentSearchQuery || '').trim() !== '' && (
                         <div style={{
                           position: 'absolute',
                           top: '100%',
@@ -1391,7 +1391,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const names = groovelabStudentSearchQuery.split(' ');
+                                const names = (groovelabStudentSearchQuery || '').split(' ');
                                 setNewStudentFirstName(names[0] || '');
                                 setNewStudentLastName(names.slice(1).join(' ') || '');
                                 setNewStudentIsGroovelabActive(true);
@@ -1620,7 +1620,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         {/* Modal Header */}
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <h3 id="add-gl-student-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                            <Plus style={{ color: '#eab308', marginRight: '6px' }} size={18} /> Schüler hinzufügen
+                            <Plus style={{ color: '#facc15', marginRight: '6px' }} size={18} /> Schüler hinzufügen
                           </h3>
                           <button 
                             type="button"
@@ -1659,14 +1659,15 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
                                 {(() => {
                                   // Find school students not in GrooveLab — strictly filtered by this school's ID
+                                  const modalQuery = (groovelabStudentModalSearchQuery || '').toLowerCase().trim();
                                   const nonActiveStudents = students.filter(s =>
                                     s.school_id === schoolId &&
                                     !(s.is_groovelab_active || s.isGroovelabActive) &&
                                     (
-                                      !groovelabStudentModalSearchQuery.trim() ||
-                                      (s.first_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
-                                      (s.last_name || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim()) ||
-                                      (s.nickname || '').toLowerCase().includes(groovelabStudentModalSearchQuery.toLowerCase().trim())
+                                      !modalQuery ||
+                                      (s.first_name || '').toLowerCase().includes(modalQuery) ||
+                                      (s.last_name || '').toLowerCase().includes(modalQuery) ||
+                                      (s.nickname || '').toLowerCase().includes(modalQuery)
                                     )
                                   );
 
@@ -1747,7 +1748,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                           ) : (
                             <form onSubmit={handleCreateStudentGroovelab}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                                     <input
@@ -1810,13 +1811,13 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                 const firstName = (t.firstName || '').toLowerCase();
                 const lastName = (t.lastName || '').toLowerCase();
                 const pin = (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase();
-                const query = coachSearchQuery.toLowerCase().trim();
+                const query = (coachSearchQuery || '').toLowerCase().trim();
                 
                 const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || pin.includes(query);
                 
                 const instrument = (t.instrument || 'Nicht festgelegt').toLowerCase();
-                const filterInst = coachFilterInstrument.toLowerCase();
-                const matchesInstrument = coachFilterInstrument === 'All' || instrument === filterInst;
+                const filterInst = (coachFilterInstrument || 'All').toLowerCase();
+                const matchesInstrument = (coachFilterInstrument || 'All') === 'All' || instrument === filterInst;
                 
                 return matchesSearch && matchesInstrument;
               });
@@ -1825,9 +1826,9 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
               const nonGroovelabTeachers = allTeachers.filter(t => 
                 !(t.isGroovelabActive || t.isGroovelabActive === true) &&
                 (
-                  (t.firstName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
-                  (t.lastName || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim()) ||
-                  (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase().includes(coachSearchQuery.toLowerCase().trim())
+                  (t.firstName || '').toLowerCase().includes((coachSearchQuery || '').toLowerCase().trim()) ||
+                  (t.lastName || '').toLowerCase().includes((coachSearchQuery || '').toLowerCase().trim()) ||
+                  (t.ausweisNummer || t.ausweis_nummer || '').toLowerCase().includes((coachSearchQuery || '').toLowerCase().trim())
                 )
               );
 
@@ -1904,7 +1905,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
 
                       {/* Intelligent Auto-suggest / Add Dropdown */}
-                      {coachSearchQuery.trim() !== '' && (
+                      {(coachSearchQuery || '').trim() !== '' && (
                         <div style={{
                           position: 'absolute',
                           top: '100%',
@@ -1981,7 +1982,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             <button
                               type="button"
                               onClick={() => {
-                                const names = coachSearchQuery.split(' ');
+                                const names = (coachSearchQuery || '').split(' ');
                                 setNewTeacherFirstName(names[0] || '');
                                 setNewTeacherLastName(names.slice(1).join(' ') || '');
                                 setShowAddTeacherModal(true);
@@ -2216,7 +2217,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         {/* Modal Header */}
                         <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <h3 id="add-coach-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                            <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#eab308' }} /> Lehrkraft hinzufügen
+                            <Plus size={18} style={{ marginRight: '6px', verticalAlign: 'middle', color: '#facc15' }} /> Lehrkraft hinzufügen
                           </h3>
                           <button 
                             type="button"
@@ -2255,12 +2256,14 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '180px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
                                 {(() => {
                                   // Find school teachers not in GrooveLab
+                                  const modalCoachQuery = (coachModalSearchQuery || '').toLowerCase().trim();
                                   const nonActiveCoaches = allTeachers.filter(t => 
                                     !(t.isGroovelabActive || t.is_groovelab_active) &&
                                     (
-                                      (t.firstName || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim()) ||
-                                      (t.lastName || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim()) ||
-                                      (t.nickname || '').toLowerCase().includes(coachModalSearchQuery.toLowerCase().trim())
+                                      !modalCoachQuery ||
+                                      (t.firstName || '').toLowerCase().includes(modalCoachQuery) ||
+                                      (t.lastName || '').toLowerCase().includes(modalCoachQuery) ||
+                                      (t.nickname || '').toLowerCase().includes(modalCoachQuery)
                                     )
                                   );
 
@@ -2340,7 +2343,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                           ) : (
                             <form onSubmit={handleCreateCoachForGroovelab}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                                     <input
@@ -2472,7 +2475,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                   </p>
                 </div>
 
-                {/* MODULAR COVER CARDS GRID (GROOVELAB YELLOW #eab308) */}
+                {/* MODULAR COVER CARDS GRID (GROOVELAB YELLOW #facc15) */}
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
@@ -2485,8 +2488,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Band-Engine & Besetzung',
                       subtitle: `Max. ${glMaxBandMembers} Musiker • Gründungsworkflow`,
                       badge: `Max. ${glMaxBandMembers} Musiker`,
-                      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      gradient: '#facc15',
+                      shadowColor: 'none',
                       icon: Users
                     },
                     {
@@ -2494,8 +2497,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Song-Library & Level',
                       subtitle: 'Starter, Pro, Master & Repertoire',
                       badge: `${[glSongLevelStarterEnabled, glSongLevelProEnabled, glSongLevelMasterEnabled].filter(Boolean).length} Level Aktiv`,
-                      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      shadowColor: 'rgba(245, 158, 11, 0.40)',
+                      gradient: '#f97316',
+                      shadowColor: 'none',
                       icon: Music
                     },
                     {
@@ -2503,8 +2506,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Live Lab & Band-Performance',
                       subtitle: `${glLiveDefaultBpm} BPM Standard • ${glLiveCountInBars === 2 ? '2 Takte' : '1 Takt'} Vorzähler`,
                       badge: `${glLiveDefaultBpm} BPM • Stage-View`,
-                      gradient: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
-                      shadowColor: 'rgba(217, 119, 6, 0.40)',
+                      gradient: '#f97316',
+                      shadowColor: 'none',
                       icon: Mic
                     },
                     {
@@ -2512,8 +2515,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Skill-Radar & XP',
                       subtitle: '5-Achsen-Radar • Song-Mastery XP',
                       badge: `${[glSkillRadarTiming, glSkillRadarTechnique, glSkillRadarSound, glSkillRadarRepertoire, glSkillRadarTeamplay].filter(Boolean).length} Achsen Aktiv`,
-                      gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
-                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      gradient: '#facc15',
+                      shadowColor: 'none',
                       icon: Award
                     },
                     {
@@ -2521,8 +2524,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Musiker- & Band-Avatare',
                       subtitle: 'Geist-Avatare & Band-Wappen',
                       badge: glMusicianAvatarsEnabled ? 'Geist-Avatar Aktiv' : 'Deaktiviert',
-                      gradient: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
-                      shadowColor: 'rgba(250, 204, 21, 0.40)',
+                      gradient: '#facc15',
+                      shadowColor: 'none',
                       icon: Smile
                     },
                     {
@@ -2530,8 +2533,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Band-Rooms & Chat',
                       subtitle: 'Band-Chat, Shouts & Moderation',
                       badge: glBandChatEnabled ? 'Band-Chat Aktiv' : 'Deaktiviert',
-                      gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
-                      shadowColor: 'rgba(245, 158, 11, 0.40)',
+                      gradient: '#f97316',
+                      shadowColor: 'none',
                       icon: Radio
                     },
                     {
@@ -2539,8 +2542,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Coach-Rechte',
                       subtitle: 'Schüler & Lehrer im GrooveLab',
                       badge: teachersManageStudents ? 'Erweitert' : 'Standard',
-                      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                      shadowColor: 'rgba(234, 179, 8, 0.40)',
+                      gradient: '#facc15',
+                      shadowColor: 'none',
                       icon: ShieldCheck
                     },
                     {
@@ -2548,8 +2551,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                       title: 'Ideenschmiede GrooveLab',
                       subtitle: 'Wünsche & Feedback für Bands',
                       badge: 'Mitgestalten',
-                      gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
-                      shadowColor: 'rgba(202, 138, 4, 0.40)',
+                      gradient: '#facc15',
+                      shadowColor: 'none',
                       icon: Lightbulb
                     }
                   ].map((module) => {
@@ -2582,7 +2585,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'translateY(-4px)';
                           e.currentTarget.style.boxShadow = '0 14px 28px -6px rgba(0,0,0,0.08), 0 4px 8px -2px rgba(0,0,0,0.04)';
-                          e.currentTarget.style.borderColor = '#eab308';
+                          e.currentTarget.style.borderColor = '#facc15';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'translateY(0)';
@@ -2609,12 +2612,12 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#ffffff',
-                          boxShadow: `0 8px 18px -4px ${module.shadowColor}`,
+                          color: module.gradient === '#facc15' ? '#0f172a' : '#ffffff',
+                          boxShadow: 'none',
                           marginBottom: '14px',
                           flexShrink: 0
                         }}>
-                          <IconComp size={28} color="#ffffff" strokeWidth={2.2} />
+                          <IconComp size={28} color={module.gradient === '#facc15' ? '#0f172a' : '#ffffff'} strokeWidth={2.2} />
                         </div>
 
                         {/* Title */}
@@ -2647,7 +2650,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                           fontWeight: 800,
                           color: '#854d0e',
                           background: '#fefce8',
-                          border: '1px solid #fef08a',
+                          border: 'none',
                           padding: '4px 10px',
                           borderRadius: '100px',
                           letterSpacing: '0.02em',
@@ -2718,19 +2721,19 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             width: '42px',
                             height: '42px',
                             borderRadius: '12px',
-                            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                            background: '#facc15',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: 'none'
                           }}>
-                            {activeGroovelabSettingsModal === 'bands' && <Users size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'songs' && <Music size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'live' && <Mic size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'radar' && <Award size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'avatars' && <Smile size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'rooms' && <Radio size={22} color="#ffffff" />}
-                            {activeGroovelabSettingsModal === 'permissions' && <ShieldCheck size={22} color="#ffffff" />}
+                            {activeGroovelabSettingsModal === 'bands' && <Users size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'songs' && <Music size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'live' && <Mic size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'radar' && <Award size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'avatars' && <Smile size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'rooms' && <Radio size={22} color="#0f172a" />}
+                            {activeGroovelabSettingsModal === 'permissions' && <ShieldCheck size={22} color="#0f172a" />}
                           </div>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
@@ -2792,7 +2795,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                       padding: '8px',
                                       borderRadius: '10px',
                                       border: '1.5px solid',
-                                      borderColor: glMaxBandMembers === num ? '#eab308' : '#e2e8f0',
+                                      borderColor: glMaxBandMembers === num ? '#facc15' : '#e2e8f0',
                                       background: glMaxBandMembers === num ? '#fefce8' : '#ffffff',
                                       color: glMaxBandMembers === num ? '#854d0e' : '#64748b',
                                       fontWeight: 800,
@@ -2817,8 +2820,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glAllowStudentBandCreation ? '#eab308' : '#e2e8f0',
-                                  color: glAllowStudentBandCreation ? '#ffffff' : '#64748b',
+                                  background: glAllowStudentBandCreation ? '#facc15' : '#e2e8f0',
+                                  color: glAllowStudentBandCreation ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -2850,8 +2853,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                     padding: '6px 14px',
                                     borderRadius: '100px',
                                     border: 'none',
-                                    background: item.val ? '#eab308' : '#e2e8f0',
-                                    color: item.val ? '#ffffff' : '#64748b',
+                                    background: item.val ? '#facc15' : '#e2e8f0',
+                                    color: item.val ? '#0f172a' : '#64748b',
                                     fontWeight: 800,
                                     fontSize: '0.76rem',
                                     cursor: 'pointer'
@@ -2880,7 +2883,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                       padding: '8px',
                                       borderRadius: '10px',
                                       border: '1.5px solid',
-                                      borderColor: glLiveDefaultBpm === bpm ? '#eab308' : '#e2e8f0',
+                                      borderColor: glLiveDefaultBpm === bpm ? '#facc15' : '#e2e8f0',
                                       background: glLiveDefaultBpm === bpm ? '#fefce8' : '#ffffff',
                                       color: glLiveDefaultBpm === bpm ? '#854d0e' : '#64748b',
                                       fontWeight: 800,
@@ -2907,7 +2910,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                       padding: '8px',
                                       borderRadius: '10px',
                                       border: '1.5px solid',
-                                      borderColor: glLiveCountInBars === bars ? '#eab308' : '#e2e8f0',
+                                      borderColor: glLiveCountInBars === bars ? '#facc15' : '#e2e8f0',
                                       background: glLiveCountInBars === bars ? '#fefce8' : '#ffffff',
                                       color: glLiveCountInBars === bars ? '#854d0e' : '#64748b',
                                       fontWeight: 800,
@@ -2932,8 +2935,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glLiveStageDisplayEnabled ? '#eab308' : '#e2e8f0',
-                                  color: glLiveStageDisplayEnabled ? '#ffffff' : '#64748b',
+                                  background: glLiveStageDisplayEnabled ? '#facc15' : '#e2e8f0',
+                                  color: glLiveStageDisplayEnabled ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -2966,8 +2969,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                     padding: '6px 14px',
                                     borderRadius: '100px',
                                     border: 'none',
-                                    background: item.val ? '#eab308' : '#e2e8f0',
-                                    color: item.val ? '#ffffff' : '#64748b',
+                                    background: item.val ? '#facc15' : '#e2e8f0',
+                                    color: item.val ? '#0f172a' : '#64748b',
                                     fontWeight: 800,
                                     fontSize: '0.76rem',
                                     cursor: 'pointer'
@@ -2994,8 +2997,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glMusicianAvatarsEnabled ? '#eab308' : '#e2e8f0',
-                                  color: glMusicianAvatarsEnabled ? '#ffffff' : '#64748b',
+                                  background: glMusicianAvatarsEnabled ? '#facc15' : '#e2e8f0',
+                                  color: glMusicianAvatarsEnabled ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3016,8 +3019,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glBandCoatOfArmsEnabled ? '#eab308' : '#e2e8f0',
-                                  color: glBandCoatOfArmsEnabled ? '#ffffff' : '#64748b',
+                                  background: glBandCoatOfArmsEnabled ? '#facc15' : '#e2e8f0',
+                                  color: glBandCoatOfArmsEnabled ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3043,8 +3046,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glBandChatEnabled ? '#eab308' : '#e2e8f0',
-                                  color: glBandChatEnabled ? '#ffffff' : '#64748b',
+                                  background: glBandChatEnabled ? '#facc15' : '#e2e8f0',
+                                  color: glBandChatEnabled ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3065,8 +3068,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: glJamRecordingCompression ? '#eab308' : '#e2e8f0',
-                                  color: glJamRecordingCompression ? '#ffffff' : '#64748b',
+                                  background: glJamRecordingCompression ? '#facc15' : '#e2e8f0',
+                                  color: glJamRecordingCompression ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3092,8 +3095,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: teachersManageStudents ? '#eab308' : '#e2e8f0',
-                                  color: teachersManageStudents ? '#ffffff' : '#64748b',
+                                  background: teachersManageStudents ? '#facc15' : '#e2e8f0',
+                                  color: teachersManageStudents ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3114,8 +3117,8 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                                   padding: '6px 14px',
                                   borderRadius: '100px',
                                   border: 'none',
-                                  background: teachersManageTeachers ? '#eab308' : '#e2e8f0',
-                                  color: teachersManageTeachers ? '#ffffff' : '#64748b',
+                                  background: teachersManageTeachers ? '#facc15' : '#e2e8f0',
+                                  color: teachersManageTeachers ? '#0f172a' : '#64748b',
                                   fontWeight: 800,
                                   fontSize: '0.76rem',
                                   cursor: 'pointer'
@@ -3143,7 +3146,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                             padding: '10px 20px',
                             borderRadius: '12px',
                             border: 'none',
-                            background: '#eab308',
+                            background: '#facc15',
                             color: '#0f172a',
                             fontWeight: 800,
                             fontSize: '0.84rem',

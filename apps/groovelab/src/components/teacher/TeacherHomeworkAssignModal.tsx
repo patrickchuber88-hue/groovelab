@@ -308,7 +308,7 @@ export const TeacherHomeworkAssignModal: React.FC<TeacherHomeworkAssignModalProp
                 padding: '12px 16px',
                 borderRadius: '12px',
                 background: '#fef2f2',
-                border: '1px solid #fecaca',
+                border: 'none',
                 color: '#991b1b',
                 fontSize: '0.82rem',
                 display: 'flex',

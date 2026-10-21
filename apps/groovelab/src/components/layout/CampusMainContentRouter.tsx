@@ -262,6 +262,21 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
     }
   }, [isMessagesActive, hasVisitedMessages]);
 
+  // 🚀 Idle Pre-Warming: Preload complementary module chunks during browser idle time for 0ms first switch
+  React.useEffect(() => {
+    const preload = () => {
+      import('../TeacherDashboard').catch(() => {});
+      import('../AdminDashboard').catch(() => {});
+      import('../StudentAvatarDashboard').catch(() => {});
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(preload, { timeout: 2500 });
+      return () => (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
+    }
+    const timerId = setTimeout(preload, 1500);
+    return () => clearTimeout(timerId);
+  }, []);
+
   const handleNavigateToSchedule = React.useCallback((dateStr?: string) => {
     if (typeof window !== 'undefined') {
       if (dateStr) {
@@ -315,7 +330,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           position: windowWidth <= 768 ? 'relative' : 'sticky',
           top: 0,
           zIndex: 890,
-          background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+          background: '#0ea5e9',
           color: '#ffffff',
           padding: windowWidth <= 768 ? '10px 14px' : '8px 16px',
           borderRadius: '14px',
@@ -612,29 +627,31 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           display: (isAdminTeacherSuiteActive && activeStudentTab !== 'profile' && activeStudentTab !== 'messages') ? 'block' : 'none',
           width: '100%'
         }}>
-          <ErrorBoundary key={`admin-teacher-suite-${activePlatform}-${activeWorkspace || user?.role || 'default'}`}>
-            <AdminDashboard 
-              key={`admin-dashboard-${activePlatform}-${activeWorkspace || user?.role || 'default'}`}
-              userId={user.id} 
-              activeWorkspace={activeWorkspace || (user.role === 'teacher' ? 'teacher' : undefined)}
-              userRole={user.role}
-              onLogout={handleLogout} 
-              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'mediathek', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? (activeStudentTab === 'mediathek' ? 'songs' : activeStudentTab) : undefined}
-              activePlatform={activePlatform as any}
-              onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
-              onSwitchPlatform={(platform) => setActivePlatform(platform)}
-              onOpenBandProfile={(band: any) => {
-                setSelectedBandForProfile(band);
-                setShowBandProfile(true);
-              }}
-              session={session}
-              onSessionChange={setSession}
-              locationMode={locationMode}
-              onLocationModeChange={(mode) => {
-                setLocationMode(mode);
-                sessionStorage.setItem('groovelab_location_mode', mode);
-              }}
-            />
+          <ErrorBoundary key={`admin-teacher-suite-${activeWorkspace || user?.role || 'default'}`}>
+            <Suspense fallback={<DashboardLoader />}>
+              <AdminDashboard 
+                key={`admin-dashboard-${activeWorkspace || user?.role || 'default'}`}
+                userId={user.id} 
+                activeWorkspace={activeWorkspace || (user.role === 'teacher' ? 'teacher' : undefined)}
+                userRole={user.role}
+                onLogout={handleLogout} 
+                forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'mediathek', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? (activeStudentTab === 'mediathek' ? 'songs' : activeStudentTab) : undefined}
+                activePlatform={activePlatform as any}
+                onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
+                onSwitchPlatform={(platform) => setActivePlatform(platform)}
+                onOpenBandProfile={(band: any) => {
+                  setSelectedBandForProfile(band);
+                  setShowBandProfile(true);
+                }}
+                session={session}
+                onSessionChange={setSession}
+                locationMode={locationMode}
+                onLocationModeChange={(mode) => {
+                  setLocationMode(mode);
+                  sessionStorage.setItem('groovelab_location_mode', mode);
+                }}
+              />
+            </Suspense>
           </ErrorBoundary>
         </div>
       )}

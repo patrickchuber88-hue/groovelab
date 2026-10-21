@@ -244,7 +244,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
       {errorMessage && (
         <div style={{
           background: '#fef2f2',
-          border: '1px solid #fecaca',
+          border: 'none',
           borderRadius: '12px',
           padding: '10px 14px',
           display: 'flex',

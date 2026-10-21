@@ -73,12 +73,25 @@ export function useTeacherBookings({
   const [showAllBookings, setShowAllBookings] = useState<boolean>(false);
   const [scheduleChangesTimeWindow, setScheduleChangesTimeWindow] = useState<'7days' | 'all'>('7days');
 
+  const teacherRef = useRef(teacher);
+  teacherRef.current = teacher;
+  const roomsRef = useRef(rooms);
+  roomsRef.current = rooms;
+  const allStudentsRef = useRef(allStudents);
+  allStudentsRef.current = allStudents;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const hasLoadedBookingsRef = useRef(false);
+
   const loadMyBookings = useCallback(async () => {
-    const isStudent = viewMode === 'student' || teacher?.role?.toLowerCase() === 'student';
-    if (!userId || isStudent || activeTab === 'live') return;
+    const curTeacher = teacherRef.current;
+    const curRooms = roomsRef.current;
+    const curStudents = allStudentsRef.current;
+    const isStudent = viewMode === 'student' || curTeacher?.role?.toLowerCase() === 'student';
+    if (!userId || isStudent) return;
     try {
       let allBookings: any[] = [];
-      const sId = teacher?.school_id || '';
+      const sId = curTeacher?.school_id || '';
       const stored = (sId ? localStorage.getItem(`groovelab_campus_bookings_${sId}`) : null) || localStorage.getItem('groovelab_campus_bookings');
       if (stored) {
         try {
@@ -108,7 +121,7 @@ export function useTeacherBookings({
         return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
       };
 
-      const teacherBoards: any[] = getTeacherActiveBoards(userId, teacher);
+      const teacherBoards: any[] = getTeacherActiveBoards(userId, curTeacher);
 
       const [{ data: dbBookings }, { data: teacherSchedules }] = await Promise.all([
         supabase
@@ -332,8 +345,8 @@ export function useTeacherBookings({
         
         let rName = occ.schedules?.rooms?.name || occ.schedules?.room?.name || occ.roomName || occ.room_name;
         const rId = occ.room_id || occ.schedules?.room_id || occ.schedules?.rooms?.id;
-        if ((!rName || rName === 'Raum') && rId && rooms && rooms.length > 0) {
-          const foundRoom = rooms.find((r: any) => String(r.id) === String(rId));
+        if ((!rName || rName === 'Raum') && rId && curRooms && curRooms.length > 0) {
+          const foundRoom = curRooms.find((r: any) => String(r.id) === String(rId));
           if (foundRoom) rName = foundRoom.name;
         }
 
@@ -347,8 +360,8 @@ export function useTeacherBookings({
           }
 
           // 2. Über allStudents Array
-          if (occ.student_id && allStudents && allStudents.length > 0) {
-            const found = allStudents.find((s: any) => 
+          if (occ.student_id && curStudents && curStudents.length > 0) {
+            const found = curStudents.find((s: any) => 
               String(s.id) === String(occ.student_id) ||
               String(s.student_id) === String(occ.student_id) ||
               String(s.user_id) === String(occ.student_id)
@@ -439,8 +452,8 @@ export function useTeacherBookings({
 
         const rawInstrument = occ.student?.instrument || occ.schedules?.instrument || (() => {
           // 1. Aus allStudents
-          if (occ.student_id && allStudents && allStudents.length > 0) {
-            const found = allStudents.find((s: any) => 
+          if (occ.student_id && curStudents && curStudents.length > 0) {
+            const found = curStudents.find((s: any) => 
               String(s.id) === String(occ.student_id) ||
               String(s.student_id) === String(occ.student_id) ||
               String(s.user_id) === String(occ.student_id)
@@ -468,7 +481,7 @@ export function useTeacherBookings({
           return '';
         })();
 
-        const teacherDefaultInst = teacher?.instrument || (teacher?.instruments && teacher.instruments[0]) || 'Gitarre';
+        const teacherDefaultInst = curTeacher?.instrument || (curTeacher?.instruments && curTeacher.instruments[0]) || 'Gitarre';
         const instrument = resolveStudentInstrument(rawInstrument, null, teacherDefaultInst);
 
         return {
@@ -490,9 +503,9 @@ export function useTeacherBookings({
           instrument,
           student_acknowledged: occ.student_acknowledged,
           studentAcknowledged: occ.studentAcknowledged,
-          canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_ausfall' || isTeacherCurrentlyAbsent(teacher)) ? 'teacher' : undefined),
-          teacher_acknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacher_acknowledged,
-          teacherAcknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacherAcknowledged,
+          canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_ausfall' || isTeacherCurrentlyAbsent(curTeacher)) ? 'teacher' : undefined),
+          teacher_acknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(curTeacher)) ? true : occ.teacher_acknowledged,
+          teacherAcknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(curTeacher)) ? true : occ.teacherAcknowledged,
           is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
           is_moved: occ.is_moved || occ.isMoved,
           is_room_booking: Boolean(occ.is_room_booking || occ.isRoomBooking || occ.room_override_id || occ.roomOverrideId || occ.is_room_changed || occ.isRoomChanged),
@@ -690,12 +703,19 @@ export function useTeacherBookings({
         return a.startTime.localeCompare(b.startTime);
       });
 
+      hasLoadedBookingsRef.current = true;
       setMyBookings(prev => areArraysEqualFast(prev, filteredBookings) ? prev : filteredBookings);
       setMyChangedAppointments(prev => areArraysEqualFast(prev, finalOccurs) ? prev : finalOccurs);
     } catch (err) {
       console.error('Failed to load my bookings:', err);
     }
-  }, [userId, teacher, activePlatform, rooms, allStudents, showRealNames, viewMode, activeTab, hideHeader]);
+  }, [userId, showRealNames, viewMode]);
+
+  useEffect(() => {
+    if (!hasLoadedBookingsRef.current && activeTab !== 'live') {
+      loadMyBookings();
+    }
+  }, [activeTab, loadMyBookings]);
 
   useEffect(() => {
     const handleFilteredStorage = (e: StorageEvent) => {
@@ -705,7 +725,9 @@ export function useTeacherBookings({
       loadMyBookings();
     };
 
-    loadMyBookings();
+    if (activeTabRef.current !== 'live') {
+      loadMyBookings();
+    }
     window.addEventListener('storage', handleFilteredStorage);
     window.addEventListener('refresh-bookings', loadMyBookings);
     window.addEventListener('groovelab_schedule_changed', loadMyBookings);

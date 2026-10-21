@@ -123,7 +123,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
               height: '38px',
               borderRadius: '11px',
               background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -171,7 +171,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             fontWeight: 750,
             color: '#15803d',
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             padding: '7px 11px',
             borderRadius: '9px'
           }}>
@@ -272,7 +272,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
               fontWeight: 800,
               color: '#16a34a',
               background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               padding: '2px 8px',
               borderRadius: '100px',
               whiteSpace: 'nowrap',
@@ -340,7 +340,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             height: '38px',
             borderRadius: '11px',
             background: '#fef3c7',
-            border: '1px solid #fde68a',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -389,7 +389,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
           fontWeight: 750,
           color: '#15803d',
           background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
+          border: 'none',
           padding: '7px 11px',
           borderRadius: '9px'
         }}>
@@ -444,7 +444,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
                 fontWeight: 800,
                 color: '#b45309',
                 background: '#fef3c7',
-                border: '1px solid #fde68a',
+                border: 'none',
                 padding: '2px 7px',
                 borderRadius: '6px',
                 letterSpacing: '0.02em'
@@ -657,7 +657,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             fontWeight: 800,
             color: '#16a34a',
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             padding: '2px 8px',
             borderRadius: '100px',
             whiteSpace: 'nowrap',

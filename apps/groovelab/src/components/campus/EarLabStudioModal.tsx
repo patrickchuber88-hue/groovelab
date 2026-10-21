@@ -28,13 +28,8 @@ import {
   ChordPlaybackMode,
   AnchorNoteStep
 } from '../../services/audio/EarSynthEngine';
-import { 
-  RealtimePitchStream, 
-  YinPitchResult, 
-  evaluatePitchMatch, 
-  midiToNoteName, 
-  midiToFreq 
-} from '../../services/audio/YinPitchDetectionEngine';
+import { midiToNoteName } from '../../services/audio/YinPitchDetectionEngine';
+import { EarLabSingBackStage } from './EarLabSingBackStage';
 import { EarLeaderboardWidget, EarDiscipline, EarVdmLevel } from './EarLeaderboardWidget';
 import { 
   VdmBadgeLevel, 
@@ -44,10 +39,23 @@ import {
   getVdmBadgeTitle 
 } from './VdmBadgeMedallions';
 import { supabase } from '../../lib/supabase';
+import { getEffectiveInstrument } from '../../utils/avatarResolutionEngine';
+import { normalizeInstrumentToKey } from '../../services/canonicalScoreEngine';
+import { MicroScoreInstrument } from '../student/meisterwerk/microscore/microScore.types';
 
-export type TrainingPillar = 'intervals' | 'chords' | 'pitch_match';
-export type VdmLevel = 'junior' | 'd1' | 'd2' | 'd3';
-export type IntervalPlaySelectionMode = 'ascending' | 'descending' | 'harmonic' | 'vdm_mix';
+import {
+  INSTRUMENT_META,
+  type TrainingPillar,
+  type VdmLevel,
+  type IntervalPlaySelectionMode,
+  type IntervalItem,
+  type ChordItem,
+  type ChordInversionItem,
+  INTERVAL_CATALOG,
+  CHORD_CATALOG,
+  CHORD_INVERSIONS
+} from './earLabCatalogData';
+export type { TrainingPillar, VdmLevel, IntervalPlaySelectionMode, ChordInversionItem };
 
 export interface EarLabStudioModalProps {
   student?: any;
@@ -58,440 +66,6 @@ export interface EarLabStudioModalProps {
   embedded?: boolean;
   useNotebookLayout?: boolean;
 }
-
-interface IntervalItem {
-  id: string;
-  semitones: number;
-  name: string;
-  shortName: string;
-  juniorName: string;
-  visualDots: string;
-  songAnchorShort: string;
-  proShort: string;
-  proClassification: string;
-  vdmLevel: VdmLevel;
-  songAnchor: string;
-  anchorNotes: (number | AnchorNoteStep)[]; // Halbtöne relativ zum Grundton oder rhythmisierte Steps
-}
-
-interface ChordItem {
-  id: string;
-  name: string;
-  shortName: string;
-  intervals: number[];
-  vdmLevel: VdmLevel;
-  description: string;
-  juniorName: string;
-  visualSymbol: string;
-  songAnchorShort: string;
-  proShort: string;
-  proClassification: string;
-}
-
-// 🎼 Didaktisch modernisierte Song-Anker & didaktische Intervalle (0,1% Goldstandard: Rhythmus & Tonsprung-Spotlighting)
-const INTERVAL_CATALOG: IntervalItem[] = [
-  {
-    id: 'p1',
-    semitones: 0,
-    name: 'Reine Prime',
-    shortName: '1',
-    juniorName: 'Zwilling',
-    visualDots: '● = ●',
-    songAnchorShort: 'Gleicher Ton • 0 HT',
-    proShort: 'P1',
-    proClassification: 'Einklang • 0 HT',
-    vdmLevel: 'junior',
-    songAnchor: 'Ton-Wiederholung (Gleicher Ton) / Zwilling',
-    anchorNotes: [
-      { semitones: 0, duration: 0.45, isTargetInterval: true },
-      { semitones: 0, duration: 0.45, isTargetInterval: true },
-      { semitones: 0, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'm2',
-    semitones: 1,
-    name: 'Kleine Sekunde',
-    shortName: 'k2',
-    juniorName: 'Schleichen',
-    visualDots: '● ↗ ●',
-    songAnchorShort: 'Der weiße Hai • 1 HT',
-    proShort: 'm2',
-    proClassification: 'Halbtonschritt • 1 HT',
-    vdmLevel: 'd2',
-    songAnchor: 'Der weiße Hai / Billie Eilish (Bad Guy)',
-    anchorNotes: [
-      { semitones: 0, duration: 0.55, isTargetInterval: true },
-      { semitones: 1, duration: 0.55, isTargetInterval: true },
-      { semitones: 0, duration: 0.35, isTargetInterval: false },
-      { semitones: 1, duration: 0.50, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'M2',
-    semitones: 2,
-    name: 'Große Sekunde',
-    shortName: 'g2',
-    juniorName: 'Schritt',
-    visualDots: '● ↗ ●',
-    songAnchorShort: 'Alle meine Entchen • 2 HT',
-    proShort: 'M2',
-    proClassification: 'Ganztonschritt • 2 HT',
-    vdmLevel: 'd1',
-    songAnchor: 'Alle meine Entchen / Happy Birthday',
-    anchorNotes: [
-      { semitones: 0, duration: 0.35, isTargetInterval: true },
-      { semitones: 2, duration: 0.35, isTargetInterval: true },
-      { semitones: 4, duration: 0.30, isTargetInterval: false },
-      { semitones: 5, duration: 0.30, isTargetInterval: false },
-      { semitones: 7, duration: 0.45, isTargetInterval: false },
-      { semitones: 7, duration: 0.55, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'm3',
-    semitones: 3,
-    name: 'Kleine Terz',
-    shortName: 'k3',
-    juniorName: 'Kuckuck',
-    visualDots: '● ↘ ●',
-    songAnchorShort: 'Kuckuck, Kuckuck • 3 HT',
-    proShort: 'm3',
-    proClassification: 'Moll-Terz • 3 HT',
-    vdmLevel: 'junior',
-    songAnchor: 'Kuckuck, Kuckuck / Smoke on the Water',
-    anchorNotes: [
-      { semitones: 3, duration: 0.48, isTargetInterval: true },
-      { semitones: 0, duration: 0.65, isTargetInterval: true },
-      { semitones: 3, duration: 0.35, isTargetInterval: false },
-      { semitones: 0, duration: 0.60, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'M3',
-    semitones: 4,
-    name: 'Große Terz',
-    shortName: 'g3',
-    juniorName: 'Morgensonne',
-    visualDots: '● ↗ ⬤',
-    songAnchorShort: 'Alle Vögel • 4 HT',
-    proShort: 'M3',
-    proClassification: 'Dur-Terz • 4 HT',
-    vdmLevel: 'd1',
-    songAnchor: 'Alle Vögel sind schon da / Oh When the Saints',
-    anchorNotes: [
-      { semitones: 0, duration: 0.42, isTargetInterval: true },
-      { semitones: 4, duration: 0.42, isTargetInterval: true },
-      { semitones: 7, duration: 0.38, isTargetInterval: false },
-      { semitones: 4, duration: 0.38, isTargetInterval: false },
-      { semitones: 0, duration: 0.65, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'p4',
-    semitones: 5,
-    name: 'Reine Quarte',
-    shortName: '4',
-    juniorName: 'Tatü-Tata',
-    visualDots: '● ↗ ⬤',
-    songAnchorShort: 'Tatü-Tata • 5 HT',
-    proShort: 'P4',
-    proClassification: 'Subdominante • 5 HT',
-    vdmLevel: 'junior',
-    songAnchor: 'Tatü-Tata (Feuerwehr) / O Tannenbaum',
-    anchorNotes: [
-      { semitones: 0, duration: 0.48, isTargetInterval: true },
-      { semitones: 5, duration: 0.65, isTargetInterval: true },
-      { semitones: 0, duration: 0.40, isTargetInterval: false },
-      { semitones: 5, duration: 0.65, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'tritone',
-    semitones: 6,
-    name: 'Tritonus',
-    shortName: 'TT',
-    juniorName: 'Geisterton',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'The Simpsons • 6 HT',
-    proShort: 'TT',
-    proClassification: 'ü4 / v5 • 6 HT',
-    vdmLevel: 'd3',
-    songAnchor: 'The Simpsons / Maria (West Side Story)',
-    anchorNotes: [
-      { semitones: 0, duration: 0.55, isTargetInterval: true },
-      { semitones: 6, duration: 0.45, isTargetInterval: true },
-      { semitones: 7, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'p5',
-    semitones: 7,
-    name: 'Reine Quinte',
-    shortName: '5',
-    juniorName: 'Zauberruf',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'Weihnachtsmann • 7 HT',
-    proShort: 'P5',
-    proClassification: 'Dominante • 7 HT',
-    vdmLevel: 'junior',
-    songAnchor: 'Morgen kommt der Weihnachtsmann / Star Wars',
-    anchorNotes: [
-      { semitones: 0, duration: 0.45, isTargetInterval: true },
-      { semitones: 7, duration: 0.50, isTargetInterval: true },
-      { semitones: 7, duration: 0.35, isTargetInterval: false },
-      { semitones: 9, duration: 0.35, isTargetInterval: false },
-      { semitones: 9, duration: 0.35, isTargetInterval: false },
-      { semitones: 7, duration: 0.75, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'm6',
-    semitones: 8,
-    name: 'Kleine Sexte',
-    shortName: 'k6',
-    juniorName: 'Elise-Sprung',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'Für Elise • 8 HT',
-    proShort: 'm6',
-    proClassification: 'kl. Sexte • 8 HT',
-    vdmLevel: 'd2',
-    songAnchor: 'Für Elise / Love Story (Schicksalsmelodie)',
-    anchorNotes: [
-      { semitones: 0, duration: 0.45, isTargetInterval: true },
-      { semitones: 8, duration: 0.48, isTargetInterval: true },
-      { semitones: 7, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'M6',
-    semitones: 9,
-    name: 'Große Sexte',
-    shortName: 'g6',
-    juniorName: 'Biene Maja',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'Biene Maja • 9 HT',
-    proShort: 'M6',
-    proClassification: 'gr. Sexte • 9 HT',
-    vdmLevel: 'd2',
-    songAnchor: 'Die Biene Maja / My Bonnie lies over the ocean',
-    anchorNotes: [
-      { semitones: 0, duration: 0.48, isTargetInterval: true },
-      { semitones: 9, duration: 0.48, isTargetInterval: true },
-      { semitones: 7, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'm7',
-    semitones: 10,
-    name: 'Kleine Septime',
-    shortName: 'k7',
-    juniorName: 'Blues-Sprung',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'The Winner • 10 HT',
-    proShort: 'm7',
-    proClassification: 'kl. Septime • 10 HT',
-    vdmLevel: 'd2',
-    songAnchor: 'The Winner Takes It All / Star Trek Theme',
-    anchorNotes: [
-      { semitones: 0, duration: 0.42, isTargetInterval: true },
-      { semitones: 10, duration: 0.55, isTargetInterval: true },
-      { semitones: 8, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'M7',
-    semitones: 11,
-    name: 'Große Septime',
-    shortName: 'g7',
-    juniorName: 'Weitsprung',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'Take On Me • 11 HT',
-    proShort: 'M7',
-    proClassification: 'gr. Septime • 11 HT',
-    vdmLevel: 'd2',
-    songAnchor: 'Take On Me (A-ha) / Superman Theme',
-    anchorNotes: [
-      { semitones: 0, duration: 0.35, isTargetInterval: true },
-      { semitones: 11, duration: 0.65, isTargetInterval: true },
-      { semitones: 12, duration: 0.85, isTargetInterval: false }
-    ]
-  },
-  {
-    id: 'p8',
-    semitones: 12,
-    name: 'Reine Oktave',
-    shortName: '8',
-    juniorName: 'Riesensprung',
-    visualDots: '● ⤢ ⬤',
-    songAnchorShort: 'Over the Rainbow • 12 HT',
-    proShort: 'P8',
-    proClassification: 'Volle Oktave • 12 HT',
-    vdmLevel: 'junior',
-    songAnchor: 'Somewhere Over the Rainbow / Riesensprung',
-    anchorNotes: [
-      { semitones: 0, duration: 0.62, isTargetInterval: true },
-      { semitones: 12, duration: 0.72, isTargetInterval: true },
-      { semitones: 11, duration: 0.35, isTargetInterval: false },
-      { semitones: 7, duration: 0.35, isTargetInterval: false },
-      { semitones: 8, duration: 0.35, isTargetInterval: false },
-      { semitones: 9, duration: 0.85, isTargetInterval: false }
-    ]
-  }
-];
-
-// 🎹 Akkord- & Kadenzen-Katalog (D1–D3)
-const CHORD_CATALOG: ChordItem[] = [
-  {
-    id: 'major',
-    name: 'Dur-Dreiklang',
-    shortName: 'Dur',
-    juniorName: 'Fröhlich',
-    visualSymbol: '▲ Dur',
-    songAnchorShort: 'Dur • Hell & Fröhlich',
-    proShort: 'Maj',
-    proClassification: 'Dur-Dreiklang (1-3-5)',
-    intervals: [0, 4, 7],
-    vdmLevel: 'junior',
-    description: 'Hell, strahlend, fröhlich (Grundton, große Terz, Quinte)'
-  },
-  {
-    id: 'minor',
-    name: 'Moll-Dreiklang',
-    shortName: 'Moll',
-    juniorName: 'Traurig',
-    visualSymbol: '▼ Moll',
-    songAnchorShort: 'Moll • Sanft & Traurig',
-    proShort: 'Min',
-    proClassification: 'Moll-Dreiklang (1-b3-5)',
-    intervals: [0, 3, 7],
-    vdmLevel: 'junior',
-    description: 'Melancholisch, getragen, traurig (Grundton, kleine Terz, Quinte)'
-  },
-  {
-    id: 'diminished',
-    name: 'Vermindert',
-    shortName: 'verm.',
-    juniorName: 'Gruselig',
-    visualSymbol: '◆ Verm.',
-    songAnchorShort: 'Vermindert • Schauder & Spannung',
-    proShort: 'dim',
-    proClassification: 'Vermindert (1-b3-b5)',
-    intervals: [0, 3, 6],
-    vdmLevel: 'd2',
-    description: 'Schaurig, instabil, drängend (Zwei kleine Terzen)'
-  },
-  {
-    id: 'augmented',
-    name: 'Übermäßig',
-    shortName: 'überm.',
-    juniorName: 'Zauber',
-    visualSymbol: '✦ Überm.',
-    songAnchorShort: 'Übermäßig • Schwebend & Mystisch',
-    proShort: 'aug',
-    proClassification: 'Übermäßig (1-3-#5)',
-    intervals: [0, 4, 8],
-    vdmLevel: 'd2',
-    description: 'Schwebend, mystisch, wie verzaubert (Zwei große Terzen)'
-  },
-  {
-    id: 'dom7',
-    name: 'Dominantseptakkord (7)',
-    shortName: '7',
-    juniorName: 'Blues-Klang',
-    visualSymbol: '■ 7',
-    songAnchorShort: 'Dominant 7 • Bluesig & Drängend',
-    proShort: '7',
-    proClassification: 'Dominantsept (1-3-5-b7)',
-    intervals: [0, 4, 7, 10],
-    vdmLevel: 'd3',
-    description: 'Bluesig, drängend nach Auflösung (Dur + kleine 7)'
-  },
-  {
-    id: 'maj7',
-    name: 'Major 7 (maj7)',
-    shortName: 'maj7',
-    juniorName: 'Traum-Klang',
-    visualSymbol: '✦ maj7',
-    songAnchorShort: 'Major 7 • Samtig & Träumerisch',
-    proShort: 'maj7',
-    proClassification: 'Dur-Sept (1-3-5-7)',
-    intervals: [0, 4, 7, 11],
-    vdmLevel: 'd3',
-    description: 'Jazzig, samtig, träumerisch (Dur + große 7)'
-  },
-  {
-    id: 'min7',
-    name: 'Moll-Septakkord (m7)',
-    shortName: 'm7',
-    juniorName: 'Abend-Klang',
-    visualSymbol: '● m7',
-    songAnchorShort: 'Moll 7 • Warm & Entspannt',
-    proShort: 'm7',
-    proClassification: 'Moll-Sept (1-b3-5-b7)',
-    intervals: [0, 3, 7, 10],
-    vdmLevel: 'd3',
-    description: 'Warm, soulig, entspannt (Moll + kleine 7)'
-  },
-  {
-    id: 'm7b5',
-    name: 'Halbvermindert (m7b5)',
-    shortName: 'ø',
-    juniorName: 'Nebel-Klang',
-    visualSymbol: '◇ ø',
-    songAnchorShort: 'Halbvermindert • Geheimnisvoll',
-    proShort: 'm7b5',
-    proClassification: 'Halbvermindert (1-b3-b5-b7)',
-    intervals: [0, 3, 6, 10],
-    vdmLevel: 'd3',
-    description: 'Typischer Jazz-Stufen-Akkord, unbestimmt schwebend'
-  }
-];
-
-// 🔄 Dreiklangs-Umkehrungen (D2–D3 Musikschul-Standard)
-export interface ChordInversionItem {
-  id: string;
-  name: string;
-  shortName: string;
-  juniorName: string;
-  visualSymbol: string;
-  intervals: number[];
-  proClassification: string;
-  description: string;
-}
-
-const CHORD_INVERSIONS: ChordInversionItem[] = [
-  {
-    id: 'root_pos',
-    name: 'Grundstellung',
-    shortName: 'Grundst.',
-    juniorName: 'Boden-Klang',
-    visualSymbol: '▲ 1-3-5',
-    intervals: [0, 4, 7],
-    proClassification: 'Grundstellung (1-3-5)',
-    description: 'Der Grundton liegt im Bass (stabil & fest)'
-  },
-  {
-    id: 'first_inv',
-    name: '1. Umkehrung (Sextakkord)',
-    shortName: 'Sextakkord',
-    juniorName: 'Schwebeklang',
-    visualSymbol: '✦ 3-5-1',
-    intervals: [4, 7, 12],
-    proClassification: 'Sextakkord (3-5-8)',
-    description: 'Die Terz liegt im Bass (leicht schwebend)'
-  },
-  {
-    id: 'second_inv',
-    name: '2. Umkehrung (Quartsextakkord)',
-    shortName: 'Quartsext',
-    juniorName: 'Spannungsklang',
-    visualSymbol: '■ 5-1-3',
-    intervals: [7, 12, 16],
-    proClassification: 'Quartsextakkord (5-8-10)',
-    description: 'Die Quinte liegt im Bass (drängend & offen)'
-  }
-];
 
 // 🎤 Sing-Back Ton-Pool (Junior & D1–D3)
 const PITCH_MATCH_NOTES: { midi: number; label: string; vdmLevel: VdmLevel }[] = [
@@ -518,45 +92,39 @@ const renderIntervalGesture = (
   color: string = '#7c3aed',
   mode: IntervalPlaybackMode = 'ascending'
 ) => {
-  const w = 38;
-  const h = 22;
-  const r = 2.6; // Feiner, pädagogischer Ton-Punkt
+  const w = 48;
+  const h = 28;
+  const r = 3.2; // Großzügiger, klar lesbarer Ton-Punkt für Weitsicht
 
   // 1. PRIME (Unisono / Zwilling): 0 Halbtöne
   if (semitones === 0 || id === 'p1') {
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
         {/* Referenz-Horizont */}
-        <line x1="4" y1="16.5" x2="34" y2="16.5" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.22" />
+        <line x1="4" y1="20" x2="44" y2="20" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
         {/* Gestrichelte Gleichklang-Brücke */}
-        <line x1="8" y1="11" x2="30" y2="11" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeDasharray="2 2" />
-        <circle cx="8" cy="11" r={r} fill={color} />
-        <circle cx="30" cy="11" r={r} fill={color} />
+        <line x1="9" y1="14" x2="39" y2="14" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeDasharray="3 3" />
+        <circle cx="9" cy="14" r={r} fill={color} />
+        <circle cx="39" cy="14" r={r} fill={color} />
       </svg>
     );
   }
 
-  // Proportionale vertikale Auslenkung (Δy): 1 HT = 1.3px ... 12 HT = 13.5px
-  // Sekunde (2 HT): Δy = 2.6px (sanfter Schritt)
-  // Kl. Terz (3 HT): Δy = 3.9px
-  // Gr. Terz (4 HT): Δy = 5.2px
-  // Quarte (5 HT): Δy = 6.6px (deutlicher Sprung)
-  // Quinte (7 HT): Δy = 9.2px (weiter Signalruf)
-  // Oktave (12 HT): Δy = 13.5px (maximaler Himmelsbogen)
-  const dy = Math.min(13.5, Math.max(1.5, semitones * 1.25));
+  // Proportionale vertikale Auslenkung (Δy): 1 HT = 1.5px ... 12 HT = 17px
+  const dy = Math.min(17, Math.max(2, semitones * 1.45));
 
   // 2. MODUS: HARMONISCH (◆ Zusammen / Simultan)
   // Beide Töne erklingen gleichzeitig -> vertikales "Türmchen" wie ein Noten-Zweiklang
   if (mode === 'harmonic') {
-    const x = 19;
-    const yBase = 17.5;
-    const yTarget = Math.max(4, yBase - dy);
+    const x = 24;
+    const yBase = 22;
+    const yTarget = Math.max(5, yBase - dy);
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
         {/* Referenz-Horizont */}
-        <line x1="9" y1="19.5" x2="29" y2="19.5" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.25" />
+        <line x1="10" y1="24.5" x2="38" y2="24.5" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
         {/* Vertikale Zweiklang-Klammer */}
-        <line x1={x} y1={yBase} x2={x} y2={yTarget} stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+        <line x1={x} y1={yBase} x2={x} y2={yTarget} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
         <circle cx={x} cy={yBase} r={r} fill={color} />
         <circle cx={x} cy={yTarget} r={r} fill={color} />
       </svg>
@@ -566,19 +134,19 @@ const renderIntervalGesture = (
   // 3. MODUS: ABSTEIGEND (▼ Ab)
   // Ton 1 beginnt oben links, Ton 2 fällt nach rechts unten
   if (mode === 'descending') {
-    const x1 = 8;
-    const x2 = 30;
-    const y1 = 4.5;
-    const y2 = Math.min(18.0, y1 + dy);
+    const x1 = 9;
+    const x2 = 39;
+    const y1 = 6;
+    const y2 = Math.min(22, y1 + dy);
 
     if (id === 'p8' || semitones >= 12) {
       // Oktave abwärts: Schwungvoller Tiefenbogen
       return (
         <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
-          <line x1="4" y1="3" x2="34" y2="3" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.25" />
-          <path d="M 8 4.5 Q 19 20 30 18" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
-          <circle cx="8" cy="4.5" r={r} fill={color} />
-          <circle cx="30" cy="18" r={r} fill={color} />
+          <line x1="4" y1="4" x2="44" y2="4" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
+          <path d="M 9 6 Q 24 25 39 22" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="9" cy="6" r={r} fill={color} />
+          <circle cx="39" cy="22" r={r} fill={color} />
         </svg>
       );
     }
@@ -586,9 +154,9 @@ const renderIntervalGesture = (
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
         {/* Oberer Referenz-Horizont */}
-        <line x1="4" y1="3" x2="34" y2="3" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.25" />
+        <line x1="4" y1="4" x2="44" y2="4" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
         {/* Diagonale Gefällslinie */}
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
         <circle cx={x1} cy={y1} r={r} fill={color} />
         <circle cx={x2} cy={y2} r={r} fill={color} />
       </svg>
@@ -597,19 +165,19 @@ const renderIntervalGesture = (
 
   // 4. MODUS: AUFSTEIGEND (▲ Auf) - Standard
   // Ton 1 beginnt unten links auf dem Horizont, Ton 2 steigt proportional nach rechts oben
-  const x1 = 8;
-  const x2 = 30;
-  const y1 = 17.5;
-  const y2 = Math.max(3.8, y1 - dy);
+  const x1 = 9;
+  const x2 = 39;
+  const y1 = 22;
+  const y2 = Math.max(5, y1 - dy);
 
   if (id === 'p8' || semitones >= 12) {
     // Oktave aufwärts (Riesensprung): Hoher Himmelsbogen von Basis bis Zenit
     return (
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
-        <line x1="4" y1="19.5" x2="34" y2="19.5" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.25" />
-        <path d="M 8 17.5 Q 19 2 30 4" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
-        <circle cx="8" cy="17.5" r={r} fill={color} />
-        <circle cx="30" cy="4" r={r} fill={color} />
+        <line x1="4" y1="24.5" x2="44" y2="24.5" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
+        <path d="M 9 22 Q 24 3 39 5" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
+        <circle cx="9" cy="22" r={r} fill={color} />
+        <circle cx="39" cy="5" r={r} fill={color} />
       </svg>
     );
   }
@@ -617,9 +185,9 @@ const renderIntervalGesture = (
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }} aria-hidden="true">
       {/* Basis-Horizont (Glockenspiel- / Notenlinien-Referenz) */}
-      <line x1="4" y1="19.5" x2="34" y2="19.5" stroke={color} strokeWidth="1" strokeDasharray="2 2" opacity="0.25" />
+      <line x1="4" y1="24.5" x2="44" y2="24.5" stroke={color} strokeWidth="1.2" strokeDasharray="2.5 2.5" opacity="0.25" />
       {/* Proportionale Steigungslinie */}
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
       <circle cx={x1} cy={y1} r={r} fill={color} />
       <circle cx={x2} cy={y2} r={r} fill={color} />
     </svg>
@@ -641,7 +209,58 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
   // 3 Tonale Säulen (Rhythmus obsolet)
   const [activePillar, setActivePillar] = useState<TrainingPillar>('intervals');
   const [vdmLevel, setVdmLevel] = useState<VdmLevel>(uiLevel === 'junior' ? 'junior' : 'd1');
-  const [soundTimbre, setSoundTimbre] = useState<SoundEngineTimbre>('rhodes');
+
+  // 🏛️ 0,1% Goldstandard: Instrumenten-Erkennung des Schülers & Schlagzeug-Sonderfall
+  const rawStudentInst = useMemo(() => {
+    return (
+      student?.instrument ||
+      student?.main_instrument ||
+      student?.resolved_instrument ||
+      student?.groovelab_instrument ||
+      student?.subject ||
+      (student ? getEffectiveInstrument(student) : null)
+    );
+  }, [student]);
+
+  const resolvedStudentInst: MicroScoreInstrument = useMemo(() => {
+    return normalizeInstrumentToKey(rawStudentInst);
+  }, [rawStudentInst]);
+
+  const isPercussion = resolvedStudentInst === 'drums';
+  const effectiveUserInst: MicroScoreInstrument = isPercussion ? 'piano' : resolvedStudentInst;
+  const userInstMeta = INSTRUMENT_META[resolvedStudentInst] || { label: 'Instrument', icon: '🎵' };
+
+  // 2-Wege-Wahlfreiheit: 'instrument' vs. 'piano' mit Persistenz
+  const [soundSelectionMode, setSoundSelectionMode] = useState<'instrument' | 'piano'>(() => {
+    try {
+      const saved = localStorage.getItem(`ear_lab_sound_mode_${student?.id || 'guest'}`);
+      if (saved === 'piano' || saved === 'instrument') return saved;
+      return isPercussion ? 'piano' : 'instrument';
+    } catch {
+      return isPercussion ? 'piano' : 'instrument';
+    }
+  });
+
+  const handleSoundSelectionModeChange = (mode: 'instrument' | 'piano') => {
+    setSoundSelectionMode(mode);
+    try {
+      localStorage.setItem(`ear_lab_sound_mode_${student?.id || 'guest'}`, mode);
+    } catch {}
+  };
+
+  const [soundTimbre, setSoundTimbre] = useState<SoundEngineTimbre>(() => {
+    if (isPercussion || soundSelectionMode === 'piano') return 'grand_piano';
+    return effectiveUserInst as SoundEngineTimbre;
+  });
+
+  // Synchronisation des aktiven Timbres für EarSynthEngine
+  useEffect(() => {
+    if (soundSelectionMode === 'piano' || isPercussion) {
+      setSoundTimbre('grand_piano');
+    } else {
+      setSoundTimbre(effectiveUserInst as SoundEngineTimbre);
+    }
+  }, [soundSelectionMode, effectiveUserInst, isPercussion]);
 
   // Key Center Drone (Tonika-Bordun)
   const [isDroneEnabled, setIsDroneEnabled] = useState<boolean>(false);
@@ -676,12 +295,6 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
 
   // 3. Sing-Back / Pitch-Match State (YIN)
   const [currentPitchQuestion, setCurrentPitchQuestion] = useState<{ midi: number; label: string } | null>(null);
-  const [isPitchListening, setIsPitchListening] = useState<boolean>(false);
-  const [livePitchResult, setLivePitchResult] = useState<YinPitchResult | null>(null);
-  const [pitchMatchLockCountdown, setPitchMatchLockCountdown] = useState<number>(0);
-  const [isPitchLockedIn, setIsPitchLockedIn] = useState<boolean>(false);
-  const pitchStreamRef = useRef<RealtimePitchStream | null>(null);
-  const pitchHoldTimerRef = useRef<any>(null);
 
   // Gamification & Session Metrics
   const [challengeProgress, setChallengeProgress] = useState({ current: 1, total: 10, correctCount: 0 });
@@ -783,13 +396,14 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
     setQuestionStartTime(Date.now());
   }, [availableChords, chordCategory, vdmLevel]);
 
-  // Generiere Pitch-Match Frage
+  // Generiere Pitch-Match Frage (vermeidet unmittelbare Wiederholung desselben Tons)
   const generateNewPitchQuestion = useCallback(() => {
-    const randomNote = availablePitchNotes[Math.floor(Math.random() * availablePitchNotes.length)];
-    setCurrentPitchQuestion(randomNote);
-    setIsPitchLockedIn(false);
-    setLivePitchResult(null);
-    setPitchMatchLockCountdown(0);
+    setCurrentPitchQuestion(prev => {
+      const pool = availablePitchNotes.length > 1
+        ? availablePitchNotes.filter(n => n.midi !== prev?.midi)
+        : availablePitchNotes;
+      return pool[Math.floor(Math.random() * pool.length)];
+    });
     setQuestionStartTime(Date.now());
   }, [availablePitchNotes]);
 
@@ -901,12 +515,6 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
       soundTimbre
     );
   }, [currentChordQuestion, chordPlayMode, soundTimbre]);
-
-  // Pitch-Match Referenzton abspielen
-  const handlePlayTargetPitch = useCallback(() => {
-    if (!currentPitchQuestion) return;
-    earSynth.playNote(currentPitchQuestion.midi, 1.8, 0.4, 0, soundTimbre);
-  }, [currentPitchQuestion, soundTimbre]);
 
   // Kadenz zur Einstimmung abspielen
   const handlePlayCadence = () => {
@@ -1098,54 +706,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
     advanceToNextStep(isCorrect);
   };
 
-  // Sing-Back / Pitch-Match Mikrofon Steuerung
-  const togglePitchListening = async () => {
-    if (isPitchListening) {
-      pitchStreamRef.current?.stop();
-      setIsPitchListening(false);
-      setLivePitchResult(null);
-    } else {
-      if (!pitchStreamRef.current) {
-        pitchStreamRef.current = new RealtimePitchStream();
-      }
-      const ok = await pitchStreamRef.current.start((result) => {
-        setLivePitchResult(result);
-
-        // Prüfe ob Ton im Zielfenster liegt
-        if (currentPitchQuestion && result.pitch && result.isAudible) {
-          const targetFreq = midiToFreq(currentPitchQuestion.midi);
-          const score = evaluatePitchMatch(result.pitch, targetFreq, 30);
-
-          if (score.isMatched) {
-            setPitchMatchLockCountdown(prev => {
-              if (prev >= 100) {
-                // Ton erfolgreich gehalten!
-                if (!isPitchLockedIn) {
-                  setIsPitchLockedIn(true);
-                  pitchStreamRef.current?.stop();
-                  setIsPitchListening(false);
-                  setTimeout(() => {
-                    advanceToNextStep(true);
-                  }, 900);
-                }
-                return 100;
-              }
-              return Math.min(100, prev + 25);
-            });
-          } else {
-            setPitchMatchLockCountdown(prev => Math.max(0, prev - 15));
-          }
-        }
-      });
-      setIsPitchListening(ok);
-    }
-  };
-
   // Unmount Cleanup
   useEffect(() => {
     return () => {
-      pitchStreamRef.current?.stop();
-      clearTimeout(pitchHoldTimerRef.current);
       toneAnimationTimersRef.current.forEach(clearTimeout);
       earSynth.stopAll();
     };
@@ -1172,14 +735,14 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
       aria-label={uiLevel === 'junior' ? 'Klang-Detektiv Studio' : 'Gehörtraining Studio'}
       style={{
         width: '100%',
-        maxWidth: '840px',
+        maxWidth: embedded ? '100%' : '1040px',
         margin: '0 auto',
         background: '#ffffff',
         borderRadius: '24px',
-        border: '1.5px solid rgba(139, 92, 246, 0.25)',
-        padding: embedded ? '16px' : '22px',
-        paddingBottom: embedded ? '16px' : 'calc(22px + env(safe-area-inset-bottom, 0px))',
-        boxShadow: embedded ? 'none' : '0 12px 36px -4px rgba(139, 92, 246, 0.14), 0 2px 8px rgba(0, 0, 0, 0.02)',
+        border: '1.5px solid #e2e8f0',
+        padding: embedded ? '18px 22px' : '24px 28px',
+        paddingBottom: embedded ? '18px 22px' : 'calc(24px + env(safe-area-inset-bottom, 0px))',
+        boxShadow: 'none',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
@@ -1201,31 +764,31 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
         paddingBottom: '8px',
         borderBottom: '1px solid #f1f5f9'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+            width: '44px',
+            height: '44px',
+            borderRadius: '14px',
+            background: '#a855f7',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: 'none'
           }}>
-            <Headphones size={20} strokeWidth={2.4} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+            <Headphones size={23} strokeWidth={2.4} color="#ffffff" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
               {uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining'}
             </h2>
-            <span style={{ fontSize: '0.70rem', color: '#7c3aed', fontWeight: 750 }}>
+            <span style={{ fontSize: '0.80rem', color: '#7e22ce', fontWeight: 750 }}>
               {uiLevel === 'junior' ? 'Höre genau hin: Welcher Ton-Sprung ist das?' : '0,1% Goldstandard • 3 Tonale Säulen'}
             </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Hall of Ear Toggle */}
           <button
             type="button"
@@ -1233,20 +796,20 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '10px',
-              border: activeView === 'hall_of_ear' ? '1px solid #7c3aed' : '1.5px solid #e2e8f0',
-              background: activeView === 'hall_of_ear' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : '#f8fafc',
-              color: activeView === 'hall_of_ear' ? '#ffffff' : '#6d28d9',
-              fontSize: '0.74rem',
+              gap: '7px',
+              padding: '8px 14px',
+              borderRadius: '12px',
+              border: activeView === 'hall_of_ear' ? 'none' : '1.5px solid #e2e8f0',
+              background: activeView === 'hall_of_ear' ? '#a855f7' : '#f8fafc',
+              color: activeView === 'hall_of_ear' ? '#ffffff' : '#7e22ce',
+              fontSize: '0.82rem',
               fontWeight: 850,
               cursor: 'pointer',
-              boxShadow: activeView === 'hall_of_ear' ? '0 4px 12px rgba(139, 92, 246, 0.35)' : 'none',
+              boxShadow: 'none',
               transition: 'all 0.15s ease'
             }}
           >
-            <Trophy size={14} strokeWidth={2.4} />
+            <Trophy size={16} strokeWidth={2.4} />
             <span>Hall of Ear</span>
           </button>
 
@@ -1256,9 +819,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
               onClick={onClose}
               aria-label="Schließen"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
                 border: '1.5px solid #e2e8f0',
                 background: '#ffffff',
                 color: '#64748b',
@@ -1268,7 +831,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 cursor: 'pointer'
               }}
             >
-              <X size={16} strokeWidth={2.4} />
+              <X size={18} strokeWidth={2.4} />
             </button>
           )}
         </div>
@@ -1288,39 +851,39 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
             type="button"
             onClick={() => setActiveView('studio')}
             style={{
-              padding: '10px 18px',
-              borderRadius: '12px',
+              padding: '12px 20px',
+              borderRadius: '14px',
               border: 'none',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+              background: '#a855f7',
               color: '#ffffff',
-              fontSize: '0.80rem',
+              fontSize: '0.88rem',
               fontWeight: 850,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '8px',
               boxShadow: 'none'
             }}
           >
-            <Headphones size={15} strokeWidth={2.4} />
+            <Headphones size={17} strokeWidth={2.4} />
             <span>Zurück zum Trainings-Studio</span>
           </button>
         </div>
       ) : (
         /* Ansicht: TRAINING STUDIO */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {/* 2. Säulen-Leiste (3 didaktische Säulen - 52px Apple HIG Touch-Ergonomie) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* 2. Säulen-Leiste (3 didaktische Säulen - 60px Großformat Apple Touch-Ergonomie) */}
           <div
             role="tablist"
             aria-label="Didaktische Gehör-Säulen"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '6px',
+              gap: '8px',
               background: '#f8fafc',
-              padding: '5px',
-              borderRadius: '16px',
+              padding: '6px',
+              borderRadius: '18px',
               border: '1.5px solid #e2e8f0'
             }}
           >
@@ -1336,31 +899,31 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
-                minHeight: '52px',
-                padding: '6px 4px',
-                borderRadius: '12px',
+                gap: '3px',
+                minHeight: '60px',
+                padding: '8px 6px',
+                borderRadius: '14px',
                 border: 'none',
-                background: activePillar === 'intervals' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                background: activePillar === 'intervals' ? '#a855f7' : 'transparent',
                 color: activePillar === 'intervals' ? '#ffffff' : '#64748b',
                 cursor: 'pointer',
-                boxShadow: activePillar === 'intervals' ? '0 4px 14px rgba(139, 92, 246, 0.35)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 touchAction: 'manipulation',
                 userSelect: 'none'
               }}
               className="hover-scale"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Music size={15} strokeWidth={activePillar === 'intervals' ? 2.6 : 2.2} />
-                <span style={{ fontWeight: 950, fontSize: '0.82rem', letterSpacing: '-0.01em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Music size={17} strokeWidth={activePillar === 'intervals' ? 2.6 : 2.2} />
+                <span style={{ fontWeight: 950, fontSize: '0.96rem', letterSpacing: '-0.01em' }}>
                   Intervalle
                 </span>
               </div>
               <span style={{
-                fontSize: '0.64rem',
+                fontSize: '0.74rem',
                 fontWeight: 750,
-                color: activePillar === 'intervals' ? 'rgba(255, 255, 255, 0.90)' : '#94a3b8',
+                color: activePillar === 'intervals' ? 'rgba(255, 255, 255, 0.92)' : '#94a3b8',
                 letterSpacing: '-0.01em'
               }}>
                 {uiLevel === 'junior' ? 'Tonsprünge' : 'Melodie (D1–D3)'}
@@ -1379,31 +942,31 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
-                minHeight: '52px',
-                padding: '6px 4px',
-                borderRadius: '12px',
+                gap: '3px',
+                minHeight: '60px',
+                padding: '8px 6px',
+                borderRadius: '14px',
                 border: 'none',
-                background: activePillar === 'chords' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                background: activePillar === 'chords' ? '#a855f7' : 'transparent',
                 color: activePillar === 'chords' ? '#ffffff' : '#64748b',
                 cursor: 'pointer',
-                boxShadow: activePillar === 'chords' ? '0 4px 14px rgba(139, 92, 246, 0.35)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 touchAction: 'manipulation',
                 userSelect: 'none'
               }}
               className="hover-scale"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Sliders size={15} strokeWidth={activePillar === 'chords' ? 2.6 : 2.2} />
-                <span style={{ fontWeight: 950, fontSize: '0.82rem', letterSpacing: '-0.01em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sliders size={17} strokeWidth={activePillar === 'chords' ? 2.6 : 2.2} />
+                <span style={{ fontWeight: 950, fontSize: '0.96rem', letterSpacing: '-0.01em' }}>
                   Akkordfarben
                 </span>
               </div>
               <span style={{
-                fontSize: '0.64rem',
+                fontSize: '0.74rem',
                 fontWeight: 750,
-                color: activePillar === 'chords' ? 'rgba(255, 255, 255, 0.90)' : '#94a3b8',
+                color: activePillar === 'chords' ? 'rgba(255, 255, 255, 0.92)' : '#94a3b8',
                 letterSpacing: '-0.01em'
               }}>
                 {uiLevel === 'junior' ? 'Klangfarben' : 'Harmonie (Dur/Moll)'}
@@ -1422,31 +985,31 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '2px',
-                minHeight: '52px',
-                padding: '6px 4px',
-                borderRadius: '12px',
+                gap: '3px',
+                minHeight: '60px',
+                padding: '8px 6px',
+                borderRadius: '14px',
                 border: 'none',
-                background: activePillar === 'pitch_match' ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
+                background: activePillar === 'pitch_match' ? '#a855f7' : 'transparent',
                 color: activePillar === 'pitch_match' ? '#ffffff' : '#64748b',
                 cursor: 'pointer',
-                boxShadow: activePillar === 'pitch_match' ? '0 4px 14px rgba(139, 92, 246, 0.35)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                 touchAction: 'manipulation',
                 userSelect: 'none'
               }}
               className="hover-scale"
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Mic size={15} strokeWidth={activePillar === 'pitch_match' ? 2.6 : 2.2} />
-                <span style={{ fontWeight: 950, fontSize: '0.82rem', letterSpacing: '-0.01em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Mic size={17} strokeWidth={activePillar === 'pitch_match' ? 2.6 : 2.2} />
+                <span style={{ fontWeight: 950, fontSize: '0.96rem', letterSpacing: '-0.01em' }}>
                   Sing-Back
                 </span>
               </div>
               <span style={{
-                fontSize: '0.64rem',
+                fontSize: '0.74rem',
                 fontWeight: 750,
-                color: activePillar === 'pitch_match' ? 'rgba(255, 255, 255, 0.90)' : '#94a3b8',
+                color: activePillar === 'pitch_match' ? 'rgba(255, 255, 255, 0.92)' : '#94a3b8',
                 letterSpacing: '-0.01em'
               }}>
                 {uiLevel === 'junior' ? 'Mitsingen' : 'Intonation (YIN)'}
@@ -1454,102 +1017,167 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
             </button>
           </div>
 
-          {/* 3. Utility-Leiste: VdM-Level, Timbre & Key Center Drone */}
+          {/* 3. Vereinigte Studio-Toolbar (0,1% Viewport-Kompaktheit & Großformat-Ergonomie) */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '6px',
-            fontSize: '0.72rem'
+            gap: '10px',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '16px',
+            padding: '8px 12px',
+            fontSize: '0.78rem'
           }}>
-            {/* Musikschul-D-Stufen & Vorstufe (4 Level) */}
-            <div style={{ display: 'flex', gap: '3px', background: '#f1f5f9', padding: '3px', borderRadius: '10px' }}>
-              {(['junior', 'd1', 'd2', 'd3'] as VdmLevel[]).map(lvl => (
-                <button
-                  key={lvl}
-                  type="button"
-                  onClick={() => {
-                    setVdmLevel(lvl);
-                    if (lvl === 'junior' || lvl === 'd1') setChordCategory('types');
-                  }}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: vdmLevel === lvl ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)' : 'transparent',
-                    color: vdmLevel === lvl ? '#ffffff' : '#64748b',
-                    fontWeight: vdmLevel === lvl ? 900 : 650,
-                    fontSize: '0.70rem',
-                    cursor: 'pointer',
-                    boxShadow: vdmLevel === lvl ? '0 2px 8px rgba(139, 92, 246, 0.25)' : 'none'
-                  }}
-                  title={
-                    uiLevel === 'junior'
-                      ? (lvl === 'junior' ? 'Junior (Vorstufe / 5 Ur-Signale)' : lvl === 'd1' ? 'Stufe 1 (D1 Bronze)' : lvl === 'd2' ? 'Stufe 2 (D2 Silber)' : 'Stufe 3 (D3 Gold)')
-                      : (lvl === 'junior' ? 'Vorstufe / Junior (5 Grundintervalle & Dur/Moll)' : lvl === 'd1' ? 'D1 Bronze (7 Intervalle)' : lvl === 'd2' ? 'D2 Silber (11 Intervalle & Umkehrungen)' : 'D3 Gold (Volles Tonspektrum & Septakkorde)')
-                  }
-                >
-                  {uiLevel === 'junior'
-                    ? (lvl === 'junior' ? '🐣 Vorstufe' : lvl === 'd1' ? '🥉 Bronze' : lvl === 'd2' ? '🥈 Silber' : '🥇 Gold')
-                    : (lvl === 'junior' ? 'Vorstufe' : lvl === 'd1' ? 'D1 Bronze' : lvl === 'd2' ? 'D2 Silber' : 'D3 Gold')}
-                </button>
-              ))}
+            {/* Linke Flanke: Level-Wahl & Instrumenten-Klangfarbe */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              {/* Musikschul-D-Stufen & Vorstufe (4 Level) */}
+              <div style={{ display: 'flex', gap: '3px', background: '#ffffff', padding: '3px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                {(['junior', 'd1', 'd2', 'd3'] as VdmLevel[]).map(lvl => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => {
+                      setVdmLevel(lvl);
+                      if (lvl === 'junior' || lvl === 'd1') setChordCategory('types');
+                    }}
+                    style={{
+                      padding: '5px 11px',
+                      borderRadius: '7px',
+                      border: 'none',
+                      background: vdmLevel === lvl ? '#a855f7' : 'transparent',
+                      color: vdmLevel === lvl ? '#ffffff' : '#64748b',
+                      fontWeight: vdmLevel === lvl ? 900 : 700,
+                      fontSize: '0.76rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.12s ease'
+                    }}
+                    title={
+                      uiLevel === 'junior'
+                        ? (lvl === 'junior' ? 'Junior (Vorstufe / 5 Ur-Signale)' : lvl === 'd1' ? 'Stufe 1 (D1 Bronze)' : lvl === 'd2' ? 'Stufe 2 (D2 Silber)' : 'Stufe 3 (D3 Gold)')
+                        : (lvl === 'junior' ? 'Vorstufe / Junior (5 Grundintervalle & Dur/Moll)' : lvl === 'd1' ? 'D1 Bronze (7 Intervalle)' : lvl === 'd2' ? 'D2 Silber (11 Intervalle & Umkehrungen)' : 'D3 Gold (Volles Tonspektrum & Septakkorde)')
+                    }
+                  >
+                    {uiLevel === 'junior'
+                      ? (lvl === 'junior' ? '🐣 Vorstufe' : lvl === 'd1' ? '🥉 Bronze' : lvl === 'd2' ? '🥈 Silber' : '🥇 Gold')
+                      : (lvl === 'junior' ? 'Vorstufe' : lvl === 'd1' ? 'D1 Bronze' : lvl === 'd2' ? 'D2 Silber' : 'D3 Gold')}
+                  </button>
+                ))}
+              </div>
+
+              {/* Klangfarbe: 2-Wege-Wahl (Mein Instrument vs. Neutraler Flügel) */}
+              <div 
+                role="radiogroup" 
+                aria-label="Klangfarbe für Gehörtraining"
+                style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#ffffff', padding: '3px', borderRadius: '10px', border: '1px solid #e2e8f0' }}
+              >
+                {!isPercussion ? (
+                  <>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={soundSelectionMode === 'instrument'}
+                      tabIndex={0}
+                      onClick={() => handleSoundSelectionModeChange('instrument')}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSoundSelectionModeChange('instrument');
+                        }
+                      }}
+                      title={`Gehörtraining im vertrauten Klang deines Instruments (${userInstMeta.label})`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 11px',
+                        borderRadius: '7px',
+                        border: 'none',
+                        background: soundSelectionMode === 'instrument' ? '#0f172a' : 'transparent',
+                        color: soundSelectionMode === 'instrument' ? '#ffffff' : '#64748b',
+                        fontSize: '0.75rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      <span aria-hidden="true">{userInstMeta.icon}</span>
+                      <span>{userInstMeta.label}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={soundSelectionMode === 'piano'}
+                      tabIndex={0}
+                      onClick={() => handleSoundSelectionModeChange('piano')}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSoundSelectionModeChange('piano');
+                        }
+                      }}
+                      title="Neutraler Konzertflügel für objektives tonales Gehörtraining"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '5px 11px',
+                        borderRadius: '7px',
+                        border: 'none',
+                        background: soundSelectionMode === 'piano' ? '#0f172a' : 'transparent',
+                        color: soundSelectionMode === 'piano' ? '#ffffff' : '#64748b',
+                        fontSize: '0.75rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      <span aria-hidden="true">🎹</span>
+                      <span>Flügel</span>
+                    </button>
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '5px 12px',
+                      borderRadius: '7px',
+                      background: '#0f172a',
+                      color: '#ffffff',
+                      fontSize: '0.75rem',
+                      fontWeight: 750
+                    }}
+                    title="Schlagzeuge besitzen keine melodische Tonhöhe – neutraler Flügel ist als Referenz aktiv"
+                  >
+                    <span aria-hidden="true">🎹</span>
+                    <span>Flügel (Neutral)</span>
+                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginLeft: '3px' }}>• 🥁 Schlagzeug</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Timbre & Key Center Drone Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {/* Klangfarbe */}
-              <div style={{ display: 'flex', gap: '2px', background: '#f1f5f9', padding: '3px', borderRadius: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSoundTimbre('rhodes')}
-                  style={{
-                    padding: '3px 7px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: soundTimbre === 'rhodes' ? '#ffffff' : 'transparent',
-                    color: soundTimbre === 'rhodes' ? '#0f172a' : '#64748b',
-                    fontSize: '0.65rem',
-                    fontWeight: 750,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Rhodes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSoundTimbre('grand_piano')}
-                  style={{
-                    padding: '3px 7px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: soundTimbre === 'grand_piano' ? '#ffffff' : 'transparent',
-                    color: soundTimbre === 'grand_piano' ? '#0f172a' : '#64748b',
-                    fontSize: '0.65rem',
-                    fontWeight: 750,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Flügel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSoundTimbre('strings')}
-                  style={{
-                    padding: '3px 7px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: soundTimbre === 'strings' ? '#ffffff' : 'transparent',
-                    color: soundTimbre === 'strings' ? '#0f172a' : '#64748b',
-                    fontSize: '0.65rem',
-                    fontWeight: 750,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Streicher
-                </button>
+            {/* Rechte Flanke: Challenge-Fortschritt, Streak & Audiowerkzeuge */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.80rem' }}>
+                <span style={{ fontWeight: 850, color: '#0f172a' }}>
+                  Runde {challengeProgress.current}/{challengeProgress.total}
+                </span>
+                <span style={{ color: '#cbd5e1' }}>•</span>
+                <span style={{ color: '#059669', fontWeight: 800 }}>
+                  {challengeProgress.correctCount} Richtig
+                </span>
               </div>
+
+              {streak > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#d97706', fontWeight: 850, fontSize: '0.80rem' }}>
+                  <Flame size={15} strokeWidth={2.4} />
+                  <span>{streak}x</span>
+                </div>
+              )}
 
               {/* Tonika Bordun Drone */}
               <button
@@ -1559,68 +1187,43 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
+                  gap: '5px',
+                  padding: '5px 10px',
                   borderRadius: '8px',
                   border: '1px solid #e2e8f0',
                   background: isDroneEnabled ? '#0f172a' : '#ffffff',
                   color: isDroneEnabled ? '#ffffff' : '#475569',
-                  fontSize: '0.66rem',
+                  fontSize: '0.74rem',
                   fontWeight: 800,
                   cursor: 'pointer',
                   transition: 'all 0.12s ease'
                 }}
               >
-                <Radio size={11} strokeWidth={2.4} />
+                <Radio size={13} strokeWidth={2.4} />
                 <span>Bordun {isDroneEnabled ? 'AN' : 'AUS'}</span>
               </button>
-            </div>
-          </div>
 
-          {/* 4. Challenge-Fortschritt & Streak */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '6px 12px',
-            fontSize: '0.72rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 800, color: '#0f172a' }}>
-                Runde {challengeProgress.current} von {challengeProgress.total}
-              </span>
-              <span style={{ color: '#94a3b8' }}>•</span>
-              <span style={{ color: '#64748b', fontWeight: 600 }}>
-                {challengeProgress.correctCount} Richtig
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {streak > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#0f172a', fontWeight: 850 }}>
-                  <Flame size={13} strokeWidth={2.4} />
-                  <span>{streak}x Streak</span>
-                </div>
-              )}
+              {/* Kadenz */}
               <button
                 type="button"
                 onClick={handlePlayCadence}
+                title="Harmonische I-IV-V-I Kadenz zur Verankerung des Grundtons abspielen"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  border: 'none',
-                  background: 'transparent',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
                   color: '#475569',
-                  fontWeight: 750,
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
                   cursor: 'pointer',
-                  fontSize: '0.68rem'
+                  transition: 'all 0.12s ease'
                 }}
               >
-                <Sparkles size={11} strokeWidth={2.2} />
+                <Sparkles size={13} strokeWidth={2.2} />
                 <span>Kadenz</span>
               </button>
             </div>
@@ -1713,7 +1316,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
               {/* 🎖️ 0,1% Goldstandard: Digitales Leistungsabzeichen & Vitrinen-Integration */}
               {(latestRecordedSession?.accuracy ?? 0) >= 70 && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  background: '#f8fafc',
                   border: '1.5px solid #e2e8f0',
                   borderRadius: '16px',
                   padding: '16px 20px',
@@ -1721,7 +1324,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+                  boxShadow: 'none',
                   width: '100%',
                   maxWidth: '420px',
                   boxSizing: 'border-box'
@@ -1733,9 +1336,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   <div style={{
                     fontSize: '0.74rem',
                     fontWeight: 800,
-                    color: '#16a34a',
-                    background: '#ecfdf5',
-                    border: '1px solid #bbf7d0',
+                    color: '#047857',
+                    background: '#d1fae5',
+                    border: 'none',
                     padding: '2px 10px',
                     borderRadius: '99px'
                   }}>
@@ -1765,12 +1368,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         padding: '8px 16px',
                         borderRadius: '10px',
                         border: 'none',
-                        background: isBadgeSaved ? '#16a34a' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        background: isBadgeSaved ? '#34a853' : '#f97316',
                         color: '#ffffff',
                         fontSize: '0.78rem',
                         fontWeight: 900,
                         cursor: isBadgeSaved ? 'default' : 'pointer',
-                        boxShadow: isBadgeSaved ? 'none' : '0 4px 12px rgba(245, 158, 11, 0.35)',
+                        boxShadow: 'none',
                         transition: 'all 0.15s ease'
                       }}
                     >
@@ -1881,41 +1484,39 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   flexWrap: 'wrap',
-                  gap: '10px'
+                  gap: '12px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     <button
                       type="button"
                       onClick={handlePlayCurrentInterval}
                       style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '16px',
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '18px',
                         border: 'none',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        background: '#a855f7',
                         color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        boxShadow: !hasListenedToQuestion
-                          ? '0 0 22px rgba(139, 92, 246, 0.70), 0 6px 18px rgba(139, 92, 246, 0.40)'
-                          : '0 6px 18px rgba(139, 92, 246, 0.40)',
+                        boxShadow: 'none',
                         transform: !hasListenedToQuestion ? 'scale(1.05)' : 'scale(1)',
                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}
                       className={!hasListenedToQuestion ? 'animate-pulse hover-scale' : 'hover-scale'}
                       title="Intervall anhören (Leertaste)"
                     >
-                      <Play size={22} fill="#ffffff" strokeWidth={0} />
+                      <Play size={26} fill="#ffffff" strokeWidth={0} />
                     </button>
                     <div>
-                      <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', display: 'block' }}>
+                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', display: 'block', letterSpacing: '-0.01em' }}>
                         Intervall anhören
                       </span>
                       <span style={{
-                        fontSize: '0.72rem',
-                        color: !hasListenedToQuestion ? '#7c3aed' : '#64748b',
+                        fontSize: '0.80rem',
+                        color: !hasListenedToQuestion ? '#7e22ce' : '#64748b',
                         fontWeight: !hasListenedToQuestion ? 800 : 500,
                         transition: 'color 0.2s ease'
                       }}>
@@ -1934,12 +1535,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         type="button"
                         onClick={() => setIntervalPlayMode(mode)}
                         style={{
-                          padding: '6px 10px',
+                          padding: '7px 12px',
                           borderRadius: '8px',
                           border: 'none',
                           background: intervalPlayMode === mode ? '#ffffff' : 'transparent',
-                          color: intervalPlayMode === mode ? '#7c3aed' : '#64748b',
-                          fontSize: '0.70rem',
+                          color: intervalPlayMode === mode ? '#7e22ce' : '#64748b',
+                          fontSize: '0.76rem',
                           fontWeight: intervalPlayMode === mode ? 900 : 700,
                           cursor: 'pointer',
                           boxShadow: intervalPlayMode === mode ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
@@ -1952,48 +1553,54 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   </div>
                 </div>
 
-                {/* 🌟 0,1% Goldstandard: Echte vertikale Tonstufen-Bühne (Synästhesie Hören & Sehen) */}
+                {/* 🌟 0,1% Goldstandard: Echte vertikale Tonstufen-Bühne (2-Phasen-Entkopplung: Hören & Sehen) */}
                 {(() => {
+                  const isSubmitted = isIntervalAnswerSubmitted && !!currentIntervalQuestion;
                   const semitones = currentIntervalQuestion?.interval.semitones || 0;
                   const effectiveMode = currentIntervalQuestion?.effectiveMode || (intervalPlayMode === 'vdm_mix' ? 'ascending' : intervalPlayMode);
                   const isDescending = effectiveMode === 'descending';
                   const isHarmonic = effectiveMode === 'harmonic';
                   
-                  // Stufenhöhe proportional berechnen: 0 HT = 0px ... 12 HT = 32px
-                  const stepOffset = semitones === 0 ? 0 : Math.min(32, Math.max(6, Math.round((semitones / 12) * 32)));
+                  // 🏛️ 0,1% Goldstandard Pädagogische Immunität:
+                  // VOR Abgabe der Antwort (Ratephase) ist der Offset zwingend 0px (vollkommen neutrale horizontale Ebene).
+                  // ERST NACH Abgabe der Antwort (Synästhesie-Feedback) fährt Ton 2 reaktiv auf die reale Stufenhöhe (0..36px).
+                  const stepOffset = isSubmitted
+                    ? (semitones === 0 ? 0 : Math.min(36, Math.max(6, Math.round((semitones / 12) * 36))))
+                    : 0;
 
-                  // Y-Positionen der Verbindungslinie (Höhe des flexiblen Mittelbereichs = 52px)
-                  let lineY1 = 38;
-                  let lineY2 = 38;
-                  if (isHarmonic) {
-                    lineY1 = 38;
-                    lineY2 = 38;
-                  } else if (isDescending) {
-                    lineY1 = 12;
-                    lineY2 = 12 + stepOffset;
-                  } else {
-                    lineY1 = 38;
-                    lineY2 = Math.max(8, 38 - stepOffset);
+                  // Y-Positionen der Verbindungslinie (Höhe des flexiblen Mittelbereichs = 64px, Neutralhöhe = 32px)
+                  let lineY1 = 32;
+                  let lineY2 = 32;
+                  if (isSubmitted) {
+                    if (isHarmonic) {
+                      lineY1 = 44;
+                      lineY2 = 44;
+                    } else if (isDescending) {
+                      lineY1 = 14;
+                      lineY2 = 14 + stepOffset;
+                    } else {
+                      lineY1 = 48;
+                      lineY2 = Math.max(12, 48 - stepOffset);
+                    }
                   }
 
                   const badgeTop = (lineY1 + lineY2) / 2;
 
-                  const isSubmitted = isIntervalAnswerSubmitted && currentIntervalQuestion;
-                  const isCorrect = isSubmitted && selectedIntervalAnswer === currentIntervalQuestion.interval.id;
+                  const isCorrect = isSubmitted && selectedIntervalAnswer === currentIntervalQuestion?.interval.id;
                   const chosenItem = isSubmitted && !isCorrect ? INTERVAL_CATALOG.find(i => i.id === selectedIntervalAnswer) : null;
 
                   // Berechne Ghost-Linie für die abweichende Schüler-Auswahl
                   let chosenLineY2 = lineY2;
                   let chosenOffsetDiff = 0;
-                  if (chosenItem) {
+                  if (chosenItem && isSubmitted) {
                     const chosenSemi = chosenItem.semitones;
-                    const chosenStepOffset = chosenSemi === 0 ? 0 : Math.min(32, Math.max(6, Math.round((chosenSemi / 12) * 32)));
+                    const chosenStepOffset = chosenSemi === 0 ? 0 : Math.min(36, Math.max(6, Math.round((chosenSemi / 12) * 36)));
                     if (isHarmonic) {
-                      chosenLineY2 = 38;
+                      chosenLineY2 = 44;
                     } else if (isDescending) {
-                      chosenLineY2 = 12 + chosenStepOffset;
+                      chosenLineY2 = 14 + chosenStepOffset;
                     } else {
-                      chosenLineY2 = Math.max(8, 38 - chosenStepOffset);
+                      chosenLineY2 = Math.max(12, 48 - chosenStepOffset);
                     }
                     chosenOffsetDiff = semitones - chosenSemi; // positiv = gesucht war höher; negativ = gesucht war tiefer
                   }
@@ -2002,9 +1609,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                     <div style={{
                       background: '#ffffff',
                       border: '1.5px solid #e2e8f0',
-                      borderRadius: '16px',
-                      padding: '12px 18px',
-                      minHeight: '78px',
+                      borderRadius: '18px',
+                      padding: '16px 22px',
+                      minHeight: '94px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -2015,76 +1622,72 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '10px',
                         zIndex: 2,
-                        transform: isDescending ? `translateY(-${stepOffset / 2}px)` : 'none',
-                        transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                        transform: isSubmitted && isDescending ? `translateY(-${stepOffset / 2}px)` : 'none',
+                        transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}>
                         <div style={{
-                          width: '36px',
-                          height: '36px',
+                          width: '46px',
+                          height: '46px',
                           borderRadius: '50%',
-                          background: playingToneStep === 1
-                            ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-                            : '#f8fafc',
+                          background: playingToneStep === 1 ? '#a855f7' : '#f8fafc',
                           color: playingToneStep === 1 ? '#ffffff' : '#334155',
                           border: playingToneStep === 1 ? 'none' : '1.5px solid #cbd5e1',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '0.84rem',
+                          fontSize: '1.02rem',
                           fontWeight: 950,
-                          boxShadow: playingToneStep === 1
-                            ? '0 0 18px rgba(139, 92, 246, 0.70), 0 2px 8px rgba(139, 92, 246, 0.40)'
-                            : 'none',
+                          boxShadow: 'none',
                           transform: playingToneStep === 1 ? 'scale(1.15)' : 'scale(1)',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                         }}>
-                          {isIntervalAnswerSubmitted && currentIntervalQuestion
+                          {isSubmitted && currentIntervalQuestion
                             ? midiToNoteName(currentIntervalQuestion.rootMidi)
                             : '1'}
                         </div>
                         <span style={{
-                          fontSize: '0.74rem',
+                          fontSize: '0.84rem',
                           fontWeight: 800,
-                          color: playingToneStep === 1 ? '#7c3aed' : '#475569',
+                          color: playingToneStep === 1 ? '#7e22ce' : '#475569',
                           transition: 'color 0.15s ease'
                         }}>
-                          {isIntervalAnswerSubmitted && currentIntervalQuestion ? 'Grundton' : 'Ton 1'}
+                          {isSubmitted && currentIntervalQuestion ? 'Grundton' : 'Ton 1'}
                         </span>
                       </div>
 
                       {/* Verbindungs-Achse & Distanz-Pill */}
                       <div style={{
                         flex: 1,
-                        margin: '0 16px',
+                        margin: '0 20px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
-                        height: '52px'
+                        height: '64px'
                       }}>
                         {/* Diagonale Stufen-Vektorlinie */}
                         <svg width="100%" height="100%" style={{ overflow: 'visible', position: 'absolute', inset: 0 }}>
-                          {/* Feste Horizontlinie am Boden */}
+                          {/* Feste Referenzlinie auf Nulllinie (32px) */}
                           <line
                             x1="0"
-                            y1="38"
+                            y1="32"
                             x2="100%"
-                            y2="38"
+                            y2="32"
                             stroke="#f1f5f9"
                             strokeWidth="1.5"
                             strokeDasharray="4 4"
                           />
-                          {/* Schüler-Fehler Ghostlinie (A/B-Vergleich) */}
-                          {chosenItem && (
+                          {/* Schüler-Fehler Ghostlinie (A/B-Vergleich nur nach Abgabe) */}
+                          {chosenItem && isSubmitted && (
                             <line
                               x1="0"
                               y1={lineY1}
                               x2="100%"
                               y2={chosenLineY2}
-                              stroke="#f43f5e"
-                              strokeWidth="2"
+                              stroke="#ef4444"
+                              strokeWidth="2.2"
                               strokeLinecap="round"
                               strokeDasharray="4 4"
                               opacity="0.85"
@@ -2096,11 +1699,11 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                             y1={lineY1}
                             x2="100%"
                             y2={lineY2}
-                            stroke={isSubmitted ? (isCorrect ? '#10b981' : '#059669') : playingToneStep > 0 ? '#8b5cf6' : '#cbd5e1'}
-                            strokeWidth={isSubmitted ? '3' : '2.5'}
+                            stroke={isSubmitted ? '#10b981' : playingToneStep > 0 ? '#a855f7' : '#cbd5e1'}
+                            strokeWidth={isSubmitted ? '3.5' : '3'}
                             strokeLinecap="round"
-                            strokeDasharray={semitones === 0 ? '4 4' : 'none'}
-                            style={{ transition: 'all 0.25s ease' }}
+                            strokeDasharray={isSubmitted && semitones === 0 ? '4 4' : 'none'}
+                            style={{ transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)' }}
                           />
                         </svg>
 
@@ -2112,40 +1715,36 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           transform: 'translate(-50%, -50%)',
                           zIndex: 2,
                           background: isSubmitted
-                            ? (isCorrect ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fee2e2')
+                            ? (isCorrect ? '#10b981' : '#fee2e2')
                             : '#ffffff',
-                          border: isSubmitted
-                            ? (isCorrect ? 'none' : '1.5px solid #fca5a5')
-                            : playingToneStep > 0
-                            ? '1.5px solid #8b5cf6'
-                            : '1.5px solid #e2e8f0',
+                          border: isSubmitted ? 'none' : '1.5px solid #e2e8f0',
                           color: isSubmitted
-                            ? (isCorrect ? '#ffffff' : '#991b1b')
+                            ? (isCorrect ? '#ffffff' : '#b91c1c')
                             : playingToneStep > 0
-                            ? '#7c3aed'
+                            ? '#7e22ce'
                             : '#475569',
-                          padding: '3px 12px',
+                          padding: '5px 14px',
                           borderRadius: '99px',
-                          fontSize: '0.70rem',
+                          fontSize: '0.82rem',
                           fontWeight: 850,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                          transition: 'all 0.2s ease',
+                          boxShadow: 'none',
+                          transition: 'all 0.25s ease',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '7px',
                           whiteSpace: 'nowrap'
                         }}>
-                          {isSubmitted ? (
+                          {isSubmitted && currentIntervalQuestion ? (
                             isCorrect ? (
                               <>
-                                <CheckCircle2 size={13} strokeWidth={2.4} />
+                                <CheckCircle2 size={15} strokeWidth={2.4} />
                                 <span>{currentIntervalQuestion.interval.name}</span>
                                 <span>•</span>
                                 <span>{currentIntervalQuestion.interval.semitones} HT</span>
                               </>
                             ) : (
                               <>
-                                <XCircle size={13} strokeWidth={2.4} />
+                                <XCircle size={15} strokeWidth={2.4} />
                                 <span>Gesucht: {currentIntervalQuestion.interval.name} ({currentIntervalQuestion.interval.semitones} HT)</span>
                                 {chosenItem && (
                                   <>
@@ -2158,17 +1757,15 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                                 )}
                               </>
                             )
-                          ) : playingToneStep > 0 ? (
+                          ) : playingToneStep === 1 ? (
                             <>
-                              <Volume2 size={12} strokeWidth={2.4} />
-                              <span>
-                                {effectiveMode === 'harmonic'
-                                  ? 'Zusammen'
-                                  : effectiveMode === 'descending'
-                                  ? 'Abwärts'
-                                  : 'Aufwärts'}
-                                {intervalPlayMode === 'vdm_mix' ? ' (🎲 Mix)' : ''}
-                              </span>
+                              <Volume2 size={14} strokeWidth={2.4} />
+                              <span>Ton 1 (Startton)</span>
+                            </>
+                          ) : playingToneStep === 2 ? (
+                            <>
+                              <Volume2 size={14} strokeWidth={2.4} />
+                              <span>Ton 2 (Zielton)</span>
                             </>
                           ) : (
                             <span>Höre die Schrittweite</span>
@@ -2180,44 +1777,40 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '10px',
                         zIndex: 2,
-                        transform: isHarmonic
+                        transform: !isSubmitted || isHarmonic
                           ? 'none'
                           : isDescending
                           ? `translateY(${stepOffset / 2}px)`
                           : `translateY(-${stepOffset / 2}px)`,
-                        transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                        transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}>
                         <span style={{
-                          fontSize: '0.74rem',
+                          fontSize: '0.84rem',
                           fontWeight: 800,
-                          color: playingToneStep === 2 ? '#7c3aed' : '#475569',
+                          color: playingToneStep === 2 ? '#7e22ce' : '#475569',
                           transition: 'color 0.15s ease'
                         }}>
-                          {isIntervalAnswerSubmitted && currentIntervalQuestion ? 'Zielton' : 'Ton 2'}
+                          {isSubmitted && currentIntervalQuestion ? 'Zielton' : 'Ton 2'}
                         </span>
                         <div style={{
-                          width: '36px',
-                          height: '36px',
+                          width: '46px',
+                          height: '46px',
                           borderRadius: '50%',
-                          background: playingToneStep === 2
-                            ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
-                            : '#f8fafc',
+                          background: playingToneStep === 2 ? '#a855f7' : '#f8fafc',
                           color: playingToneStep === 2 ? '#ffffff' : '#334155',
                           border: playingToneStep === 2 ? 'none' : '1.5px solid #cbd5e1',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '0.84rem',
+                          fontSize: '1.02rem',
                           fontWeight: 950,
-                          boxShadow: playingToneStep === 2
-                            ? '0 0 18px rgba(139, 92, 246, 0.70), 0 2px 8px rgba(139, 92, 246, 0.40)'
-                            : 'none',
+                          boxShadow: 'none',
                           transform: playingToneStep === 2 ? 'scale(1.15)' : 'scale(1)',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                         }}>
-                          {isIntervalAnswerSubmitted && currentIntervalQuestion
+                          {isSubmitted && currentIntervalQuestion
                             ? midiToNoteName(currentIntervalQuestion.rootMidi + currentIntervalQuestion.interval.semitones)
                             : '2'}
                         </div>
@@ -2227,13 +1820,13 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 })()}
               </div>
 
-              {/* Intervall-Auswahlkacheln (0,1% Goldstandard: Taktile Bild-First Kacheln im balancierten Responsive-Grid) */}
+              {/* Intervall-Auswahlkacheln (0,1% Goldstandard: Taktile Bild-First Kacheln im balancierten Großformat Responsive-Grid) */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: availableIntervals.length <= 5
-                  ? 'repeat(auto-fit, minmax(130px, 1fr))'
-                  : 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '10px',
+                  ? 'repeat(auto-fit, minmax(145px, 1fr))'
+                  : 'repeat(auto-fit, minmax(155px, 1fr))',
+                gap: '12px',
                 width: '100%',
                 justifyContent: 'center'
               }}>
@@ -2243,30 +1836,30 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   const isCorrect = currentIntervalQuestion?.interval.id === item.id;
 
                   let bg = '#ffffff';
-                  let border = '#e2e8f0';
+                  let border = '1.5px solid #e2e8f0';
                   let text = '#0f172a';
-                  let badgeBg = 'rgba(139, 92, 246, 0.08)';
-                  let badgeColor = '#7c3aed';
+                  let badgeBg = '#f3e8ff';
+                  let badgeColor = '#7e22ce';
                   let subColor = '#64748b';
 
                   if (isSubmitted) {
                     if (isCorrect) {
-                      bg = '#ecfdf5';
-                      border = '#10b981';
-                      text = '#065f46';
+                      bg = '#d1fae5';
+                      border = 'none';
+                      text = '#047857';
                       badgeBg = '#10b981';
                       badgeColor = '#ffffff';
                       subColor = '#047857';
                     } else if (isChosen && !isCorrect) {
-                      bg = '#fff1f2';
-                      border = '#f43f5e';
-                      text = '#9f1239';
-                      badgeBg = '#f43f5e';
+                      bg = '#fee2e2';
+                      border = 'none';
+                      text = '#b91c1c';
+                      badgeBg = '#ef4444';
                       badgeColor = '#ffffff';
-                      subColor = '#be123c';
+                      subColor = '#b91c1c';
                     } else {
                       bg = '#f8fafc';
-                      border = '#e2e8f0';
+                      border = '1.5px solid #e2e8f0';
                       text = '#94a3b8';
                       badgeBg = '#f1f5f9';
                       badgeColor = '#94a3b8';
@@ -2295,10 +1888,10 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         position: 'relative',
                         width: '100%',
                         boxSizing: 'border-box',
-                        padding: '12px 10px',
-                        minHeight: '88px',
-                        borderRadius: '16px',
-                        border: `1.5px solid ${border}`,
+                        padding: '14px 12px',
+                        minHeight: '104px',
+                        borderRadius: '18px',
+                        border,
                         background: bg,
                         color: text,
                         cursor: isSubmitted ? 'default' : !hasListenedToQuestion ? 'not-allowed' : 'pointer',
@@ -2307,9 +1900,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '5px',
+                        gap: '6px',
                         transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                        boxShadow: isChosen ? '0 6px 16px rgba(0,0,0,0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                        boxShadow: 'none',
                         overflow: 'hidden',
                         opacity: !hasListenedToQuestion && !isSubmitted ? 0.68 : 1,
                         userSelect: 'none',
@@ -2322,7 +1915,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           : `${item.name} (${item.semitones} Halbtöne)`
                       }
                     >
-                      {/* Didaktisches Vorhören: Kleiner 🔊 Button oben rechts */}
+                      {/* Didaktisches Vorhören: Ergonomischer 🔊 Button oben rechts (Apple HIG Touch-Target) */}
                       <button
                         type="button"
                         tabIndex={0}
@@ -2336,26 +1929,28 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           position: 'absolute',
                           top: '6px',
                           right: '6px',
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(148, 163, 184, 0.35)',
-                          background: 'rgba(255, 255, 255, 0.90)',
-                          backdropFilter: 'blur(4px)',
-                          color: isCorrect && isSubmitted ? '#047857' : isChosen && !isCorrect && isSubmitted ? '#be123c' : '#64748b',
+                          width: '32px',
+                          height: '32px',
+                          minWidth: '32px',
+                          minHeight: '32px',
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0',
+                          background: '#ffffff',
+                          color: isCorrect && isSubmitted ? '#047857' : isChosen && !isCorrect && isSubmitted ? '#b91c1c' : '#64748b',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          boxShadow: 'none',
+                          touchAction: 'manipulation',
                           zIndex: 3
                         }}
                         className="hover-scale"
                         title={`Diesen Tonsprung vorhören: ${item.name} (${item.semitones} Halbtöne)`}
                         aria-label={`Diesen Tonsprung vorhören: ${item.name}`}
                       >
-                        <Volume2 size={13} strokeWidth={2.4} />
+                        <Volume2 size={15} strokeWidth={2.4} />
                       </button>
 
                       {/* 1. Bild-First: Prominente Vektor-Geste im Zentrum */}
@@ -2363,7 +1958,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '3px 8px',
+                        padding: '4px 10px',
                         borderRadius: '10px',
                         background: badgeBg,
                         color: badgeColor,
@@ -2374,10 +1969,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                             item.id,
                             item.semitones,
                             badgeColor,
-                            currentIntervalQuestion?.effectiveMode || (intervalPlayMode === 'vdm_mix' ? 'ascending' : intervalPlayMode)
+                            isSubmitted
+                              ? (currentIntervalQuestion?.effectiveMode || 'ascending')
+                              : (intervalPlayMode === 'vdm_mix' ? 'ascending' : intervalPlayMode)
                           )
                         ) : (
-                          <span style={{ fontSize: '0.74rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 900, whiteSpace: 'nowrap' }}>
                             {uiLevel === 'pro' ? item.proShort : item.shortName}
                           </span>
                         )}
@@ -2386,7 +1983,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       {/* 2. Junior-Name: Groß, fett und sprechend */}
                       <span style={{
                         fontWeight: 950,
-                        fontSize: '0.96rem',
+                        fontSize: '1.08rem',
                         letterSpacing: '-0.02em',
                         lineHeight: 1.15,
                         color: text,
@@ -2409,12 +2006,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '4px',
-                          padding: '3px 8px',
+                          gap: '5px',
+                          padding: '4px 10px',
                           borderRadius: '8px',
-                          background: 'rgba(139, 92, 246, 0.08)',
-                          color: subColor,
-                          fontSize: '0.68rem',
+                          background: '#f3e8ff',
+                          color: '#7e22ce',
+                          fontSize: '0.76rem',
                           fontWeight: 750,
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
@@ -2428,7 +2025,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         title={`Melodie anspielen: ${item.songAnchor}`}
                         aria-label={`Melodie anspielen für ${item.name}: ${item.songAnchor}`}
                       >
-                        <Music size={11} strokeWidth={2.4} color="#7c3aed" style={{ flexShrink: 0 }} />
+                        <Music size={13} strokeWidth={2.4} color="#7e22ce" style={{ flexShrink: 0 }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {uiLevel === 'junior'
                             ? item.name
@@ -2445,14 +2042,14 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
               {/* Didaktische Feedback-Kassette & A/B-Hörvergleich */}
               {isIntervalAnswerSubmitted && currentIntervalQuestion && (
                 <div style={{
-                  background: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#ecfdf5' : '#fff1f2',
-                  border: `1.5px solid ${selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#10b981' : '#f43f5e'}`,
+                  background: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#d1fae5' : '#fee2e2',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '14px 16px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '10px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                  boxShadow: 'none'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2475,7 +2072,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          background: '#f43f5e',
+                          background: '#ef4444',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -2489,7 +2086,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         <span style={{
                           fontSize: '0.88rem',
                           fontWeight: 900,
-                          color: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#065f46' : '#9f1239',
+                          color: selectedIntervalAnswer === currentIntervalQuestion.interval.id ? '#047857' : '#b91c1c',
                           display: 'block'
                         }}>
                           {selectedIntervalAnswer === currentIntervalQuestion.interval.id
@@ -2516,7 +2113,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        background: '#a855f7',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '12px',
@@ -2555,8 +2152,8 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         alignItems: 'center',
                         gap: '5px',
                         background: '#ffffff',
-                        border: '1.5px solid #10b981',
-                        color: '#065f46',
+                        border: '1.5px solid #e2e8f0',
+                        color: '#047857',
                         borderRadius: '8px',
                         padding: '5px 11px',
                         fontSize: '0.72rem',
@@ -2580,8 +2177,8 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           alignItems: 'center',
                           gap: '5px',
                           background: '#ffffff',
-                          border: '1.5px solid #f43f5e',
-                          color: '#9f1239',
+                          border: '1.5px solid #e2e8f0',
+                          color: '#b91c1c',
                           borderRadius: '8px',
                           padding: '5px 11px',
                           fontSize: '0.72rem',
@@ -2611,9 +2208,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '5px',
-                        background: 'rgba(139, 92, 246, 0.12)',
-                        border: '1.5px solid rgba(139, 92, 246, 0.35)',
-                        color: '#7c3aed',
+                        background: '#f3e8ff',
+                        border: 'none',
+                        color: '#7e22ce',
                         borderRadius: '8px',
                         padding: '5px 11px',
                         fontSize: '0.72rem',
@@ -2643,9 +2240,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px',
-                          background: '#fff1f2',
-                          border: '1.5px solid #fca5a5',
-                          color: '#be123c',
+                          background: '#ffffff',
+                          border: 'none',
+                          color: '#b91c1c',
                           borderRadius: '8px',
                           padding: '5px 11px',
                           fontSize: '0.72rem',
@@ -2683,41 +2280,39 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
-                gap: '10px'
+                gap: '12px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <button
                     type="button"
                     onClick={handlePlayCurrentChord}
                     style={{
-                      width: '52px',
-                      height: '52px',
-                      borderRadius: '16px',
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '18px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                      background: '#a855f7',
                       color: '#ffffff',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: !hasListenedToChordQuestion
-                        ? '0 0 22px rgba(139, 92, 246, 0.70), 0 6px 18px rgba(139, 92, 246, 0.40)'
-                        : '0 6px 18px rgba(139, 92, 246, 0.40)',
+                      boxShadow: 'none',
                       transform: !hasListenedToChordQuestion ? 'scale(1.05)' : 'scale(1)',
                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                     className={!hasListenedToChordQuestion ? 'animate-pulse hover-scale' : 'hover-scale'}
                     title="Akkord anhören (Leertaste)"
                   >
-                    <Play size={22} fill="#ffffff" strokeWidth={0} />
+                    <Play size={26} fill="#ffffff" strokeWidth={0} />
                   </button>
                   <div>
-                    <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', display: 'block' }}>
+                    <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', display: 'block', letterSpacing: '-0.01em' }}>
                       Akkord anhören
                     </span>
                     <span style={{
-                      fontSize: '0.72rem',
-                      color: !hasListenedToChordQuestion ? '#7c3aed' : '#64748b',
+                      fontSize: '0.80rem',
+                      color: !hasListenedToChordQuestion ? '#7e22ce' : '#64748b',
                       fontWeight: !hasListenedToChordQuestion ? 800 : 500,
                       transition: 'color 0.2s ease'
                     }}>
@@ -2735,12 +2330,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       type="button"
                       onClick={() => setChordPlayMode(mode)}
                       style={{
-                        padding: '6px 10px',
+                        padding: '7px 12px',
                         borderRadius: '8px',
                         border: 'none',
                         background: chordPlayMode === mode ? '#ffffff' : 'transparent',
-                        color: chordPlayMode === mode ? '#7c3aed' : '#64748b',
-                        fontSize: '0.70rem',
+                        color: chordPlayMode === mode ? '#7e22ce' : '#64748b',
+                        fontSize: '0.76rem',
                         fontWeight: chordPlayMode === mode ? 900 : 700,
                         cursor: 'pointer',
                         boxShadow: chordPlayMode === mode ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
@@ -2757,13 +2352,13 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '8px',
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '4px 6px'
+                  borderRadius: '14px',
+                  padding: '6px 8px'
                 }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', paddingLeft: '4px' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', paddingLeft: '4px' }}>
                     Kategorie:
                   </span>
                   <div style={{ display: 'flex', gap: '3px' }}>
@@ -2771,12 +2366,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       type="button"
                       onClick={() => setChordCategory('types')}
                       style={{
-                        padding: '4px 10px',
+                        padding: '5px 12px',
                         borderRadius: '8px',
                         border: 'none',
                         background: chordCategory === 'types' ? '#ffffff' : 'transparent',
-                        color: chordCategory === 'types' ? '#7c3aed' : '#64748b',
-                        fontSize: '0.70rem',
+                        color: chordCategory === 'types' ? '#7e22ce' : '#64748b',
+                        fontSize: '0.76rem',
                         fontWeight: chordCategory === 'types' ? 900 : 700,
                         cursor: 'pointer',
                         boxShadow: chordCategory === 'types' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
@@ -2788,12 +2383,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       type="button"
                       onClick={() => setChordCategory('inversions')}
                       style={{
-                        padding: '4px 10px',
+                        padding: '5px 12px',
                         borderRadius: '8px',
                         border: 'none',
                         background: chordCategory === 'inversions' ? '#ffffff' : 'transparent',
-                        color: chordCategory === 'inversions' ? '#7c3aed' : '#64748b',
-                        fontSize: '0.70rem',
+                        color: chordCategory === 'inversions' ? '#7e22ce' : '#64748b',
+                        fontSize: '0.76rem',
                         fontWeight: chordCategory === 'inversions' ? 900 : 700,
                         cursor: 'pointer',
                         boxShadow: chordCategory === 'inversions' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
@@ -2805,11 +2400,11 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                 </div>
               )}
 
-              {/* Akkord-Auswahlkacheln (0,1% Goldstandard 3-Ebenen & Einzeilen-Schutz) */}
+              {/* Akkord-Auswahlkacheln (0,1% Goldstandard 3-Ebenen & Großformat-Touch-Zonen) */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-                gap: '8px'
+                gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))',
+                gap: '10px'
               }}>
                 {(((vdmLevel === 'd2' || vdmLevel === 'd3') && (currentChordQuestion?.isInversion || chordCategory === 'inversions'))
                   ? CHORD_INVERSIONS
@@ -2820,30 +2415,30 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   const isCorrect = currentChordQuestion?.chord.id === item.id;
 
                   let bg = '#ffffff';
-                  let border = '#e2e8f0';
+                  let border = '1.5px solid #e2e8f0';
                   let text = '#0f172a';
-                  let badgeBg = 'rgba(139, 92, 246, 0.10)';
-                  let badgeColor = '#7c3aed';
+                  let badgeBg = '#f3e8ff';
+                  let badgeColor = '#7e22ce';
                   let subColor = '#64748b';
 
                   if (isSubmitted) {
                     if (isCorrect) {
-                      bg = '#ecfdf5';
-                      border = '#10b981';
-                      text = '#065f46';
+                      bg = '#d1fae5';
+                      border = 'none';
+                      text = '#047857';
                       badgeBg = '#10b981';
                       badgeColor = '#ffffff';
                       subColor = '#047857';
                     } else if (isChosen && !isCorrect) {
-                      bg = '#fff1f2';
-                      border = '#f43f5e';
-                      text = '#9f1239';
-                      badgeBg = '#f43f5e';
+                      bg = '#fee2e2';
+                      border = 'none';
+                      text = '#b91c1c';
+                      badgeBg = '#ef4444';
                       badgeColor = '#ffffff';
-                      subColor = '#be123c';
+                      subColor = '#b91c1c';
                     } else {
                       bg = '#f8fafc';
-                      border = '#e2e8f0';
+                      border = '1.5px solid #e2e8f0';
                       text = '#94a3b8';
                       badgeBg = '#f1f5f9';
                       badgeColor = '#94a3b8';
@@ -2870,11 +2465,11 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       }}
                       style={{
                         position: 'relative',
-                        padding: '10px 12px',
-                        paddingRight: '36px',
-                        minHeight: '62px',
-                        borderRadius: '14px',
-                        border: `1.5px solid ${border}`,
+                        padding: '12px 14px',
+                        paddingRight: '40px',
+                        minHeight: '74px',
+                        borderRadius: '16px',
+                        border,
                         background: bg,
                         color: text,
                         cursor: isSubmitted ? 'default' : !hasListenedToChordQuestion ? 'not-allowed' : 'pointer',
@@ -2882,9 +2477,9 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center',
-                        gap: '3px',
+                        gap: '4px',
                         transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                        boxShadow: isChosen ? '0 4px 12px rgba(0,0,0,0.06)' : 'none',
+                        boxShadow: 'none',
                         overflow: 'hidden',
                         opacity: !hasListenedToChordQuestion && !isSubmitted ? 0.68 : 1,
                         userSelect: 'none',
@@ -2897,7 +2492,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           : `${item.name}: ${item.description}`
                       }
                     >
-                      {/* Didaktisches Kachel-Vorhören */}
+                      {/* Didaktisches Kachel-Vorhören (Apple HIG Touch-Target) */}
                       <button
                         type="button"
                         tabIndex={0}
@@ -2911,45 +2506,47 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           position: 'absolute',
                           top: '6px',
                           right: '6px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '7px',
-                          border: '1px solid rgba(148, 163, 184, 0.35)',
-                          background: 'rgba(255, 255, 255, 0.90)',
-                          backdropFilter: 'blur(4px)',
-                          color: isCorrect && isSubmitted ? '#047857' : isChosen && !isCorrect && isSubmitted ? '#be123c' : '#64748b',
+                          width: '32px',
+                          height: '32px',
+                          minWidth: '32px',
+                          minHeight: '32px',
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0',
+                          background: '#ffffff',
+                          color: isCorrect && isSubmitted ? '#047857' : isChosen && !isCorrect && isSubmitted ? '#b91c1c' : '#64748b',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                          boxShadow: 'none',
+                          touchAction: 'manipulation',
                           zIndex: 3
                         }}
                         className="hover-scale"
                         title={`Diesen Klang vorhören: ${item.name}`}
                         aria-label={`Diesen Klang vorhören: ${item.name}`}
                       >
-                        <Volume2 size={12} strokeWidth={2.4} />
+                        <Volume2 size={15} strokeWidth={2.4} />
                       </button>
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
                         <span style={{
                           fontWeight: 900,
-                          fontSize: 'clamp(0.78rem, 1.1vw, 0.88rem)',
+                          fontSize: 'clamp(0.88rem, 1.2vw, 1.02rem)',
                           letterSpacing: '-0.01em',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          maxWidth: 'calc(100% - 38px)'
+                          maxWidth: 'calc(100% - 40px)'
                         }}>
                           {uiLevel === 'junior' ? item.juniorName : item.name}
                         </span>
                         <span style={{
-                          fontSize: uiLevel === 'junior' ? '0.64rem' : '0.70rem',
+                          fontSize: uiLevel === 'junior' ? '0.72rem' : '0.78rem',
                           fontWeight: 850,
-                          padding: '2px 6px',
-                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          borderRadius: '7px',
                           background: badgeBg,
                           color: badgeColor,
                           flexShrink: 0,
@@ -2963,7 +2560,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         </span>
                       </div>
                       <span style={{
-                        fontSize: '0.68rem',
+                        fontSize: '0.76rem',
                         color: subColor,
                         fontWeight: 650,
                         whiteSpace: 'nowrap',
@@ -2982,21 +2579,21 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
               {/* Didaktische Feedback-Kassette & A/B-Hörvergleich für Akkorde */}
               {isChordAnswerSubmitted && currentChordQuestion && (
                 <div style={{
-                  background: selectedChordAnswer === currentChordQuestion.chord.id ? '#ecfdf5' : '#fff1f2',
-                  border: `1.5px solid ${selectedChordAnswer === currentChordQuestion.chord.id ? '#10b981' : '#f43f5e'}`,
-                  borderRadius: '16px',
-                  padding: '14px 16px',
+                  background: selectedChordAnswer === currentChordQuestion.chord.id ? '#d1fae5' : '#fee2e2',
+                  border: 'none',
+                  borderRadius: '18px',
+                  padding: '16px 18px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '10px',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                  gap: '12px',
+                  boxShadow: 'none'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       {selectedChordAnswer === currentChordQuestion.chord.id ? (
                         <div style={{
-                          width: '32px',
-                          height: '32px',
+                          width: '38px',
+                          height: '38px',
                           borderRadius: '50%',
                           background: '#10b981',
                           color: '#ffffff',
@@ -3005,28 +2602,28 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                           justifyContent: 'center',
                           flexShrink: 0
                         }}>
-                          <Check size={18} strokeWidth={3} />
+                          <Check size={20} strokeWidth={3} />
                         </div>
                       ) : (
                         <div style={{
-                          width: '32px',
-                          height: '32px',
+                          width: '38px',
+                          height: '38px',
                           borderRadius: '50%',
-                          background: '#f43f5e',
+                          background: '#ef4444',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0
                         }}>
-                          <X size={18} strokeWidth={3} />
+                          <X size={20} strokeWidth={3} />
                         </div>
                       )}
                       <div>
                         <span style={{
-                          fontSize: '0.88rem',
+                          fontSize: '0.98rem',
                           fontWeight: 900,
-                          color: selectedChordAnswer === currentChordQuestion.chord.id ? '#065f46' : '#9f1239',
+                          color: selectedChordAnswer === currentChordQuestion.chord.id ? '#047857' : '#b91c1c',
                           display: 'block'
                         }}>
                           {selectedChordAnswer === currentChordQuestion.chord.id
@@ -3037,7 +2634,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                               ? `Fast! Richtig war: ${currentChordQuestion.chord.juniorName} (${currentChordQuestion.chord.name})`
                               : `Fast! Es war: ${currentChordQuestion.chord.name}`}
                         </span>
-                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 650 }}>
+                        <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 650 }}>
                           {currentChordQuestion.isInversion
                             ? `Aufbau: ${currentChordQuestion.chord.proClassification} • ${currentChordQuestion.chord.description}`
                             : `Klangfarbe: ${currentChordQuestion.chord.description}`}
@@ -3052,13 +2649,13 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        gap: '8px',
+                        background: '#a855f7',
                         color: '#ffffff',
                         border: 'none',
-                        borderRadius: '12px',
-                        padding: '9px 18px',
-                        fontSize: '0.80rem',
+                        borderRadius: '14px',
+                        padding: '11px 22px',
+                        fontSize: '0.86rem',
                         fontWeight: 900,
                         cursor: 'pointer',
                         boxShadow: 'none'
@@ -3066,7 +2663,7 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       className="hover-scale"
                     >
                       <span>Nächste Frage</span>
-                      <ArrowRight size={15} strokeWidth={2.6} />
+                      <ArrowRight size={17} strokeWidth={2.6} />
                     </button>
                   </div>
 
@@ -3074,12 +2671,12 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    paddingTop: '8px',
+                    gap: '10px',
+                    paddingTop: '10px',
                     borderTop: '1px solid rgba(0,0,0,0.06)',
                     flexWrap: 'wrap'
                   }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#475569' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#475569' }}>
                       A/B Hörvergleich:
                     </span>
 
@@ -3090,20 +2687,20 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '5px',
+                        gap: '6px',
                         background: '#ffffff',
-                        border: '1.5px solid #10b981',
-                        color: '#065f46',
-                        borderRadius: '8px',
-                        padding: '5px 11px',
-                        fontSize: '0.72rem',
+                        border: '1.5px solid #e2e8f0',
+                        color: '#047857',
+                        borderRadius: '10px',
+                        padding: '6px 13px',
+                        fontSize: '0.78rem',
                         fontWeight: 800,
                         cursor: 'pointer'
                       }}
                       className="hover-scale"
                       title="Gehörten Akkord erneut abspielen"
                     >
-                      <Volume2 size={13} strokeWidth={2.5} />
+                      <Volume2 size={15} strokeWidth={2.5} />
                       <span>▶ Gehört ({uiLevel === 'junior' ? currentChordQuestion.chord.juniorName : currentChordQuestion.chord.name})</span>
                     </button>
 
@@ -3115,20 +2712,20 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '5px',
+                          gap: '6px',
                           background: '#ffffff',
-                          border: '1.5px solid #f43f5e',
-                          color: '#9f1239',
-                          borderRadius: '8px',
-                          padding: '5px 11px',
-                          fontSize: '0.72rem',
+                          border: '1.5px solid #e2e8f0',
+                          color: '#b91c1c',
+                          borderRadius: '10px',
+                          padding: '6px 13px',
+                          fontSize: '0.78rem',
                           fontWeight: 800,
                           cursor: 'pointer'
                         }}
                         className="hover-scale"
                         title="Deine gewählte Antwort zum Vergleich anhören"
                       >
-                        <Volume2 size={13} strokeWidth={2.5} />
+                        <Volume2 size={15} strokeWidth={2.5} />
                         <span>▶ Deine Wahl ({uiLevel === 'junior' ? lastChosenChord.juniorName : lastChosenChord.name})</span>
                       </button>
                     )}
@@ -3140,295 +2737,14 @@ export const EarLabStudioModal: React.FC<EarLabStudioModalProps> = ({
             /* ========================================================
                SÄULE 3: SING-BACK & PITCH-MATCH (YIN)
                ======================================================== */
-            <div
-              role="tabpanel"
-              id="panel-ear-pitch-match"
-              aria-labelledby="tab-ear-pitch-match"
-              tabIndex={0}
-              style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}
-            >
-              <div style={{
-                background: '#f8fafc',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '14px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={handlePlayTargetPitch}
-                      style={{
-                        width: '52px',
-                        height: '52px',
-                        borderRadius: '16px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                      title="Zielton vorhören"
-                    >
-                      <Volume2 size={22} strokeWidth={2.4} />
-                    </button>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a' }}>
-                          Zielton: {currentPitchQuestion?.label}
-                        </span>
-                        <span style={{
-                          fontSize: '0.70rem',
-                          fontWeight: 800,
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          background: 'rgba(139, 92, 246, 0.12)',
-                          color: '#7c3aed'
-                        }}>
-                          {Math.round(midiToFreq(currentPitchQuestion?.midi || 60))} Hz
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                        Höre den Ton und singe ihn präzise nach (Oktav-tolerant)
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={togglePitchListening}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '9px 18px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: isPitchListening
-                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: '#ffffff',
-                      fontSize: '0.80rem',
-                      fontWeight: 850,
-                      cursor: 'pointer',
-                      boxShadow: isPitchListening
-                        ? '0 4px 14px rgba(239, 68, 68, 0.35)'
-                        : '0 4px 14px rgba(16, 185, 129, 0.35)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Mic size={16} strokeWidth={2.4} />
-                    <span>{isPitchListening ? 'Mikrofon aktiv' : 'Mikrofon starten'}</span>
-                  </button>
-                </div>
-
-                {/* 2027 Vocal Pitch Highway Visualizer */}
-                <div style={{
-                  width: '100%',
-                  background: '#ffffff',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '16px',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '12px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-                }}>
-                  {livePitchResult && livePitchResult.isAudible && livePitchResult.pitch ? (
-                    (() => {
-                      const targetFreq = midiToFreq(currentPitchQuestion?.midi || 60);
-                      const evalScore = evaluatePitchMatch(livePitchResult.pitch, targetFreq, 28);
-                      const isMatched = evalScore.isMatched;
-                      const cents = evalScore.cents;
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', width: '100%' }}>
-                          {/* Gesungene Note vs. Zielton */}
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                            <span style={{
-                              fontSize: '2.2rem',
-                              fontWeight: 950,
-                              color: isMatched ? '#10b981' : '#0f172a',
-                              letterSpacing: '-0.02em',
-                              transition: 'color 0.15s ease'
-                            }}>
-                              {livePitchResult.noteName || '–'}
-                            </span>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>
-                              ({Math.round(livePitchResult.pitch)} Hz)
-                            </span>
-                          </div>
-
-                          {/* Vocal Highway Pitch Track */}
-                          <div style={{
-                            width: '100%',
-                            maxWidth: '380px',
-                            height: '24px',
-                            background: '#f1f5f9',
-                            borderRadius: '100px',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            border: '1px solid #e2e8f0'
-                          }}>
-                            {/* Mittlerer Ziel-Korridor (Sweet Spot) */}
-                            <div style={{
-                              position: 'absolute',
-                              left: '42%',
-                              width: '16%',
-                              height: '100%',
-                              background: isMatched ? 'rgba(16, 185, 129, 0.25)' : '#e2e8f0',
-                              borderLeft: '1.5px dashed #cbd5e1',
-                              borderRight: '1.5px dashed #cbd5e1',
-                              transition: 'background 0.15s ease'
-                            }} />
-
-                            {/* Dynamischer Voice Orb / Stimm-Cursor */}
-                            <div style={{
-                              position: 'absolute',
-                              left: `${Math.max(5, Math.min(95, 50 + (cents)))}%`,
-                              top: '50%',
-                              transform: 'translate(-50%, -50%)',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              background: isMatched
-                                ? '#10b981'
-                                : cents < -15
-                                ? '#3b82f6'
-                                : '#f97316',
-                              boxShadow: isMatched
-                                ? '0 0 14px rgba(16, 185, 129, 0.85)'
-                                : '0 2px 6px rgba(0,0,0,0.2)',
-                              transition: 'left 0.08s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease'
-                            }} />
-                          </div>
-
-                          {/* Didaktische Richtungs-Führung */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {isMatched ? (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: '#ecfdf5',
-                                border: '1px solid #10b981',
-                                color: '#065f46',
-                                padding: '4px 14px',
-                                borderRadius: '99px',
-                                fontSize: '0.78rem',
-                                fontWeight: 900,
-                                boxShadow: 'none'
-                              }}>
-                                <Check size={14} strokeWidth={3} />
-                                <span>{uiLevel === 'junior' ? 'Super getroffen! Halte den Ton...' : 'Perfekt getroffen! Ton halten...'}</span>
-                              </div>
-                            ) : cents < -15 ? (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#eff6ff',
-                                border: '1px solid #93c5fd',
-                                color: '#1e40af',
-                                padding: '4px 12px',
-                                borderRadius: '99px',
-                                fontSize: '0.76rem',
-                                fontWeight: 850
-                              }}>
-                                <ArrowUp size={13} strokeWidth={2.8} />
-                                <span>
-                                  {uiLevel === 'junior'
-                                    ? 'Höher singen'
-                                    : uiLevel === 'pro'
-                                    ? `Höher singen (Δ -${Math.abs(Math.round(cents))} ct)`
-                                    : `Höher singen (${Math.abs(Math.round(cents))}ct zu tief)`}
-                                </span>
-                              </div>
-                            ) : (
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#fff7ed',
-                                border: '1px solid #fed7aa',
-                                color: '#c2410c',
-                                padding: '4px 12px',
-                                borderRadius: '99px',
-                                fontSize: '0.76rem',
-                                fontWeight: 850
-                              }}>
-                                <ArrowDown size={13} strokeWidth={2.8} />
-                                <span>
-                                  {uiLevel === 'junior'
-                                    ? 'Tiefer singen'
-                                    : uiLevel === 'pro'
-                                    ? `Tiefer singen (Δ +${Math.round(cents)} ct)`
-                                    : `Tiefer singen (${Math.round(cents)}ct zu hoch)`}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 1,2s Lock-In Ladebalken */}
-                          {pitchMatchLockCountdown > 0 && (
-                            <div style={{
-                              width: '100%',
-                              maxWidth: '240px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '4px',
-                              marginTop: '2px'
-                            }}>
-                              <div style={{
-                                width: '100%',
-                                height: '8px',
-                                background: '#f1f5f9',
-                                borderRadius: '100px',
-                                overflow: 'hidden',
-                                border: '1px solid #e2e8f0'
-                              }}>
-                                <div style={{
-                                  width: `${pitchMatchLockCountdown}%`,
-                                  height: '100%',
-                                  background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                                  boxShadow: 'none',
-                                  transition: 'width 0.08s linear'
-                                }} />
-                              </div>
-                              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#059669' }}>
-                                Intonation einrasten: {pitchMatchLockCountdown}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div style={{ padding: '16px 0', textAlign: 'center', color: '#64748b', fontSize: '0.78rem' }}>
-                      <Activity size={24} strokeWidth={2.0} color="#8b5cf6" style={{ marginBottom: '6px' }} />
-                      <p style={{ margin: 0, fontWeight: 750, color: '#0f172a' }}>
-                        {isPitchListening ? 'Höre zu... Singe jetzt den Zielton!' : 'Mikrofon starten & Zielton nachsingen'}
-                      </p>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '0.70rem', color: '#94a3b8' }}>
-                        Tipp: Du kannst den Ton in deiner bequemen Stimmlage singen (auch eine Oktave tiefer oder höher).
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <EarLabSingBackStage
+              currentPitchQuestion={currentPitchQuestion}
+              vdmLevel={vdmLevel}
+              uiLevel={uiLevel}
+              soundTimbre={soundTimbre}
+              onPitchMatched={() => advanceToNextStep(true)}
+              onSkipPitchQuestion={generateNewPitchQuestion}
+            />
           )}
         </div>
       )}

@@ -112,7 +112,7 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
               color: '#3730a3',
               padding: '2px 8px',
               borderRadius: '8px',
-              border: '1px solid #c7d2fe'
+              border: 'none'
             }}>
               {reps}× Wiederholen
             </span>
@@ -298,7 +298,7 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
         flexWrap: 'wrap',
         gap: '10px',
         background: '#faf5ff',
-        border: '1.5px solid #f3e8ff',
+        border: 'none',
         padding: '12px 16px',
         borderRadius: '16px'
       }}>
@@ -365,7 +365,7 @@ export const SongSectionCard: React.FC<SongSectionCardProps> = ({
             color: '#059669',
             fontWeight: 850,
             background: '#ecfdf5',
-            border: '1px solid #10b981',
+            border: 'none',
             padding: '3px 8px',
             borderRadius: '8px'
           }}>

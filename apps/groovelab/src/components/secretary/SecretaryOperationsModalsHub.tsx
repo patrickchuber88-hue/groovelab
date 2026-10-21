@@ -218,6 +218,7 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
               </div>
               <button
                 type="button"
+                data-testid="modal-close-btn"
                 aria-label="Logbuch schließen"
                 onClick={() => {
                   setShowLogbookModal(false);
@@ -227,15 +228,19 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
                   background: '#f1f5f9',
                   border: 'none',
                   color: '#475569',
-                  width: '36px',
-                  height: '36px',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
                   fontWeight: 'bold',
-                  fontSize: '1rem',
+                  fontSize: '1.05rem',
+                  flexShrink: 0,
+                  touchAction: 'manipulation',
                   transition: 'all 0.15s'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
@@ -528,21 +533,26 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
               </div>
               <button
                 type="button"
+                data-testid="modal-close-btn"
                 aria-label="Logbuch schließen"
                 onClick={() => setShowTrialLogModal(false)}
                 style={{
                   background: '#f1f5f9',
                   border: 'none',
                   color: '#64748b',
-                  fontSize: '1rem',
+                  fontSize: '1.05rem',
                   fontWeight: 900,
-                  width: '32px',
-                  height: '32px',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   borderRadius: '50%',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  touchAction: 'manipulation'
                 }}
               >
                 ✕
@@ -676,12 +686,30 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
               </h3>
               <button 
                 type="button"
+                data-testid="modal-close-btn"
                 aria-label="Dialog schließen"
                 onClick={() => {
                   setShowResetModal(false);
                   setResetConfirmText('');
                 }}
-                style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#742a2a', fontWeight: 'bold' }}
+                style={{
+                  border: 'none',
+                  background: 'rgba(197, 48, 48, 0.08)',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  borderRadius: '50%',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  color: '#742a2a',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  touchAction: 'manipulation'
+                }}
               >
                 ✕
               </button>
@@ -689,7 +717,7 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
 
             {/* Body */}
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ background: '#fff5f5', border: '1.5px solid #feb2b2', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+              <div style={{ background: '#fff5f5', border: 'none', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <ShieldAlert size={24} style={{ color: '#e53e3e', flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.8rem', color: '#742a2a', lineHeight: '1.45' }}>
                   <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.84rem' }}>Achtung: Dies ist eine destruktive Aktion!</strong>
@@ -823,22 +851,38 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
               </div>
               <button
                 type="button"
+                data-testid="modal-close-btn"
                 aria-label="Dialog schließen"
                 onClick={() => {
                   setShowBulkDeleteModal(false);
                   setBulkDeleteStep(1);
                   setBulkDeletePin('');
                 }}
-                style={{ background: 'rgba(255, 255, 255, 0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  touchAction: 'manipulation'
+                }}
               >
-                <X size={18} />
+                <X size={20} strokeWidth={2.3} />
               </button>
             </div>
 
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {bulkDeleteStep === 1 ? (
                 <>
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <div style={{ background: '#fef2f2', border: 'none', borderRadius: '16px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                     <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div style={{ fontSize: '0.84rem', color: '#991b1b', lineHeight: 1.5 }}>
                       Du bist dabei, <strong>{selectedStudentIds.length} Schüler</strong> gleichzeitig zu entfernen.
@@ -881,7 +925,7 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
                 </>
               ) : (
                 <>
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+                  <div style={{ background: '#fef2f2', border: 'none', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
                     <div style={{ fontWeight: 900, color: '#991b1b', fontSize: '0.95rem', marginBottom: '6px' }}>
                       Zweite Sicherheitsstufe: PIN-Bestätigung
                     </div>

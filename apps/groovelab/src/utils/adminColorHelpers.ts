@@ -19,10 +19,10 @@ export const getStationColor = (name: string | null | undefined, dbColor?: strin
   const matches = name.match(/\d+/g);
   if (!matches) return "#64748b";
   const num = parseInt(matches[matches.length - 1], 10);
-  if (num === 1 || num === 2) return "#eab308"; // Yellow
+  if (num === 1 || num === 2) return "#facc15"; // Yellow
   if (num === 3 || num === 4) return "#a855f7"; // Purple
   if (num === 5 || num === 6) return "#3b82f6"; // Blue
-  if (num === 7 || num === 8) return "#eab308"; // Yellow
+  if (num === 7 || num === 8) return "#facc15"; // Yellow
   return "#64748b";
 };
 

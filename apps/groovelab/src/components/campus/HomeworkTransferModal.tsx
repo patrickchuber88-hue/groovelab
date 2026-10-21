@@ -318,7 +318,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                   background: '#dcfce7',
                   padding: '2px 8px',
                   borderRadius: '100px',
-                  border: '1px solid #bbf7d0'
+                  border: 'none'
                 }}>
                   Ziel: Diese Woche (KW {targetWeekNum})
                 </span>
@@ -384,7 +384,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                   borderRadius: '100px',
                   background: '#fefce8',
                   color: '#713f12',
-                  border: '1.2px solid #eab308',
+                  border: 'none',
                   boxShadow: 'none',
                   fontSize: '0.74rem',
                   fontWeight: 850,
@@ -556,7 +556,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                       padding: '3px 8px',
                                       borderRadius: '100px',
                                       border: isPReactivate 
-                                        ? '1.2px solid #eab308' 
+                                        ? '1.2px solid #ca8a04' 
                                         : isPMaster 
                                           ? 'none' 
                                           : '1px solid #cbd5e1',
@@ -576,7 +576,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                       gap: '4px',
                                       transition: 'all 0.15s ease',
                                       boxShadow: isPReactivate 
-                                        ? '0 1px 3px rgba(234, 179, 8, 0.25)' 
+                                        ? '0 1px 3px rgba(250, 204, 21, 0.25)' 
                                         : isPMaster 
                                           ? '0 1px 4px rgba(16, 185, 129, 0.25)' 
                                           : 'none'
@@ -611,7 +611,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                                       background: '#fefce8',
                                       padding: '2px 7px',
                                       borderRadius: '100px',
-                                      border: '1px solid #fef08a'
+                                      border: 'none'
                                     }}>
                                       {reactivatedCount} von {item.pages.length} übernehmen
                                     </span>
@@ -673,12 +673,12 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                             alignItems: 'center',
                             gap: '4px',
                             transition: 'all 0.15s ease',
-                            background: currentDecision === 'reactivate' ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : 'transparent',
-                            color: currentDecision === 'reactivate' ? '#713f12' : '#64748b',
-                            boxShadow: currentDecision === 'reactivate' ? '0 2px 6px rgba(234, 179, 8, 0.35)' : 'none'
+                            background: currentDecision === 'reactivate' ? '#facc15' : 'transparent',
+                            color: currentDecision === 'reactivate' ? '#0f172a' : '#64748b',
+                            boxShadow: 'none'
                           }}
                         >
-                          <RotateCw size={11} strokeWidth={2.6} color={currentDecision === 'reactivate' ? '#713f12' : 'currentColor'} />
+                          <RotateCw size={11} strokeWidth={2.6} color={currentDecision === 'reactivate' ? '#0f172a' : 'currentColor'} />
                           <span>Reaktivieren</span>
                         </button>
 
@@ -833,12 +833,12 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                             alignItems: 'center',
                             gap: '4px',
                             transition: 'all 0.15s ease',
-                            background: currentDecision === 'reactivate' ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : 'transparent',
-                            color: currentDecision === 'reactivate' ? '#713f12' : '#64748b',
-                            boxShadow: currentDecision === 'reactivate' ? '0 2px 6px rgba(234, 179, 8, 0.35)' : 'none'
+                            background: currentDecision === 'reactivate' ? '#facc15' : 'transparent',
+                            color: currentDecision === 'reactivate' ? '#0f172a' : '#64748b',
+                            boxShadow: 'none'
                           }}
                         >
-                          <RotateCw size={11} strokeWidth={2.6} color={currentDecision === 'reactivate' ? '#713f12' : 'currentColor'} />
+                          <RotateCw size={11} strokeWidth={2.6} color={currentDecision === 'reactivate' ? '#0f172a' : 'currentColor'} />
                           <span>Reaktivieren</span>
                         </button>
 
@@ -916,7 +916,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                           height: '30px',
                           borderRadius: '50%',
                           background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
+                          border: 'none',
                           color: '#16a34a',
                           display: 'flex',
                           alignItems: 'center',
@@ -1019,7 +1019,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
               background: '#fefce8',
               padding: '3px 8px',
               borderRadius: '100px',
-              border: '1.2px solid #eab308',
+              border: 'none',
               boxShadow: 'none'
             }}>
               {reactivateCount} zum Übertragen
@@ -1032,7 +1032,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
                 background: '#dcfce7',
                 padding: '3px 8px',
                 borderRadius: '100px',
-                border: '1px solid #bbf7d0'
+                border: 'none'
               }}>
                 {masterCount} Meistern
               </span>

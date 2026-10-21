@@ -7,7 +7,8 @@ import {
   resolveCampusStudentAvatar, 
   resolveGrooveLabTeacherAvatar,
   getEffectiveInstrument, 
-  isGenericInstrument 
+  isGenericInstrument,
+  isInstrumentAvatar 
 } from "../StudioAvatar";
 export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar };
 
@@ -62,7 +63,7 @@ export const AvatarImage = React.memo(({
   }, [user]);
 
   const displaySrc = useMemo(() => {
-    const activePlat = activePlatform || (typeof window !== "undefined" ? localStorage.getItem("groovelab_active_platform") : "groovelab");
+    const activePlat = activePlatform || (typeof window !== "undefined" ? (localStorage.getItem("groovelab_active_platform") || "campus") : "campus");
     const targetUser = user;
     
     const r = (targetUser?.role || "").toLowerCase();
@@ -92,7 +93,7 @@ export const AvatarImage = React.memo(({
     if (activePlat === "campus") {
       // 🏛️ Campus Module SSOT Invariant:
       // 1. Ghost avatar (/avatar_ghost.jpg) belongs EXCLUSIVELY to GrooveLab and is strictly forbidden in Campus.
-      // 2. Musician avatars (student_*, teen_*, bandstyle_*) are strictly forbidden in Campus.
+      // 2. Musician avatars (student_*, teen_*, bandstyle_*, teacher_*, avatar_teacher*) are strictly forbidden in Campus.
       // 3. Admin / Secretary in Campus receive /campus_login_hero.png.
       // 4. All students and teachers in Campus MUST receive their 3D instrument avatar.
       if (targetUser) {
@@ -103,11 +104,8 @@ export const AvatarImage = React.memo(({
           resolved_instrument: resolvedInstrument || targetUser.resolved_instrument || targetUser.instrument 
         });
       }
-      if (src && !src.includes('avatar_ghost') && !src.includes('campus_login_hero')) {
-        const isMusicianPic = src.includes('student_') || src.includes('bandstyle_') || src.includes('teen_') || src.includes('avatar_boy') || src.includes('avatar_girl');
-        if (!isMusicianPic && (src.includes('_avatar') || src.includes('instrument_avatar') || src.startsWith('data:') || src.startsWith('blob:'))) {
-          return src;
-        }
+      if (src && isInstrumentAvatar(src)) {
+        return src;
       }
       return "/avatars/gitarre_avatar_new.png";
     } else {

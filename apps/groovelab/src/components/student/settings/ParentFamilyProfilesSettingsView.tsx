@@ -469,7 +469,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                         borderRadius: '10px',
                         background: '#fef2f2',
                         color: '#b91c1c',
-                        border: '1.5px solid #fecaca',
+                        border: 'none',
                         fontSize: '0.74rem',
                         fontWeight: 800,
                         cursor: 'pointer',
@@ -499,7 +499,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
                     padding: '8px 14px',
                     borderRadius: '12px',
                     background: '#fef2f2',
-                    border: '1.5px solid #fecaca',
+                    border: 'none',
                     color: '#b91c1c',
                     fontSize: '0.76rem',
                     fontWeight: 850,
@@ -541,7 +541,7 @@ export const ParentFamilyProfilesSettingsView: React.FC<ParentFamilyProfilesSett
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #fecaca'
+              border: 'none'
             }}>
               <Trash2 size={18} aria-hidden="true" />
             </div>

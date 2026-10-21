@@ -1065,7 +1065,7 @@ export const SongArchitectureWizardModal: React.FC<SongArchitectureWizardModalPr
                               onClick={() => handleDeleteSection(sec.id)}
                               style={{
                                 background: '#fef2f2',
-                                border: '1px solid #fecaca',
+                                border: 'none',
                                 color: '#ef4444',
                                 padding: '2px 6px',
                                 borderRadius: '6px',

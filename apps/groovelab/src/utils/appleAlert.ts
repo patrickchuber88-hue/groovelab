@@ -91,11 +91,11 @@ export function initAppleAlert(): void {
         </div>
       `;
     } else {
-      btnBackground = 'linear-gradient(135deg, #eab308, #ca8a04)';
-      btnShadow = '0 4px 12px rgba(234, 179, 8, 0.2)';
+      btnBackground = '#facc15';
+      btnShadow = 'none';
       iconHtml = `
-        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(234, 179, 8, 0.08); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: 1px solid rgba(234, 179, 8, 0.15);">
-          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: #fef9c3; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; border: none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#854d0e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
         </div>
       `;
     }

@@ -745,7 +745,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                     type="checkbox"
                     checked={hasGroovelab}
                     onChange={(e) => setHasGroovelab(e.target.checked)}
-                    style={{ accentColor: '#eab308', width: '20px', height: '20px' }}
+                    style={{ accentColor: '#facc15', width: '20px', height: '20px' }}
                   />
                 </label>
               </div>
@@ -1287,7 +1287,7 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
           bottom: '80px',
           right: '120px',
           background: '#fef2f2',
-          border: '1px solid #fca5a5',
+          border: 'none',
           borderRadius: '12px',
           padding: '10px 18px',
           color: '#dc2626',

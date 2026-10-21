@@ -40,7 +40,7 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
   handleDeleteStation,
   onUpdateStationColor,
   supabase,
-  brandColor = '#eab308'
+  brandColor = '#facc15'
 }) => {
   const [editingColorStation, setEditingColorStation] = useState<any | null>(null);
 

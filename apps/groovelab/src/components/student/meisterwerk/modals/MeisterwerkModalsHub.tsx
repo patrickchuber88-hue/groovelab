@@ -333,7 +333,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                 <div
                   style={{
                     background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
-                    border: '1.5px solid #bfdbfe',
+                    border: 'none',
                     borderRadius: '16px',
                     padding: '16px',
                     display: 'flex',
@@ -846,7 +846,7 @@ export const MeisterwerkModalsHub: React.FC<MeisterwerkModalsHubProps> = ({
                     gap: '12px'
                   }}
                 >
-                  <Star size={24} color="#eab308" />
+                  <Star size={24} color="#ca8a04" fill="#facc15" />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#854d0e' }}>
                       Dein persönliches Sticker-Sammelalbum

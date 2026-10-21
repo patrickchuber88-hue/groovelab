@@ -66,7 +66,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
         borderRadius: '24px',
         padding: '24px',
-        border: '1.5px solid #10b981',
+        border: 'none',
         boxShadow: 'none',
         textAlign: 'left',
         position: 'relative',
@@ -263,7 +263,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         {audioPurgeError && (
           <div style={{
             background: '#fef2f2',
-            border: '1px solid #fecaca',
+            border: 'none',
             color: '#991b1b',
             padding: '12px 16px',
             borderRadius: '14px',
@@ -300,7 +300,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         {deletionError && (
           <div style={{
             background: '#fef2f2',
-            border: '1px solid #fecaca',
+            border: 'none',
             color: '#991b1b',
             padding: '12px 16px',
             borderRadius: '14px',

@@ -577,7 +577,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                         fontWeight: 800,
                         color: '#15803d',
                         background: '#dcfce7',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         padding: '2px 8px',
                         borderRadius: '100px',
                         display: 'inline-flex',
@@ -594,7 +594,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                         fontWeight: 800,
                         color: '#0369a1',
                         background: '#f0f9ff',
-                        border: '1px solid #e0f2fe',
+                        border: 'none',
                         padding: '3px 9px',
                         borderRadius: '100px'
                       }}>
@@ -610,7 +610,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                   {studentQuestion && (
                     <div style={{
                       background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                      border: '1.5px solid #fde68a',
+                      border: 'none',
                       borderRadius: '12px',
                       padding: '10px 12px',
                       display: 'flex',
@@ -820,7 +820,7 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
               className="hover-scale"
             >
               <span>Detail-Analyse & Superkräfte anzeigen</span>
-              <ChevronDown size={14} color="#22c55e" />
+              <ChevronDown size={14} color="#34a853" />
             </button>
           )}
         </div>

@@ -94,7 +94,7 @@ export const TeacherMakeupRadarWidget: React.FC<TeacherMakeupRadarWidgetProps> =
             borderRadius: '100px',
             background: '#eff6ff',
             color: '#1d4ed8',
-            border: '1px solid #bfdbfe',
+            border: 'none',
             fontFamily: 'Inter'
           }}>
             {tokens.length} {tokens.length === 1 ? 'Kontingent' : 'Kontingente'} • {totalOpenMinutes} Min. offen

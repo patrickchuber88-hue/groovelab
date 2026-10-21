@@ -9,7 +9,7 @@ interface TeacherDetailModalProps {
 }
 
 export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher, onClose }) => {
-  const brandColor: string = 'var(--primary-color, #eab308)'; // GrooveLab Gold / Dynamic Theme Accent
+  const brandColor: string = 'var(--primary-color, #facc15)'; // GrooveLab Gold / Dynamic Theme Accent
 
   const ADMIN_INSTRUMENT_ICONS: Record<string, any> = { 
     "Gitarre": renderInstrumentIcon("Gitarre"), 
@@ -208,7 +208,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
             <div style={{ display: 'inline-block', marginBottom: '20px' }}>
               <span style={{ 
                 background: brandColor, 
-                color: brandColor === '#eab308' || brandColor.includes('yellow') ? '#1e293b' : '#ffffff',
+                color: brandColor === '#facc15' || brandColor.includes('yellow') ? '#0f172a' : '#ffffff',
                 fontWeight: 800, 
                 textTransform: 'uppercase', 
                 letterSpacing: '0.08em',

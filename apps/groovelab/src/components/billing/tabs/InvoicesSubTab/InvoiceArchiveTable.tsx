@@ -144,22 +144,22 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                 {isPreview ? invoice.id : (invoice.amount < 0 ? String(invoice.id).replace('INV-', 'GS-') : (invoice.invoice_number || String(invoice.id).replace('INV-', 'RE-')))}
               </span>
               {isPreview && (
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd', letterSpacing: '0.03em' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: '4px', border: 'none', letterSpacing: '0.03em' }}>
                   Vorschau
                 </span>
               )}
               {(invoice.status === 'issued' || invoice.status === 'Versendet' || invoice.status === 'dispatched' || invoice.status === 'delivered') && (
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd', letterSpacing: '0.03em' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '2px 7px', borderRadius: '4px', border: 'none', letterSpacing: '0.03em' }}>
                   {invoice.status === 'delivered' ? 'Zugestellt' : 'Versendet'}
                 </span>
               )}
               {(invoice.status === 'paid' || invoice.status === 'Bezahlt') && (
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bbf7d0', letterSpacing: '0.03em' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', padding: '2px 7px', borderRadius: '4px', border: 'none', letterSpacing: '0.03em' }}>
                   Bezahlt
                 </span>
               )}
               {(invoice.status === 'open' || invoice.status === 'overdue') && !isPreview && (
-                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', padding: '2px 7px', borderRadius: '4px', border: '1px solid #fecaca', letterSpacing: '0.03em' }}>
+                <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', padding: '2px 7px', borderRadius: '4px', border: 'none', letterSpacing: '0.03em' }}>
                   {invoice.status === 'overdue' ? 'Überfällig' : 'Offen'}
                 </span>
               )}
@@ -298,7 +298,7 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                 }}
                 style={{
                   background: 'rgba(239, 68, 68, 0.08)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  border: 'none',
                   borderRadius: '8px',
                   padding: '5px 8px',
                   fontSize: '0.72rem',
@@ -411,7 +411,7 @@ export const InvoiceArchiveTable: React.FC<InvoiceArchiveTableProps> = ({
                 background: '#f0f9ff',
                 padding: '12px 14px',
                 borderRadius: '14px',
-                border: '1px solid #bae6fd',
+                border: 'none',
                 marginBottom: '4px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#0369a1', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>

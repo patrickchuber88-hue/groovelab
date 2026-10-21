@@ -101,7 +101,7 @@ export const ParentDevelopmentGridSettingsView: React.FC<ParentDevelopmentGridSe
               fontWeight: 850,
               color: '#92400e',
               background: '#fef3c7',
-              border: '1px solid #fde68a',
+              border: 'none',
               padding: '4px 12px',
               borderRadius: '100px',
               display: 'inline-flex',
@@ -168,7 +168,7 @@ export const ParentDevelopmentGridSettingsView: React.FC<ParentDevelopmentGridSe
               Aktueller didaktischer Stand für {firstName}
             </div>
           </div>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bae6fd' }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
             5 Didaktische Säulen
           </span>
         </div>
@@ -231,7 +231,7 @@ export const ParentDevelopmentGridSettingsView: React.FC<ParentDevelopmentGridSe
                     <span>{tag.label}</span>
                   </span>
                   {isFocus ? (
-                    <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '100px', border: '1px solid #fde68a' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: '100px', border: 'none' }}>
                       🎯 Wochenfokus
                     </span>
                   ) : (

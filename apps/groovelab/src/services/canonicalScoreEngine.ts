@@ -19,7 +19,7 @@ import {
   MicroScoreDuration,
   MicroScoreInstrumentProjection
 } from '../components/student/meisterwerk/microscore/microScore.types';
-import { pitchToBestFretAndString } from '../components/student/meisterwerk/microscore/guitarFretboardEngine';
+import { pitchToBestFretAndString, fretAndStringToPitch } from '../components/student/meisterwerk/microscore/guitarFretboardEngine';
 
 // Noten-Namen für chromatische Transposition
 const CHROMATIC_SCALE_SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -123,6 +123,66 @@ export const GUITAR_OPEN_CHORDS: Record<string, GuitarChordVoicing> = {
     pitches: ['A3', 'E4', 'A4', 'C#5', 'E5'],
     frets: [0, 2, 2, 2, 0],
     strings: [4, 3, 2, 1, 0]
+  },
+  'Dm9': {
+    pitches: ['D4', 'A4', 'C5', 'E5'],
+    frets: [0, 2, 1, 0],
+    strings: [3, 2, 1, 0]
+  },
+  'G13': {
+    pitches: ['G3', 'F4', 'B4', 'E5'],
+    frets: [3, 3, 0, 0],
+    strings: [5, 3, 1, 0]
+  },
+  'Am7': {
+    pitches: ['A3', 'E4', 'G4', 'C5', 'E5'],
+    frets: [0, 2, 0, 1, 0],
+    strings: [4, 3, 2, 1, 0]
+  },
+  'Em7': {
+    pitches: ['E3', 'B3', 'D4', 'G4', 'B4', 'E5'],
+    frets: [0, 2, 0, 0, 0, 0],
+    strings: [5, 4, 3, 2, 1, 0]
+  },
+  'Fmaj7': {
+    pitches: ['F4', 'A4', 'C5', 'E5'],
+    frets: [3, 2, 1, 0],
+    strings: [3, 2, 1, 0]
+  },
+  'A7': {
+    pitches: ['A3', 'E4', 'G4', 'C#5', 'E5'],
+    frets: [0, 2, 0, 2, 0],
+    strings: [4, 3, 2, 1, 0]
+  },
+  'D7': {
+    pitches: ['D4', 'A4', 'C5', 'F#5'],
+    frets: [0, 2, 1, 2],
+    strings: [3, 2, 1, 0]
+  },
+  'E7': {
+    pitches: ['E3', 'B3', 'D4', 'G#4', 'B4', 'E5'],
+    frets: [0, 2, 0, 1, 0, 0],
+    strings: [5, 4, 3, 2, 1, 0]
+  },
+  'B7': {
+    pitches: ['B3', 'D#4', 'A4', 'B4', 'F#5'],
+    frets: [2, 1, 2, 0, 2],
+    strings: [4, 3, 2, 1, 0]
+  },
+  'Cadd9': {
+    pitches: ['C4', 'E4', 'G4', 'D5', 'E5'],
+    frets: [3, 2, 0, 3, 0],
+    strings: [4, 3, 2, 1, 0]
+  },
+  'Dsus4': {
+    pitches: ['D4', 'A4', 'D5', 'G5'],
+    frets: [0, 2, 3, 3],
+    strings: [3, 2, 1, 0]
+  },
+  'Asus4': {
+    pitches: ['A3', 'E4', 'A4', 'D5', 'E5'],
+    frets: [0, 2, 2, 3, 0],
+    strings: [4, 3, 2, 1, 0]
   }
 };
 
@@ -219,6 +279,8 @@ export function normalizeInstrumentToKey(raw?: string | null): MicroScoreInstrum
   if (!raw) return 'piano';
   const l = raw.toLowerCase().trim();
   if (l === 'universal' || l === 'all' || l === 'universell') return 'universal';
+  if (l.includes('vocal') || l.includes('gesang') || l.includes('stimme') || l.includes('voice')) return 'vocals';
+  if (l.includes('ukulele') || l.includes('uke')) return 'ukulele';
   if (l.includes('gitarre') || l.includes('guitar')) return 'guitar';
   if (l.includes('e-bass') || l.includes('bass') || l.includes('kontrabass')) return 'bass';
   if (l.includes('klavier') || l.includes('piano') || l.includes('keyboard') || l.includes('tasten')) return 'piano';
@@ -243,6 +305,81 @@ export function getPitchMidi(pitch: string): number {
   const semitone = NOTE_TO_SEMITONE[match[1]] ?? 0;
   const octave = parseInt(match[2], 10);
   return (octave + 1) * 12 + semitone;
+}
+
+/**
+ * 🏛️ 0,1% Goldstandard Ambitus-Engine:
+ * Hält Melodien zusammenhängend (ohne Oktav-Knick) im physikalischen und didaktischen
+ * Wohlfühl-Tonumfang (Sweet-Spot) des jeweiligen Zielinstruments.
+ */
+export function clampNotesToInstrumentAmbitus(
+  notes: MicroScoreNote[],
+  minSweetMidi: number,
+  maxSweetMidi: number,
+  hardFloorMidi: number = minSweetMidi,
+  preferFlats: boolean = false
+): MicroScoreNote[] {
+  const pitchedMidis = notes
+    .filter(n => n.pitch && n.pitch !== 'REST')
+    .map(n => getPitchMidi(n.pitch));
+
+  if (pitchedMidis.length === 0) return notes;
+
+  const minMidi = Math.min(...pitchedMidis);
+  const maxMidi = Math.max(...pitchedMidis);
+
+  // 1. Globale Oktav-Verschiebung (k * 12) zur 100%igen Wahrung der melodischen Kontur & Intervalle
+  let globalOctaveShift = 0;
+  if (minMidi < hardFloorMidi) {
+    const octavesUp = Math.ceil((hardFloorMidi - minMidi) / 12);
+    globalOctaveShift = octavesUp * 12;
+  } else if (minMidi < minSweetMidi && maxMidi + 12 <= maxSweetMidi + 4) {
+    globalOctaveShift = 12;
+  } else if (maxMidi > maxSweetMidi + 2) {
+    const octavesDown = Math.floor((maxMidi - maxSweetMidi) / 12);
+    if (octavesDown > 0 && minMidi - octavesDown * 12 >= hardFloorMidi) {
+      globalOctaveShift = -octavesDown * 12;
+    } else if (minMidi - 12 >= hardFloorMidi) {
+      globalOctaveShift = -12;
+    }
+  }
+
+  // 2. Einzelnoten-Sicherung falls das Ausgangsmotiv den gesamten Ambitus des Instruments übersteigt
+  return notes.map(n => {
+    if (!n.pitch || n.pitch === 'REST') return n;
+    let shiftedPitch = globalOctaveShift !== 0
+      ? transposePitch(n.pitch, globalOctaveShift, preferFlats)
+      : n.pitch;
+    let midi = getPitchMidi(shiftedPitch);
+
+    while (midi > 0 && midi < hardFloorMidi) {
+      shiftedPitch = transposePitch(shiftedPitch, 12, preferFlats);
+      midi = getPitchMidi(shiftedPitch);
+    }
+    while (midi > maxSweetMidi + 4 && midi - 12 >= hardFloorMidi) {
+      shiftedPitch = transposePitch(shiftedPitch, -12, preferFlats);
+      midi = getPitchMidi(shiftedPitch);
+    }
+
+    return shiftedPitch === n.pitch ? n : { ...n, pitch: shiftedPitch };
+  });
+}
+
+/**
+ * Reduziert simultane Blockakkorde für monophone Instrumente (Bläser) auf die oberste Melodiestimme
+ */
+function collapsePolyphonyForMonophonicInstrument(notes: MicroScoreNote[]): MicroScoreNote[] {
+  const bySlot = new Map<string, MicroScoreNote>();
+  notes.forEach(n => {
+    const key = `${n.barIndex}-${n.beatFraction}`;
+    const existing = bySlot.get(key);
+    if (!existing) {
+      bySlot.set(key, n);
+    } else if (n.pitch !== 'REST' && (existing.pitch === 'REST' || getPitchMidi(n.pitch) >= getPitchMidi(existing.pitch))) {
+      bySlot.set(key, n);
+    }
+  });
+  return Array.from(bySlot.values());
 }
 
 /**
@@ -321,13 +458,13 @@ export function buildDrumWaltzGroove(barsCount: number = 2): MicroScoreNote[] {
 export function buildDrumGrooveForChord(barIndex: number, isFirstBar: boolean = false): MicroScoreNote[] {
   const notes: MicroScoreNote[] = [];
 
-  // Crash auf Beat 1 des ersten Taktes
+  // Crash auf Beat 1 des ersten Taktes (8tel-Dauer für saubere PAS-Balkung mit Offbeat-Hi-Hat auf 1+)
   if (isFirstBar) {
     notes.push({
       id: `drum-${barIndex}-crash-0`,
       barIndex,
       beatFraction: 0,
-      duration: '4',
+      duration: '8',
       pitch: 'A5'
     });
   }
@@ -381,8 +518,332 @@ export function buildDrumGrooveForChord(barIndex: number, isFirstBar: boolean = 
 }
 
 /**
+ * 🥁 0,1% Goldstandard 5-Archetypen Drum-Orchestration Engine:
+ * Adaptiert JEDEN beliebigen Notenschnipsel (EMP, Tonleiter, Akkord, Technik, Rhythmus, BandPack)
+ * in ein didaktisch und musikalisch authentisches PAS-Schlagzeug-Arrangement (Stimme 1: Hände ↑, Stimme 2: Füße ↓).
+ */
+export function buildCanonicalDrumAdaptation(snippet: MicroScoreSnippet): {
+  notes: MicroScoreNote[];
+  description: string;
+} {
+  // 🛡️ Strict Blank-Canvas Axiom: Ein leerer Schnipsel ("Notenschnipsel erstellen") bleibt zu 100% leer!
+  const hasSourceNotes = Array.isArray(snippet.notes) && snippet.notes.length > 0;
+  const hasSourceChords = Array.isArray(snippet.chords) && snippet.chords.length > 0;
+  if (!hasSourceNotes && !hasSourceChords) {
+    return {
+      notes: [],
+      description: ''
+    };
+  }
+
+  const barsCount = Math.max(1, snippet.barsCount || 2);
+  const cat = (snippet.category || '').trim();
+  const folder = (snippet.vdmFolder || '').toLowerCase();
+  const titleLower = (snippet.title || '').toLowerCase();
+
+  // 1. Walzer / 3/4-Takt -> Kanonischer PAS Walzer-Groove (Kick auf 1, Snare + Hi-Hat auf 2 & 3)
+  if (snippet.timeSignature === '3/4') {
+    return {
+      notes: buildDrumWaltzGroove(barsCount),
+      description: 'PAS 3/4 Walzer-Groove: Bass Drum (F4) auf Zählzeit 1, Snare (C5) & Hi-Hat (G5) als Nachschlag auf 2 und 3.'
+    };
+  }
+
+  // 2. 6/8-Takt -> Kanonischer 6/8 Halftime-Ballad-Groove (Hi-Hat auf den 6 Achteln, Kick auf 1, Snare auf 4)
+  if (snippet.timeSignature === '6/8') {
+    const notes: MicroScoreNote[] = [];
+    for (let b = 0; b < barsCount; b++) {
+      [0, 2, 4, 6, 8, 10].forEach(frac => {
+        notes.push({
+          id: `d68_${b}_hh_${frac}`,
+          barIndex: b,
+          beatFraction: frac,
+          duration: '8',
+          pitch: b === 0 && frac === 0 ? 'A5' : 'G5'
+        });
+      });
+      notes.push({ id: `d68_${b}_bd_0`, barIndex: b, beatFraction: 0, duration: '4', isDotted: true, pitch: 'F4' });
+      notes.push({ id: `d68_${b}_sd_6`, barIndex: b, beatFraction: 6, duration: '4', isDotted: true, pitch: 'C5' });
+    }
+    return {
+      notes,
+      description: 'PAS 6/8 Balladen-Groove: Wiegender Achtel-Puls auf der Hi-Hat (G5), Bass Drum (F4) auf 1 und Snare-Backbeat (C5) auf 4.'
+    };
+  }
+
+  // Sammle monophone Melodienoten (oberste Stimme pro Zeitschlitz) und MIDI-Ambitus
+  const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes || []);
+  const pitchedNotes = monophonic.filter(n => n.pitch && n.pitch !== 'REST');
+  const midis = pitchedNotes.map(n => getPitchMidi(n.pitch)).filter(m => m >= 0);
+  const minMidi = midis.length > 0 ? Math.min(...midis) : 60;
+  const maxMidi = midis.length > 0 ? Math.max(...midis) : 72;
+  const midiSpan = Math.max(1, maxMidi - minMidi);
+
+  // ARCHETYP A: FRÜHERZIEHUNG (EMP) & VOKAL / INTERVALL-DIALOG (z. B. Kuckucksruf, Echo, Dreiton-Ruf, Elefant & Maus)
+  if (cat === 'Früherziehung' || cat === 'Vokal' || folder.startsWith('emp-') || folder.startsWith('vokal-') || titleLower.includes('kuckuck')) {
+    const notes: MicroScoreNote[] = [];
+    const uniqueMidis = Array.from(new Set(midis)).sort((a, b) => a - b);
+
+    monophonic.forEach((n, idx) => {
+      if (!n.pitch || n.pitch === 'REST') {
+        notes.push({ ...n });
+        return;
+      }
+      const m = getPitchMidi(n.pitch);
+      let drumPitch = 'C5'; // Default Snare
+
+      if (uniqueMidis.length === 1) {
+        // Reine Sprachrhythmus- oder Ein-Ton-Übung -> Abwechslungsreicher Snare / Kick Dialog
+        drumPitch = (n.beatFraction === 0 || n.beatFraction === 8) ? 'C5' : 'E5';
+      } else if (uniqueMidis.length === 2) {
+        // Zweiton-Ruf (z. B. Kuckucksruf G4 - E4, Elefant & Maus):
+        // Höherer Ton -> Snare Drum (C5, klarer heller Ruf), Tieferer Ton -> Floor Tom (A4, warmer tiefer Ruf)
+        drumPitch = m === uniqueMidis[uniqueMidis.length - 1] ? 'C5' : 'A4';
+      } else if (uniqueMidis.length === 3) {
+        // Dreiton-Ruf (z. B. Backe backe Kuchen Mi-Sol-La): Floor Tom (A4), Snare (C5), High Tom (E5)
+        const rank = uniqueMidis.indexOf(m);
+        drumPitch = rank === 0 ? 'A4' : rank === 1 ? 'C5' : 'E5';
+      } else {
+        // Fünftonraum / Pentatonik: Konturgetreue Verteilung über Floor Tom -> Mid Tom -> High Tom -> Snare -> Hi-Hat
+        const normPos = (m - minMidi) / midiSpan;
+        if (normPos <= 0.20) drumPitch = 'A4';      // Floor Tom
+        else if (normPos <= 0.45) drumPitch = 'C5'; // Snare Drum
+        else if (normPos <= 0.70) drumPitch = 'D5'; // Mid Tom
+        else if (normPos <= 0.90) drumPitch = 'E5'; // High Tom
+        else drumPitch = 'G5';                      // Hi-Hat
+      }
+
+      notes.push({
+        ...n,
+        id: `emp_h_${idx}`,
+        pitch: drumPitch,
+        fret: undefined,
+        stringIndex: undefined
+      });
+
+      // Sanfter Fuß-Erdungspuls (Bass Drum F4) auf Zählzeit 1 jedes Taktes, damit Stimme 2 (Füße ↓) verankert ist
+      if (n.beatFraction === 0) {
+        const footDur: MicroScoreDuration = (n.duration === '1' || n.duration === '2') ? n.duration : '4';
+        notes.push({
+          id: `emp_f_${n.barIndex}_0`,
+          barIndex: n.barIndex,
+          beatFraction: 0,
+          duration: footDur,
+          pitch: 'F4'
+        });
+      }
+    });
+
+    return {
+      notes,
+      description: 'PAS Klangfarben-Dialog (Hoch / Tief): Hohe Ruftöne auf Snare & High-Tom (C5/E5), tiefe Antworttöne auf der Standtom (A4) mit Bass-Drum-Puls (F4) auf Schlag 1.'
+    };
+  }
+
+  // ARCHETYP B: TONLEITERN & PENTATONIK -> Around-the-Kit Tom-Run mit Fuß-Ostinato (Kick & Hi-Hat Foot)
+  if (cat === 'Tonleitern' || folder === 'dur' || folder === 'moll' || folder === 'pentatonik' || folder === 'modal' || folder === 'fuenfton') {
+    const notes: MicroScoreNote[] = [];
+    // Kanonische Kessel-Reihenfolge von tief nach hoch und zurück: Floor Tom (A4), Snare (C5), Mid Tom (D5), High Tom (E5), Ride/Crash (F5/A5)
+    const kitVoiceLadder = ['A4', 'C5', 'D5', 'E5', 'F5'];
+
+    monophonic.forEach((n, idx) => {
+      if (!n.pitch || n.pitch === 'REST') {
+        notes.push({ ...n });
+        return;
+      }
+      const m = getPitchMidi(n.pitch);
+      const normPos = (m - minMidi) / midiSpan;
+      const ladderIdx = Math.min(kitVoiceLadder.length - 1, Math.max(0, Math.floor(normPos * kitVoiceLadder.length)));
+      const isFinalNote = n.barIndex === barsCount - 1 && n.beatFraction >= 8 && n.duration !== '8' && n.duration !== '16';
+      const drumPitch = isFinalNote ? 'A5' : kitVoiceLadder[ladderIdx];
+
+      notes.push({
+        ...n,
+        id: `scale_h_${idx}`,
+        pitch: drumPitch,
+        fret: undefined,
+        stringIndex: undefined
+      });
+    });
+
+    // Polyphoner Fuß-Puls unter dem Tom-Lauf: Bass Drum (F4) auf 1 & 3, Pedal Hi-Hat (D3) auf 2 & 4
+    for (let b = 0; b < barsCount; b++) {
+      notes.push({ id: `scale_bd_${b}_0`, barIndex: b, beatFraction: 0, duration: '4', pitch: 'F4' });
+      notes.push({ id: `scale_hhf_${b}_4`, barIndex: b, beatFraction: 4, duration: '4', pitch: 'D3' });
+      notes.push({ id: `scale_bd_${b}_8`, barIndex: b, beatFraction: 8, duration: '4', pitch: 'F4' });
+      if (b < barsCount - 1) {
+        notes.push({ id: `scale_hhf_${b}_12`, barIndex: b, beatFraction: 12, duration: '4', pitch: 'D3' });
+      }
+    }
+
+    return {
+      notes,
+      description: 'PAS Around-the-Kit Tom-Workout: Konturgetreuer Kessel-Lauf über Standtom (A4), Snare (C5), Mid-Tom (D5) und High-Tom (E5) über konstantem Fuß-Ostinato (Kick F4 & Pedal-Hi-Hat D3).'
+    };
+  }
+
+  // ARCHETYP C: AKKORDE, KADENZEN, ZUPFINSTRUMENTE & BAND-PACKS -> Stilistischer PAS Band-Groove
+  const isChordOrBand =
+    cat === 'Akkorde' ||
+    cat === 'Zupfinstrumente' ||
+    cat === 'BandPacks' ||
+    folder.includes('kadenzen') ||
+    folder.includes('dreiklaenge') ||
+    folder.includes('akkord') ||
+    folder.includes('alberti');
+
+  if (isChordOrBand) {
+    // Spezialfall Jazz-Kadenz (II-V-I) oder Walking Bass -> Jazz Ride-Pattern mit Hi-Hat auf 2 & 4
+    if (folder.includes('jazz') || titleLower.includes('jazz') || titleLower.includes('walking')) {
+      const notes: MicroScoreNote[] = [];
+      for (let b = 0; b < barsCount; b++) {
+        [0, 4, 6, 8, 12, 14].forEach(frac => {
+          notes.push({
+            id: `jazz_${b}_ride_${frac}`,
+            barIndex: b,
+            beatFraction: frac,
+            duration: (frac === 0 || frac === 8) ? '4' : '8',
+            pitch: 'F5' // Ride Cymbal
+          });
+        });
+        notes.push({ id: `jazz_${b}_bd_0`, barIndex: b, beatFraction: 0, duration: '4', pitch: 'F4' });
+        notes.push({ id: `jazz_${b}_hhf_4`, barIndex: b, beatFraction: 4, duration: '4', pitch: 'D3' });
+        notes.push({ id: `jazz_${b}_hhf_12`, barIndex: b, beatFraction: 12, duration: '4', pitch: 'D3' });
+      }
+      return {
+        notes,
+        description: 'PAS Jazz-Swing Ride-Pattern: Ride-Becken (F5) mit klassischer Swing-Figur und getretener Hi-Hat (D3) auf Zählzeit 2 und 4.'
+      };
+    }
+
+    // Spezialfall Synkopische Stabs / Calypso / Arpeggio: Rhythmus-Kontur mit Backbeat veredeln
+    if (folder.includes('arpeggio') || titleLower.includes('calypso') || titleLower.includes('funk')) {
+      const notes: MicroScoreNote[] = [];
+      for (let b = 0; b < barsCount; b++) {
+        // Hi-Hat Achtel-Teppich
+        [0, 2, 4, 6, 8, 10, 12, 14].forEach(frac => {
+          notes.push({
+            id: ` sync_${b}_hh_${frac}`,
+            barIndex: b,
+            beatFraction: frac,
+            duration: '8',
+            pitch: b === 0 && frac === 0 ? 'A5' : 'G5'
+          });
+        });
+        // Kick auf 1 und synkopisch auf 2+ (frac 6) & 3 (frac 8)
+        notes.push({ id: `sync_${b}_bd_0`, barIndex: b, beatFraction: 0, duration: '4', pitch: 'F4' });
+        notes.push({ id: `sync_${b}_sd_4`, barIndex: b, beatFraction: 4, duration: '4', pitch: 'C5' });
+        notes.push({ id: `sync_${b}_bd_6`, barIndex: b, beatFraction: 6, duration: '8', pitch: 'F4' });
+        notes.push({ id: `sync_${b}_bd_10`, barIndex: b, beatFraction: 10, duration: '8', pitch: 'F4' });
+        notes.push({ id: `sync_${b}_sd_12`, barIndex: b, beatFraction: 12, duration: '4', pitch: 'C5' });
+      }
+      return {
+        notes,
+        description: 'PAS Groove-Begleitung: Synkopierte Bass-Drum (F4) passend zum Anschlagsmuster mit klarem Snare-Backbeat (C5) auf 2 und 4.'
+      };
+    }
+
+    // Standard Akkord-/Kadenz-Übung -> Voller PAS Rock/Pop-Groove über alle Takte
+    const grooveNotes: MicroScoreNote[] = [];
+    for (let b = 0; b < barsCount; b++) {
+      grooveNotes.push(...buildDrumGrooveForChord(b, b === 0));
+    }
+    return {
+      notes: grooveNotes,
+      description: 'PAS Band-Groove zur Harmoniebegleitung: Crash-Akzent (A5) auf Takt 1, durchgehende Achtel-Hi-Hat (G5), Bass Drum (F4) auf 1 & 3 sowie Snare-Backbeat (C5) auf 2 & 4.'
+    };
+  }
+
+  // ARCHETYP D: TECHNIK, WARM-UPS & FINGER-FITNESS -> PAS Rudiment & Stick-Control Workout
+  if (cat === 'Technik') {
+    const notes: MicroScoreNote[] = [];
+    monophonic.forEach((n, idx) => {
+      if (!n.pitch || n.pitch === 'REST') {
+        notes.push({ ...n });
+        return;
+      }
+      // Wechselspiel zwischen Snare (C5) und Toms (E5 / D5 / A4) je nach Taktposition
+      let drumPitch = 'C5';
+      if (n.beatFraction >= 12) drumPitch = 'A4';
+      else if (n.beatFraction >= 8) drumPitch = 'D5';
+      else if (n.beatFraction >= 4) drumPitch = 'E5';
+
+      notes.push({
+        ...n,
+        id: `tech_h_${idx}`,
+        pitch: drumPitch,
+        fret: undefined,
+        stringIndex: undefined
+      });
+    });
+
+    for (let b = 0; b < barsCount; b++) {
+      notes.push({ id: `tech_bd_${b}_0`, barIndex: b, beatFraction: 0, duration: '4', pitch: 'F4' });
+      notes.push({ id: `tech_bd_${b}_8`, barIndex: b, beatFraction: 8, duration: '4', pitch: 'F4' });
+    }
+
+    return {
+      notes,
+      description: 'PAS Stick-Control & Rudiment-Workout: Präzises Hand-zu-Hand-Training (R-L) im Wechsel über Snare (C5), High-Tom (E5), Mid-Tom (D5) und Floor-Tom (A4) über ruhigem Kick-Puls (F4).'
+    };
+  }
+
+  // ARCHETYP E: RHYTHMUS-DRILLS, SYNKOPEN & TRIOLEN -> Exakte Snare/Tom-Rhythmik über Kick-Grundpuls
+  const rhythmNotes: MicroScoreNote[] = [];
+  const barHasFeet = new Set<string>();
+
+  monophonic.forEach((n, idx) => {
+    if (!n.pitch || n.pitch === 'REST') {
+      rhythmNotes.push({ ...n });
+      return;
+    }
+    const mapped = mapMelodicPitchToDrum(n.pitch, n.beatFraction, n.barIndex);
+    // In Rhythmus-Drills sollen die geschriebenen Noten primär in der Hand-Stimme (Snare C5 / Tom E5) liegen,
+    // damit der Fuß unabhängig den Grundpuls auf 1 und 3 hält
+    const handPitch = (mapped === 'F4' || mapped === 'D3') ? 'C5' : mapped;
+    rhythmNotes.push({
+      ...n,
+      id: `rhy_h_${idx}`,
+      pitch: handPitch,
+      fret: undefined,
+      stringIndex: undefined
+    });
+  });
+
+  for (let b = 0; b < barsCount; b++) {
+    [0, 8].forEach(beatFrac => {
+      const slotKey = `${b}-${beatFrac}`;
+      const hasRestHere = monophonic.some(n => n.barIndex === b && Math.abs(n.beatFraction - beatFrac) < 0.5 && n.pitch === 'REST');
+      // Wenn auf Beat 0 bereits eine Ganze Note ('1') liegt, darf auf Beat 8 kein zweiter Kick gesetzt werden
+      const coveredByWholeNote = beatFrac === 8 && monophonic.some(n => n.barIndex === b && n.beatFraction === 0 && n.duration === '1');
+      if (!hasRestHere && !coveredByWholeNote && !barHasFeet.has(slotKey)) {
+        barHasFeet.add(slotKey);
+        const handNoteHere = monophonic.find(n => n.barIndex === b && Math.abs(n.beatFraction - beatFrac) < 0.5 && n.pitch && n.pitch !== 'REST');
+        const footDur: MicroScoreDuration = (handNoteHere && (handNoteHere.duration === '2' || handNoteHere.duration === '1'))
+          ? handNoteHere.duration
+          : '4';
+        rhythmNotes.push({
+          id: `rhy_bd_${b}_${beatFrac}`,
+          barIndex: b,
+          beatFraction: beatFrac,
+          duration: footDur,
+          isDotted: handNoteHere?.duration === '2' ? handNoteHere.isDotted : undefined,
+          pitch: 'F4'
+        });
+      }
+    });
+  }
+
+  return {
+    notes: rhythmNotes,
+    description: 'PAS Rhythmus- & Timing-Training: Exakte Rhythmusfigur auf Snare & Toms (Stimme 1 ↑) gestützt von der Bass Drum (F4, Stimme 2 ↓) auf den Schwerpunkten.'
+  };
+}
+
+/**
  * Die Hauptfunktion: Projiziert ein beliebiges Notenschnipsel verlustfrei auf das Zielinstrument
  * inklusive physikalisch korrekter Notenschlüssel-Governance (Violin-, Bass- & Percussion-Clef)
+ * und instrumentenspezifischer Ambitus-Sicherung (Blockflöte >= C4, Streicher >= G3, Gitarre >= E3).
  */
 export function resolveSnippetForInstrument(
   snippet: MicroScoreSnippet,
@@ -390,59 +851,120 @@ export function resolveSnippetForInstrument(
 ): MicroScoreSnippet {
   const normTarget = normalizeInstrumentToKey(targetInstrument);
 
-  // Wenn Ziel 'universal' ist, bestehendes spezifisches Instrument unverändert beibehalten
-  if (normTarget === 'universal' && snippet.instrument && snippet.instrument !== 'universal') {
-    return snippet;
-  }
-
-  // Wenn bereits exakt passend
-  if (snippet.instrument === normTarget) {
-    if (!snippet.clef) {
-      const defaultClef = (normTarget === 'bass' || normTarget === 'trombone') ? 'bass' : (normTarget === 'drums' ? 'percussion' : 'treble');
-      return { ...snippet, clef: defaultClef };
-    }
-    return snippet;
-  }
-
-  // Wenn explizite statische Projektion vorhanden
+  // 1. Wenn explizite statische Projektion vorhanden ist, hat diese IMMER höchste Priorität!
   if (snippet.projections && snippet.projections[normTarget]) {
     const proj = snippet.projections[normTarget]!;
+    let projNotes = proj.notes;
+    if (normTarget === 'guitar' || normTarget === 'bass' || normTarget === 'ukulele' || normTarget === 'strings') {
+      projNotes = projNotes.map(n => {
+        if (n.pitch && n.pitch !== 'REST' && n.fret !== undefined && n.stringIndex !== undefined) {
+          const expectedPitch = fretAndStringToPitch(n.stringIndex, n.fret, normTarget);
+          if (expectedPitch && expectedPitch !== n.pitch) {
+            return { ...n, pitch: expectedPitch };
+          }
+        }
+        return n;
+      });
+    }
     return {
       ...snippet,
       instrument: normTarget,
-      notes: proj.notes,
+      notes: projNotes,
       chords: proj.chords || snippet.chords,
-      displayMode: proj.displayMode || (normTarget === 'guitar' || normTarget === 'bass' || normTarget === 'strings' ? 'both' : 'notes'),
+      displayMode: proj.displayMode || (normTarget === 'guitar' || normTarget === 'bass' || normTarget === 'ukulele' ? 'both' : 'notes'),
       clef: proj.clef || (normTarget === 'bass' || normTarget === 'trombone' ? 'bass' : (normTarget === 'drums' ? 'percussion' : 'treble')),
       description: proj.description || snippet.description
     };
   }
 
+  // 2. Wenn Ziel 'universal' ist, bestehendes spezifisches Instrument unverändert beibehalten
+  if (normTarget === 'universal' && snippet.instrument && snippet.instrument !== 'universal') {
+    return snippet;
+  }
+
+  // 3. Wenn bereits exakt passend
+  if (snippet.instrument === normTarget) {
+    const defaultClef = (normTarget === 'bass' || normTarget === 'trombone') ? 'bass' : (normTarget === 'drums' ? 'percussion' : 'treble');
+    const clef = snippet.clef || defaultClef;
+    if (normTarget === 'guitar' || normTarget === 'bass' || normTarget === 'ukulele' || normTarget === 'strings') {
+      const reconciledNotes = snippet.notes.map(n => {
+        if (n.pitch && n.pitch !== 'REST' && n.fret !== undefined && n.stringIndex !== undefined) {
+          const expectedPitch = fretAndStringToPitch(n.stringIndex, n.fret, normTarget);
+          if (expectedPitch && expectedPitch !== n.pitch) {
+            return { ...n, pitch: expectedPitch };
+          }
+        }
+        return n;
+      });
+      return {
+        ...snippet,
+        clef,
+        notes: reconciledNotes
+      };
+    }
+    return { ...snippet, clef };
+  }
+
+  // 🛡️ 4. Strict Blank-Canvas Axiom: Wenn der Schnipsel komplett leer ist (0 Noten & 0 Akkorde),
+  // wechsle bei Instrumentenwechsel ausschließlich Schlüssel & Anzeige-Modus, ohne Noten zu halluzinieren!
+  if ((!snippet.notes || snippet.notes.length === 0) && (!snippet.chords || snippet.chords.length === 0)) {
+    const targetInst = normTarget === 'universal' ? 'piano' : normTarget;
+    const targetClef = (targetInst === 'bass' || targetInst === 'trombone')
+      ? 'bass'
+      : (targetInst === 'drums' ? 'percussion' : 'treble');
+    const targetDisplayMode = (targetInst === 'guitar' || targetInst === 'bass' || targetInst === 'ukulele')
+      ? 'both'
+      : 'notes';
+    return {
+      ...snippet,
+      instrument: targetInst,
+      clef: targetClef,
+      displayMode: targetDisplayMode,
+      notes: []
+    };
+  }
+
   // --- DYNAMISCHE 0,1% PROJEKTION ---
 
-  // 1. GITARRE (Treble Clef, 1. Lage Open Chords & TAB)
+  // 1. GITARRE (Treble Clef 8vb, 1. Lage Open Chords & TAB, Boden: E3 notiert = E2 klingend)
   if (normTarget === 'guitar') {
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0);
+    const isPureChordSnippet = snippet.category === 'Akkorde' && (!snippet.notes || snippet.notes.length <= 4);
     let projectedNotes: MicroScoreNote[] = [];
 
-    if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
-      // Baue echte simultane offene Akkorde
+    if (isPureChordSnippet && snippet.chords && snippet.chords.length > 0) {
       snippet.chords.forEach(c => {
-        // 4 Viertelschläge pro Takt
         [0, 4, 8, 12].forEach(beat => {
           const chordNotes = buildGuitarChordNotes(c.chordName, c.barIndex, beat, '4');
           projectedNotes.push(...chordNotes);
         });
       });
+    } else if (snippet.chords && snippet.chords.length > 0 && snippet.notes && snippet.notes.length > 0 && snippet.category !== 'Zupfinstrumente') {
+      // 0,1% Rhythmus-Erhalt: Übertrage authentische Synkopen / Stabs (z. B. Funk Drive) auf Gitarren-Akkorde
+      const beats = new Map<string, { barIndex: number; beatFraction: number; duration: MicroScoreDuration }>();
+      snippet.notes.forEach(n => {
+        const key = `${n.barIndex}-${n.beatFraction}`;
+        if (!beats.has(key)) {
+          beats.set(key, { barIndex: n.barIndex, beatFraction: n.beatFraction, duration: n.duration });
+        }
+      });
+      beats.forEach(({ barIndex, beatFraction, duration }) => {
+        const chord = snippet.chords?.find(c => c.barIndex === barIndex) || snippet.chords?.[0];
+        if (chord) {
+          const cNotes = buildGuitarChordNotes(chord.chordName, barIndex, beatFraction, duration);
+          projectedNotes.push(...cNotes);
+        }
+      });
     } else {
-      // Projiziere Tonleiter/Melodie mit Bund & Saite in 1. Lage
-      projectedNotes = snippet.notes.map(n => {
+      const clamped = clampNotesToInstrumentAmbitus(snippet.notes, 55, 81, 52); // E3 (52) bis A5 (81)
+      projectedNotes = clamped.map(n => {
         if (n.pitch && n.pitch !== 'REST') {
           const tab = pitchToBestFretAndString(n.pitch, undefined, false);
+          const reconciledPitch = tab ? fretAndStringToPitch(tab.stringIndex, tab.fret, 'guitar') : n.pitch;
           return {
             ...n,
-            fret: n.fret !== undefined ? n.fret : tab?.fret,
-            stringIndex: n.stringIndex !== undefined ? n.stringIndex : tab?.stringIndex
+            pitch: reconciledPitch,
+            fret: tab ? tab.fret : n.fret,
+            stringIndex: tab ? tab.stringIndex : n.stringIndex
           };
         }
         return n;
@@ -458,9 +980,35 @@ export function resolveSnippetForInstrument(
     };
   }
 
-  // 2. E-BASS (Bass Clef, tiefe Lage E1-G2 & 4-Saiten-TAB)
+  // 1b. UKULELE (Treble Clef C-klingend, G4-C4-E4-A4 4-Saiten-TAB)
+  if (normTarget === 'ukulele') {
+    const clamped = clampNotesToInstrumentAmbitus(snippet.notes, 60, 81, 60); // C4 (60) bis A5 (81)
+    const projectedNotes = clamped.map(n => {
+      if (n.pitch && n.pitch !== 'REST') {
+        const tab = pitchToBestFretAndString(n.pitch, undefined, 'ukulele');
+        const reconciledPitch = tab ? fretAndStringToPitch(tab.stringIndex, tab.fret, 'ukulele') : n.pitch;
+        return {
+          ...n,
+          pitch: reconciledPitch,
+          fret: tab ? tab.fret : n.fret,
+          stringIndex: tab ? tab.stringIndex : n.stringIndex
+        };
+      }
+      return n;
+    });
+
+    return {
+      ...snippet,
+      instrument: 'ukulele',
+      displayMode: 'both',
+      clef: 'treble',
+      notes: projectedNotes
+    };
+  }
+
+  // 2. E-BASS (Bass Clef 8vb, notiert E2-G4 = klingend E1-G3 & 4-Saiten-TAB)
   if (normTarget === 'bass') {
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0);
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
     let projectedNotes: MicroScoreNote[] = [];
 
     if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
@@ -469,16 +1017,20 @@ export function resolveSnippetForInstrument(
         projectedNotes.push(...bassNotes);
       });
     } else {
-      // Transponiere in Bass-Lage
-      projectedNotes = snippet.notes.map(n => {
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      const transposedDown = monophonic.map(n =>
+        n.pitch && n.pitch !== 'REST' ? { ...n, pitch: transposePitch(n.pitch, -12) } : n
+      );
+      const clamped = clampNotesToInstrumentAmbitus(transposedDown, 43, 62, 40); // E2 (40) bis D4 (62)
+      projectedNotes = clamped.map(n => {
         if (n.pitch && n.pitch !== 'REST') {
-          const deepPitch = transposePitch(n.pitch, -12);
-          const tab = pitchToBestFretAndString(deepPitch, undefined, true);
+          const tab = pitchToBestFretAndString(n.pitch, undefined, true);
+          const reconciledPitch = tab ? fretAndStringToPitch(Math.min(tab.stringIndex, 3), tab.fret, 'bass') : n.pitch;
           return {
             ...n,
-            pitch: deepPitch,
+            pitch: reconciledPitch,
             fret: tab?.fret,
-            stringIndex: tab ? Math.min(tab.stringIndex, 3) : 0 // 4 Saiten Bass
+            stringIndex: tab ? Math.min(tab.stringIndex, 3) : 0
           };
         }
         return n;
@@ -494,15 +1046,18 @@ export function resolveSnippetForInstrument(
     };
   }
 
-  // 2b. STREICHER / VIOLINE (Treble Clef, 1. Lage G3..E5 & 4-Saiten-TAB)
+  // 2b. STREICHER / VIOLINE (Treble Clef, 1. Lage G3..B5, Reines Notensystem!)
   if (normTarget === 'strings') {
-    const projectedNotes = snippet.notes.map(n => {
+    const clamped = clampNotesToInstrumentAmbitus(snippet.notes, 55, 81, 55); // G3 (55, leere G-Saite) bis A5 (81)
+    const projectedNotes = clamped.map(n => {
       if (n.pitch && n.pitch !== 'REST') {
         const tab = pitchToBestFretAndString(n.pitch, undefined, 'strings');
+        const reconciledPitch = tab ? fretAndStringToPitch(tab.stringIndex, tab.fret, 'strings') : n.pitch;
         return {
           ...n,
-          fret: n.fret !== undefined ? n.fret : tab?.fret,
-          stringIndex: n.stringIndex !== undefined ? n.stringIndex : tab?.stringIndex
+          pitch: reconciledPitch,
+          fret: tab ? tab.fret : n.fret,
+          stringIndex: tab ? tab.stringIndex : n.stringIndex
         };
       }
       return n;
@@ -511,15 +1066,90 @@ export function resolveSnippetForInstrument(
     return {
       ...snippet,
       instrument: 'strings',
-      displayMode: 'both',
+      displayMode: 'notes',
       clef: 'treble',
       notes: projectedNotes
     };
   }
 
-  // 3. POSAUNE (Bass Clef, Tiefblech)
+  // 2c. BLOCKFLÖTE (Sopran in C: Physikalischer Boden C4 = MIDI 60, Sweet-Spot D4..G5 = MIDI 62..79)
+  if (normTarget === 'recorder') {
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
+    let projectedNotes: MicroScoreNote[] = [];
+
+    if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
+      snippet.chords.forEach(c => {
+        const arpeggio = buildWindArpeggioForChord(c.chordName, c.barIndex, 0);
+        projectedNotes.push(...arpeggio);
+      });
+      projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 62, 79, 60);
+    } else {
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      projectedNotes = clampNotesToInstrumentAmbitus(monophonic, 62, 79, 60);
+    }
+
+    return {
+      ...snippet,
+      instrument: 'recorder',
+      displayMode: 'notes',
+      clef: 'treble',
+      notes: projectedNotes
+    };
+  }
+
+  // 2d. QUERFLÖTE (C-Konzertflöte: Physikalischer Boden C4 = MIDI 60, Sweet-Spot D4..D6 = MIDI 62..86)
+  if (normTarget === 'flute') {
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
+    let projectedNotes: MicroScoreNote[] = [];
+
+    if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
+      snippet.chords.forEach(c => {
+        const arpeggio = buildWindArpeggioForChord(c.chordName, c.barIndex, 0);
+        projectedNotes.push(...arpeggio);
+      });
+      projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 62, 86, 60);
+    } else {
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      projectedNotes = clampNotesToInstrumentAmbitus(monophonic, 62, 86, 60);
+    }
+
+    return {
+      ...snippet,
+      instrument: 'flute',
+      displayMode: 'notes',
+      clef: 'treble',
+      notes: projectedNotes
+    };
+  }
+
+  // 2e. GESANG / VOCALS (Klingend C, Ambitus C4..A5 = MIDI 60..81, Monophone Gesangslinie)
+  if (normTarget === 'vocals') {
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
+    let projectedNotes: MicroScoreNote[] = [];
+
+    if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
+      snippet.chords.forEach(c => {
+        const arpeggio = buildWindArpeggioForChord(c.chordName, c.barIndex, 0);
+        projectedNotes.push(...arpeggio);
+      });
+      projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 60, 81, 60);
+    } else {
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      projectedNotes = clampNotesToInstrumentAmbitus(monophonic, 60, 81, 60);
+    }
+
+    return {
+      ...snippet,
+      instrument: 'vocals',
+      displayMode: 'notes',
+      clef: 'treble',
+      notes: projectedNotes
+    };
+  }
+
+  // 3. POSAUNE (Bass Clef, Tiefblech: Bb2..F4 = MIDI 46..65)
   if (normTarget === 'trombone') {
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0);
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
     let projectedNotes: MicroScoreNote[] = [];
 
     if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
@@ -528,11 +1158,13 @@ export function resolveSnippetForInstrument(
         projectedNotes.push(...arpeggio);
       });
     } else {
-      projectedNotes = snippet.notes.map(n => ({
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      projectedNotes = monophonic.map(n => ({
         ...n,
-        pitch: transposePitch(n.pitch, -12, false)
+        pitch: transposePitch(n.pitch, -12, true)
       }));
     }
+    projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 46, 65, 41, true);
 
     return {
       ...snippet,
@@ -543,22 +1175,27 @@ export function resolveSnippetForInstrument(
     };
   }
 
-  // 4. BLÄSER: ALTSAXOPHON (Treble Clef, Eb)
+  // 4. BLÄSER: ALTSAXOPHON (Treble Clef, Eb: Smart +9 oder -3 Halbtöne im Sweet-Spot C4..A5 = MIDI 60..81)
   if (normTarget === 'altosax') {
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0);
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
     let projectedNotes: MicroScoreNote[] = [];
 
     if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
       snippet.chords.forEach(c => {
-        const arpeggio = buildWindArpeggioForChord(c.chordName, c.barIndex, 9);
+        const arpeggio = buildWindArpeggioForChord(c.chordName, c.barIndex, -3);
         projectedNotes.push(...arpeggio);
       });
     } else {
-      projectedNotes = snippet.notes.map(n => ({
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      const maxOrigMidi = Math.max(...monophonic.filter(n => n.pitch && n.pitch !== 'REST').map(n => getPitchMidi(n.pitch)), 60);
+      // Verhindert Ausbrechen in das Altissimo-Register (> A5) bei hohen Ausgangsmelodien
+      const semiShift = maxOrigMidi + 9 > 81 ? -3 : 9;
+      projectedNotes = monophonic.map(n => ({
         ...n,
-        pitch: transposePitch(n.pitch, 9, false) // +9 Halbtöne für Eb
+        pitch: transposePitch(n.pitch, semiShift, false)
       }));
     }
+    projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 60, 81, 58);
 
     return {
       ...snippet,
@@ -569,9 +1206,9 @@ export function resolveSnippetForInstrument(
     };
   }
 
-  // 5. BLÄSER: TROMPETE / KLARINETTE (Treble Clef, Bb)
+  // 5. BLÄSER: TROMPETE / KLARINETTE (Treble Clef, Bb: +2 Halbtöne im Sweet-Spot C4..G5 = MIDI 60..79)
   if (normTarget === 'trumpet' || normTarget === 'clarinet') {
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0);
+    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && snippet.notes.length > 8);
     let projectedNotes: MicroScoreNote[] = [];
 
     if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
@@ -580,11 +1217,14 @@ export function resolveSnippetForInstrument(
         projectedNotes.push(...arpeggio);
       });
     } else {
-      projectedNotes = snippet.notes.map(n => ({
+      const monophonic = collapsePolyphonyForMonophonicInstrument(snippet.notes);
+      projectedNotes = monophonic.map(n => ({
         ...n,
-        pitch: transposePitch(n.pitch, 2, false) // +2 Halbtöne für Bb
+        pitch: transposePitch(n.pitch, 2, false)
       }));
     }
+    const maxSweet = normTarget === 'trumpet' ? 79 : 84; // Trompete bis G5 (79), Klarinette bis C6 (84)
+    projectedNotes = clampNotesToInstrumentAmbitus(projectedNotes, 60, maxSweet, 55);
 
     return {
       ...snippet,
@@ -595,9 +1235,8 @@ export function resolveSnippetForInstrument(
     };
   }
 
-  // 6. SCHLAGZEUG (Percussion Clef, PAS Standard & 1:1 Rhythmus-Projektion)
+  // 6. SCHLAGZEUG (Percussion Clef, PAS Standard & 5-Archetypen Drum-Orchestration Engine)
   if (normTarget === 'drums') {
-    // 🥁 WÄCHTER: Wenn das Schnipsel bereits ein Schlagzeug-Snippet ist, Noten 100% unverändert beibehalten!
     if (snippet.clef === 'percussion' || snippet.instrument === 'drums' || (snippet.id && snippet.id.includes('drum'))) {
       return {
         ...snippet,
@@ -607,38 +1246,19 @@ export function resolveSnippetForInstrument(
       };
     }
 
-    const isChordSnippet = snippet.category === 'Akkorde' || (snippet.chords && snippet.chords.length > 0 && (!snippet.notes || snippet.notes.length === 0));
-    let projectedNotes: MicroScoreNote[] = [];
-
-    if (snippet.timeSignature === '3/4') {
-      // Authentischer 3/4 Walzer-Groove (PAS-Standard)
-      projectedNotes = buildDrumWaltzGroove(snippet.barsCount || 2);
-    } else if (isChordSnippet && snippet.chords && snippet.chords.length > 0) {
-      snippet.chords.forEach((c, idx) => {
-        const groove = buildDrumGrooveForChord(c.barIndex, idx === 0);
-        projectedNotes.push(...groove);
-      });
-    } else if (snippet.notes && snippet.notes.length > 0) {
-      // 1:1 Rhythmus-Parität: Projiziere melodische Noten auf das Schlagzeugkit
-      projectedNotes = snippet.notes.map(n => ({
-        ...n,
-        pitch: mapMelodicPitchToDrum(n.pitch, n.beatFraction, n.barIndex)
-      }));
-    } else {
-      // Fallback 1-Takt Basis-Groove
-      projectedNotes = buildDrumGrooveForChord(0, true);
-    }
+    const adaptation = buildCanonicalDrumAdaptation(snippet);
 
     return {
       ...snippet,
       instrument: 'drums',
       displayMode: 'notes',
       clef: 'percussion',
-      notes: projectedNotes
+      description: adaptation.description,
+      notes: adaptation.notes
     };
   }
 
-  // 7. KLAVIER & QUERFLÖTE & STREICHER (C Klingend / Standard)
+  // 7. KLAVIER / STANDARD (C Klingend)
   return {
     ...snippet,
     instrument: normTarget === 'universal' ? 'piano' : normTarget,
@@ -646,3 +1266,64 @@ export function resolveSnippetForInstrument(
     clef: snippet.clef || 'treble'
   };
 }
+
+/**
+ * 🏛️ 0,1% Goldstandard: Dynamisches Arrangement-Badge
+ * Ermittelt eine didaktisch präzise Besetzungs-Bezeichnung für den UI-Header
+ */
+export function getSnippetArrangementLabel(snippet: MicroScoreSnippet, activeInstrument: string): string {
+  const norm = normalizeInstrumentToKey(activeInstrument);
+  const origNorm = normalizeInstrumentToKey(snippet.instrument || 'universal');
+
+  if (norm === 'drums') {
+    const cat = (snippet.category || '').trim();
+    const folder = (snippet.vdmFolder || '').toLowerCase();
+    const titleLower = (snippet.title || '').toLowerCase();
+    if (snippet.timeSignature === '3/4') return 'PAS 3/4 Walzer-Groove';
+    if (snippet.timeSignature === '6/8') return 'PAS 6/8 Ballad-Groove';
+    if (cat === 'Früherziehung' || cat === 'Vokal' || folder.startsWith('emp-') || titleLower.includes('kuckuck')) {
+      return 'PAS Klangfarben-Dialog (Snare / Standtom)';
+    }
+    if (cat === 'Tonleitern' || folder === 'dur' || folder === 'moll' || folder === 'pentatonik' || folder === 'modal') {
+      return 'PAS Around-the-Kit Tom-Run';
+    }
+    if (cat === 'Technik') {
+      return 'PAS Stick-Control & Rudiments';
+    }
+    if (cat === 'Akkorde' || cat === 'Zupfinstrumente' || cat === 'BandPacks') {
+      return 'PAS Band-Begleit-Groove';
+    }
+    return 'Drum-Groove (PAS-Standard)';
+  }
+
+  if (origNorm === norm && norm !== 'universal') {
+    if (norm === 'recorder') return 'Blockflöten-Fassung (C4–G5)';
+    if (norm === 'ukulele') return 'Ukulele-Fassung (4-Saiten TAB G-C-E-A)';
+    if (norm === 'guitar') return 'Gitarren-Fassung (6-Saiten TAB)';
+    if (norm === 'bass') return 'E-Bass (4-Saiten TAB & Bassschlüssel)';
+    if (norm === 'strings') return 'Streicher-Fassung (Notensystem)';
+    if (norm === 'flute') return 'Querflöte (D4–C6)';
+    if (norm === 'altosax') return 'Altsaxophon in Eb';
+    if (norm === 'trumpet') return 'Trompete in Bb';
+    if (norm === 'trombone') return 'Posaune (Bassschlüssel)';
+    if (norm === 'vocals') return 'Gesangs-Fassung (Melodie & Phrasierung)';
+    return 'Original-Fassung';
+  }
+
+  const instNames: Record<string, string> = {
+    piano: 'Klavier-Satz (Harmonien & Noten)',
+    ukulele: 'Ukulele-Arrangement (4-Saiten TAB G-C-E-A)',
+    guitar: 'Gitarren-Arrangement (Open Chords & TAB)',
+    bass: 'E-Bass Begleitung (4-Saiten TAB & Bassschlüssel)',
+    drums: 'Schlagzeug-Groove (PAS-Standard)',
+    recorder: 'Blockflöte (Sopran C4–G5)',
+    flute: 'Querflöte (D4–C6)',
+    strings: 'Streicher / Violine (Notensystem)',
+    vocals: 'Gesangs-Fassung (Vokale Phrasierung C4–A5)',
+    altosax: 'Altsaxophon (in Eb)',
+    trumpet: 'Trompete (in Bb)',
+    trombone: 'Posaune (Bassschlüssel)'
+  };
+  return instNames[norm] || `Arrangement für ${activeInstrument}`;
+}
+

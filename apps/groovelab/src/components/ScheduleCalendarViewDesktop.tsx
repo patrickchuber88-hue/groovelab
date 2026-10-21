@@ -529,10 +529,10 @@ export function ScheduleCalendarViewDesktop({
     hoverBg = 'rgba(234, 67, 53, 0.12)';
     textAccentColor = '#ea4335';
   } else if (isGroovelab) {
-    brandColor = '#eab308'; // GrooveLab Yellow
-    lightBg = 'rgba(234, 179, 8, 0.06)';
-    hoverBg = 'rgba(234, 179, 8, 0.12)';
-    textAccentColor = '#ca8a04'; // Dark yellow text
+    brandColor = '#facc15'; // GrooveLab Yellow
+    lightBg = '#fef9c3';
+    hoverBg = 'rgba(250, 204, 21, 0.16)';
+    textAccentColor = '#854d0e'; // Dark yellow text
   }
 
   useEffect(() => {
@@ -5330,7 +5330,7 @@ export function ScheduleCalendarViewDesktop({
       case 'canceled_by_teacher_ausfall':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
-      case 'rescheduled_confirmed': return { bg: 'rgba(254, 243, 199, 0.55)', border: '#eab308', text: '#854d0e' };
+      case 'rescheduled_confirmed': return { bg: 'rgba(254, 243, 199, 0.55)', border: '#facc15', text: '#854d0e' };
       default: return { bg: 'rgba(241, 245, 249, 0.45)', border: '#cbd5e1', text: '#475569' };
     }
   };
@@ -5927,7 +5927,7 @@ export function ScheduleCalendarViewDesktop({
                       const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
                       const activeBg = isCampus ? '#34a853' : (isGroovelab ? '#facc15' : '#ea4335');
                       const activeColor = isGroovelab ? '#0f172a' : '#ffffff';
-                      const activeBorder = isCampus ? '#2e7d32' : (isGroovelab ? '#eab308' : '#dc2626');
+                      const activeBorder = isCampus ? '#2e7d32' : (isGroovelab ? '#facc15' : '#dc2626');
 
                       return (
                         <div
@@ -6213,7 +6213,7 @@ export function ScheduleCalendarViewDesktop({
                 <span>Tauschen</span>
                 {swapSourceOcc && (
                   <span style={{
-                    background: '#eab308',
+                    background: '#facc15',
                     color: '#0f172a',
                     fontSize: '0.62rem',
                     fontWeight: 900,
@@ -6420,7 +6420,7 @@ export function ScheduleCalendarViewDesktop({
           return (
             <div style={{
               background: 'rgba(245, 158, 11, 0.08)',
-              border: '1px solid rgba(245, 158, 11, 0.18)',
+              border: 'none',
               color: '#b45309',
               borderRadius: '16px',
               padding: '12px 20px',
@@ -6501,7 +6501,7 @@ export function ScheduleCalendarViewDesktop({
                 width: '32px',
                 height: '32px',
                 borderRadius: '10px',
-                background: swapSourceOcc ? '#eab308' : 'rgba(255, 255, 255, 0.15)',
+                background: swapSourceOcc ? '#facc15' : 'rgba(255, 255, 255, 0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -6620,7 +6620,7 @@ export function ScheduleCalendarViewDesktop({
         {(((scheduleStatus as string) === 'ready_for_admin_review' || scheduleStatus === 'pending') || (hasSubmittedSchedule && (scheduleStatus as string) !== 'approved')) && (
           <div style={{
             background: '#fffbeb',
-            border: '1px solid #fde68a',
+            border: 'none',
             borderRadius: '8px',
             padding: '4px 12px',
             display: 'flex',
@@ -7779,22 +7779,22 @@ export function ScheduleCalendarViewDesktop({
                       if (isWaiting) {
                         // Gelb gestreift = Tauschtermin ausstehend / unbestätigt
                         cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       } else {
                         // Vollton Sonnengelb = Tauschtermin bestätigt
                         cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       }
                     } else if (isGroovelab) {
                       if (isWaiting) {
                         cardBackground = 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#713f12';
                       } else {
                         cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#713f12';
                       }
                     } else if (isGroupLesson) {
@@ -7820,12 +7820,12 @@ export function ScheduleCalendarViewDesktop({
                       if (isWaiting) {
                         // Gelb gestrichelt = Einzeltermin verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
                         cardBackground = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       } else if (isConfirmedReschedule) {
                         // Vollton Gelb = Einzeltermin verschoben und durch Schüler bestätigt
                         cardBackground = 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)';
-                        finalColors.border = '#eab308';
+                        finalColors.border = '#facc15';
                         finalColors.text = '#854d0e';
                       } else {
                         // Vollton Grün = Unveränderter Stammtermin Einzeltermin aus dem Stundenplan-Designer
@@ -7925,7 +7925,7 @@ export function ScheduleCalendarViewDesktop({
                   const isSelectedForSwap = Boolean(isSwapModeActive && swapSourceOcc && occ.id && swapSourceOcc.id === occ.id);
                   if (isSelectedForSwap) {
                     cardBackground = 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)';
-                    finalColors.border = '#eab308';
+                    finalColors.border = '#facc15';
                     finalColors.text = '#854d0e';
                   }
                   
@@ -8062,11 +8062,11 @@ export function ScheduleCalendarViewDesktop({
                           border: isGap 
                             ? undefined
                             : isSelectedForSwap
-                              ? '2px solid #eab308'
+                              ? '2px solid #facc15'
                               : ((isGroupModeActive && selectedForGroup.includes(occ.id))
                                 ? '2px solid #2563eb'
                                 : (isRescheduled 
-                                  ? (isConfirmedReschedule ? '1px solid #eab308' : `2px dashed ${finalColors.border}`) 
+                                  ? (isConfirmedReschedule ? '1px solid #facc15' : `2px dashed ${finalColors.border}`) 
                                   : isVacant 
                                     ? `1px dashed ${brandColor}` 
                                     : isBreak 
@@ -8244,7 +8244,7 @@ export function ScheduleCalendarViewDesktop({
                                           justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
-                                          border: '1px solid #fde047',
+                                          border: 'none',
                                           boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
@@ -8268,7 +8268,7 @@ export function ScheduleCalendarViewDesktop({
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid rgba(239,68,68,0.25)',
+                                        border: 'none',
                                         whiteSpace: 'nowrap'
                                       }} title="Zeit-Kollision">
                                         <AlertCircle size={8} strokeWidth={2.8} />
@@ -8341,7 +8341,7 @@ export function ScheduleCalendarViewDesktop({
                                              letterSpacing: '0.02em',
                                              background: isConfirmed ? '#fef3c7' : '#fefce8',
                                              color: isConfirmed ? '#854d0e' : '#b45309',
-                                             border: isConfirmed ? '1px solid #eab308' : '1px dashed #f59e0b',
+                                             border: isConfirmed ? '1px solid #facc15' : '1px dashed #f59e0b',
                                              flexShrink: 0,
                                              whiteSpace: 'nowrap',
                                              cursor: isConfirmed ? 'default' : 'pointer'
@@ -8438,14 +8438,14 @@ export function ScheduleCalendarViewDesktop({
 
                                 {/* Tausch & Vertretung Badge */}
                                 {isSelectedForSwap && (
-                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#854d0e', background: '#fef08a', border: '1px solid #fde047', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#854d0e', background: '#fef08a', border: 'none', padding: '1px 5px', borderRadius: '4px', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                     <ArrowLeftRight size={9} />
                                     <span>1. Partner</span>
                                   </div>
                                 )}
 
                                 {(occ.substitute_teacher_id || occ.is_substitute) && (
-                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: '1px solid #c7d2fe', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#3730a3', background: '#e0e7ff', padding: '1px 5px', borderRadius: '4px', border: 'none', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     Vertretung: {formatTeacherFullName(occ.substitute_teacher || allSchoolTeachers.find(t => t.id === occ.substitute_teacher_id)) || 'Lehrkraft'}
                                   </div>
                                 )}
@@ -8578,7 +8578,7 @@ export function ScheduleCalendarViewDesktop({
                                           justifyContent: 'center',
                                           background: '#fef08a',
                                           color: '#854d0e',
-                                          border: '1px solid #fde047',
+                                          border: 'none',
                                           boxShadow: 'none',
                                           cursor: 'pointer',
                                           flexShrink: 0,
@@ -8602,7 +8602,7 @@ export function ScheduleCalendarViewDesktop({
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid #fde047',
+                                        border: 'none',
                                         flexShrink: 0
                                       }}>
                                         <ArrowLeftRight size={9} />
@@ -8620,7 +8620,7 @@ export function ScheduleCalendarViewDesktop({
                                         display: 'inline-flex', 
                                         alignItems: 'center', 
                                         gap: '2px', 
-                                        border: '1px solid rgba(239,68,68,0.25)',
+                                        border: 'none',
                                         whiteSpace: 'nowrap'
                                       }} title="Zeit-Kollision: Dieser Termin überlappt sich mit einem parallelen Termin">
                                         <AlertCircle size={9} strokeWidth={2.8} />
@@ -8628,22 +8628,22 @@ export function ScheduleCalendarViewDesktop({
                                       </span>
                                     )}
                                     {isAbsentSlot && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Entfällt
                                       </span>
                                     )}
                                     {isExcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(245,158,11,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Entschuldigt
                                       </span>
                                     )}
                                     {isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                         Fehlt
                                       </span>
                                     )}
                                     {isCancelled && !isExcused && !isUnexcused && (
-                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                      <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                                         Abgesagt
                                         {isCancelledAck && (
                                           <span 
@@ -8879,7 +8879,7 @@ return (
                                         justifyContent: 'center',
                                         background: '#fef08a',
                                         color: '#854d0e',
-                                        border: '1px solid #fde047',
+                                        border: 'none',
                                         boxShadow: 'none',
                                         cursor: 'pointer',
                                         flexShrink: 0,
@@ -8896,22 +8896,22 @@ return (
                                     <Users size={13} style={{ color: finalColors.text, opacity: 0.7 }} />
                                   )}
                                   {isAbsentSlot && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Entfällt
                                     </span>
                                   )}
                                   {isExcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(245,158,11,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Entschuldigt
                                     </span>
                                   )}
                                   {isUnexcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Fehlt
                                     </span>
                                   )}
                                   {isCancelled && !isExcused && !isUnexcused && (
-                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+                                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
                                       Abgesagt
                                     </span>
                                   )}
@@ -8938,7 +8938,7 @@ return (
                                               fontWeight: 900,
                                               color: '#c2410c',
                                               background: '#ffedd5',
-                                              border: '1px solid #fdba74',
+                                              border: 'none',
                                               padding: '1px 4px',
                                               borderRadius: '4px',
                                               display: 'inline-flex',
@@ -9073,7 +9073,7 @@ return (
                                     </span>
                                   )}
                                   {isParallelConflict && (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(239, 68, 68, 0.15)', border: 'none', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
                                       <AlertCircle size={10} color="currentColor" />
                                       <span>Doppelbelegung</span>
                                     </span>
@@ -9236,7 +9236,7 @@ return (
                 {rescheduledOcc ? (
                   <div style={{ 
                     background: '#e6f4ea', 
-                    border: '1px solid #34a853', 
+                    border: 'none', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
                     width: '100%', 
@@ -9249,7 +9249,7 @@ return (
                 ) : (
                   <div style={{ 
                     background: '#fef2f2', 
-                    border: '1px solid #ef4444', 
+                    border: 'none', 
                     borderRadius: '16px', 
                     padding: '14px 18px', 
                     width: '100%', 
@@ -9576,7 +9576,7 @@ return (
                         borderRadius: '16px',
                         padding: '12px 14px',
                         marginBottom: '16px',
-                        border: '1px solid #fdba74',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
@@ -9593,7 +9593,7 @@ return (
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: '1.5px solid #fed7aa'
+                            border: 'none'
                           }}>
                             ☕
                           </div>
@@ -9609,7 +9609,7 @@ return (
                                 color: '#c2410c',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                border: '1px solid #fdba74'
+                                border: 'none'
                               }}>
                                 Pause
                               </span>
@@ -9643,7 +9643,7 @@ return (
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: '1.5px solid #a7f3d0'
+                            border: 'none'
                           }}>
                             {occ.student.first_name ? occ.student.first_name[0] : 'S'}
                           </div>
@@ -9659,7 +9659,7 @@ return (
                                 color: '#166534',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                border: '1px solid #bbf7d0'
+                                border: 'none'
                               }}>
                                 {formatDisplaySubjectOrInstrument(occ)}
                               </span>
@@ -9927,7 +9927,7 @@ return (
                             width: '100%',
                             padding: '10px 12px', 
                             borderRadius: '10px', 
-                            border: '1px solid rgba(239, 68, 68, 0.3)', 
+                            border: 'none', 
                             background: 'rgba(239, 68, 68, 0.08)', 
                             color: '#dc2626', 
                             fontSize: '0.82rem', 
@@ -10082,7 +10082,7 @@ return (
                                 setEditOccState(null);
                               }}
                               style={{
-                                background: '#22c55e',
+                                background: '#34a853',
                                 color: '#ffffff',
                                 border: 'none',
                                 borderRadius: '8px',
@@ -10257,7 +10257,7 @@ return (
                         padding: '8px 12px',
                         borderRadius: '12px',
                         background: '#f0fdf4',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         fontSize: '0.71rem',
                         color: '#166534',
                         fontWeight: 650,
@@ -10458,6 +10458,7 @@ return (
                   uiLevel={docStudent?.campus_ui_level || undefined}
                   parentPermissions={docStudent?.parent_permissions}
                   hasTresorStorage={checkIsAudioTresorActive(docStudent)}
+                  isTeacherTools={true}
                 />
               </React.Suspense>
             )}
@@ -10892,7 +10893,7 @@ return (
                     width: '24px', 
                     height: '24px', 
                     borderRadius: '50%', 
-                    background: '#eab308', 
+                    background: '#facc15', 
                     color: '#0f172a',
                     display: 'flex', 
                     alignItems: 'center', 
@@ -10946,7 +10947,7 @@ return (
               {occ.notes && (
                 <div style={{ 
                   background: '#fffbeb', 
-                  border: '1px solid #fef3c7', 
+                  border: 'none', 
                   borderRadius: '10px', 
                   padding: '10px 12px', 
                   fontSize: '0.76rem', 
@@ -11020,7 +11021,7 @@ return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
                 background: '#fef3c7',
-                border: '1px solid #fde68a',
+                border: 'none',
                 borderRadius: '8px',
                 padding: '2px 7px',
                 display: 'flex',
@@ -11378,7 +11379,7 @@ return (
                   height: '34px',
                   borderRadius: '11px',
                   background: '#fef2f2',
-                  border: '1px solid #fee2e2',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -11423,7 +11424,7 @@ return (
             <div
               style={{
                 background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '14px 16px',
                 display: 'flex',
@@ -11543,7 +11544,7 @@ return (
               }}
               style={{
                 background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '13px 15px',
                 display: 'flex',
@@ -11653,7 +11654,7 @@ return (
             aria-label="Aktion rückgängig machen (⌘Z)"
             style={{
               background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               color: '#166534',
               padding: '4px 10px',
               borderRadius: '9999px',

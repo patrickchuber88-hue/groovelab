@@ -156,7 +156,7 @@ export const ParentPracticeReportSettingsView: React.FC<ParentPracticeReportSett
         padding: '20px',
         borderRadius: '20px',
         background: '#f0fdf4',
-        border: '1.5px solid #bbf7d0',
+        border: 'none',
         color: '#15803d',
         textAlign: 'left'
       }}>

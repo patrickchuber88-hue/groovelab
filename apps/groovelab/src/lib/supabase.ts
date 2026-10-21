@@ -169,6 +169,23 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
 
       const response = await fetch(input, fetchInit);
       if (timeoutId) clearTimeout(timeoutId);
+
+      // [P0-1] Capture Stage-2 verified PIN session lease from PostgREST response headers
+      try {
+        const mintedLeaseId = response.headers?.get?.('x-session-lease-id')?.trim();
+        if (
+          mintedLeaseId &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mintedLeaseId) &&
+          typeof window !== 'undefined'
+        ) {
+          try {
+            window.sessionStorage.setItem('gl_active_session_lease_id', mintedLeaseId);
+          } catch {}
+          try {
+            window.localStorage.setItem('gl_active_session_lease_id', mintedLeaseId);
+          } catch {}
+        }
+      } catch {}
       
       // Security Guardrail: Only retry pure infrastructure transients (502, 503, 504)
       // NEVER retry 401, 403, or 429 rate limits to prevent brute-force or lockout amplification

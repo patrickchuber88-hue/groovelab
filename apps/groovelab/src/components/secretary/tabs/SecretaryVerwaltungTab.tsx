@@ -986,6 +986,8 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             userId={userId}
             schoolId={schoolId}
             schoolNumericId={schoolNumericId}
+            schoolName={schoolName}
+            windowWidth={windowWidth}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             secretarySubTab={secretarySubTab}
@@ -1067,6 +1069,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             setExpandedLiveDayStr={setExpandedLiveDayStr}
             selectedArchiveLog={selectedArchiveLog}
             setSelectedArchiveLog={setSelectedArchiveLog}
+            windowWidth={windowWidth}
           />
         </Suspense>
       )}
@@ -1345,6 +1348,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             equipmentNameInputRef={equipmentNameInputRef}
             equipmentQtyInputRef={equipmentQtyInputRef}
             parseRoomName={parseRoomName}
+            windowWidth={windowWidth}
           />
         </Suspense>
       )}
@@ -1500,6 +1504,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             setExpandedResponseIds={setExpandedResponseIds}
             handleExportAnnouncementPdf={() => window.print()}
             handleExportAnnouncementCsv={() => handleExportCSV(selectedAnnouncementForStats)}
+            windowWidth={windowWidth}
           />
         </Suspense>
       )}

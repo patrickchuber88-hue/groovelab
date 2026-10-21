@@ -129,4 +129,11 @@ assert.strictEqual(isTeacherInstrumentCompatible('Schlagzeug', 'Klavier'), false
 assert.strictEqual(isTeacherInstrumentCompatible('Klavier / Keyboard', 'Piano'), true, 'Klavier/Keyboard matches Piano');
 console.log('✔ Test 6: isTeacherInstrumentCompatible passed');
 
+// Test 7: 0,1% Goldstandard: GrooveLab All-Instruments Parity Guard
+// In GrooveLab (band & stations lab), all active GrooveLab students regardless of instrument are included
+const groovelabAllInstrumentRoster = mockInstrumentRoster.filter(s => Boolean(s.is_groovelab_active));
+assert.strictEqual(groovelabAllInstrumentRoster.length, 3, 'GrooveLab roster must include all instruments (Schlagzeug, Gitarre, Musiker)');
+assert.strictEqual(groovelabAllInstrumentRoster.some(s => s.id === 's3' && s.instrument === 'Schlagzeug'), true, 'Aurora (Schlagzeug) must be included in GrooveLab');
+console.log('✔ Test 7: GrooveLab All-Instruments Parity Guard passed');
+
 console.log('🎉 ALL STUDENT ROSTER SERVICE TESTS PASSED PERFECTLY!');

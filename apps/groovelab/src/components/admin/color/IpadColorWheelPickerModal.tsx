@@ -20,7 +20,7 @@ const CURATED_PALETTE = [
   { hex: '#ef4444', label: 'Rot' },
   { hex: '#f97316', label: 'Orange' },
   { hex: '#f59e0b', label: 'Bernstein' },
-  { hex: '#eab308', label: 'Gelb' },
+  { hex: '#facc15', label: 'Gelb' },
   { hex: '#84cc16', label: 'Limette' },
   { hex: '#10b981', label: 'Smaragd' },
   { hex: '#06b6d4', label: 'Cyan' },
@@ -101,7 +101,7 @@ export const IpadColorWheelPickerModal: React.FC<IpadColorWheelPickerModalProps>
   onClose,
   onColorChange,
   supabase,
-  brandColor = '#eab308'
+  brandColor = '#facc15'
 }) => {
   const initialColor = station?.color || '#3b82f6';
   const [hexColor, setHexColor] = useState<string>(initialColor);

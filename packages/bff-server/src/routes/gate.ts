@@ -58,6 +58,10 @@ function timingSafeCompare(a: string, b: string): boolean {
   return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
+export function verifySiteGateToken(token: string): boolean {
+  return verifyToken(token);
+}
+
 function verifyToken(token: string): boolean {
   if (!token || typeof token !== 'string') return false;
   const parts = token.split('.');

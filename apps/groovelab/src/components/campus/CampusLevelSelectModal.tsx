@@ -180,7 +180,7 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             marginBottom: '10px',
-            border: '1px solid rgba(52, 168, 83, 0.2)'
+            border: 'none'
           }}>
             <Sparkles size={13} color="#16a34a" />
             <span>CAMPUS-GROOVELAB ANPASSUNG</span>

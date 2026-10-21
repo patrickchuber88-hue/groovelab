@@ -84,26 +84,21 @@ export async function encryptVaultData(data: any): Promise<string> {
 
     return `enc:v1:${ivHex}:${cipherHex}`;
   } catch (err) {
-    console.error('[AESVault] Encryption error:', err);
-    // Fallback: Return raw string if Web Crypto fails
-    return typeof data === 'string' ? data : JSON.stringify(data);
+    console.error('[AESVault] Encryption error (Fail-Closed):', err);
+    throw new Error('AES_VAULT_ENCRYPTION_FAILED: Unverschlüsselte Speicherung ist aus Sicherheitsgründen gesperrt.');
   }
 }
 
 /**
  * Decrypts an authenticated AES-256-GCM ciphertext container back into original JavaScript data.
- * Transparently supports unencrypted JSON fallbacks for backward compatibility.
+ * [MIG-592 / Vektor 7] Strict Fail-Closed: Rejects any unencrypted or tampered payload not prefixed with `enc:v1:`.
  */
 export async function decryptVaultData<T = any>(payload: string | null): Promise<T | null> {
   if (!payload || typeof payload !== 'string') return null;
 
-  // Backward compatibility: If not encrypted, parse directly as JSON
+  // Fail-Closed: Never accept unencrypted JSON strings in the AES-GCM vault
   if (!payload.startsWith('enc:v1:')) {
-    try {
-      return JSON.parse(payload) as T;
-    } catch {
-      return payload as unknown as T;
-    }
+    return null;
   }
 
   try {

@@ -91,7 +91,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
             <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
                 <Sliders size={22} strokeWidth={2.4} />
               </div>
               <span>GrooveLab Einstellungen</span>
@@ -118,8 +118,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 title: 'Live Lab & Proberaum',
                 subtitle: currentPreferredRoom ? `${currentPreferredRoom.name || 'Proberaum'} aktiv` : 'Raum-Kopplung & Timeout',
                 badge: currentPreferredRoom ? (currentPreferredRoom.name || 'Raum') : 'Standard',
-                gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                shadowColor: 'rgba(234, 179, 8, 0.35)',
+                gradient: '#facc15',
+                shadowColor: 'none',
                 icon: Radio
               },
               {
@@ -127,8 +127,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 title: 'Repertoire & Songs',
                 subtitle: `Stage-Ready ab ${groovelabSettings.stage_ready_threshold || 85}% XP`,
                 badge: `${groovelabSettings.stage_ready_threshold || 85}% XP Schwelle`,
-                gradient: 'linear-gradient(135deg, #facc15 0%, #d97706 100%)',
-                shadowColor: 'rgba(250, 204, 21, 0.40)',
+                gradient: '#f97316',
+                shadowColor: 'none',
                 icon: Disc
               },
               {
@@ -136,8 +136,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 title: 'Coach-Profil & Avatar',
                 subtitle: (teacher ? formatTeacherFullName(teacher) : '') || 'Musiker-Avatar & Rolle',
                 badge: teacher?.instrument || 'Band-Coach',
-                gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
-                shadowColor: 'rgba(234, 179, 8, 0.35)',
+                gradient: '#a855f7',
+                shadowColor: 'none',
                 icon: Sparkles
               },
               {
@@ -147,8 +147,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                   ? (securityOverview?.has_passkey ? '4-stellige PIN & Passkey aktiv' : '4-stellige PIN aktiv • Passkey hinzufügen')
                   : (securityOverview?.has_passkey ? 'Passkey aktiv • PIN einrichten' : 'PIN & Passkey einrichten'),
                 badge: (securityOverview?.has_personal_pin || teacher?.has_personal_pin) ? 'PIN Aktiv ✓' : 'Sicherheit',
-                gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
-                shadowColor: 'rgba(202, 138, 4, 0.40)',
+                gradient: '#10b981',
+                shadowColor: 'none',
                 icon: ShieldCheck
               },
               {
@@ -156,8 +156,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 title: 'Chat-Ruhezeiten',
                 subtitle: teacher?.quiet_hours?.enabled !== false ? `${teacher?.quiet_hours?.start_time || '19:00'} – ${teacher?.quiet_hours?.end_time || '07:30'} Uhr` : 'Deaktiviert',
                 badge: teacher?.quiet_hours?.enabled !== false ? 'Aktiv' : 'Aus',
-                gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                shadowColor: 'rgba(99, 102, 241, 0.35)',
+                gradient: '#6366f1',
+                shadowColor: 'none',
                 icon: Moon
               },
               {
@@ -165,8 +165,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                 title: 'Ideenschmiede',
                 subtitle: 'Song-Wünsche & Feedback melden',
                 badge: 'Mitgestalten',
-                gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
-                shadowColor: 'rgba(245, 158, 11, 0.35)',
+                gradient: '#0ea5e9',
+                shadowColor: 'none',
                 icon: Lightbulb
               }
             ];
@@ -226,15 +226,15 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           height: '64px',
                           borderRadius: '16px',
                           background: module.gradient,
-                          boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                          boxShadow: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           position: 'relative',
                           overflow: 'hidden',
-                          border: '1px solid rgba(255, 255, 255, 0.25)'
+                          border: 'none'
                         }}>
-                          <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                          <IconComp size={30} color={module.id === 'livelab' ? '#0f172a' : '#ffffff'} strokeWidth={2.3} />
                         </div>
                         <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
                           <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
@@ -251,7 +251,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             fontWeight: 800,
                             color: '#854d0e',
                             background: '#fefce8',
-                            border: '1px solid #fef08a',
+                            border: 'none',
                             padding: '2px 8px',
                             borderRadius: '100px'
                           }}>
@@ -268,7 +268,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                   background: '#fefce8', 
                   borderRadius: '20px', 
                   padding: '18px 24px', 
-                  border: '1.5px solid #fef08a',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -277,7 +277,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                   marginTop: '8px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#eab308', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#facc15', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <BookOpen size={20} />
                     </div>
                     <div>
@@ -293,7 +293,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                     type="button"
                     onClick={() => setIsHelpCenterOpen(true)}
                     style={{
-                      background: '#eab308',
+                      background: '#facc15',
                       color: '#0f172a',
                       border: 'none',
                       padding: '9px 18px',
@@ -372,16 +372,16 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       width: '42px',
                       height: '42px',
                       borderRadius: '12px',
-                      background: activeTeacherSettingsModal === 'quiet_hours' ? 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                      background: activeTeacherSettingsModal === 'quiet_hours' ? '#6366f1' : '#facc15',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: activeTeacherSettingsModal === 'quiet_hours' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : '0 4px 12px rgba(234, 179, 8, 0.3)'
+                      boxShadow: 'none'
                     }}>
-                      {activeTeacherSettingsModal === 'livelab' && <Radio size={22} color="#ffffff" />}
-                      {activeTeacherSettingsModal === 'repertoire' && <Disc size={22} color="#ffffff" />}
-                      {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && <Sparkles size={22} color="#ffffff" />}
-                      {activeTeacherSettingsModal === 'security' && <ShieldCheck size={22} color="#ffffff" />}
+                      {activeTeacherSettingsModal === 'livelab' && <Radio size={22} color="#0f172a" />}
+                      {activeTeacherSettingsModal === 'repertoire' && <Disc size={22} color="#0f172a" />}
+                      {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && <Sparkles size={22} color="#0f172a" />}
+                      {activeTeacherSettingsModal === 'security' && <ShieldCheck size={22} color="#0f172a" />}
                       {activeTeacherSettingsModal === 'quiet_hours' && <Moon size={22} color="#ffffff" />}
                     </div>
                     <div>
@@ -434,7 +434,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                         {/* Preferred Room Selector */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ background: '#f8fafc', border: 'none', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Radio size={18} color="#ca8a04" />
                             <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Bevorzugter Proberaum (Live Lab)</strong>
@@ -462,8 +462,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   style={{
                                     padding: '12px 14px',
                                     borderRadius: '12px',
-                                    border: isSelected ? '2px solid #eab308' : '1px solid #e2e8f0',
-                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    border: isSelected ? 'none' : '1px solid #e2e8f0',
+                                    background: isSelected ? '#fef9c3' : '#ffffff',
                                     color: isSelected ? '#854d0e' : '#1e293b',
                                     fontWeight: 800,
                                     fontSize: '0.82rem',
@@ -481,7 +481,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         </div>
 
                         {/* Auto Session Timeout */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ background: '#f8fafc', border: 'none', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Clock size={18} color="#ca8a04" />
                             <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Kiosk Auto-Logout nach Inaktivität</strong>
@@ -515,8 +515,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   style={{
                                     padding: '8px 16px',
                                     borderRadius: '10px',
-                                    border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
-                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    border: isSelected ? 'none' : '1px solid #cbd5e1',
+                                    background: isSelected ? '#fef9c3' : '#ffffff',
                                     color: isSelected ? '#854d0e' : '#64748b',
                                     fontWeight: 800,
                                     fontSize: '0.8rem',
@@ -532,7 +532,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         </div>
 
                         {/* Geofence Status */}
-                        <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ background: '#fefce8', border: 'none', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <ShieldCheck size={24} color="#ca8a04" />
                           <div>
                             <strong style={{ fontSize: '0.84rem', color: '#713f12', display: 'block' }}>Ortsgebundener Geofence Aktiv</strong>
@@ -573,7 +573,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                         {/* Stage-Ready Threshold */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ background: '#f8fafc', border: 'none', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Disc size={18} color="#ca8a04" />
                             <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Stage-Ready Schwellenwert (Song-Meisterschaft)</strong>
@@ -593,8 +593,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                     flex: 1,
                                     padding: '10px',
                                     borderRadius: '12px',
-                                    border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
-                                    background: isSelected ? '#fefce8' : '#ffffff',
+                                    border: isSelected ? 'none' : '1px solid #cbd5e1',
+                                    background: isSelected ? '#fef9c3' : '#ffffff',
                                     color: isSelected ? '#854d0e' : '#64748b',
                                     fontWeight: 900,
                                     fontSize: '0.86rem',
@@ -618,7 +618,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           padding: '16px',
                           borderRadius: '16px',
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           gap: '12px'
                         }}>
                           <div>
@@ -633,7 +633,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             type="button"
                             onClick={() => updateGrooveSetting('allow_student_song_proposals', currentGrooveSettings.allow_student_song_proposals === false ? true : false)}
                             className={`app-binary-switch ${currentGrooveSettings.allow_student_song_proposals !== false ? 'active' : ''}`}
-                            style={{ backgroundColor: currentGrooveSettings.allow_student_song_proposals !== false ? '#eab308' : undefined, flexShrink: 0 }}
+                            style={{ backgroundColor: currentGrooveSettings.allow_student_song_proposals !== false ? '#facc15' : undefined, flexShrink: 0 }}
                           >
                             <div className="app-binary-switch-knob" />
                           </button>
@@ -647,7 +647,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           padding: '16px',
                           borderRadius: '16px',
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           gap: '12px'
                         }}>
                           <div>
@@ -662,7 +662,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             type="button"
                             onClick={() => updateGrooveSetting('auto_add_mastered_songs', currentGrooveSettings.auto_add_mastered_songs === false ? true : false)}
                             className={`app-binary-switch ${currentGrooveSettings.auto_add_mastered_songs !== false ? 'active' : ''}`}
-                            style={{ backgroundColor: currentGrooveSettings.auto_add_mastered_songs !== false ? '#eab308' : undefined, flexShrink: 0 }}
+                            style={{ backgroundColor: currentGrooveSettings.auto_add_mastered_songs !== false ? '#facc15' : undefined, flexShrink: 0 }}
                           >
                             <div className="app-binary-switch-knob" />
                           </button>
@@ -675,7 +675,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                   {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                       {/* Avatar Selection */}
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ background: '#f8fafc', border: 'none', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Sparkles size={18} color="#ca8a04" />
                           <strong style={{ fontSize: '0.86rem', color: '#1e293b' }}>Musiker-Avatar (Live Lab &amp; Sidebar)</strong>
@@ -736,10 +736,10 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   gap: '6px',
                                   padding: '10px 6px',
                                   borderRadius: '14px',
-                                  background: isSelected ? '#fefce8' : '#ffffff',
-                                  border: isSelected ? '2px solid #eab308' : '1px solid #e2e8f0',
+                                  background: isSelected ? '#fef9c3' : '#ffffff',
+                                  border: isSelected ? 'none' : '1px solid #e2e8f0',
                                   cursor: 'pointer',
-                                  boxShadow: isSelected ? '0 4px 14px rgba(234,179,8,0.25)' : 'none',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s'
                                 }}
                                 className="hover-scale"
@@ -759,14 +759,14 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       </div>
 
                       {/* Coach Data */}
-                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '14px', background: '#f8fafc', padding: '20px', borderRadius: '16px', border: 'none' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
                           <input 
                             type="text" 
                             readOnly 
                             value={teacher?.first_name || ''} 
-                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
                           />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -775,7 +775,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             type="text" 
                             readOnly 
                             value={teacher?.last_name || ''} 
-                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
                           />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: windowWidth < 640 ? 'span 1' : 'span 2' }}>
@@ -784,7 +784,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             type="text" 
                             readOnly 
                             value="GrooveLab Band-Coach" 
-                            style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                            style={{ padding: '10px 14px', borderRadius: '8px', border: 'none', background: '#e2e8f0', color: '#64748b', fontSize: '0.84rem', fontWeight: 700, cursor: 'not-allowed', outline: 'none', width: '100%', boxSizing: 'border-box' }}
                           />
                         </div>
                       </div>
@@ -946,8 +946,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* 1. STATUS & ARCHITEKTUR BANNER */}
                         <div style={{
-                          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                          border: '1px solid #e2e8f0',
+                          background: '#f8fafc',
+                          border: 'none',
                           borderRadius: '18px',
                           padding: '20px',
                           display: 'flex',
@@ -961,12 +961,12 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               width: '44px',
                               height: '44px',
                               borderRadius: '12px',
-                              background: '#fefce8',
-                              border: '1px solid #fef08a',
+                              background: '#fef9c3',
+                              border: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: '#ca8a04',
+                              color: '#854d0e',
                               flexShrink: 0
                             }}>
                               <ShieldCheck size={26} strokeWidth={2.4} />
@@ -979,9 +979,9 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                   fontWeight: 800,
                                   padding: '3px 10px',
                                   borderRadius: '999px',
-                                  background: hasPin ? '#dcfce7' : '#fef3c7',
-                                  color: hasPin ? '#15803d' : '#b45309',
-                                  border: `1px solid ${hasPin ? '#bbf7d0' : '#fde68a'}`
+                                  background: hasPin ? '#dcfce7' : '#fef9c3',
+                                  color: hasPin ? '#15803d' : '#854d0e',
+                                  border: 'none'
                                 }}>
                                   {hasPin ? 'PIN Aktiviert ✓' : 'PIN nicht hinterlegt'}
                                 </span>
@@ -993,7 +993,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                     borderRadius: '999px',
                                     background: '#e0f2fe',
                                     color: '#0369a1',
-                                    border: '1px solid #bae6fd'
+                                    border: 'none'
                                   }}>
                                     {passkeyCount} Passkey(s) aktiv ✓
                                   </span>
@@ -1047,7 +1047,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                 height: '36px',
                                 borderRadius: '10px',
                                 background: '#fefce8',
-                                border: '1px solid #fef08a',
+                                border: 'none',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1062,11 +1062,11 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {hasPin ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                                   <CheckCircle2 size={14} /> Aktiviert
                                 </span>
                               ) : (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #fde68a' }}>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                                   <AlertCircle size={14} /> Keine PIN hinterlegt
                                 </span>
                               )}
@@ -1082,7 +1082,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               padding: '12px 16px',
                               borderRadius: '12px',
                               background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
+                              border: 'none',
                               color: '#15803d',
                               fontSize: '0.82rem',
                               fontWeight: 700,
@@ -1100,7 +1100,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               padding: '12px 16px',
                               borderRadius: '12px',
                               background: '#fef2f2',
-                              border: '1px solid #fecaca',
+                              border: 'none',
                               color: '#b91c1c',
                               fontSize: '0.82rem',
                               fontWeight: 700,
@@ -1174,7 +1174,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                 padding: '12px 22px',
                                 minHeight: '46px',
                                 borderRadius: '12px',
-                                background: newPinInput.trim().length === 4 ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : '#e2e8f0',
+                                background: newPinInput.trim().length === 4 ? '#facc15' : '#e2e8f0',
                                 color: newPinInput.trim().length === 4 ? '#0f172a' : '#94a3b8',
                                 border: 'none',
                                 fontWeight: 850,
@@ -1184,7 +1184,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: '8px',
-                                boxShadow: newPinInput.trim().length === 4 ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
+                                boxShadow: 'none',
                                 transition: 'all 0.15s ease',
                                 touchAction: 'manipulation'
                               }}
@@ -1213,7 +1213,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                                 height: '36px',
                                 borderRadius: '10px',
                                 background: '#f0fdf4',
-                                border: '1px solid #bbf7d0',
+                                border: 'none',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1228,11 +1228,11 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                             </div>
                             <div>
                               {isWebAuthnSupported() ? (
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#dcfce7', color: '#15803d', border: 'none' }}>
                                   Gerät unterstützt Biometrie ✓
                                 </span>
                               ) : (
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#fee2e2', color: '#b91c1c', border: 'none' }}>
                                   Nicht unterstützt
                                 </span>
                               )}
@@ -1245,7 +1245,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
 
                           {/* LIST OF REGISTERED PASSKEYS */}
                           {securityOverview?.passkeys && securityOverview.passkeys.length > 0 && (
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px' }}>
+                            <div style={{ background: '#f8fafc', border: 'none', borderRadius: '14px', padding: '14px 16px' }}>
                               <strong style={{ fontSize: '0.76rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>
                                 Registrierte Geräte &amp; Passkeys ({securityOverview.passkeys.length})
                               </strong>
@@ -1324,7 +1324,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         {/* 4. KOPPLUNG & KIOSK-INFOS */}
                         <div style={{
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           borderRadius: '16px',
                           padding: '18px',
                           display: 'flex',
@@ -1367,8 +1367,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          background: isEnabled ? '#ecfdf5' : '#f8fafc',
-                          border: `1.5px solid ${isEnabled ? '#10b981' : '#e2e8f0'}`,
+                          background: isEnabled ? '#d1fae5' : '#f8fafc',
+                          border: 'none',
                           borderRadius: '16px',
                           padding: '16px 18px'
                         }}>
@@ -1377,7 +1377,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               width: '38px',
                               height: '38px',
                               borderRadius: '10px',
-                              background: isEnabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e2e8f0',
+                              background: isEnabled ? '#10b981' : '#e2e8f0',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1484,7 +1484,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           borderRadius: '14px',
                           padding: '12px 16px',
                           opacity: isEnabled ? 1 : 0.45,
@@ -1550,8 +1550,8 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
 
                         {/* Legal & Didactic Autonomy Card */}
                         <div style={{
-                          background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                          border: '1px solid #bbf7d0',
+                          background: '#dcfce7',
+                          border: 'none',
                           borderRadius: '14px',
                           padding: '14px 16px',
                           display: 'flex',
@@ -1565,7 +1565,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           <p style={{ margin: 0, fontSize: '0.72rem', color: '#15803d', lineHeight: 1.45 }}>
                             Außerhalb deiner Unterrichts- und Dienstzeiten besteht keine Pflicht zur ständigen Erreichbarkeit. Im Chatfenster von Schülern wird dein Feierabend-Banner eingeblendet:
                             <br />
-                            <em style={{ display: 'block', marginTop: '6px', padding: '8px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #bbf7d0', color: '#166534' }}>
+                            <em style={{ display: 'block', marginTop: '6px', padding: '8px 12px', background: '#ffffff', borderRadius: '8px', border: 'none', color: '#166534' }}>
                               „<Moon size={13} color="#166534" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{teacher ? formatTeacherFullName(teacher) : 'Lehrkraft'} hat Feierabend: Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet. Dringende Absagen bitte direkt per E-Mail senden.“
                             </em>
                           </p>

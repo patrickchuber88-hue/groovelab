@@ -74,7 +74,7 @@ export const AbsenceGracePeriodBanner: React.FC<AbsenceGracePeriodBannerProps> =
       aria-label="Ausfall-Schonfrist aktiv"
       style={{
         background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-        border: '1.5px solid #fde68a',
+        border: 'none',
         borderRadius: '16px',
         padding: '12px 16px',
         margin: '0 0 14px 0',
@@ -111,7 +111,7 @@ export const AbsenceGracePeriodBanner: React.FC<AbsenceGracePeriodBannerProps> =
               <span
                 style={{
                   background: '#fef3c7',
-                  border: '1px solid #f59e0b',
+                  border: 'none',
                   color: '#b45309',
                   fontSize: '0.70rem',
                   fontWeight: 800,

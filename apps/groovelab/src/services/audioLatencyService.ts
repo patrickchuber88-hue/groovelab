@@ -1,26 +1,52 @@
 /**
  * ==============================================================================
  * 🎧 Campus-Groovelab Audio Latency Service (0.1% Goldstandard 2027 Benchmark)
- * OWASP ASVS Level 3 / Fail-Safe / Hardware-Route-Aware Audio Calibration Engine
+ * OWASP ASVS Level 3 / Fail-Safe / Multi-Device & Multi-Route Cloud Calibration
  * ==============================================================================
  * 
- * Bounded Context: Audio I/O Synchronization & Device Latency Compensation
+ * Bounded Context: Audio I/O Synchronization & Per-User Multi-Device Compensation
  * Precision: ±2ms acoustic loopback cross-correlation & hardware baseline matrix
  */
 
+import { supabase } from '../lib/supabase';
 import { UniversalLatencyEngine } from '../utils/universalLatencyEngine';
+import { getOrCreateDeviceKey, getDeviceDisplayName } from '../utils/sessionLeaseManager';
 import { acquireAudioLease, releaseAudioLease } from './audio/audioContextPool';
 import { acquireAudioStream } from './audioPermissionService';
+
+export interface SavedDeviceCalibration {
+  profile_key: string;
+  device_key: string;
+  hardware_signature: string;
+  platform: 'ios' | 'mac' | 'windows' | 'android' | 'other';
+  route_type: 'speaker' | 'headphones' | 'bluetooth' | 'usb';
+  device_name: string;
+  input_device_name: string;
+  device_label: string;
+  io_hash: string;
+  latency_ms: number;
+  confidence?: number;
+  method?: 'acoustic_chirp' | 'manual_slider' | 'preset';
+  calibrated_at: string;
+}
 
 export interface AudioRouteInfo {
   routeType: 'speaker' | 'headphones' | 'bluetooth' | 'usb';
   deviceName: string;
   inputDeviceName: string;
+  deviceDisplayName: string;
   isBluetooth: boolean;
   baselineLatencyMs: number;
   calibratedLatencyMs: number | null;
   effectiveLatencyMs: number;
   platform: 'ios' | 'mac' | 'windows' | 'android' | 'other';
+  isCalibrated: boolean;
+  profileKey: string;
+  deviceKey: string;
+  hardwareSignature: string;
+  calibratedAt: string | null;
+  calibrationMethod: 'acoustic_chirp' | 'manual_slider' | 'preset' | null;
+  savedDevices: SavedDeviceCalibration[];
 }
 
 type LatencyChangeListener = (info: AudioRouteInfo) => void;
@@ -29,6 +55,11 @@ class AudioLatencyService {
   private static instance: AudioLatencyService | null = null;
   private listeners: Set<LatencyChangeListener> = new Set();
   private cachedRoute: AudioRouteInfo | null = null;
+  private activeUserId: string | null = null;
+  private hydratedUserIds: Set<string> = new Set();
+  private userCalibrationsMap: Record<string, SavedDeviceCalibration> = {};
+  private pendingPromptReason: string | null = null;
+  private pendingProceedCallback: (() => void) | null = null;
 
   private constructor() {
     if (typeof window !== 'undefined') {
@@ -38,6 +69,9 @@ class AudioLatencyService {
           this.refreshRoute();
         });
       }
+
+      // Sync active user on storage or login changes
+      this.syncActiveUserFromStorage();
     }
   }
 
@@ -46,6 +80,199 @@ class AudioLatencyService {
       AudioLatencyService.instance = new AudioLatencyService();
     }
     return AudioLatencyService.instance;
+  }
+
+  /**
+   * Computes a deterministic physical hardware signature for the current machine/tablet
+   * so the same device is recognized even across browser/PWA boundaries.
+   */
+  public getHardwareSignature(): string {
+    if (typeof window === 'undefined') return 'server_default';
+    const platform = this.detectPlatform();
+    const cores = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4;
+    const screenW = typeof window.screen !== 'undefined' ? Math.max(window.screen.width || 0, window.screen.height || 0) : 0;
+    const screenH = typeof window.screen !== 'undefined' ? Math.min(window.screen.width || 0, window.screen.height || 0) : 0;
+    return `${platform}_${cores}c_${screenW}x${screenH}`;
+  }
+
+  /**
+   * Resolves the currently logged-in user ID from memory or session/localStorage
+   */
+  public resolveActiveUserId(): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const sessionUid = sessionStorage.getItem('groovelab_user_id');
+      if (sessionUid && sessionUid.trim().length > 0) {
+        return sessionUid.trim();
+      }
+      const cachedRaw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw);
+        if (parsed?.id && typeof parsed.id === 'string') {
+          return parsed.id;
+        }
+      }
+    } catch (_) {}
+    return this.activeUserId;
+  }
+
+  private getLocalStorageMapKey(userId: string | null): string {
+    return userId ? `campus_user_audio_calibrations_${userId}` : 'campus_user_audio_calibrations_anon';
+  }
+
+  private loadLocalCalibrationsMap(userId: string | null): Record<string, SavedDeviceCalibration> {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(this.getLocalStorageMapKey(userId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, SavedDeviceCalibration>;
+        }
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  private saveLocalCalibrationsMap(userId: string | null, map: Record<string, SavedDeviceCalibration>): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(this.getLocalStorageMapKey(userId), JSON.stringify(map));
+    } catch (_) {}
+  }
+
+  /**
+   * Synchronizes the active user context from storage and loads their multi-device calibration map.
+   */
+  public syncActiveUserFromStorage(): void {
+    const detectedUid = this.resolveActiveUserId();
+    if (detectedUid !== this.activeUserId) {
+      this.activeUserId = detectedUid;
+      this.userCalibrationsMap = this.loadLocalCalibrationsMap(detectedUid);
+
+      // Also check if cached_user in storage already carries `audio_calibrations`
+      if (typeof window !== 'undefined' && detectedUid) {
+        try {
+          const cachedRaw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
+          if (cachedRaw) {
+            const parsedUser = JSON.parse(cachedRaw);
+            if (parsedUser?.id === detectedUid && parsedUser?.audio_calibrations) {
+              this.mergeRemoteCalibrations(detectedUid, parsedUser.audio_calibrations, parsedUser.device_calibration);
+            }
+          }
+        } catch (_) {}
+
+        // Trigger async DB verification once per user session
+        if (!this.hydratedUserIds.has(detectedUid)) {
+          this.hydratedUserIds.add(detectedUid);
+          this.fetchRemoteCalibrations(detectedUid).catch(() => {});
+        }
+      }
+    } else if (Object.keys(this.userCalibrationsMap).length === 0) {
+      this.userCalibrationsMap = this.loadLocalCalibrationsMap(detectedUid);
+    }
+  }
+
+  /**
+   * Called immediately upon user login (`LoginScreen`, `QRLandingPage`, `CampusIdPinAuthCard`, `App.tsx`)
+   * Checks which device the user is logged in on and loads the matching calibration or marks as uncalibrated.
+   */
+  public async hydrateFromUserLogin(user: {
+    id?: string;
+    audio_calibrations?: Record<string, SavedDeviceCalibration> | null;
+    device_calibration?: any;
+  } | null | undefined): Promise<AudioRouteInfo> {
+    if (!user?.id) {
+      this.activeUserId = null;
+      this.userCalibrationsMap = this.loadLocalCalibrationsMap(null);
+      return this.refreshRoute();
+    }
+
+    const userId = user.id;
+    this.activeUserId = userId;
+    this.userCalibrationsMap = this.loadLocalCalibrationsMap(userId);
+
+    if (user.audio_calibrations || user.device_calibration) {
+      this.mergeRemoteCalibrations(userId, user.audio_calibrations, user.device_calibration);
+    }
+
+    // Fetch authoritative calibrations from PostgreSQL if not embedded in login payload
+    if (!user.audio_calibrations || Object.keys(user.audio_calibrations).length === 0) {
+      await this.fetchRemoteCalibrations(userId);
+    } else {
+      this.hydratedUserIds.add(userId);
+    }
+
+    return this.refreshRoute();
+  }
+
+  private mergeRemoteCalibrations(
+    userId: string,
+    remoteMap?: Record<string, any> | null,
+    legacySingle?: any
+  ): void {
+    const merged: Record<string, SavedDeviceCalibration> = {
+      ...this.loadLocalCalibrationsMap(userId),
+      ...this.userCalibrationsMap
+    };
+
+    if (remoteMap && typeof remoteMap === 'object' && !Array.isArray(remoteMap)) {
+      for (const [key, val] of Object.entries(remoteMap)) {
+        if (val && typeof val === 'object' && typeof val.latency_ms === 'number') {
+          merged[key] = {
+            profile_key: val.profile_key || key,
+            device_key: val.device_key || 'unknown',
+            hardware_signature: val.hardware_signature || '',
+            platform: val.platform || this.detectPlatform(),
+            route_type: val.route_type || 'speaker',
+            device_name: val.device_name || 'Audio-Gerät',
+            input_device_name: val.input_device_name || 'Mikrofon',
+            device_label: val.device_label || val.device_name || 'Audio-Gerät',
+            io_hash: val.io_hash || 'default',
+            latency_ms: Math.round(val.latency_ms),
+            confidence: typeof val.confidence === 'number' ? val.confidence : 0.95,
+            method: val.method || 'acoustic_chirp',
+            calibrated_at: val.calibrated_at || new Date().toISOString()
+          };
+        }
+      }
+    }
+
+    // Backwards-compatible migration for single `device_calibration` object
+    if (legacySingle && typeof legacySingle === 'object' && typeof legacySingle.latency_ms === 'number' && Object.keys(merged).length === 0) {
+      const legacyPlatform = this.detectPlatform();
+      const legacyKey = legacySingle.profile_key || `${legacyPlatform}_speaker_${legacySingle.device_hash || 'default'}`;
+      merged[legacyKey] = {
+        profile_key: legacyKey,
+        device_key: legacySingle.device_key || getOrCreateDeviceKey(),
+        hardware_signature: legacySingle.hardware_signature || this.getHardwareSignature(),
+        platform: legacyPlatform,
+        route_type: legacySingle.route_type || 'speaker',
+        device_name: legacySingle.device_name || 'Audio-Gerät',
+        input_device_name: legacySingle.input_device_name || 'Mikrofon',
+        device_label: legacySingle.device_label || getDeviceDisplayName(),
+        io_hash: legacySingle.device_hash || 'default',
+        latency_ms: Math.round(legacySingle.latency_ms),
+        confidence: 0.9,
+        method: 'acoustic_chirp',
+        calibrated_at: legacySingle.calibrated_at || new Date().toISOString()
+      };
+    }
+
+    this.userCalibrationsMap = merged;
+    this.saveLocalCalibrationsMap(userId, merged);
+  }
+
+  private async fetchRemoteCalibrations(userId: string): Promise<void> {
+    try {
+      const { data, error } = await (supabase.rpc as any)('get_user_audio_calibrations', {
+        p_user_id: userId
+      });
+      if (!error && data?.success && data.audio_calibrations) {
+        this.mergeRemoteCalibrations(userId, data.audio_calibrations);
+        await this.refreshRoute();
+      }
+    } catch (_) {}
   }
 
   /**
@@ -71,15 +298,73 @@ class AudioLatencyService {
     return 'other';
   }
 
+  private computeShortHash(input: string): string {
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      hash = ((hash << 5) - hash) + input.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Finds the best matching calibration for the current physical device and active audio route.
+   * Priority:
+   *   1. Exact `profileKey` match (same device_key + route_type + io_hash)
+   *   2. Same browser installation `device_key` + same `route_type` (handles pre-permission empty device labels)
+   *   3. Same physical `hardware_signature` + same `route_type` (handles Safari <-> PWA or cleared storage)
+   */
+  private findMatchingCalibration(
+    profileKey: string,
+    deviceKey: string,
+    hardwareSignature: string,
+    routeType: 'speaker' | 'headphones' | 'bluetooth' | 'usb'
+  ): SavedDeviceCalibration | null {
+    const entries = Object.values(this.userCalibrationsMap);
+    if (entries.length === 0) return null;
+
+    // 1. Exact profile key match
+    if (this.userCalibrationsMap[profileKey]) {
+      return this.userCalibrationsMap[profileKey];
+    }
+
+    // Sort candidates by most recent calibration timestamp
+    const sorted = [...entries].sort((a, b) => {
+      return (b.calibrated_at || '').localeCompare(a.calibrated_at || '');
+    });
+
+    // 2. Same device_key + same route_type
+    const byDeviceKey = sorted.find(
+      e => e.device_key === deviceKey && e.route_type === routeType
+    );
+    if (byDeviceKey) return byDeviceKey;
+
+    // 3. Same hardware_signature + same route_type
+    const byHardwareSig = sorted.find(
+      e => e.hardware_signature === hardwareSignature && e.route_type === routeType
+    );
+    if (byHardwareSig) return byHardwareSig;
+
+    return null;
+  }
+
   /**
    * Detects the active audio route (Speaker vs. Bluetooth vs. Headphones vs. USB Interface)
+   * and matches it against the current user's saved multi-device calibrations.
    */
   public async detectCurrentAudioRoute(): Promise<AudioRouteInfo> {
+    this.syncActiveUserFromStorage();
+
     const platform = this.detectPlatform();
+    const deviceKey = getOrCreateDeviceKey();
+    const hardwareSignature = this.getHardwareSignature();
+    const deviceDisplayName = getDeviceDisplayName();
+
     let deviceName = 'Standard Audio-Ausgabe';
     let inputDeviceName = platform === 'mac' ? 'Mac Mikrofon' : platform === 'ios' ? 'iPad / iPhone Mikrofon' : 'Standard-Mikrofon';
     let routeType: 'speaker' | 'headphones' | 'bluetooth' | 'usb' = 'speaker';
     let isBluetooth = false;
+    let rawIoLabels = '';
 
     if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
       try {
@@ -87,16 +372,18 @@ class AudioLatencyService {
         const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
         const audioInputs = devices.filter(d => d.kind === 'audioinput');
 
-        // Check if any device label indicates Bluetooth, USB or external interface
-        const allLabels = [...audioOutputs, ...audioInputs].map(d => d.label.toLowerCase()).join(' ');
+        const allLabels = [...audioOutputs, ...audioInputs].map(d => (d.label || '').toLowerCase()).join(' ');
+        rawIoLabels = allLabels.trim();
 
         if (allLabels.includes('airpods') || allLabels.includes('bluetooth') || allLabels.includes('bt ') || allLabels.includes('wireless') || allLabels.includes('buds') || allLabels.includes('wh-1000') || allLabels.includes('wf-1000')) {
           routeType = 'bluetooth';
           isBluetooth = true;
-          deviceName = 'Bluetooth Kopfhörer (z.B. AirPods)';
+          const btDevice = [...audioOutputs, ...audioInputs].find(d => /airpods|bluetooth|wireless|buds|wh-1000|wf-1000/i.test(d.label || ''));
+          deviceName = btDevice?.label || 'Bluetooth Kopfhörer (z.B. AirPods)';
         } else if (allLabels.includes('usb') || allLabels.includes('scarlett') || allLabels.includes('interface') || allLabels.includes('behringer') || allLabels.includes('motu') || allLabels.includes('universal audio')) {
           routeType = 'usb';
-          deviceName = 'USB Audio-Interface';
+          const usbDevice = [...audioOutputs, ...audioInputs].find(d => /usb|scarlett|interface|behringer|motu|universal audio/i.test(d.label || ''));
+          deviceName = usbDevice?.label || 'USB Audio-Interface';
         } else if (allLabels.includes('headphone') || allLabels.includes('kopfhörer') || allLabels.includes('headset')) {
           routeType = 'headphones';
           deviceName = 'Kabelgebundene Kopfhörer';
@@ -111,17 +398,15 @@ class AudioLatencyService {
             inputDeviceName = defaultInput.label;
           }
         }
-      } catch (e) {
-        // Enumerate fallback
-      }
+      } catch (_) {}
     }
 
-    // Curated Baseline Matrix (Hetzner 2db785fa Proven Roundtrip Values in ms)
+    // Curated Baseline Matrix (Proven Roundtrip Values in ms)
     let baselineLatencyMs = 70;
     if (routeType === 'bluetooth') {
-      baselineLatencyMs = 210; // A2DP Bluetooth Audio Buffer typical offset
+      baselineLatencyMs = 210;
     } else if (routeType === 'usb') {
-      baselineLatencyMs = 35; // Low-latency ASIO/CoreAudio interface + WebRTC bridge
+      baselineLatencyMs = 35;
     } else if (routeType === 'headphones') {
       baselineLatencyMs = 55;
     } else {
@@ -134,62 +419,45 @@ class AudioLatencyService {
       }
     }
 
-    // Check localStorage for previously calibrated or manually adjusted offset
-    const storageKey = `campus_audio_latency_${routeType}_${platform}`;
-    let calibratedLatencyMs: number | null = null;
+    const ioHash = rawIoLabels ? this.computeShortHash(`${routeType}_${deviceName}_${inputDeviceName}`) : 'default';
+    const shortDeviceKey = deviceKey.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) || 'dev';
+    const profileKey = `${platform}_${routeType}_${shortDeviceKey}_${ioHash}`;
 
-    if (typeof window !== 'undefined') {
-      try {
-        // 🛡️ One-time self-healing migration (v3): Clear stale 42ms/45ms or uncompensated ScriptProcessor(4096) offsets
-        const migKey = 'campus_latency_cal_v3';
-        if (localStorage.getItem(migKey) !== '1') {
-          const rawRouteVal = localStorage.getItem(storageKey);
-          const rawMasterVal = localStorage.getItem('campus_master_latency_ms');
-          const parsedRoute = rawRouteVal ? parseInt(rawRouteVal, 10) : NaN;
-          const parsedMaster = rawMasterVal ? parseInt(rawMasterVal, 10) : NaN;
-          if (!isBluetooth && ((parsedRoute > 110 && parsedRoute < 180) || parsedRoute === 42 || (parsedMaster > 110 && parsedMaster < 180) || parsedMaster === 42)) {
-            localStorage.removeItem(storageKey);
-            UniversalLatencyEngine.saveLatencyMs(baselineLatencyMs);
-          }
-          localStorage.setItem(migKey, '1');
-        }
+    // Match against the active user's saved multi-device calibrations
+    const matched = this.findMatchingCalibration(profileKey, deviceKey, hardwareSignature, routeType);
 
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = parseInt(stored, 10);
-          if (!isNaN(parsed) && parsed >= -500 && parsed <= 1000) {
-            calibratedLatencyMs = parsed;
-          }
-        } else {
-          // 🌟 SSOT Fallback: Read from UniversalLatencyEngine master storage key
-          const masterVal = localStorage.getItem('campus_master_latency_ms');
-          if (masterVal !== null) {
-            const parsed = parseInt(masterVal, 10);
-            if (!isNaN(parsed) && parsed >= 0 && parsed <= 600) {
-              // Only adopt masterVal if it matches current route class (avoid applying BT latency to speaker or vice versa)
-              if (isBluetooth ? parsed >= 120 : parsed <= 115) {
-                calibratedLatencyMs = parsed;
-              }
-            }
-          }
-        }
-      } catch (e) {}
-    }
-
+    const calibratedLatencyMs = matched ? matched.latency_ms : null;
+    const isCalibrated = matched !== null;
     const effectiveLatencyMs = calibratedLatencyMs !== null ? calibratedLatencyMs : baselineLatencyMs;
+
+    const savedDevices = Object.values(this.userCalibrationsMap).sort((a, b) =>
+      (b.calibrated_at || '').localeCompare(a.calibrated_at || '')
+    );
 
     const info: AudioRouteInfo = {
       routeType,
-      deviceName,
-      inputDeviceName,
+      deviceName: matched?.device_name && rawIoLabels === '' ? matched.device_name : deviceName,
+      inputDeviceName: matched?.input_device_name && rawIoLabels === '' ? matched.input_device_name : inputDeviceName,
+      deviceDisplayName,
       isBluetooth,
       baselineLatencyMs,
       calibratedLatencyMs,
       effectiveLatencyMs,
-      platform
+      platform,
+      isCalibrated,
+      profileKey: matched?.profile_key || profileKey,
+      deviceKey,
+      hardwareSignature,
+      calibratedAt: matched?.calibrated_at || null,
+      calibrationMethod: matched?.method || null,
+      savedDevices
     };
 
     this.cachedRoute = info;
+
+    // Keep UniversalLatencyEngine memory & legacy listeners synchronized with the active user's effective latency
+    UniversalLatencyEngine.syncActiveRouteLatency(effectiveLatencyMs, isCalibrated);
+
     return info;
   }
 
@@ -214,54 +482,233 @@ class AudioLatencyService {
   }
 
   /**
-   * Manually sets or fine-tunes the latency compensation for the current route
+   * Returns true if the current hardware device + active audio route has an explicit calibration for this user.
    */
-  public setManualLatencyMs(ms: number): void {
-    if (!this.cachedRoute) return;
-    const clamped = Math.max(-300, Math.min(600, Math.round(ms)));
-    const storageKey = `campus_audio_latency_${this.cachedRoute.routeType}_${this.cachedRoute.platform}`;
-    
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(storageKey, clamped.toString());
-      } catch (e) {}
-    }
+  public isCurrentRouteCalibrated(): boolean {
+    return Boolean(this.cachedRoute?.isCalibrated);
+  }
 
-    this.cachedRoute.calibratedLatencyMs = clamped;
-    this.cachedRoute.effectiveLatencyMs = clamped;
-    this.notifyListeners(this.cachedRoute);
-
-    // 🌟 SSOT Bridge: Broadcast to UniversalLatencyEngine for all studio modules (Loopstation, GrooveTrainer, DuettDeck)
+  /**
+   * Checks if the user dismissed the calibration prompt for the current device/route in this browser session.
+   */
+  public isPromptDismissedForSession(): boolean {
+    if (typeof window === 'undefined' || !this.cachedRoute) return false;
     try {
-      UniversalLatencyEngine.saveLatencyMs(Math.max(0, clamped));
-    } catch (err) {
-      console.warn('[AudioLatencyService] UniversalLatencyEngine sync error:', err);
+      const uid = this.resolveActiveUserId() || 'anon';
+      const skipKey = `campus_cal_skip_${uid}_${this.cachedRoute.routeType}`;
+      return sessionStorage.getItem(skipKey) === '1';
+    } catch (_) {
+      return false;
     }
   }
 
   /**
-   * Resets latency to the curated hardware baseline
+   * Marks the calibration prompt as skipped for the current session so the user is never blocked in class.
+   */
+  public dismissPromptForSession(): void {
+    if (typeof window !== 'undefined' && this.cachedRoute) {
+      try {
+        const uid = this.resolveActiveUserId() || 'anon';
+        const skipKey = `campus_cal_skip_${uid}_${this.cachedRoute.routeType}`;
+        sessionStorage.setItem(skipKey, '1');
+      } catch (_) {}
+    }
+    const cb = this.pendingProceedCallback;
+    this.pendingProceedCallback = null;
+    this.pendingPromptReason = null;
+    if (cb) {
+      try {
+        cb();
+      } catch (_) {}
+    }
+  }
+
+  public getPendingPromptReason(): string | null {
+    return this.pendingPromptReason;
+  }
+
+  public clearPendingPrompt(runProceed: boolean = false): void {
+    const cb = this.pendingProceedCallback;
+    this.pendingProceedCallback = null;
+    this.pendingPromptReason = null;
+    if (runProceed && cb) {
+      try {
+        cb();
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Just-in-Time Calibration Gate before starting a timing-critical audio recording:
+   * - If the current device + route is ALREADY calibrated (or skipped for this session), returns `false` (proceed immediately).
+   * - If uncalibrated, opens `AudioSettingsSheet` in onboarding prompt mode and returns `true`.
+   */
+  public requestCalibrationPromptIfNeeded(reasonLabel: string, onProceedAfterCalibration?: () => void): boolean {
+    if (typeof navigator !== 'undefined' && (navigator as any).webdriver) {
+      return false;
+    }
+    this.syncActiveUserFromStorage();
+    if (this.isCurrentRouteCalibrated() || this.isPromptDismissedForSession()) {
+      return false;
+    }
+
+    this.pendingPromptReason = reasonLabel;
+    this.pendingProceedCallback = onProceedAfterCalibration || null;
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('campus_open_audio_settings', {
+        detail: {
+          isAutoPrompt: true,
+          promptReason: reasonLabel
+        }
+      }));
+    }
+    return true;
+  }
+
+  /**
+   * Saves a calibration for the current device & audio route both locally (user-scoped) and in PostgreSQL (`users_raw.audio_calibrations`).
+   */
+  public setManualLatencyMs(
+    ms: number,
+    method: 'acoustic_chirp' | 'manual_slider' | 'preset' = 'manual_slider',
+    confidence: number = 1.0
+  ): void {
+    if (!this.cachedRoute) return;
+    const clamped = Math.max(-100, Math.min(600, Math.round(ms)));
+    const userId = this.resolveActiveUserId();
+    const nowIso = new Date().toISOString();
+
+    const ioHash = this.computeShortHash(`${this.cachedRoute.routeType}_${this.cachedRoute.deviceName}_${this.cachedRoute.inputDeviceName}`);
+    const shortDeviceKey = this.cachedRoute.deviceKey.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) || 'dev';
+    const profileKey = `${this.cachedRoute.platform}_${this.cachedRoute.routeType}_${shortDeviceKey}_${ioHash}`;
+
+    const entry: SavedDeviceCalibration = {
+      profile_key: profileKey,
+      device_key: this.cachedRoute.deviceKey,
+      hardware_signature: this.cachedRoute.hardwareSignature,
+      platform: this.cachedRoute.platform,
+      route_type: this.cachedRoute.routeType,
+      device_name: this.cachedRoute.deviceName,
+      input_device_name: this.cachedRoute.inputDeviceName,
+      device_label: this.cachedRoute.deviceDisplayName,
+      io_hash: ioHash,
+      latency_ms: clamped,
+      confidence,
+      method,
+      calibrated_at: nowIso
+    };
+
+    this.userCalibrationsMap[profileKey] = entry;
+    this.saveLocalCalibrationsMap(userId, this.userCalibrationsMap);
+
+    // Update cached route state
+    this.cachedRoute = {
+      ...this.cachedRoute,
+      profileKey,
+      calibratedLatencyMs: clamped,
+      effectiveLatencyMs: clamped,
+      isCalibrated: true,
+      calibratedAt: nowIso,
+      calibrationMethod: method,
+      savedDevices: Object.values(this.userCalibrationsMap).sort((a, b) =>
+        (b.calibrated_at || '').localeCompare(a.calibrated_at || '')
+      )
+    };
+
+    this.notifyListeners(this.cachedRoute);
+
+    // Broadcast to UniversalLatencyEngine for all studio modules
+    try {
+      UniversalLatencyEngine.saveLatencyMs(clamped, userId || undefined);
+    } catch (err) {
+      console.warn('[AudioLatencyService] UniversalLatencyEngine sync error:', err);
+    }
+
+    // Persist to PostgreSQL multi-device map via authoritative RPC
+    if (userId) {
+      this.persistCalibrationToCloud(userId, profileKey, entry).catch((err) => {
+        console.warn('[AudioLatencyService] Cloud calibration persist error:', err);
+      });
+    }
+  }
+
+  private async persistCalibrationToCloud(
+    userId: string,
+    profileKey: string,
+    entry: SavedDeviceCalibration
+  ): Promise<void> {
+    try {
+      const { data, error } = await (supabase.rpc as any)('save_user_audio_calibration', {
+        p_user_id: userId,
+        p_profile_key: profileKey,
+        p_calibration: entry
+      });
+
+      if (!error && data?.success && data.audio_calibrations) {
+        // Also update cached_user in sessionStorage/localStorage so page reloads have instant parity
+        this.updateCachedUserCalibrationsInStorage(userId, data.audio_calibrations);
+      }
+    } catch (_) {}
+  }
+
+  private updateCachedUserCalibrationsInStorage(userId: string, calibrationsMap: Record<string, any>): void {
+    if (typeof window === 'undefined') return;
+    for (const store of [sessionStorage, localStorage]) {
+      try {
+        const raw = store.getItem('groovelab_cached_user');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.id === userId) {
+            parsed.audio_calibrations = calibrationsMap;
+            store.setItem('groovelab_cached_user', JSON.stringify(parsed));
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Resets latency for the current device/route back to the curated hardware baseline
    */
   public resetToBaseline(): AudioRouteInfo | null {
     if (!this.cachedRoute) return null;
-    const storageKey = `campus_audio_latency_${this.cachedRoute.routeType}_${this.cachedRoute.platform}`;
-    
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (e) {}
+    const userId = this.resolveActiveUserId();
+    const profileKeyToRemove = this.cachedRoute.profileKey;
+
+    // Remove matching entries for this device + route
+    for (const [k, v] of Object.entries(this.userCalibrationsMap)) {
+      if (
+        k === profileKeyToRemove ||
+        (v.device_key === this.cachedRoute.deviceKey && v.route_type === this.cachedRoute.routeType) ||
+        (v.hardware_signature === this.cachedRoute.hardwareSignature && v.route_type === this.cachedRoute.routeType)
+      ) {
+        delete this.userCalibrationsMap[k];
+        if (userId) {
+          (supabase.rpc as any)('delete_user_audio_calibration', {
+            p_user_id: userId,
+            p_profile_key: k
+          }).catch(() => {});
+        }
+      }
     }
 
-    this.cachedRoute.calibratedLatencyMs = null;
-    this.cachedRoute.effectiveLatencyMs = this.cachedRoute.baselineLatencyMs;
+    this.saveLocalCalibrationsMap(userId, this.userCalibrationsMap);
+
+    this.cachedRoute = {
+      ...this.cachedRoute,
+      calibratedLatencyMs: null,
+      effectiveLatencyMs: this.cachedRoute.baselineLatencyMs,
+      isCalibrated: false,
+      calibratedAt: null,
+      calibrationMethod: null,
+      savedDevices: Object.values(this.userCalibrationsMap).sort((a, b) =>
+        (b.calibrated_at || '').localeCompare(a.calibrated_at || '')
+      )
+    };
+
     this.notifyListeners(this.cachedRoute);
-
-    // 🌟 SSOT Bridge: Reset UniversalLatencyEngine to hardware baseline
-    try {
-      UniversalLatencyEngine.saveLatencyMs(this.cachedRoute.baselineLatencyMs);
-    } catch (err) {
-      console.warn('[AudioLatencyService] UniversalLatencyEngine reset error:', err);
-    }
+    UniversalLatencyEngine.syncActiveRouteLatency(this.cachedRoute.baselineLatencyMs, false);
 
     return this.cachedRoute;
   }
@@ -301,6 +748,9 @@ class AudioLatencyService {
     }
 
     try {
+      // Refresh route after microphone permission is granted so hardware labels (e.g. "MacBook Air-Mikrofon") are captured
+      await this.detectCurrentAudioRoute();
+
       onProgress?.(20, 'Akustisches Mess-Signal vorbereiten...');
 
       // 🏆 0.1% Goldstandard 2027: 100ms Logarithmic Chirp (800 Hz -> 3.200 Hz) with Raised-Cosine Window
@@ -482,14 +932,13 @@ class AudioLatencyService {
       } else if (measuredDelaysMs.length === 1) {
         finalMeasuredMs = measuredDelaysMs[0];
       } else {
-        // Fallback to baseline if measurement was too quiet or obstructed
-        finalMeasuredMs = this.cachedRoute?.baselineLatencyMs || 42;
+        throw new Error('Kein deutliches Test-Signal erkannt. Bitte Lautstärke etwas erhöhen und erneut messen.');
       }
 
       const confidence = Math.min(1, Math.max(0.4, maxOverallNcc * 1.5));
 
-      // Persist result into SSOT
-      this.setManualLatencyMs(finalMeasuredMs);
+      // Persist result into per-user multi-device SSOT & Cloud
+      this.setManualLatencyMs(finalMeasuredMs, 'acoustic_chirp', confidence);
       onProgress?.(100, `Kalibrierung erfolgreich: ${finalMeasuredMs} ms`);
 
       return { latencyMs: finalMeasuredMs, confidence };

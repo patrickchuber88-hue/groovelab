@@ -253,7 +253,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
                 <span style={{
                   background: 'rgba(52, 168, 83, 0.2)',
                   color: '#4ade80',
-                  border: '1px solid rgba(74, 222, 128, 0.35)',
+                  border: 'none',
                   padding: '4px 12px',
                   borderRadius: '100px',
                   fontSize: '0.66rem',

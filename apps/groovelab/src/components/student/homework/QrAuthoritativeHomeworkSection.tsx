@@ -5,29 +5,10 @@ import {
   Lock, Sparkles, Pin, User, Volume2, VolumeX, AlertTriangle
 } from 'lucide-react';
 import { StudentHomeworkStatusButton } from './StudentHomeworkStatusButton';
-import {
-  formatConsecutivePageRanges,
-  formatConsecutiveExerciseRanges,
-  cleanHomeworkNote,
-  isDummyOrTestSong,
-  isWeeklySnapshotContainer
-} from '../tabs/briefing/homeworkSummaryHelper';
-import {
-  parseSnapshotLehrwerke,
-  parseSnapshotSongs,
-  parseAudioEntries,
-  parseDidacticTextNotes,
-  parseRawNotesArray,
-  UnpackedAudioNote
-} from '../meisterwerk/utils/meisterwerkSnapshotUnpacker';
+import { formatConsecutivePageRanges, formatConsecutiveExerciseRanges, cleanHomeworkNote, isDummyOrTestSong, isWeeklySnapshotContainer } from '../tabs/briefing/homeworkSummaryHelper';
+import { parseSnapshotLehrwerke, parseSnapshotSongs, parseAudioEntries, parseMicroScoreEntries, parseDidacticTextNotes, parseRawNotesArray, UnpackedAudioNote } from '../meisterwerk/utils/meisterwerkSnapshotUnpacker';
 import { isInternalMetadataNote, cleanNotesText } from '../../../domain/stickersAndTresor';
-import {
-  getISOWeek,
-  getItemWeek,
-  getWeekDateRange,
-  getSongColor,
-  CANONICAL_LEHRWERK_COLOR
-} from '../studentDateUtils';
+import { getISOWeek, getItemWeek, getWeekDateRange, getSongColor, CANONICAL_LEHRWERK_COLOR } from '../studentDateUtils';
 import { cleanHomeworkTitle } from '../../../utils/homeworkSnapshotHelper';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
@@ -457,13 +438,20 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
 
     const audioTracks: UnpackedAudioNote[] = [];
     const didacticNotes: string[] = [];
+    const microScores: any[] = [];
 
-    // Extract from currentWeekNotesList (Audio & Didactic Notes for this week)
+    // Extract from currentWeekNotesList (Audio, MicroScores & Didactic Notes for this week)
     if (currentWeekNotesList.length > 0) {
       const snapAudios = parseAudioEntries(currentWeekNotesList);
       snapAudios.forEach(a => {
         if (!audioTracks.some(existing => existing.url === a.url)) {
           audioTracks.push(a);
+        }
+      });
+      const snapMicroScores = parseMicroScoreEntries(currentWeekNotesList);
+      snapMicroScores.forEach(ms => {
+        if (!microScores.some(existing => (existing.id && existing.id === ms.id) || (existing.title && ms.title && existing.title.toLowerCase() === ms.title.toLowerCase()))) {
+          microScores.push(ms);
         }
       });
       const snapNotes = parseDidacticTextNotes(currentWeekNotesList);
@@ -554,10 +542,12 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
 
     // 🌉 SMART VORWOCHEN-FALLBACK & AUDIO/NOTE BRIDGE (100% Parity with MeisterwerkDocumentTab)
     // Pädagogische Kontinuität (Zero-LocalStorage / Mobile Cold Cache):
-    // Wenn für die aktuelle Woche noch keine vollständigen Einträge existieren,
-    // übernehme nahtlos Lehrwerke, Songs, Audioaufnahmen und didaktische Notizen aus dem jüngsten Vorwochen-Snapshot.
-    const hasActiveCurrentHomework = (Object.keys(groupedLehrwerke).length > 0 || songs.length > 0 || audioTracks.length > 0 || didacticNotes.length > 0);
-    if (!hasActiveCurrentHomework || audioTracks.length === 0 || didacticNotes.length === 0 || songs.length === 0 || Object.keys(groupedLehrwerke).length === 0) {
+    // Wenn für die aktuelle Woche noch keine Einträge existieren,
+    // übernehme nahtlos Lehrwerke, Songs, Notenschnipsel, Audioaufnahmen und didaktische Notizen aus dem jüngsten Vorwochen-Snapshot.
+    let isCarriedOver = false;
+    let carriedOverWeekLabel: string | null = null;
+    const hasActiveCurrentHomework = (Object.keys(groupedLehrwerke).length > 0 || songs.length > 0 || microScores.length > 0 || audioTracks.length > 0 || didacticNotes.length > 0);
+    if (!hasActiveCurrentHomework) {
       const pastWeekSnapshots = rawItems.filter(item => {
         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
         const kwMatch = item.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
@@ -593,6 +583,12 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
 
         const parsedPastNotes = parseRawNotesArray(snapRaw);
         if (parsedPastNotes.length === 0) continue;
+
+        if (!carriedOverWeekLabel) {
+          const kwMatch = pastSnapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+          carriedOverWeekLabel = kwMatch ? `KW ${kwMatch[1]}` : 'Vorwoche';
+        }
+        isCarriedOver = true;
 
         // 1. Lehrwerke der Vorwoche übernehmen (falls aktuell noch keine)
         if (Object.keys(groupedLehrwerke).length === 0) {
@@ -653,6 +649,16 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
             }
           });
         }
+
+        // 5. Notenschnipsel der Vorwoche übernehmen (falls aktuell noch keine)
+        if (microScores.length === 0) {
+          const pastMicroScores = parseMicroScoreEntries(parsedPastNotes);
+          pastMicroScores.forEach(ms => {
+            if (!microScores.some(existing => (existing.id && existing.id === ms.id) || (existing.title && ms.title && existing.title.toLowerCase() === ms.title.toLowerCase()))) {
+              microScores.push(ms);
+            }
+          });
+        }
       }
     }
 
@@ -692,10 +698,13 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
     return {
       books: booksList,
       songs,
+      microScores,
       audioTracks,
       didacticNotes,
       studentQuestion: studentQuestionText,
-      hasActiveHomework: booksList.length > 0 || songs.length > 0 || didacticNotes.length > 0 || audioTracks.length > 0
+      hasActiveHomework: booksList.length > 0 || songs.length > 0 || microScores.length > 0 || didacticNotes.length > 0 || audioTracks.length > 0,
+      isCarriedOver,
+      carriedOverWeekLabel
     };
   }, [progressItems, localProgress, lehrwerke, activeSongSkills, assignedCampusSongs, studentId, currentKw, currentWeekIso]);
 
@@ -997,9 +1006,18 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
           }}>
             <Calendar size={14} strokeWidth={2.5} />
           </div>
-          <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-            Dein Wochen-Fahrplan (KW {currentKw})
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              {currentWeekData.isCarriedOver
+                ? `📌 Letzte Hausaufgabe (${currentWeekData.carriedOverWeekLabel || 'Vorwoche'})`
+                : `Dein Wochen-Fahrplan (KW ${currentKw})`}
+            </span>
+            {currentWeekData.isCarriedOver && (
+              <span style={{ fontSize: '0.70rem', color: '#854d0e', fontWeight: 650 }}>
+                Aus der letzten Stunde · Gilt, bis deine Lehrkraft neue Aufgaben einträgt
+              </span>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1339,7 +1357,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                         fontWeight: 850,
                         color: '#15803d',
                         background: '#dcfce7',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         padding: '3px 9px',
                         borderRadius: '99px',
                         whiteSpace: 'nowrap',
@@ -1637,6 +1655,56 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
           </div>
         )}
 
+        {/* Notenschnipsel (MicroScores 1–4 Takte) */}
+        {currentWeekData.microScores && currentWeekData.microScores.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {currentWeekData.microScores.map((ms: any, msIdx: number) => {
+              const msId = ms.id || `ms-${msIdx}`;
+              const msTitle = ms.title || 'Notenschnipsel';
+              const msSubtitle = `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`;
+              return (
+                <div
+                  key={`qr-ms-${msId}-${msIdx}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    paddingBottom: msIdx < currentWeekData.microScores.length - 1 ? '8px' : '0',
+                    borderBottom: msIdx < currentWeekData.microScores.length - 1 ? '1px solid rgba(0, 0, 0, 0.06)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <MicroScoreSnippetButton
+                      studentId={studentId}
+                      taskId={msId}
+                      taskTitle={msTitle}
+                      defaultInstrument={ms.instrument || profile?.instrument}
+                      initialSnippet={ms}
+                      isJunior={false}
+                      readOnly={true}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', wordBreak: 'break-word', lineHeight: 1.25 }}>
+                        {msTitle}
+                      </span>
+                      <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
+                        {msSubtitle}
+                      </span>
+                    </div>
+                  </div>
+                  <StudentHomeworkStatusButton
+                    studentId={studentId}
+                    taskId={msId}
+                    label={msTitle}
+                    variant="standard"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Audio Recordings Carousel (Week-Scoped) */}
         {!compressed && currentWeekData.audioTracks.length > 0 && (
           <div style={{ paddingTop: '2px', width: '100%', boxSizing: 'border-box' }}>
@@ -1866,7 +1934,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                             fontWeight: 800,
                             color: '#713f12',
                             background: '#fef08a',
-                            border: '1px solid #fde047',
+                            border: 'none',
                             padding: '1px 6px',
                             borderRadius: '6px'
                           }}>
@@ -1910,7 +1978,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                         {/* 1. Hausaufgaben KW {pwNum} Container */}
                         <div style={{
                           background: '#fffbeb',
-                          border: '1px solid #fef08a',
+                          border: 'none',
                           borderRadius: '12px',
                           padding: '12px 14px',
                           display: 'flex',

@@ -9,8 +9,8 @@
  * - BFSG 2025 & WCAG 2.2 AA konform (Tastaturbedienung, Kontrast ≥ 7:1)
  */
 
-import React, { useState, useMemo } from 'react';
-import { X, QrCode, Search, School, User, GraduationCap, Music, CheckCircle2, MessageSquare, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { X, QrCode, Search, School, User, GraduationCap, Music, CheckCircle2, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 
@@ -20,6 +20,7 @@ export interface SecretaryLostInstrumentModalProps {
   students?: any[];
   campusTeachers?: any[];
   schoolId?: string;
+  userId?: string;
   onNotifyTeacher?: (teacherId: string, message: string) => void;
 }
 
@@ -29,12 +30,15 @@ export const SecretaryLostInstrumentModal: React.FC<SecretaryLostInstrumentModal
   students = [],
   campusTeachers = [],
   schoolId,
+  userId,
   onNotifyTeacher
 }) => {
   const [tokenInput, setTokenInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [remoteMatchedStudent, setRemoteMatchedStudent] = useState<any | null>(null);
   const [notifySuccess, setNotifySuccess] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
 
   // Suche in der lokalen Schülerliste
   const localMatch = useMemo(() => {
@@ -59,14 +63,60 @@ export const SecretaryLostInstrumentModal: React.FC<SecretaryLostInstrumentModal
   const matchedStudent = localMatch || remoteMatchedStudent;
 
   // Zugeordnete Lehrkraft ermitteln
+  const [fallbackTeacher, setFallbackTeacher] = useState<any | null>(null);
+
+  const cleanTeacherId = (id?: string | null) => (id ? String(id).replace(/^teacher-/i, '').toLowerCase() : '');
+
   const assignedTeacher = useMemo(() => {
     if (!matchedStudent?.teacher_id) return null;
-    return campusTeachers.find(t => t.id === matchedStudent.teacher_id);
+    const sTeacherId = cleanTeacherId(matchedStudent.teacher_id);
+    return campusTeachers.find(t => cleanTeacherId(t.id) === sTeacherId) || null;
   }, [matchedStudent, campusTeachers]);
 
-  const teacherDisplayName = assignedTeacher
-    ? formatTeacherFullName(assignedTeacher.first_name, assignedTeacher.last_name)
+  // Falls Lehrkraft nicht im lokalen Cache/Props vorhanden ist, asynchron aus der DB laden
+  useEffect(() => {
+    const rawTeacherId = matchedStudent?.teacher_id;
+    if (!rawTeacherId || assignedTeacher) {
+      setFallbackTeacher(null);
+      return;
+    }
+
+    const sTeacherId = cleanTeacherId(rawTeacherId);
+    let isCancelled = false;
+
+    supabase
+      .from('users')
+      .select('id, first_name, last_name, instrument, email, role')
+      .or(`id.eq.${sTeacherId},id.eq.${rawTeacherId}`)
+      .maybeSingle()
+      .then(
+        ({ data }) => {
+          if (!isCancelled && data) {
+            setFallbackTeacher(data);
+          }
+        },
+        (err: unknown) => {
+          console.warn('Fehler beim Nachladen der Lehrkraft:', err);
+        }
+      );
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [matchedStudent?.teacher_id, assignedTeacher]);
+
+  const effectiveTeacher = assignedTeacher || fallbackTeacher;
+
+  const teacherDisplayName = effectiveTeacher
+    ? formatTeacherFullName(effectiveTeacher)
     : 'Nicht zugewiesen';
+
+  const teacherFirstName = (
+    effectiveTeacher?.first_name ||
+    effectiveTeacher?.firstName ||
+    teacherDisplayName.split(' ')[0] ||
+    'Lehrkraft'
+  ).trim();
 
   // Remote-Suche, falls Schüler nicht im lokalen Cache
   const handleRemoteSearch = async () => {
@@ -104,17 +154,89 @@ export const SecretaryLostInstrumentModal: React.FC<SecretaryLostInstrumentModal
     }
   };
 
-  const handleNotifyTeacher = () => {
-    if (!matchedStudent || !assignedTeacher) return;
-    const studentName = `${matchedStudent.first_name} ${matchedStudent.last_name}`.trim();
+  const handleNotifyTeacher = async () => {
+    if (!matchedStudent || !effectiveTeacher || isSending) return;
+    setNotifyError(null);
+
+    const studentName = `${matchedStudent.first_name || matchedStudent.firstName || ''} ${matchedStudent.last_name || matchedStudent.lastName || ''}`.trim();
     const inst = matchedStudent.instrument || 'Instrument';
-    const message = `Hallo ${assignedTeacher.first_name}, das Fundstück (${inst}) deines Schülers ${studentName} wurde im Sekretariat abgegeben!`;
+    const teacherGreeting = teacherFirstName || 'Kollege/in';
+    const message = `🎒 Fundstück im Sekretariat: Hallo ${teacherGreeting}, das Instrument (${inst}) deines Schülers ${studentName} wurde soeben im Schulsekretariat abgegeben!`;
 
     if (onNotifyTeacher) {
-      onNotifyTeacher(assignedTeacher.id, message);
+      try {
+        onNotifyTeacher(effectiveTeacher.id, message);
+        setNotifySuccess(true);
+        setTimeout(() => setNotifySuccess(false), 3500);
+      } catch (err: any) {
+        setNotifyError(err?.message || 'Fehler beim Aufruf der Chat-Aktion');
+      }
+      return;
     }
-    setNotifySuccess(true);
-    setTimeout(() => setNotifySuccess(false), 3000);
+
+    setIsSending(true);
+    try {
+      // 1. Authentische Sender-ID ermitteln
+      let senderId = (
+        userId ||
+        (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null) ||
+        (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null) ||
+        ''
+      ).trim();
+
+      if (!senderId) {
+        try {
+          const authUser = await supabase.auth.getUser();
+          if (authUser?.data?.user?.id) {
+            senderId = authUser.data.user.id;
+          }
+        } catch (_) {}
+      }
+
+      if (!senderId) {
+        throw new Error('Keine aktive Sekretariats-Sitzung gefunden. Bitte erneut anmelden.');
+      }
+
+      const effectiveSchoolId = (
+        schoolId ||
+        effectiveTeacher?.school_id ||
+        matchedStudent?.school_id ||
+        ''
+      ).trim();
+
+      // 2. Autoritativer Chat-Eintrag in campus_direct_messages
+      const payload: any = {
+        school_id: effectiveSchoolId,
+        sender_id: senderId,
+        recipient_id: effectiveTeacher.id,
+        content: message,
+        message_type: 'direct',
+        is_read: false
+      };
+
+      let res = await supabase.from('campus_direct_messages').insert(payload).select().single();
+
+      // Resilienz-Fallback: Falls message_type im Schema-Cache hakt
+      if (res.error) {
+        const errorStr = String(res.error.message || '');
+        if (errorStr.includes('message_type') || res.error.code === '42703' || res.error.code === 'PGRST204') {
+          delete payload.message_type;
+          res = await supabase.from('campus_direct_messages').insert(payload).select().single();
+        }
+      }
+
+      if (res.error) {
+        throw new Error(res.error.message || 'Zustellung im Campus-Chat fehlgeschlagen.');
+      }
+
+      setNotifySuccess(true);
+      setTimeout(() => setNotifySuccess(false), 3500);
+    } catch (err: any) {
+      console.warn('[SecretaryLostInstrumentModal] Fehler beim Senden im Campus-Chat:', err);
+      setNotifyError(err?.message || 'Nachricht konnte nicht im Campus-Chat zugestellt werden.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -310,7 +432,7 @@ export const SecretaryLostInstrumentModal: React.FC<SecretaryLostInstrumentModal
                     Schüler / Eigentümer
                   </div>
                   <div style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a', marginTop: '2px' }}>
-                    {matchedStudent.first_name} {matchedStudent.last_name}
+                    {matchedStudent.first_name || matchedStudent.firstName} {matchedStudent.last_name || matchedStudent.lastName}
                   </div>
                 </div>
 
@@ -356,35 +478,60 @@ export const SecretaryLostInstrumentModal: React.FC<SecretaryLostInstrumentModal
               </div>
 
               {/* 1-Klick Lehrkraft Benachrichtigung */}
-              {assignedTeacher && (
-                <button
-                  type="button"
-                  role="button"
-                  tabIndex={0}
-                  onClick={handleNotifyTeacher}
-                  style={{
-                    border: 'none',
-                    background: notifySuccess ? '#15803d' : '#0f172a',
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    padding: '10px 16px',
-                    fontSize: '0.82rem',
-                    fontWeight: 900,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <MessageSquare size={15} />
-                  <span>
-                    {notifySuccess
-                      ? `Lehrkraft ${assignedTeacher.first_name} informiert!`
-                      : `Lehrkraft ${assignedTeacher.first_name} im Campus-Chat informieren`}
-                  </span>
-                </button>
+              {effectiveTeacher && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button
+                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    onClick={handleNotifyTeacher}
+                    disabled={isSending}
+                    style={{
+                      border: 'none',
+                      background: notifySuccess ? '#15803d' : '#0f172a',
+                      color: '#ffffff',
+                      borderRadius: '10px',
+                      padding: '10px 16px',
+                      fontSize: '0.82rem',
+                      fontWeight: 900,
+                      cursor: isSending ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      opacity: isSending ? 0.75 : 1,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isSending ? (
+                      <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                    ) : (
+                      <MessageSquare size={15} />
+                    )}
+                    <span>
+                      {isSending
+                        ? `Sende Nachricht an ${teacherDisplayName}...`
+                        : notifySuccess
+                        ? `Lehrkraft ${teacherDisplayName} im Campus-Chat informiert!`
+                        : `Lehrkraft ${teacherDisplayName} im Campus-Chat informieren`}
+                    </span>
+                  </button>
+
+                  {notifyError && (
+                    <div style={{
+                      fontSize: '0.74rem',
+                      color: '#dc2626',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '2px 4px'
+                    }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{notifyError}</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : tokenInput.trim().length >= 3 && !loading ? (

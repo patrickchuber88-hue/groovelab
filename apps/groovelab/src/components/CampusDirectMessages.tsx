@@ -2,62 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMe
 import { supabase } from '../lib/supabase';
 import { logApplicationAudit } from '../services/auditLogService';
 import { CampusGroovelabText } from './CampusGroovelabBrand';
-import { 
-  Send, 
-  Search, 
-  MessageSquare, 
-  User, 
-  ArrowLeft, 
-  Check, 
-  Clock, 
-  Inbox, 
-  Plus, 
-  X, 
-  Calendar, 
-  ShieldCheck, 
-  Lock, 
-  Unlock,
-  Sparkles, 
-  CheckCheck, 
-  Loader2, 
-  ChevronDown, 
-  RotateCcw, 
-  AlertTriangle, 
-  ArrowRight, 
-  Music, 
-  HeartHandshake, 
-  Moon, 
-  Phone, 
-  Fingerprint,
-  Users,
-  Guitar,
-  Mic,
-  Headphones,
-  Radio,
-  Trophy,
-  Flame,
-  Layers,
-  Compass,
-  Info,
-  GraduationCap,
-  Hash,
-  Bell,
-  Trash2,
-  Sliders,
-  MessageCircle,
-  Flag,
-  Disc,
-  Volume2,
-  Speaker,
-  Zap,
-  Repeat,
-  BookOpen,
-  Medal,
-  FolderGit2,
-  Archive,
-  Activity,
-  Award
-} from 'lucide-react';
+import { Send, Search, MessageSquare, User, ArrowLeft, Check, Clock, Inbox, Plus, X, Calendar, ShieldCheck, Lock, Unlock, Sparkles, CheckCheck, Loader2, ChevronDown, RotateCcw, AlertTriangle, ArrowRight, Music, HeartHandshake, Moon, Phone, Fingerprint, Users, Guitar, Mic, Headphones, Radio, Trophy, Flame, Layers, Compass, Info, GraduationCap, Hash, Bell, Trash2, Sliders, MessageCircle, Flag, Disc, Volume2, Speaker, Zap, Repeat, BookOpen, Medal, FolderGit2, Archive, Activity, Award } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName, formatStudentDisplayName } from '../utils/nameHelper';
 import { isUUID } from '../utils/uuidValidator';
@@ -127,12 +72,12 @@ export const resolveGroupIconAndColor = (group: any) => {
 };
 
 export const APPLE_AVATAR_GRADIENTS = [
-  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', text: '#ffffff' },
-  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', text: '#ffffff' },
-  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)', text: '#ffffff' },
-  { bg: 'linear-gradient(135deg, #f97316 0%, #c2410c 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', text: '#ffffff' },
-  { bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #e11d48 0%, #9f1239 100%)', text: '#ffffff' },
-  { bg: 'linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%)', text: '#ffffff' }, { bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', text: '#ffffff' }
+  { bg: '#10b981', text: '#ffffff' }, { bg: '#3b82f6', text: '#ffffff' },
+  { bg: '#a855f7', text: '#ffffff' }, { bg: '#facc15', text: '#0f172a' },
+  { bg: '#ef4444', text: '#ffffff' }, { bg: '#06b6d4', text: '#ffffff' },
+  { bg: '#f97316', text: '#ffffff' }, { bg: '#34a853', text: '#ffffff' },
+  { bg: '#6366f1', text: '#ffffff' }, { bg: '#f87171', text: '#ffffff' },
+  { bg: '#0ea5e9', text: '#ffffff' }, { bg: '#475569', text: '#ffffff' }
 ];
 
 export const getDeterministicAvatarGradient = (userOrNameOrId: any, fallbackInitial?: string) => {
@@ -157,22 +102,17 @@ export const getDeterministicAvatarGradient = (userOrNameOrId: any, fallbackInit
     initial = 'A';
   }
 
-  // Anchor 'A' (z. B. Amelia) deterministisch und unverrückbar auf Apple Emerald Smaragdgrün (#10b981 -> #047857)
+  // Anchor 'A' (z. B. Amelia) deterministisch und unverrückbar auf Apple Emerald Smaragdgrün (#10b981)
   if (initial === 'A') {
     return {
-      bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+      bg: '#10b981',
       text: '#ffffff'
     };
   }
 
   const charCode = initial.charCodeAt(0);
   const letterOffset = (charCode >= 65 && charCode <= 90) ? charCode - 65 : (Math.abs(charCode) % 26);
-  const hue = Math.round((155 + letterOffset * 137.508) % 360);
-
-  return {
-    bg: `linear-gradient(135deg, hsl(${hue}, 72%, 46%) 0%, hsl(${hue}, 76%, 35%) 100%)`,
-    text: '#ffffff'
-  };
+  return APPLE_AVATAR_GRADIENTS[letterOffset % APPLE_AVATAR_GRADIENTS.length];
 };
 
 export const getContactInitials = (u: any): string => {
@@ -224,16 +164,16 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
         <div style={{
           width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`,
           background: variant === 'on-dark' ? 'rgba(255, 255, 255, 0.22)' : `${colorKey}16`,
-          border: variant === 'on-dark' ? '1.5px solid rgba(255, 255, 255, 0.38)' : `1.5px solid ${colorKey}38`,
+          border: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.15)' : `0 2px 8px ${colorKey}18`,
+          boxShadow: 'none',
           boxSizing: 'border-box'
         }}>
           <GroupIcon size={iconSize} color={variant === 'on-dark' ? '#ffffff' : colorKey} strokeWidth={2.4} />
         </div>
         {(user.unreadCount || 0) > 0 && (
           <div style={{
-            position: 'absolute', bottom: '-2px', right: '-2px', background: '#ea4335', color: 'white',
+            position: 'absolute', bottom: '-2px', right: '-2px', background: '#ef4444', color: 'white',
             borderRadius: '50%', width: '18px', height: '18px', fontSize: '0.65rem', fontWeight: 900,
             display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', boxShadow: 'none', zIndex: 2
           }}>
@@ -260,12 +200,12 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
   // Teachers get signature academic emerald palette; Admins get slate/indigo; Parents blue; Students get deterministic studio palettes
   const gradient = isTeacher 
     ? (variant === 'on-dark' 
-        ? { bg: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)', text: '#ffffff' }
-        : { bg: 'linear-gradient(135deg, #15803d 0%, #047857 100%)', text: '#ffffff' })
+        ? { bg: '#34a853', text: '#ffffff' }
+        : { bg: '#10b981', text: '#ffffff' })
     : isSecretary
-    ? { bg: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)', text: '#ffffff' }
+    ? { bg: '#0f172a', text: '#ffffff' }
     : isParent
-    ? { bg: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)', text: '#ffffff' }
+    ? { bg: '#3b82f6', text: '#ffffff' }
     : (studentRosterGradient || getDeterministicAvatarGradient(user || identifier, initials[0]));
 
   const fontSize = size >= 44 ? '0.98rem' : size >= 36 ? '0.85rem' : '0.72rem';
@@ -276,7 +216,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
       <div 
         style={{
           width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: gradient.bg,
-          border: '2px solid #ffffff', boxShadow: variant === 'on-dark' ? '0 2px 8px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0, 0, 0, 0.08)',
+          border: 'none', boxShadow: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center', color: gradient.text,
           fontWeight: 850, fontSize: fontSize, letterSpacing: '-0.02em', userSelect: 'none', boxSizing: 'border-box'
         }}
@@ -316,7 +256,7 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
             width: '12px',
             height: '12px',
             borderRadius: '50%',
-            background: isQuietHours ? '#f59e0b' : '#22c55e',
+            background: isQuietHours ? '#f59e0b' : '#34a853',
             border: 'none',
             boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
             zIndex: 2
@@ -419,7 +359,14 @@ export function CampusDirectMessages({
 
   const checkIsMobile = () => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth < 768 || Boolean(document.querySelector('.sim-viewport-mobile'));
+    if (typeof document !== 'undefined') {
+      const simCat = document.documentElement.getAttribute('data-sim-category');
+      if (simCat === 'mobile' || document.querySelector('.sim-viewport-mobile')) return true;
+      if (simCat === 'tablet' || document.querySelector('.sim-viewport-tablet')) return false;
+      const simW = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simW > 0) return simW <= 768;
+    }
+    return window.innerWidth <= 768;
   };
   const [isMobile, setIsMobile] = useState(checkIsMobile);
 
@@ -856,6 +803,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       };
 
       fetchStudentTeachers();
+      return;
     }
 
     const fetchAssignedStudents = async () => {
@@ -1727,33 +1675,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     const total = canonicalRoster.length;
     if (total === 0) return map;
 
-    // 3. Deterministische Zuweisung über die chromatische Regenbogen-Tonleiter
-    const stepAngle = 360 / total;
-
+    // 3. Deterministische Zuweisung über die 12-Ton Notenschnipsel-Farbpalette
     canonicalRoster.forEach((student, index) => {
       if (!student?.id) return;
-
-      // Index 0 (z. B. Amelia N.) bleibt unverrückbar auf Apple Emerald Smaragdgrün (155°)
-      if (index === 0) {
-        map.set(student.id, {
-          bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-          text: '#ffffff'
-        });
-        return;
-      }
-
-      // Kontinuierliche chromatische Regenbogen-Wanderung ab 155° Smaragdgrün
-      const hue = Math.round((155 + index * stepAngle) % 360);
-
-      // WCAG AA Kontrast-Optimierung für helle Gelb-/Bernstein-Zonen
-      const isWarmLightZone = hue >= 40 && hue <= 85;
-      const l1 = isWarmLightZone ? 40 : 46;
-      const l2 = isWarmLightZone ? 30 : 35;
-
-      map.set(student.id, {
-        bg: `linear-gradient(135deg, hsl(${hue}, 74%, ${l1}%) 0%, hsl(${hue}, 78%, ${l2}%) 100%)`,
-        text: '#ffffff'
-      });
+      map.set(student.id, APPLE_AVATAR_GRADIENTS[index % APPLE_AVATAR_GRADIENTS.length]);
     });
 
     return map;
@@ -1765,8 +1690,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       if (!u || u.id === user?.id) return false;
       if (selectedRecipient && u.id === selectedRecipient.id) return true;
       if (isStudent) {
-        const isTeacherRole = u.role === 'teacher' || (Array.isArray(u.roles) && u.roles.includes('teacher'));
-        return isTeacherRole;
+        const uRole = (u.role || '').toLowerCase();
+        const uRoles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
+        const isTeacherOrStaff =
+          uRole === 'teacher' ||
+          uRole === 'admin' ||
+          uRole === 'secretary' ||
+          Boolean(u.is_teacher) ||
+          uRoles.includes('teacher') ||
+          uRoles.includes('admin') ||
+          uRoles.includes('secretary');
+        return isTeacherOrStaff;
       }
 
       const role = (u.role || '').toLowerCase();
@@ -2848,14 +2782,14 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       display: 'flex', 
       gap: isMobile ? '0' : '24px', 
       position: isMobile && selectedRecipient ? 'fixed' : 'relative',
-      top: isMobile && selectedRecipient ? '-1px' : undefined,
-      left: isMobile && selectedRecipient ? '-1px' : undefined,
-      right: isMobile && selectedRecipient ? '-1px' : undefined,
-      bottom: isMobile && selectedRecipient ? '-1px' : undefined,
-      width: isMobile && selectedRecipient ? 'calc(100% + 2px)' : '100%',
-      height: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'auto') : 'calc(100vh - 140px)', 
-      maxHeight: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'none') : 'none',
-      minHeight: isMobile ? (selectedRecipient ? 'calc(100% + 2px)' : 'auto') : '700px',
+      top: isMobile && selectedRecipient ? 'calc(48px + env(safe-area-inset-top, 0px))' : undefined,
+      left: isMobile && selectedRecipient ? '0px' : undefined,
+      right: isMobile && selectedRecipient ? '0px' : undefined,
+      bottom: isMobile && selectedRecipient ? '0px' : undefined,
+      width: '100%',
+      height: isMobile ? (selectedRecipient ? 'calc(100% - 48px - env(safe-area-inset-top, 0px))' : 'auto') : 'calc(100vh - 140px)', 
+      maxHeight: isMobile ? (selectedRecipient ? 'calc(100% - 48px - env(safe-area-inset-top, 0px))' : 'none') : 'none',
+      minHeight: isMobile ? (selectedRecipient ? 'calc(100% - 48px - env(safe-area-inset-top, 0px))' : 'auto') : '700px',
       overflow: isMobile && selectedRecipient ? 'hidden' : 'visible',
       fontFamily: '"Outfit", "Inter", sans-serif',
       boxSizing: 'border-box',
@@ -3084,8 +3018,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         minHeight: '82px',
                         borderRadius: '18px',
-                        background: isSelected ? '#f0fdf4' : 'transparent',
-                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        background: isSelected ? '#dcfce7' : 'transparent',
+                        border: 'none',
                         boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
@@ -3169,7 +3103,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         height: '46px',
                         borderRadius: '50%',
                         background: '#f0fdf4',
-                        border: '1.5px solid #bbf7d0',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -3298,8 +3232,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         minHeight: '82px',
                         borderRadius: '18px',
-                        background: isSelected ? '#f0fdf4' : 'transparent',
-                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        background: isSelected ? '#dcfce7' : 'transparent',
+                        border: 'none',
                         boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
@@ -3386,8 +3320,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         width: '100%',
                         padding: isMobile ? '12px 14px' : '14px 16px',
                         borderRadius: '16px',
-                        background: isSelected ? '#f0fdf4' : 'transparent',
-                        border: isSelected ? '1px solid #bbf7d0' : '1px solid transparent',
+                        background: isSelected ? '#dcfce7' : 'transparent',
+                        border: 'none',
                         boxShadow: 'none',
                         cursor: 'pointer',
                         marginBottom: '6px',
@@ -3434,7 +3368,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           gap: '3px',
                           background: '#eff6ff',
                           color: '#1d4ed8',
-                          border: '1px solid #dbeafe',
+                          border: 'none',
                           padding: '1px 5px',
                           borderRadius: '5px',
                           fontSize: '0.62rem',
@@ -3485,7 +3419,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               paddingBottom: '12px',
               paddingLeft: isMobile ? '12px' : '22px',
               paddingRight: isMobile ? '12px' : '22px',
-              background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)', 
+              background: '#34a853', 
               color: '#ffffff',
               borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
               display: 'flex', 
@@ -3542,7 +3476,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             fontWeight: 900,
                             background: 'rgba(255, 255, 255, 0.22)',
                             color: '#ffffff',
-                            border: '1px solid rgba(255, 255, 255, 0.35)',
+                            border: 'none',
                             padding: '2px 8px',
                             borderRadius: '6px',
                             display: 'inline-flex',
@@ -3601,7 +3535,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           letterSpacing: '0.04em',
                           background: 'rgba(255, 255, 255, 0.22)',
                           color: '#ffffff',
-                          border: '1px solid rgba(255, 255, 255, 0.35)',
+                          border: 'none',
                           padding: '2px 8px',
                           borderRadius: '6px',
                           display: 'inline-block',
@@ -3632,7 +3566,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         padding: '4px 8px',
                         borderRadius: '100px',
                         background: 'rgba(255, 255, 255, 0.22)',
-                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        border: 'none',
                         color: '#ffffff',
                         fontSize: '0.70rem',
                         fontWeight: 800,
@@ -3661,12 +3595,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         height: '32px',
                         borderRadius: '50%',
                         background: 'rgba(255, 255, 255, 0.18)',
-                        border: '1px solid rgba(255, 255, 255, 0.28)',
+                        border: 'none',
                         color: '#ffffff',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                        boxShadow: 'none',
                         cursor: 'pointer'
                       }}
                       className="hover-scale"
@@ -3688,12 +3622,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     color: '#ffffff',
                     fontSize: '0.72rem',
                     fontWeight: 750,
-                    border: '1px solid rgba(255, 255, 255, 0.28)',
+                    border: 'none',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    boxShadow: 'none',
                     cursor: 'help'
                   }}
                 >
@@ -3809,7 +3743,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             touchAction: 'manipulation'
                           }}
                         >
-                          <IconComp size={13} color={isActive ? '#ffffff' : (isAnnounce ? '#eab308' : '#64748b')} strokeWidth={2.4} />
+                          <IconComp size={13} color={isActive ? '#ffffff' : (isAnnounce ? '#facc15' : '#64748b')} strokeWidth={2.4} />
                           <span>{channel.name}</span>
                           {!isActive && unreadCount > 0 && (
                             <span style={{
@@ -3878,8 +3812,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           background: '#f1f5f9',
                           padding: '3px',
                           borderRadius: '100px',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                          border: 'none',
+                          boxShadow: 'none'
                         }}
                       >
                         <button
@@ -4033,7 +3967,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   background: '#f1f5f9',
                   padding: '3px',
                   borderRadius: '100px',
-                  border: '1px solid #e2e8f0',
+                  border: 'none',
                   gap: '2px'
                 }}>
                   <button
@@ -4154,7 +4088,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       style={{
                         padding: '4px 12px',
                         borderRadius: '100px',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         background: '#f0fdf4',
                         color: '#15803d',
                         fontSize: '0.74rem',
@@ -4241,7 +4175,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           height: '56px',
                           borderRadius: '16px',
                           background: '#f0fdf4',
-                          border: '1.5px solid #bbf7d0',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -4337,7 +4271,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 const pedagogicalTrustBanner = (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '4px 0 12px 0' }}>
                     <div style={{
-                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px 16px',
+                      background: '#f8fafc', border: 'none', borderRadius: '14px', padding: '10px 16px',
                       maxWidth: '360px', textAlign: 'center', fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
                       boxShadow: '0 1px 3px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
                     }}>
@@ -4480,8 +4414,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       style={{
                         padding: '6px 14px',
                         borderRadius: '100px',
-                        background: '#ffffff',
-                        border: '1px solid #bbf7d0',
+                        background: '#dcfce7',
+                        border: 'none',
                         color: '#15803d',
                         fontSize: '0.78rem',
                         fontWeight: 800,
@@ -4638,7 +4572,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     alignItems: 'center',
                     gap: '6px',
                     background: '#fffbeb',
-                    border: '1px solid #fef3c7',
+                    border: 'none',
                     borderRadius: '100px',
                     padding: '3px 10px',
                     marginBottom: '6px',
@@ -4657,8 +4591,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '6px',
-                    background: respectWarning.isCrisis ? '#fef2f2' : '#fffbeb',
-                    border: `1.5px solid ${respectWarning.isCrisis ? '#fca5a5' : '#fcd34d'}`,
+                    background: respectWarning.isCrisis ? '#fee2e2' : '#fef9c3',
+                    border: 'none',
                     borderRadius: '14px',
                     padding: '10px 14px',
                     marginBottom: '8px',
@@ -4675,7 +4609,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     {respectWarning.isCrisis && (
                       <div style={{
                         background: '#ffffff',
-                        border: '1px solid #fecaca',
+                        border: 'none',
                         borderRadius: '8px',
                         padding: '6px 10px',
                         fontSize: '0.72rem',
@@ -4738,7 +4672,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       position: 'absolute',
                       right: '5px',
                       border: 'none',
-                      background: !typedMessage.trim() ? '#f1f5f9' : 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                      background: !typedMessage.trim() ? '#f1f5f9' : '#34a853',
                       color: !typedMessage.trim() ? '#94a3b8' : '#ffffff',
                       borderRadius: '50%',
                       width: '36px',
@@ -4792,7 +4726,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             {/* Green Hero Banner Header */}
             <div style={{
               padding: isMobile ? '20px 16px' : '28px 24px',
-              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)',
+              background: '#34a853',
               color: 'white',
               borderRadius: isMobile ? '16px 16px 0 0' : '24px 24px 0 0',
               display: 'flex',
@@ -4816,11 +4750,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
               {/* Status Badges */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: '1px solid rgba(255, 255, 255, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <ShieldCheck size={12} color="#ffffff" />
                   <span>DSGVO-Geschützt</span>
                 </span>
-                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: '1px solid rgba(255, 255, 255, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ padding: '4px 10px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.2)', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, border: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <Calendar size={12} color="#ffffff" />
                   <span>Stundenplan-Synchron</span>
                 </span>
@@ -4845,7 +4779,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(210px, 1fr))', gap: '12px' }}>
                   {isAssignedLoading ? (
-                    [1, 2, 3].map(i => <div key={`skel-card-${i}`} className="animate-pulse" style={{ height: '76px', borderRadius: '16px', background: '#f1f5f9', border: '1px solid #e2e8f0' }} />)
+                    [1, 2, 3].map(i => <div key={`skel-card-${i}`} className="animate-pulse" style={{ height: '76px', borderRadius: '16px', background: '#f1f5f9', border: 'none' }} />)
                   ) : finalPartnersList.length === 0 ? (
                     <div style={{ gridColumn: '1 / -1', padding: '24px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', color: '#94a3b8', textAlign: 'center', fontSize: '0.85rem', fontWeight: 600 }}>
                       Noch keine aktiven Schüler-Kontakte zugewiesen.
@@ -4989,8 +4923,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   key={idx}
                   style={{
                     width: '16px', height: '16px', borderRadius: '50%',
-                    background: parentPinInput.length > idx ? '#0284c7' : '#e2e8f0',
-                    border: `2px solid ${parentPinInput.length > idx ? '#0284c7' : '#cbd5e1'}`,
+                    background: parentPinInput.length > idx ? '#0ea5e9' : '#e2e8f0',
+                    border: 'none',
                     transition: 'all 0.15s ease',
                     transform: parentPinInput.length > idx ? 'scale(1.15)' : 'scale(1)'
                   }}
@@ -5018,7 +4952,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       }
                     }}
                     style={{
-                      padding: '14px', minHeight: '50px', borderRadius: '16px', border: '1.5px solid #f1f5f9',
+                      padding: '14px', minHeight: '50px', borderRadius: '16px', border: isClear || isBack ? 'none' : '1.5px solid #f1f5f9',
                       background: isClear || isBack ? '#f8fafc' : '#ffffff',
                       color: isClear ? '#ef4444' : isBack ? '#64748b' : '#0f172a',
                       fontSize: isBack ? '1.1rem' : '1.25rem', fontWeight: 800, cursor: 'pointer',
@@ -5039,8 +4973,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 disabled={isVerifyingPin}
                 onClick={handleBiometricUnlock}
                 style={{
-                  marginTop: '6px', width: '100%', padding: '12px 16px', borderRadius: '16px', border: '1px solid #bae6fd',
-                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', color: '#0284c7', fontSize: '0.88rem',
+                  marginTop: '6px', width: '100%', padding: '12px 16px', borderRadius: '16px', border: 'none',
+                  background: '#e0f2fe', color: '#0369a1', fontSize: '0.88rem',
                   fontWeight: 800, cursor: isVerifyingPin ? 'not-allowed' : 'pointer', opacity: isVerifyingPin ? 0.6 : 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxShadow: 'none'
                 }}
@@ -5133,7 +5067,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             {/* Header Banner */}
             <div style={{
               padding: '24px',
-              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)',
+              background: '#34a853',
               color: '#ffffff',
               borderRadius: '28px 28px 0 0',
               position: 'relative'
@@ -5270,7 +5204,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           padding: '10px 14px',
                           borderRadius: '14px',
                           background: '#f8fafc',
-                          border: '1px solid #f1f5f9'
+                          border: 'none'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -5314,7 +5248,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                               padding: '3px 9px',
                               borderRadius: '100px',
                               background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
+                              border: 'none',
                               color: '#15803d',
                               fontSize: '0.70rem',
                               fontWeight: 800
@@ -5414,7 +5348,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
             <div style={{
               background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 12px',
               fontSize: '0.78rem',
@@ -5438,7 +5372,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 style={{
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  border: '1px solid #fecaca',
+                  border: 'none',
                   background: '#fef2f2',
                   color: '#b91c1c',
                   fontWeight: 750,
@@ -5456,7 +5390,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 style={{
                   padding: '10px 14px',
                   borderRadius: '12px',
-                  border: '1px solid #fed7aa',
+                  border: 'none',
                   background: '#fff7ed',
                   color: '#c2410c',
                   fontWeight: 750,

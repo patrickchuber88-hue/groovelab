@@ -352,7 +352,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '4px solid #e2e8f0', borderTopColor: '#eab308', animation: 'spin 1s linear infinite' }} className="animate-spin" />
+        <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '4px solid #e2e8f0', borderTopColor: '#facc15', animation: 'spin 1s linear infinite' }} className="animate-spin" />
         <span style={{ fontWeight: 800, color: '#64748b' }}>Wird geladen...</span>
       </div>
     );
@@ -407,7 +407,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
             <div>
               <h1 style={{ fontSize: '2.2rem', fontWeight: 950, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <span style={{ display: 'inline-flex', padding: '10px', borderRadius: '16px', background: 'rgba(234, 179, 8, 0.1)', color: '#eab308' }}>
+                <span style={{ display: 'inline-flex', padding: '10px', borderRadius: '16px', background: 'rgba(234, 179, 8, 0.1)', color: '#facc15' }}>
                   <Users size={32} />
                 </span>
                 Ensembles & Bands
@@ -421,7 +421,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
               <button
                 onClick={() => setShowCreateModal(true)}
                 style={{
-                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                  background: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
                   color: '#0f172a',
                   border: 'none',
                   padding: '14px 24px',
@@ -481,7 +481,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         background: ens.type === 'band' ? '#fefce8' : '#faf5ff',
-                        color: ens.type === 'band' ? '#eab308' : '#a855f7',
+                        color: ens.type === 'band' ? '#facc15' : '#a855f7',
                         border: `1px solid ${ens.type === 'band' ? '#dbeafe' : '#f3e8ff'}`
                       }}>
                         {ens.type === 'band' ? '🎸 Band' : '🎻 Ensemble'}
@@ -498,7 +498,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         style={{
                           background: 'rgba(239, 68, 68, 0.05)',
                           color: '#ef4444',
-                          border: '1px solid rgba(239, 68, 68, 0.1)',
+                          border: 'none',
                           padding: '8px',
                           borderRadius: '10px',
                           cursor: 'pointer',
@@ -578,7 +578,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                   fontWeight: 900,
                   textTransform: 'uppercase',
                   background: selectedEnsemble?.type === 'band' ? '#fefce8' : '#faf5ff',
-                  color: selectedEnsemble?.type === 'band' ? '#eab308' : '#a855f7',
+                  color: selectedEnsemble?.type === 'band' ? '#facc15' : '#a855f7',
                   border: `1px solid ${selectedEnsemble?.type === 'band' ? '#dbeafe' : '#f3e8ff'}`
                 }}>
                   {selectedEnsemble?.type === 'band' ? '🎸 Band' : '🎻 Ensemble'}
@@ -676,8 +676,8 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                   marginBottom: '12px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <Sparkles size={20} color="#eab308" className="animate-pulse" />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    <Sparkles size={20} color="#facc15" className="animate-pulse" />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       Smarte Schnellzuweisung
                     </span>
                   </div>
@@ -687,7 +687,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: '12px', 
-                      background: '#eab308', 
+                      background: '#facc15', 
                       padding: '16px 24px', 
                       borderRadius: '20px', 
                       boxShadow: 'none',
@@ -742,7 +742,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                             }}
                             style={{
                               padding: '14px 20px',
-                              background: highlightedIndex === idx ? '#eab308' : 'transparent',
+                              background: highlightedIndex === idx ? '#facc15' : 'transparent',
                               color: highlightedIndex === idx ? 'white' : '#1e293b',
                               fontWeight: 750,
                               fontSize: '0.95rem',
@@ -756,7 +756,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                             <span style={{ 
                               fontSize: '0.75rem', 
                               fontWeight: 800, 
-                              color: highlightedIndex === idx ? 'white' : '#eab308',
+                              color: highlightedIndex === idx ? 'white' : '#facc15',
                               background: highlightedIndex === idx ? 'rgba(255,255,255,0.2)' : 'rgba(234, 179, 8, 0.08)',
                               padding: '4px 10px',
                               borderRadius: '8px'
@@ -806,7 +806,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         onClick={() => setAddingMemberTo(addingMemberTo === selectedEnsemble.id ? null : selectedEnsemble.id)}
                         style={{
                           background: 'rgba(234, 179, 8, 0.08)',
-                          color: '#eab308',
+                          color: '#facc15',
                           border: 'none',
                           padding: '10px 18px',
                           borderRadius: '12px',
@@ -869,7 +869,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                       <button
                         onClick={() => handleAddMember(selectedEnsemble.id)}
                         disabled={!selectedStudentId || !selectedInstrument.trim()}
-                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: (!selectedStudentId || !selectedInstrument.trim()) ? 0.5 : 1 }}
+                        style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#facc15', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: (!selectedStudentId || !selectedInstrument.trim()) ? 0.5 : 1 }}
                       >
                         Zuweisen
                       </button>
@@ -926,7 +926,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                                   />
                                   <button
                                     onClick={() => handleUpdateMemberInstrument(mem.id)}
-                                    style={{ border: 'none', background: '#eab308', color: '#0f172a', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    style={{ border: 'none', background: '#facc15', color: '#0f172a', borderRadius: '6px', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                   >
                                     <Check size={12} />
                                   </button>
@@ -942,7 +942,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                                   }}
                                   style={{ 
                                     fontSize: '0.8rem', 
-                                    color: '#eab308', 
+                                    color: '#facc15', 
                                     fontWeight: 800, 
                                     display: 'inline-flex', 
                                     alignItems: 'center', 
@@ -955,7 +955,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                                   }}
                                   title={isTeacher ? 'Tippen zum Bearbeiten' : ''}
                                 >
-                                  <span style={{ display: 'inline-flex' }}>{renderInstrumentIcon(mem.instrument, '#eab308', 14)}</span>
+                                  <span style={{ display: 'inline-flex' }}>{renderInstrumentIcon(mem.instrument, '#facc15', 14)}</span>
                                   <span>{mem.instrument}</span>
                                 </div>
                               )}
@@ -1020,7 +1020,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         </div>
                         <div 
                           style={{ 
-                            background: isOwnMsg ? '#eab308' : '#f1f5f9',
+                            background: isOwnMsg ? '#facc15' : '#f1f5f9',
                             color: isOwnMsg ? 'white' : '#1e293b',
                             padding: '12px 18px',
                             borderRadius: '18px',
@@ -1054,7 +1054,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                   type="submit"
                   disabled={!newMessageText.trim()}
                   style={{ 
-                    background: '#eab308', 
+                    background: '#facc15', 
                     color: '#0f172a', 
                     border: 'none', 
                     borderRadius: '14px', 
@@ -1083,7 +1083,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                     onClick={() => setAddingSongTo(addingSongTo === selectedEnsemble.id ? null : selectedEnsemble.id)}
                     style={{
                       background: 'rgba(234, 179, 8, 0.08)',
-                      color: '#eab308',
+                      color: '#facc15',
                       border: 'none',
                       padding: '10px 18px',
                       borderRadius: '12px',
@@ -1141,7 +1141,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                     <button
                       onClick={() => handleAddSong(selectedEnsemble.id)}
                       disabled={!selectedSongId}
-                      style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: !selectedSongId ? 0.5 : 1 }}
+                      style={{ flex: 1, padding: '12px', borderRadius: '12px', border: 'none', background: '#facc15', color: '#0f172a', fontWeight: 800, cursor: 'pointer', opacity: !selectedSongId ? 0.5 : 1 }}
                     >
                       Hinzufügen
                     </button>
@@ -1171,7 +1171,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(234, 179, 8, 0.05)', color: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(234, 179, 8, 0.05)', color: '#facc15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <Disc size={22} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1236,9 +1236,9 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                     padding: '14px',
                     borderRadius: '14px',
                     border: '2px solid',
-                    borderColor: newType === 'band' ? '#eab308' : '#e2e8f0',
+                    borderColor: newType === 'band' ? '#facc15' : '#e2e8f0',
                     background: newType === 'band' ? 'rgba(234, 179, 8, 0.05)' : 'white',
-                    color: newType === 'band' ? '#eab308' : '#64748b',
+                    color: newType === 'band' ? '#facc15' : '#64748b',
                     fontWeight: 800,
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -1254,9 +1254,9 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                     padding: '14px',
                     borderRadius: '14px',
                     border: '2px solid',
-                    borderColor: newType === 'ensemble' ? '#eab308' : '#e2e8f0',
+                    borderColor: newType === 'ensemble' ? '#facc15' : '#e2e8f0',
                     background: newType === 'ensemble' ? 'rgba(234, 179, 8, 0.05)' : 'white',
-                    color: newType === 'ensemble' ? '#eab308' : '#64748b',
+                    color: newType === 'ensemble' ? '#facc15' : '#64748b',
                     fontWeight: 800,
                     cursor: 'pointer',
                     transition: 'all 0.2s'
@@ -1279,7 +1279,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
               </button>
               <button
                 type="submit"
-                style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#eab308', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: '#facc15', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
               >
                 Gründen
               </button>

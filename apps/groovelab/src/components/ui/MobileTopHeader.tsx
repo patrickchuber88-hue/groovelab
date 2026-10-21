@@ -128,7 +128,7 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
           alignItems: 'flex-start'
         }}>
           <span style={{ color: '#34a853' }}>Campus-</span>
-          <span style={{ color: '#eab308' }}>Groovelab</span>
+          <span style={{ color: '#facc15' }}>Groovelab</span>
         </span>
 
         {parentUnlocked && (
@@ -149,7 +149,7 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
               gap: '4px',
               padding: '3px 8px',
               borderRadius: '20px',
-              border: '1px solid #bae6fd',
+              border: 'none',
               background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
               color: '#0284c7',
               fontSize: '0.68rem',
@@ -182,8 +182,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
             padding: '6px 14px',
             borderRadius: '100px',
             background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
-            border: activePlatform === 'campus' ? '1.5px solid #34a853' : '1.5px solid #eab308',
-            color: activePlatform === 'campus' ? '#166534' : '#854d0e',
+            border: activePlatform === 'campus' ? '1.5px solid #34a853' : '1.5px solid #facc15',
+            color: activePlatform === 'campus' ? '#137333' : '#854d0e',
             fontSize: '0.78rem',
             fontWeight: 800,
             cursor: 'pointer',

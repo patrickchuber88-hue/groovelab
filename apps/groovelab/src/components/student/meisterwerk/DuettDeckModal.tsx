@@ -1862,7 +1862,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+            background: '#f8fafc',
             flexShrink: 0
           }}
         >
@@ -1979,7 +1979,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   fontWeight: visualMode === 'overlay' ? 950 : 700,
                   fontSize: '0.72rem',
                   cursor: 'pointer',
-                  boxShadow: visualMode === 'overlay' ? '0 1px 4px rgba(124, 58, 237, 0.12)' : 'none',
+                  boxShadow: visualMode === 'overlay' ? '0 1px 4px rgba(0, 0, 0, 0.08)' : 'none',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale-mini"
@@ -2017,8 +2017,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '5px',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  background: '#dcfce7',
+                  border: 'none',
                   borderRadius: '100px',
                   padding: '3px 9px',
                   fontSize: '0.70rem',
@@ -2037,13 +2037,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: isLatencyDrawerOpen ? '#ede9fe' : '#ffffff',
-                  border: isLatencyDrawerOpen ? '1px solid #c4b5fd' : '1px solid #cbd5e1',
+                  background: isLatencyDrawerOpen ? '#f3e8ff' : '#ffffff',
+                  border: isLatencyDrawerOpen ? 'none' : '1px solid #cbd5e1',
                   borderRadius: '8px',
                   padding: '4px 9px',
                   fontSize: '0.70rem',
                   fontWeight: 800,
-                  color: isLatencyDrawerOpen ? '#6d28d9' : '#475569',
+                  color: isLatencyDrawerOpen ? '#7e22ce' : '#475569',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -2086,9 +2086,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       handleNudgeLatency(hw - latencyOffsetMs);
                     }}
                     style={{
-                      background: '#ede9fe',
-                      border: '1px solid #c4b5fd',
-                      color: '#6d28d9',
+                      background: '#f3e8ff',
+                      border: 'none',
+                      color: '#7e22ce',
                       borderRadius: '6px',
                       fontSize: '0.66rem',
                       fontWeight: 800,
@@ -2103,9 +2103,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     type="button"
                     onClick={() => handleNudgeLatency(210 - latencyOffsetMs)}
                     style={{
-                      background: '#ede9fe',
-                      border: '1px solid #c4b5fd',
-                      color: '#6d28d9',
+                      background: '#f3e8ff',
+                      border: 'none',
+                      color: '#7e22ce',
                       borderRadius: '6px',
                       fontSize: '0.66rem',
                       fontWeight: 800,
@@ -2135,12 +2135,12 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   </button>
 
                   {/* Nudge Controls */}
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#ede9fe', padding: '2px 4px', borderRadius: '6px', border: '1px solid #ddd6fe' }}>
-                    <button type="button" onClick={() => handleNudgeLatency(-5)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #c4b5fd', borderRadius: '4px', color: '#6d28d9', cursor: 'pointer' }}>-5ms</button>
-                    <button type="button" onClick={() => handleNudgeLatency(-1)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #c4b5fd', borderRadius: '4px', color: '#6d28d9', cursor: 'pointer' }}>-1ms</button>
-                    <span style={{ fontSize: '0.70rem', fontWeight: 950, color: '#6d28d9', minWidth: '46px', textAlign: 'center' }}>{latencyOffsetMs > 0 ? `+${latencyOffsetMs}ms` : `${latencyOffsetMs}ms`}</span>
-                    <button type="button" onClick={() => handleNudgeLatency(+1)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #c4b5fd', borderRadius: '4px', color: '#6d28d9', cursor: 'pointer' }}>+1ms</button>
-                    <button type="button" onClick={() => handleNudgeLatency(+5)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #c4b5fd', borderRadius: '4px', color: '#6d28d9', cursor: 'pointer' }}>+5ms</button>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#f3e8ff', padding: '2px 4px', borderRadius: '6px', border: 'none' }}>
+                    <button type="button" onClick={() => handleNudgeLatency(-5)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#7e22ce', cursor: 'pointer' }}>-5ms</button>
+                    <button type="button" onClick={() => handleNudgeLatency(-1)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#7e22ce', cursor: 'pointer' }}>-1ms</button>
+                    <span style={{ fontSize: '0.70rem', fontWeight: 950, color: '#7e22ce', minWidth: '46px', textAlign: 'center' }}>{latencyOffsetMs > 0 ? `+${latencyOffsetMs}ms` : `${latencyOffsetMs}ms`}</span>
+                    <button type="button" onClick={() => handleNudgeLatency(+1)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#7e22ce', cursor: 'pointer' }}>+1ms</button>
+                    <button type="button" onClick={() => handleNudgeLatency(+5)} style={{ padding: '2px 4px', fontSize: '0.62rem', fontWeight: 900, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px', color: '#7e22ce', cursor: 'pointer' }}>+5ms</button>
                   </div>
 
                   {/* Optional Auto-Align */}
@@ -2152,7 +2152,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                      background: '#a855f7',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '6px',
@@ -2171,7 +2171,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               </div>
 
               {autoAlignNotice && (
-                <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', padding: '3px 8px', fontSize: '0.66rem', fontWeight: 800, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ background: '#f3e8ff', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.66rem', fontWeight: 800, color: '#7e22ce', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Sparkles size={11} color="#7c3aed" />
                   <span>{autoAlignNotice}</span>
                 </div>
@@ -2204,7 +2204,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             style={{
               position: 'relative',
               height: '28px',
-              background: 'linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%)',
+              background: '#f8fafc',
               borderRadius: '10px',
               border: '1.5px solid #cbd5e1',
               display: 'flex',
@@ -2321,13 +2321,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span
                       style={{
-                        background: '#e6f4ea',
+                        background: '#dcfce7',
                         color: '#15803d',
                         fontSize: '0.66rem',
                         fontWeight: 900,
                         padding: '3px 8px',
                         borderRadius: '100px',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         textTransform: 'uppercase',
                         letterSpacing: '0.04em'
                       }}
@@ -2438,8 +2438,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                             flex: 1,
                             minWidth: '1.5px',
                             height: `${heightPct}%`,
-                            background: 'linear-gradient(180deg, #4ade80 0%, #22c55e 35%, #16a34a 70%, #15803d 100%)',
-                            boxShadow: isBaseline ? 'none' : '0 -1px 2px rgba(74, 222, 128, 0.45)',
+                            background: '#34a853',
+                            boxShadow: 'none',
                             opacity: isBaseline ? 0.35 : 1,
                             borderRadius: '1.5px',
                             transition: 'height 0.12s ease'
@@ -2485,9 +2485,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               {/* TRACK 2: SCHÜLER */}
               <div
                 style={{
-                  background: studentAudioUrl ? '#f5f3ff' : '#fafafa',
+                  background: studentAudioUrl ? '#f3e8ff' : '#f8fafc',
                   borderRadius: '20px',
-                  border: studentAudioUrl ? '1.5px solid #ddd6fe' : '1.5px dashed #cbd5e1',
+                  border: studentAudioUrl ? 'none' : '1.5px dashed #cbd5e1',
                   padding: isMobile ? '12px' : '14px 16px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -2499,13 +2499,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span
                       style={{
-                        background: studentAudioUrl ? '#ede9fe' : '#f1f5f9',
-                        color: studentAudioUrl ? '#6d28d9' : '#64748b',
+                        background: studentAudioUrl ? '#ffffff' : '#f1f5f9',
+                        color: studentAudioUrl ? '#7e22ce' : '#64748b',
                         fontSize: '0.66rem',
                         fontWeight: 900,
                         padding: '3px 8px',
                         borderRadius: '100px',
-                        border: studentAudioUrl ? '1px solid #c4b5fd' : '1px solid #e2e8f0',
+                        border: studentAudioUrl ? 'none' : '1px solid #e2e8f0',
                         textTransform: 'uppercase',
                         letterSpacing: '0.04em'
                       }}
@@ -2513,7 +2513,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       Spur 2: {studentFirstName} (Schüler)
                     </span>
                     {studentAudioUrl && (
-                      <span ref={track2TimeRef} style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
+                      <span ref={track2TimeRef} style={{ fontSize: '0.74rem', color: '#7e22ce', fontWeight: 700 }}>
                         {formatSecs(Math.max(0, currentPlayheadTime - (latencyOffsetMs / 1000)))} / {formatSecs(studentDuration)}
                       </span>
                     )}
@@ -2557,8 +2557,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
+                            background: '#dcfce7',
+                            border: 'none',
                             borderRadius: '12px',
                             padding: '8px 12px',
                             color: '#15803d',
@@ -2578,17 +2578,17 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
-                            background: '#fffbeb',
-                            border: '1px solid #fde68a',
+                            background: '#fef9c3',
+                            border: 'none',
                             borderRadius: '12px',
                             padding: '8px 12px',
-                            color: '#b45309',
+                            color: '#854d0e',
                             fontSize: '0.74rem',
                             fontWeight: 750,
                             textAlign: 'left'
                           }}
                         >
-                          <Sparkles size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                          <Sparkles size={16} color="#854d0e" style={{ flexShrink: 0 }} />
                           <span>
                             <strong>Studio-Tipp:</strong> Mit Kopfhörern klingt dein Duett am reinsten! Über Lautsprecher wird der Lehrer automatisch leise geregelt (-14 dB Guide), um Mikrofon-Verzerrungen zu verhindern.
                           </span>
@@ -2628,7 +2628,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                                 gap: '3px',
                                 minHeight: '44px',
                                 transition: 'all 0.15s ease',
-                                boxShadow: isActive ? '0 2px 8px rgba(15, 23, 42, 0.08)' : 'none'
+                                boxShadow: 'none'
                               }}
                               className="hover-scale-mini"
                             >
@@ -2655,7 +2655,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         padding: isMobile ? '12px 20px' : '14px 26px',
                         minHeight: '48px',
                         borderRadius: '16px',
-                        background: isLoadingTeacher ? '#94a3b8' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        background: isLoadingTeacher ? '#94a3b8' : '#ef4444',
                         color: '#ffffff',
                         fontSize: isMobile ? '0.88rem' : '0.96rem',
                         fontWeight: 950,
@@ -2680,8 +2680,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 {countInStep !== null && (
                   <div
                     style={{
-                      background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                      border: '1.5px solid #c4b5fd',
+                      background: '#f3e8ff',
+                      border: 'none',
                       borderRadius: '16px',
                       padding: '12px 18px',
                       display: 'flex',
@@ -2700,7 +2700,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           width: '42px',
                           height: '42px',
                           borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                          background: '#a855f7',
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
@@ -2717,7 +2717,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         <div style={{ fontSize: '0.90rem', fontWeight: 950, color: '#5b21b6' }}>
                           Bereit machen...
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 750, color: '#7c3aed', opacity: 0.9 }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 750, color: '#7e22ce', opacity: 0.9 }}>
                           Instrument ansetzen • Startet gleich!
                         </div>
                       </div>
@@ -2727,9 +2727,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       onClick={handleCancelCountIn}
                       style={{
                         background: '#ffffff',
-                        border: '1px solid #ddd6fe',
+                        border: '1px solid #e2e8f0',
                         borderRadius: '10px',
-                        color: '#6d28d9',
+                        color: '#7e22ce',
                         padding: '6px 12px',
                         fontSize: '0.74rem',
                         fontWeight: 900,
@@ -2746,7 +2746,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
                 {/* Active Recording State */}
                 {isRecording && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: isMobile ? '12px' : '14px 16px', background: '#fef2f2', border: isClippingDetected ? '2px solid #ef4444' : '1.5px solid #fca5a5', borderRadius: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: isMobile ? '12px' : '14px 16px', background: '#fee2e2', border: 'none', borderRadius: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                         <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite', flexShrink: 0 }} />
@@ -2755,7 +2755,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           <div style={{ fontSize: '0.66rem', color: '#b91c1c', fontWeight: 700 }}>Stoppt automatisch bei {formatSecs(teacherDuration)} (inkl. Ausklingen)</div>
                         </div>
                       </div>
-                      <button type="button" onClick={handleStopRecording} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', minHeight: '40px', borderRadius: '12px', background: '#dc2626', color: '#ffffff', fontSize: '0.82rem', fontWeight: 900, border: 'none', cursor: 'pointer', flexShrink: 0 }} className="hover-scale-mini">
+                      <button type="button" onClick={handleStopRecording} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', minHeight: '40px', borderRadius: '12px', background: '#ef4444', color: '#ffffff', fontSize: '0.82rem', fontWeight: 900, border: 'none', cursor: 'pointer', flexShrink: 0 }} className="hover-scale-mini">
                         <Square size={14} fill="#ffffff" />
                         <span>Jetzt Stoppen</span>
                       </button>
@@ -2807,7 +2807,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         background: '#ffffff',
                         padding: '6px 0',
                         borderRadius: '14px',
-                        border: '1.5px solid #ddd6fe',
+                        border: '1.5px solid #e2e8f0',
                         overflow: 'hidden'
                       }}
                       title="Klicken zum Spulen (Spur 2)"
@@ -2866,8 +2866,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                                 flex: 1,
                                 minWidth: '1.5px',
                                 height: `${heightPct}%`,
-                                background: 'linear-gradient(180deg, #d8b4fe 0%, #c084fc 35%, #9333ea 70%, #7e22ce 100%)',
-                                boxShadow: isBaseline ? 'none' : '0 -1px 2px rgba(216, 180, 254, 0.45)',
+                                background: '#a855f7',
+                                boxShadow: 'none',
                                 opacity: isBaseline ? 0.35 : 1,
                                 borderRadius: '1.5px',
                                 transition: 'height 0.12s ease'
@@ -2948,7 +2948,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               style={{
                 background: '#ffffff',
                 borderRadius: '20px',
-                border: '1.5px solid #ddd6fe',
+                border: '1.5px solid #e2e8f0',
                 padding: isMobile ? '12px' : '16px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2964,13 +2964,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      background: '#e6f4ea',
+                      background: '#dcfce7',
                       color: '#15803d',
                       fontSize: '0.66rem',
                       fontWeight: 900,
                       padding: '3px 8px',
                       borderRadius: '100px',
-                      border: '1px solid #bbf7d0'
+                      border: 'none'
                     }}
                   >
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }} />
@@ -2981,13 +2981,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '5px',
-                      background: '#ede9fe',
-                      color: '#6d28d9',
+                      background: '#f3e8ff',
+                      color: '#7e22ce',
                       fontSize: '0.66rem',
                       fontWeight: 900,
                       padding: '3px 8px',
                       borderRadius: '100px',
-                      border: '1px solid #c4b5fd'
+                      border: 'none'
                     }}
                   >
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7c3aed' }} />
@@ -3045,8 +3045,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px',
-                          background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
+                          background: '#dcfce7',
+                          border: 'none',
                           borderRadius: '10px',
                           padding: '6px 12px',
                           color: '#15803d',
@@ -3064,17 +3064,17 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px',
-                          background: '#fffbeb',
-                          border: '1px solid #fde68a',
+                          background: '#fef9c3',
+                          border: 'none',
                           borderRadius: '10px',
                           padding: '6px 12px',
-                          color: '#b45309',
+                          color: '#854d0e',
                           fontSize: '0.72rem',
                           fontWeight: 750,
                           textAlign: 'left'
                         }}
                       >
-                        <Sparkles size={14} color="#d97706" style={{ flexShrink: 0 }} />
+                        <Sparkles size={14} color="#854d0e" style={{ flexShrink: 0 }} />
                         <span>💡 <strong>Studio-Tipp:</strong> Mit Kopfhörern klingt dein Duett am reinsten! (Lehrer wird leise geregelt)</span>
                       </div>
                     )}
@@ -3092,7 +3092,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       gap: '8px',
                       padding: '10px 20px',
                       borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      background: '#ef4444',
                       color: '#ffffff',
                       fontSize: '0.86rem',
                       fontWeight: 900,
@@ -3111,8 +3111,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               {countInStep !== null && (
                 <div
                   style={{
-                    background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                    border: '1.5px solid #c4b5fd',
+                    background: '#f3e8ff',
+                    border: 'none',
                     borderRadius: '16px',
                     padding: '12px 18px',
                     display: 'flex',
@@ -3131,7 +3131,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         width: '42px',
                         height: '42px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                        background: '#a855f7',
                         color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
@@ -3148,7 +3148,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       <div style={{ fontSize: '0.90rem', fontWeight: 950, color: '#5b21b6' }}>
                         Bereit machen...
                       </div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 750, color: '#7c3aed', opacity: 0.9 }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 750, color: '#7e22ce', opacity: 0.9 }}>
                         Instrument ansetzen • Startet gleich!
                       </div>
                     </div>
@@ -3158,9 +3158,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     onClick={handleCancelCountIn}
                     style={{
                       background: '#ffffff',
-                      border: '1px solid #ddd6fe',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '10px',
-                      color: '#6d28d9',
+                      color: '#7e22ce',
                       padding: '6px 12px',
                       fontSize: '0.74rem',
                       fontWeight: 900,
@@ -3177,7 +3177,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
               {/* Active Recording State in Overlay */}
               {isRecording && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#fef2f2', borderRadius: '14px', border: isClippingDetected ? '2px solid #ef4444' : '1px solid #fca5a5' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#fee2e2', borderRadius: '14px', border: 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span>Aufnahme läuft ({formatSecs(recordDuration)})</span>
@@ -3185,7 +3185,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                         • {liveMeterPercent}% ({getMeterLevelDescription(liveMeterPercent).label})
                       </span>
                     </div>
-                    <button type="button" onClick={handleStopRecording} style={{ padding: '6px 12px', borderRadius: '8px', background: '#dc2626', color: '#fff', fontSize: '0.76rem', fontWeight: 900, border: 'none', cursor: 'pointer' }}>Stoppen</button>
+                    <button type="button" onClick={handleStopRecording} style={{ padding: '6px 12px', borderRadius: '8px', background: '#ef4444', color: '#fff', fontSize: '0.76rem', fontWeight: 900, border: 'none', cursor: 'pointer' }}>Stoppen</button>
                   </div>
                   <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ width: `${liveMeterPercent}%`, height: '100%', borderRadius: '4px', background: getMeterColorGradient(liveMeterPercent), transition: 'width 0.05s ease-out' }} />
@@ -3214,7 +3214,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       background: '#f8fafc',
                       padding: '8px 0',
                       borderRadius: '16px',
-                      border: '1.5px solid #c4b5fd',
+                      border: '1.5px solid #e2e8f0',
                       overflow: 'hidden'
                     }}
                     title="Klicken zum Spulen (Phasen-Röntgen: Lehrkraft & Schüler übereinander)"
@@ -3279,7 +3279,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                               minWidth: '1.5px',
                               height: `${heightPct}%`,
                               background: 'rgba(22, 163, 74, 0.65)',
-                              boxShadow: isBaseline ? 'none' : '0 -1px 1px rgba(74, 222, 128, 0.4)',
+                              boxShadow: 'none',
                               opacity: isBaseline ? 0.35 : 1,
                               borderRadius: '1.5px',
                               transition: 'height 0.12s ease'
@@ -3316,7 +3316,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                               minWidth: '1.5px',
                               height: `${heightPct}%`,
                               background: 'rgba(147, 51, 234, 0.75)',
-                              boxShadow: isBaseline ? 'none' : '0 -1px 1px rgba(216, 180, 254, 0.4)',
+                              boxShadow: 'none',
                               opacity: isBaseline ? 0.35 : 1,
                               borderRadius: '1.5px',
                               transition: 'height 0.12s ease'
@@ -3413,8 +3413,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       padding: isMobile ? '8px 4px' : '10px 8px',
                       minHeight: isMobile ? '44px' : '48px',
                       borderRadius: '12px',
-                      border: activeMixPreset === p.key ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-                      background: activeMixPreset === p.key ? '#f0fdf4' : '#ffffff',
+                      border: activeMixPreset === p.key ? 'none' : '1px solid #cbd5e1',
+                      background: activeMixPreset === p.key ? '#dcfce7' : '#ffffff',
                       color: activeMixPreset === p.key ? '#15803d' : '#475569',
                       fontSize: isMobile ? '0.72rem' : '0.78rem',
                       fontWeight: activeMixPreset === p.key ? 950 : 800,
@@ -3424,13 +3424,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '2px',
-                      boxShadow: activeMixPreset === p.key ? '0 2px 8px rgba(22, 163, 74, 0.15)' : 'none',
+                      boxShadow: 'none',
                       transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
                   >
                     <span style={{ whiteSpace: 'nowrap' }}>{p.label}</span>
-                    <span style={{ fontSize: '0.60rem', fontWeight: 650, color: activeMixPreset === p.key ? '#16a34a' : '#94a3b8', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.60rem', fontWeight: 650, color: activeMixPreset === p.key ? '#15803d' : '#94a3b8', whiteSpace: 'nowrap' }}>
                       {p.desc}
                     </span>
                   </button>
@@ -3556,9 +3556,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     padding: isMobile ? '10px 14px' : '10px 18px',
                     minHeight: '44px',
                     borderRadius: '14px',
-                    background: (saveSuccess || hasSavedTake)
-                      ? '#15803d' 
-                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    background: '#34a853',
                     color: '#ffffff',
                     fontSize: isMobile ? '0.78rem' : '0.86rem',
                     fontWeight: 950,

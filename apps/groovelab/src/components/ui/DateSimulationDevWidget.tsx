@@ -335,7 +335,7 @@ export const DateSimulationDevWidget: React.FC = () => {
             alignItems: 'center',
             gap: '6px',
             background: isSimulated 
-              ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' 
+              ? '#facc15' 
               : 'rgba(15, 23, 42, 0.90)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
@@ -411,8 +411,8 @@ export const DateSimulationDevWidget: React.FC = () => {
             zIndex: 999995,
             width: '320px',
             maxWidth: 'calc(100vw - 32px)',
-            background: 'linear-gradient(145deg, #fef08a 0%, #facc15 50%, #eab308 100%)',
-            border: '1.5px solid #ca8a04',
+            background: '#facc15',
+            border: 'none',
             borderRadius: '20px',
             padding: '12px 14px',
             boxSizing: 'border-box',

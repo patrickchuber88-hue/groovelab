@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Users, Sparkles, Settings, LayoutDashboard, Radio, GraduationCap, Eye, EyeOff, Search, Box, BookOpen 
+  Users, Sparkles, Settings, LayoutDashboard, Radio, GraduationCap, Eye, EyeOff, Search, Box, BookOpen, Lock 
 } from 'lucide-react';
 import { CampusGroovelabBrand } from '../CampusGroovelabBrand';
 import { AvatarImage } from '../common/AvatarImage';
@@ -15,6 +15,7 @@ export interface TeacherDashboardHeaderProps {
   onOpenCommandPalette: () => void;
   teacher?: any;
   onOpenMediaLibrary?: () => void;
+  onLockRoom?: () => void;
 }
 
 export function TeacherDashboardHeader({
@@ -26,7 +27,8 @@ export function TeacherDashboardHeader({
   toggleRealNames,
   onOpenCommandPalette,
   teacher,
-  onOpenMediaLibrary
+  onOpenMediaLibrary,
+  onLockRoom
 }: TeacherDashboardHeaderProps) {
   return (
     <header style={{
@@ -191,6 +193,33 @@ export function TeacherDashboardHeader({
             <span>Suche...</span>
             <kbd style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', fontSize: '0.7rem' }}>⌘K</kbd>
           </button>
+
+          {onLockRoom && (
+            <button
+              type="button"
+              onClick={onLockRoom}
+              title="Raum sperren (Pause / Feierabend)"
+              style={{
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#475569',
+                fontSize: '0.8rem',
+                fontWeight: 750,
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+            >
+              <Lock size={15} />
+              <span>Sperren</span>
+            </button>
+          )}
 
           {teacher && (
             <div style={{

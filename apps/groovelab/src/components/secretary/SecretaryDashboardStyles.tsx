@@ -9,19 +9,17 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
   return (
     <style dangerouslySetInnerHTML={{__html: `
       .google-card {
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%) !important;
-        backdrop-filter: blur(24px) saturate(1.8) !important;
-        -webkit-backdrop-filter: blur(24px) saturate(1.8) !important;
-        border: 1px solid rgba(255, 255, 255, 0.5) !important;
+        background: #ffffff !important;
+        border: none !important;
         border-radius: var(--radius-md);
         padding: 24px;
-        box-shadow: 0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        box-shadow: none !important;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         position: relative;
       }
       .google-card:hover {
-        transform: translateY(-2px) scale(1.01) !important;
-        box-shadow: 0 16px 48px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: none !important;
       }
       .student-name-hover:hover .student-title-text {
         color: #34a853 !important;
@@ -45,10 +43,9 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
         box-shadow: none;
       }
       .google-btn-secondary {
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: var(--glass-blur);
-        color: #12141a;
-        border: 1px solid rgba(0, 0, 0, 0.1);
+        background: #f1f5f9;
+        color: #0f172a;
+        border: none;
         font-weight: 700;
         font-size: 0.85rem;
         padding: 10px 24px;
@@ -58,8 +55,7 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
         font-family: 'Plus Jakarta Sans', sans-serif;
       }
       .google-btn-secondary:hover {
-        background: #ffffff;
-        border-color: rgba(0, 0, 0, 0.2);
+        background: #e2e8f0;
       }
       .google-sidebar-item {
         display: flex;
@@ -82,12 +78,12 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
         position: relative;
       }
       .google-sidebar-item:hover {
-        background: rgba(0, 0, 0, 0.04);
+        background: #f1f5f9;
       }
-      /* Active states for each tab theme */
+      /* Active states for each tab theme (Material 3 Solid Tonal Pills) */
       .google-sidebar-item.active.briefing {
-        background: rgba(234, 67, 53, 0.08) !important;
-        color: #ea4335 !important;
+        background: #fee2e2 !important;
+        color: #b91c1c !important;
         font-weight: 700;
       }
       .google-sidebar-item.active.briefing .sidebar-icon-circle {
@@ -95,8 +91,8 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
         color: #ffffff;
       }
       .google-sidebar-item.active.campus {
-        background: rgba(52, 168, 83, 0.08) !important;
-        color: #34a853 !important;
+        background: #e6f4ea !important;
+        color: #137333 !important;
         font-weight: 700;
       }
       .google-sidebar-item.active.campus .sidebar-icon-circle {
@@ -104,13 +100,13 @@ export const SecretaryDashboardStyles: React.FC = memo(() => {
         color: #ffffff;
       }
       .google-sidebar-item.active.groovelab {
-        background: rgba(251, 188, 5, 0.12) !important;
-        color: #fbbc05 !important;
+        background: #fef9c3 !important;
+        color: #854d0e !important;
         font-weight: 700;
       }
       .google-sidebar-item.active.groovelab .sidebar-icon-circle {
-        background: #fbbc05 !important;
-        color: #ffffff;
+        background: #facc15 !important;
+        color: #0f172a;
       }
       .google-sidebar-item.groovelab-dark {
         color: #a1a1aa !important;

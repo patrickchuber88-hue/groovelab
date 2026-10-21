@@ -529,7 +529,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     hoverBg = 'rgba(234, 67, 53, 0.12)';
     textAccentColor = '#ea4335';
   } else if (isGroovelab) {
-    brandColor = '#eab308'; // GrooveLab Yellow
+    brandColor = '#facc15'; // GrooveLab Yellow
     lightBg = 'rgba(234, 179, 8, 0.06)';
     hoverBg = 'rgba(234, 179, 8, 0.12)';
     textAccentColor = '#ca8a04'; // Dark yellow text
@@ -6043,7 +6043,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         </div>
 
         {onboardingError && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ background: '#fef2f2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <AlertCircle size={14} />
             <span>{onboardingError}</span>
           </div>
@@ -6084,7 +6084,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 background: '#f0fdf4',
                 color: '#15803d',
                 fontWeight: 800,
@@ -6116,7 +6116,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e0f2fe',
+                border: 'none',
                 background: '#f0f9ff',
                 color: '#0369a1',
                 fontWeight: 800,
@@ -6153,7 +6153,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 style={{
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  border: '1px solid #fed7aa',
+                  border: 'none',
                   background: '#fff7ed',
                   color: '#c2410c',
                   fontWeight: 800,
@@ -6652,7 +6652,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             onboardingOverlayContent
           ) : showCelebration ? (
         <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: '1px solid rgba(52, 168, 83, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
@@ -6667,7 +6667,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
+            style={{ background: '#facc15', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
           >
             Zurück zur Ansicht
           </button>
@@ -6915,7 +6915,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     aria-label="Tauschmodus aktiv"
                     style={{
                       background: '#ecfdf5',
-                      border: '1.5px solid #10b981',
+                      border: 'none',
                       borderRadius: '16px',
                       padding: '12px 18px',
                       marginBottom: '14px',
@@ -7258,14 +7258,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
                           if (totalAssigned > 360 && maxContinuous > 360) {
                             return (
-                              <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: 'none', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                                 <AlertCircle size={11} color="currentColor" />
                                 <span>Pflichtpause fehlt (&gt; 6 Std.)</span>
                               </div>
                             );
                           } else if (maxContinuous > 180) {
                             return (
-                              <div style={{ padding: '4px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                              <div style={{ padding: '4px 8px', marginTop: '4px', background: '#fefce8', border: 'none', borderRadius: '6px', fontSize: '0.66rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   <Clock size={11} color="currentColor" />
                                   <span>Pause empfohlen (&gt; 3 Std.)</span>
@@ -7278,7 +7278,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                   }}
                                   style={{
                                     background: '#fef08a',
-                                    border: '1px solid #facc15',
+                                    border: 'none',
                                     borderRadius: '8px',
                                     padding: '6px 12px',
                                     minHeight: '34px',
@@ -7856,7 +7856,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                         right: 0,
                                         top: `${top}px`,
                                         height: `${height}px`,
-                                        border: '2px solid #8b5cf6',
+                                        border: 'none',
                                         background: 'repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.08) 8px, rgba(139, 92, 246, 0.18) 8px, rgba(139, 92, 246, 0.18) 16px)',
                                         zIndex: 4,
                                         pointerEvents: 'none',
@@ -8354,7 +8354,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
-                              ? (isGroovelabTheme ? '#eab308' : '#22c55e')
+                              ? (isGroovelabTheme ? '#facc15' : '#34a853')
                               : '#f8fafc');
 
                         const cardBorder = hasConflict
@@ -8401,7 +8401,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                           const groupBg = hasConflict
                             ? '#ef4444'
                             : (isInsideWunsch
-                                ? (isGroovelabTheme ? '#eab308' : '#22c55e')
+                                ? (isGroovelabTheme ? '#facc15' : '#34a853')
                                 : '#f8fafc');
 
                           const groupBorder = hasConflict
@@ -8851,7 +8851,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                   >
                                     <span>{displayAssignedTime}</span>
                                     {isLiveShiftedPreview && (
-                                      <span style={{ fontSize: '0.55rem', fontWeight: 900, background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.5)', color: '#d97706', padding: '0px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                      <span style={{ fontSize: '0.55rem', fontWeight: 900, background: 'rgba(245, 158, 11, 0.2)', border: 'none', color: '#d97706', padding: '0px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                         Neu
                                       </span>
                                     )}
@@ -9041,7 +9041,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               top: '3px',
                               right: '3px',
                               background: 'rgba(16, 185, 129, 0.12)',
-                              border: '1px solid #10b981',
+                              border: 'none',
                               color: '#059669',
                               fontSize: '0.58rem',
                               fontWeight: 800,
@@ -9260,7 +9260,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               }}>
                                 {selectedStudentPrefs.some(p => Number(p.day_of_week) === Number(board.dayOfWeek) && p.preference_type === 'wunsch') ? (
                                   <>
-                                    <Star size={8} fill="#22c55e" color="#22c55e" />
+                                    <Star size={8} fill="#34a853" color="#34a853" />
                                     <span style={{ color: '#4ade80' }}>Wunschzeit</span>
                                   </>
                                 ) : selectedStudentPrefs.some(p => Number(p.day_of_week) === Number(board.dayOfWeek) && p.preference_type === 'gesperrt') ? (
@@ -9299,7 +9299,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
               {boards.length === 0 && (
                 <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.4)', border: '1.5px dashed rgba(0, 0, 0, 0.08)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px', textAlign: 'center', minHeight: '400px' }}>
-                  <Sparkles size={28} style={{ color: '#eab308', marginBottom: '12px' }} />
+                  <Sparkles size={28} style={{ color: '#facc15', marginBottom: '12px' }} />
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>Noch keine Unterrichtstage</h4>
                   <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '6px', maxWidth: '300px', lineHeight: 1.35 }}>
                     Klicke oben auf „Tag anlegen“, um geplante Unterrichtstage hinzuzufügen.
@@ -9546,7 +9546,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                             const hasSperrzeit = sPrefs.some((p: any) => p.preference_type === 'gesperrt');
                             if (hasSperrzeit) {
                               return (
-                                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
+                                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
                                   <Ban size={9} color="#dc2626" />
                                   <span>Sperrzeit-Konflikt</span>
                                 </span>
@@ -9586,7 +9586,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               padding: '6px 8px',
                               borderRadius: '6px',
                               background: '#fffbeb',
-                              border: '1px solid #fde68a',
+                              border: 'none',
                               color: '#b45309',
                               fontSize: '0.62rem',
                               fontWeight: 650,
@@ -10192,7 +10192,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       value={editingBreak.startTime}
                       onChange={(e) => setEditingBreak(prev => prev ? { ...prev, startTime: e.target.value } : null)}
                       style={{
-                        flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #fde047',
+                        flex: 1, padding: '8px 12px', borderRadius: '8px', border: 'none',
                         fontSize: '0.95rem', fontWeight: 700, color: '#b45309', outline: 'none', background: '#fefce8'
                       }}
                     />
@@ -10220,7 +10220,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         type="button"
                         onClick={() => setEditingBreak(prev => prev ? { ...prev, duration: dur } : null)}
                         style={{
-                          padding: '8px', borderRadius: '8px', border: editingBreak.duration === dur ? '2px solid #eab308' : '1px solid #e5e7eb',
+                          padding: '8px', borderRadius: '8px', border: editingBreak.duration === dur ? '2px solid #facc15' : '1px solid #e5e7eb',
                           background: editingBreak.duration === dur ? '#fefce8' : '#ffffff',
                           color: editingBreak.duration === dur ? '#b45309' : '#374151',
                           fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s'
@@ -10253,7 +10253,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       setEditingBreak(null);
                     }}
                     style={{
-                      flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#0f172a',
+                      flex: 1, padding: '10px', borderRadius: '10px', background: '#facc15', color: '#0f172a',
                       border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: 'none'
                     }}
                   >
@@ -10452,7 +10452,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     height: '44px',
                     borderRadius: '12px',
                     background: '#fef3c7',
-                    border: '1px solid #fde68a',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -10551,7 +10551,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               {/* Explanatory Callout */}
               <div style={{
                 background: 'rgba(234, 179, 8, 0.08)',
-                border: '1px solid rgba(234, 179, 8, 0.25)',
+                border: 'none',
                 borderRadius: '12px',
                 padding: '10px 14px',
                 fontSize: '0.76rem',
@@ -10599,7 +10599,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     background: isCampus
                       ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
                       : (isGroovelab
-                        ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)'
+                        ? '#facc15'
                         : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
                     border: 'none',
                     color: '#ffffff',
@@ -10660,7 +10660,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     height: '44px',
                     borderRadius: '12px',
                     background: '#e6f4ea',
-                    border: '1px solid #ceead6',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -10702,7 +10702,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               {/* Hero Overall Score Badge */}
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
-                border: '1.5px solid #bbf7d0',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '18px 22px',
                 display: 'flex',
@@ -10764,7 +10764,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 {/* 3. Wunschzeiten */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.75rem', fontWeight: 800 }}>
-                    <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeiten
+                    <Star size={13} fill="#34a853" color="#137333" /> Wunschzeiten
                   </div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {autoScheduleReportData.wunschHits} / {autoScheduleReportData.studentsWithWunsch ?? autoScheduleReportData.totalAssigned}
@@ -10854,7 +10854,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 height: '56px',
                 borderRadius: '16px',
                 background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -10887,7 +10887,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   <div style={{
                     height: '100%',
                     width: `${solverProgress}%`,
-                    background: 'linear-gradient(90deg, #34a853 0%, #22c55e 100%)',
+                    background: '#34a853',
                     borderRadius: '10px',
                     transition: 'width 0.15s ease-out',
                     boxShadow: 'none'
@@ -10985,7 +10985,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 </button>
               </div>
 
-              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '12px 14px', fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45 }}>
+              <div style={{ background: '#fef2f2', border: 'none', borderRadius: '12px', padding: '12px 14px', fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45 }}>
                 <strong>Hinweis:</strong> Alle eingeteilten Schüler verbleiben vollständig im Entwurf der Lehrkraft. Die Lehrkraft erhält die Aufforderung, sich mit dem Schulsekretariat in Verbindung zu setzen.
               </div>
 

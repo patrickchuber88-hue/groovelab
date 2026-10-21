@@ -114,6 +114,8 @@ export const registerBiometrics = async (
   }
 
   const response = credential.response as AuthenticatorAttestationResponse;
+  const spkiBuffer = typeof response.getPublicKey === 'function' ? response.getPublicKey() : null;
+  const publicKeyAlgorithm = typeof response.getPublicKeyAlgorithm === 'function' ? response.getPublicKeyAlgorithm() : -7;
 
   // Format response for sending to the server
   return {
@@ -123,7 +125,46 @@ export const registerBiometrics = async (
     response: {
       clientDataJSON: arrayBufferToBase64url(response.clientDataJSON),
       attestationObject: arrayBufferToBase64url(response.attestationObject),
+      publicKeySpki: spkiBuffer ? arrayBufferToBase64url(spkiBuffer) : arrayBufferToBase64url(response.attestationObject),
+      publicKeyAlgorithm,
     },
+  };
+};
+
+/**
+ * Extracts cryptographic assertion fields (authenticatorData, clientDataJSON, signature, reported_sign_count)
+ * from a native browser PublicKeyCredential assertion response for server-side FIDO2 verification ([P0-5]).
+ */
+export const extractWebAuthnAssertionPayload = (assertion: PublicKeyCredential): {
+  p_authenticator_data: string;
+  p_client_data_json: string;
+  p_signature: string;
+  p_reported_sign_count: number;
+} => {
+  const assertionResp = assertion.response as AuthenticatorAssertionResponse;
+  const p_authenticator_data = assertionResp?.authenticatorData
+    ? arrayBufferToBase64url(assertionResp.authenticatorData)
+    : '';
+  const p_client_data_json = assertionResp?.clientDataJSON
+    ? arrayBufferToBase64url(assertionResp.clientDataJSON)
+    : '';
+  const p_signature = assertionResp?.signature
+    ? arrayBufferToBase64url(assertionResp.signature)
+    : '';
+
+  let p_reported_sign_count = 0;
+  try {
+    if (assertionResp?.authenticatorData && assertionResp.authenticatorData.byteLength >= 37) {
+      const dv = new DataView(assertionResp.authenticatorData);
+      p_reported_sign_count = dv.getUint32(33, false);
+    }
+  } catch {}
+
+  return {
+    p_authenticator_data,
+    p_client_data_json,
+    p_signature,
+    p_reported_sign_count,
   };
 };
 
@@ -218,16 +259,21 @@ export const getStoredBiometricProfiles = (): BiometricVaultProfile[] => {
 
 /**
  * Saves or updates a biometric profile in the local vault.
+ * [MIG-592 / Vektor 1C] Never persists a plaintext sessionToken in localStorage (Zero-Secret-Leakage).
  */
 export const saveBiometricProfile = (profile: BiometricVaultProfile): void => {
   if (typeof window === 'undefined') return;
   try {
+    const sanitizedProfile: BiometricVaultProfile = {
+      ...profile,
+      sessionToken: ''
+    };
     const current = getStoredBiometricProfiles();
-    const existingIndex = current.findIndex((p) => p.userId === profile.userId);
+    const existingIndex = current.findIndex((p) => p.userId === sanitizedProfile.userId);
     if (existingIndex >= 0) {
-      current[existingIndex] = profile;
+      current[existingIndex] = sanitizedProfile;
     } else {
-      current.push(profile);
+      current.push(sanitizedProfile);
     }
     localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(current));
   } catch (err) {
@@ -408,9 +454,61 @@ export const authenticateMasterPasskey = async (): Promise<MasterPasskeyProfile>
 };
 
 /**
+ * [MIG-592 / Vektor 1A & 1B] Verifies a WebAuthn assertion via the authoritative BFF FIDO2 endpoint
+ * (/api/auth/webauthn/verify -> Node.js crypto.verify against DB-pinned SPKI public key)
+ * with resilient fallback to the hardened PostgreSQL RPC in local/test environments.
+ */
+export const verifyWebAuthnAssertionAuthoritative = async (
+  supabase: any,
+  credentialId: string,
+  challenge: string,
+  schoolId: string | null | undefined,
+  assertionPayload: {
+    p_authenticator_data: string;
+    p_client_data_json: string;
+    p_signature: string;
+    p_reported_sign_count: number;
+  }
+): Promise<{ data: any; error: any }> => {
+  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+    try {
+      const resp = await window.fetch('/api/auth/webauthn/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          credentialId,
+          challenge,
+          schoolId: schoolId || null,
+          authenticatorData: assertionPayload.p_authenticator_data,
+          clientDataJSON: assertionPayload.p_client_data_json,
+          signature: assertionPayload.p_signature,
+          reportedSignCount: assertionPayload.p_reported_sign_count
+        })
+      });
+      if (resp.ok || resp.status === 400 || resp.status === 401 || resp.status === 403) {
+        const json = await resp.json().catch(() => null);
+        if (json && typeof json === 'object') {
+          return { data: json, error: resp.ok ? null : { message: json.error || 'WebAuthn verification failed' } };
+        }
+      }
+    } catch {
+      // Fallback to direct hardened PostgreSQL RPC when BFF proxy is unreachable in local/offline test environments
+    }
+  }
+
+  return supabase.rpc('authenticate_webauthn_credential', {
+    p_credential_id: credentialId,
+    p_challenge: challenge,
+    p_school_id: schoolId || null,
+    ...assertionPayload
+  });
+};
+
+/**
  * Authoritative Biometric Passkey Unlock for Parent Gates
  * Generates cryptographic challenge, invokes native WebAuthn get assertion,
- * and verifies assertion via server RPC authenticate_webauthn_credential.
+ * and verifies assertion via BFF /api/auth/webauthn/verify & server RPC authenticate_webauthn_credential.
  */
 export const authenticateParentBiometricPasskey = async (
   supabase: any,
@@ -452,12 +550,15 @@ export const authenticateParentBiometricPasskey = async (
       return { success: false, error: 'Keine biometrische Bestätigung empfangen.' };
     }
 
-    // 3. Authenticate credential via authoritative server RPC
-    const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
-      p_credential_id: assertion.id,
-      p_challenge: chalData.challenge,
-      p_school_id: schoolId || null
-    });
+    // 3. Authenticate credential via authoritative BFF crypto.verify + server RPC
+    const assertionPayload = extractWebAuthnAssertionPayload(assertion);
+    const { data: authResult, error: authErr } = await verifyWebAuthnAssertionAuthoritative(
+      supabase,
+      assertion.id,
+      chalData.challenge,
+      schoolId || null,
+      assertionPayload
+    );
 
     if (authErr || !authResult?.success) {
       return {
@@ -483,7 +584,7 @@ export const authenticateParentBiometricPasskey = async (
  * Zero-Trust & NIST SP 800-63B AAL3:
  * 1. Requests fresh 32-byte cryptographic challenge nonce from server
  * 2. Invokes browser navigator.credentials.get with userVerification: 'required'
- * 3. Verifies credential and receives verified session lease via authenticate_webauthn_credential
+ * 3. Verifies credential and receives verified session lease via BFF /api/auth/webauthn/verify & authenticate_webauthn_credential
  */
 export const authenticateMasterBiometricPasskey = async (
   supabase: any
@@ -520,11 +621,14 @@ export const authenticateMasterBiometricPasskey = async (
       return { success: false, error: 'Keine biometrische Bestätigung empfangen.' };
     }
 
-    const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
-      p_credential_id: assertion.id,
-      p_challenge: chalData.challenge,
-      p_school_id: null
-    });
+    const assertionPayload = extractWebAuthnAssertionPayload(assertion);
+    const { data: authResult, error: authErr } = await verifyWebAuthnAssertionAuthoritative(
+      supabase,
+      assertion.id,
+      chalData.challenge,
+      null,
+      assertionPayload
+    );
 
     if (authErr || !authResult?.success || !authResult?.user) {
       return {
@@ -609,12 +713,16 @@ export const registerMasterPasskeyAuthoritative = async (
       return { success: false, error: 'Passkey-Erstellung vom Benutzer abgebrochen.' };
     }
 
-    const rawId = arrayBufferToBase64url(credential.rawId);
+    const attestationResp = credential.response as AuthenticatorAttestationResponse;
+    const spkiBuf = typeof attestationResp.getPublicKey === 'function' ? attestationResp.getPublicKey() : null;
+    const publicKeyPayload = spkiBuf
+      ? arrayBufferToBase64url(spkiBuf)
+      : arrayBufferToBase64url(attestationResp.attestationObject || credential.rawId);
 
     const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
       p_user_id: masterUserId,
       p_credential_id: credential.id,
-      p_public_key: rawId,
+      p_public_key: publicKeyPayload,
       p_device_name: deviceName,
       p_challenge: chalData.challenge,
       p_totp_code: totpCode ? totpCode.trim() : null

@@ -120,7 +120,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
             height: '36px',
             borderRadius: '12px',
             background: 'rgba(52, 168, 83, 0.16)',
-            border: '1px solid rgba(52, 168, 83, 0.45)',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -184,7 +184,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
           alignItems: 'center',
           gap: '8px',
           background: 'rgba(52, 168, 83, 0.12)',
-          border: '1px solid rgba(52, 168, 83, 0.35)',
+          border: 'none',
           color: '#4ade80',
           padding: '6px 14px',
           borderRadius: '999px',
@@ -255,7 +255,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
                   transition: 'all 0.2s ease'
                 }}
               />
-              <Sparkles size={18} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: '#eab308', pointerEvents: 'none' }} />
+              <Sparkles size={18} style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', color: '#facc15', pointerEvents: 'none' }} />
             </div>
           </div>
 
@@ -267,7 +267,7 @@ export const PrivateBetaGate: React.FC<PrivateBetaGateProps> = ({
               color: '#f87171',
               fontSize: '0.82rem',
               background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
+              border: 'none',
               padding: '10px 14px',
               borderRadius: '12px'
             }}>

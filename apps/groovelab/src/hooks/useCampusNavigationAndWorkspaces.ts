@@ -132,12 +132,22 @@ export function useCampusNavigationAndWorkspaces({
       (window as any).stopAllCameras();
     }
 
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('groovelab_active_platform', targetVal);
+      localStorage.setItem('groovelab_active_platform', targetVal);
+    }
+
     React.startTransition(() => {
       setActivePlatformRaw(targetVal);
-      // Auto-switch the active tab to the saved tab of the target platform atomically within the same transition
+      // Auto-switch the active tab to the saved/canonical tab of the target platform atomically within the same transition
       if (targetVal === 'campus') {
         const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
-        setActiveStudentTabRaw(savedTab === 'live' ? 'briefing' : savedTab);
+        const startTab = savedTab === 'live' ? 'briefing' : savedTab;
+        setActiveStudentTabRaw(startTab);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('campus_active_tab', startTab);
+          localStorage.setItem('campus_active_tab', startTab);
+        }
       } else if (targetVal === 'ensembles') {
         const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
         setActiveStudentTabRaw(savedTab);
@@ -150,10 +160,6 @@ export function useCampusNavigationAndWorkspaces({
         }
       }
     });
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('groovelab_active_platform', targetVal);
-      localStorage.setItem('groovelab_active_platform', targetVal);
-    }
   }, [locationMode, user?.role, user?.schools, user?.is_campus_active, user?.is_groovelab_active]);
 
   // 3. Workspace-Verwaltung

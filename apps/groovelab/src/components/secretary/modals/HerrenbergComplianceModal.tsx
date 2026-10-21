@@ -81,6 +81,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
 
   const modalContent = (
     <div
+      id="herrenberg-modal-container"
       role="dialog"
       aria-modal="true"
       aria-labelledby="herrenberg-modal-title"
@@ -101,6 +102,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
       }}
     >
       <div
+        id="herrenberg-modal-card"
         ref={modalRef}
         style={{
           width: '100%',
@@ -117,6 +119,32 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* ── PRINT STYLES ── */}
+        <style>{`
+          @media print {
+            body {
+              background: #ffffff !important;
+            }
+            .herrenberg-no-print {
+              display: none !important;
+            }
+            #herrenberg-modal-container {
+              position: static !important;
+              inset: auto !important;
+              background: transparent !important;
+              backdrop-filter: none !important;
+              padding: 0 !important;
+            }
+            #herrenberg-modal-card {
+              max-width: 100% !important;
+              max-height: none !important;
+              border: none !important;
+              box-shadow: none !important;
+              overflow: visible !important;
+            }
+          }
+        `}</style>
+
         {/* ── HEADER ── */}
         <div style={{
           padding: '20px 24px',
@@ -124,26 +152,28 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '16px',
           background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
             <div style={{
               width: '42px',
               height: '42px',
               borderRadius: '12px',
               background: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#059669',
-              boxShadow: 'none'
+              boxShadow: 'none',
+              flexShrink: 0
             }}>
               <Scale size={22} strokeWidth={2.4} />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 id="herrenberg-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h2 id="herrenberg-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap' }}>
                   Technisches Architektur-Merkblatt: Herrenberg-Modell
                 </h2>
                 <span style={{
@@ -154,24 +184,26 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                   borderRadius: '6px',
                   background: '#ecfdf5',
                   color: '#059669',
-                  border: '1px solid #10b981'
+                  border: 'none',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
                 }}>
                   BSG B 12 R 3/20 R
                 </span>
               </div>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Unverbindliche Fachinformation zur technischen Systemarchitektur für {schoolName} (keine Rechtsberatung gem. § 3 RDG · Übergangsregelung § 127 SGB IV)
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="herrenberg-no-print" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
             <button
               type="button"
               onClick={() => window.print()}
               aria-label="Leitfaden drucken"
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
                 padding: '8px 14px',
@@ -182,12 +214,14 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
             >
-              <Printer size={15} />
-              <span>Drucken</span>
+              <Printer size={15} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap' }}>Drucken</span>
             </button>
             <button
               ref={closeButtonRef}
@@ -201,10 +235,11 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                 border: '1px solid #cbd5e1',
                 background: '#ffffff',
                 color: '#64748b',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
+                flexShrink: 0,
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale"
@@ -215,19 +250,21 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
         </div>
 
         {/* ── TABS ── */}
-        <div style={{
+        <div className="herrenberg-no-print" style={{
           display: 'flex',
           gap: '8px',
           padding: '12px 24px',
           borderBottom: '1px solid #e2e8f0',
           background: '#ffffff',
-          overflowX: 'auto'
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {[
-            { id: 'overview' as TabType, label: 'Enthaftungs-Axiom & Abgrenzung', icon: ShieldCheck },
-            { id: 'pillars' as TabType, label: 'Die 6 Säulen der Enthaftung', icon: BookOpen },
-            { id: 'checklist' as TabType, label: 'Do\'s & Don\'ts Checkliste', icon: CheckCircle2, badge: `${complianceScore}%` },
-            { id: 'clauses' as TabType, label: 'Muster-Vertragsklauseln', icon: FileText }
+            { id: 'overview' as TabType, label: 'Enthaftungs-Axiom & Abgrenzung', shortLabel: 'Enthaftungs-Axiom', icon: ShieldCheck },
+            { id: 'pillars' as TabType, label: 'Die 6 Säulen der Enthaftung', shortLabel: '6 Säulen der Enthaftung', icon: BookOpen },
+            { id: 'checklist' as TabType, label: 'Do\'s & Don\'ts Checkliste', shortLabel: 'Do\'s & Don\'ts Checkliste', icon: CheckCircle2, badge: `${complianceScore}%` },
+            { id: 'clauses' as TabType, label: 'Muster-Vertragsklauseln', shortLabel: 'Muster-Vertragsklauseln', icon: FileText }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -236,32 +273,36 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
+                title={tab.label}
                 style={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
                   padding: '8px 16px',
                   borderRadius: '10px',
-                  border: isActive ? '1.5px solid #059669' : '1px solid #e2e8f0',
+                  border: isActive ? '1.5px solid transparent' : '1px solid #e2e8f0',
                   background: isActive ? '#ecfdf5' : '#ffffff',
                   color: isActive ? '#065f46' : '#64748b',
                   fontSize: '0.82rem',
                   fontWeight: isActive ? 800 : 650,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   transition: 'all 0.15s ease'
                 }}
               >
-                <Icon size={16} color={isActive ? '#059669' : '#94a3b8'} />
-                <span>{tab.label}</span>
+                <Icon size={16} color={isActive ? '#059669' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                <span style={{ whiteSpace: 'nowrap' }}>{tab.shortLabel}</span>
                 {tab.badge && (
                   <span style={{
                     fontSize: '0.7rem',
                     fontWeight: 900,
                     padding: '1px 6px',
                     borderRadius: '6px',
-                    background: complianceScore === 100 ? '#10b981' : '#f59e0b',
-                    color: '#ffffff'
+                    background: '#059669',
+                    color: '#ffffff',
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap'
                   }}>
                     {tab.badge}
                   </span>
@@ -288,7 +329,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
               {/* Important Legal Boundary Card */}
               <div style={{
                 background: '#eff6ff',
-                border: '1.5px solid #93c5fd',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '18px 20px',
                 display: 'flex',
@@ -331,8 +372,8 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                   nicht die Vertragsbezeichnung als „freier Mitarbeiter“, sondern das <strong>Gesamtbild der tatsächlichen Durchführung</strong> (§ 7 Abs. 1 SGB IV / § 611a BGB).
                 </p>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
+                  <div style={{ background: '#fef2f2', border: 'none', borderRadius: '12px', padding: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#b91c1c', fontWeight: 800, fontSize: '0.82rem', marginBottom: '6px' }}>
                       <AlertTriangle size={16} />
                       Kritische Eingliederungsmerkmale (Risiko)
@@ -346,7 +387,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                     </ul>
                   </div>
 
-                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px' }}>
+                  <div style={{ background: '#f0fdf4', border: 'none', borderRadius: '12px', padding: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#15803d', fontWeight: 800, fontSize: '0.82rem', marginBottom: '6px' }}>
                       <CheckCircle2 size={16} />
                       Kriterien für Selbstständigkeit (Schutz)
@@ -366,7 +407,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
 
           {/* TAB 2: THE 6 PILLARS */}
           {activeTab === 'pillars' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
               {[
                 {
                   nr: '01',
@@ -419,7 +460,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                       color: '#059669',
                       padding: '2px 8px',
                       borderRadius: '6px',
-                      border: '1px solid #10b981'
+                      border: 'none'
                     }}>
                       Säule {pillar.nr}
                     </span>
@@ -663,7 +704,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
-            className="hover-scale"
+            className="hover-scale herrenberg-no-print"
           >
             Verstanden & Schließen
           </button>

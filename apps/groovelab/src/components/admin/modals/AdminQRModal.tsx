@@ -187,7 +187,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       return () => window.removeEventListener('keydown', handleKeyDown);
     }, [onClose]);
 
-    const brandColor = activePlatform === 'groovelab' ? '#eab308' : '#34a853';
+    const brandColor = activePlatform === 'groovelab' ? '#facc15' : '#34a853';
 
     return (
       <div 
@@ -352,7 +352,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
               width: '100%',
               padding: '14px',
               borderRadius: '20px',
-              border: '1.5px solid #fecdd3',
+              border: 'none',
               background: '#fff1f2',
               color: '#e11d48',
               fontWeight: 900,

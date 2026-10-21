@@ -274,67 +274,15 @@ export async function ensureMasterAdminSessionLease(): Promise<string | null> {
       try {
         const { data: testAdmin } = await supabase.rpc('is_master_admin');
         if (testAdmin === true) {
+          sessionStorage.setItem(ACTIVE_LEASE_STORAGE, existingToken);
           return existingToken;
         }
       } catch {}
     }
 
-    // 1. Resolve authoritative Master Admin user & valid school ID (Canonical ID nach Migration 471, 568 & 574)
-    let masterUserId = '88888888-8888-8888-8888-888888888888';
-    const targetSchoolId = '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-
-    try {
-      const { data: adminPreflight } = await supabase.rpc('login_master_admin', { p_username: 'admin' });
-      if (adminPreflight?.user_id) {
-        masterUserId = adminPreflight.user_id;
-      }
-    } catch {}
-
-    // 2. Authoritative SECURITY DEFINER RPC to establish session lease
-    const { data: authData, error: authErr } = await supabase.rpc('authenticate_by_credential', {
-      p_credential: masterUserId,
-      p_school_id: targetSchoolId
-    });
-
-    if (!authErr && authData && (authData as any).lease_token) {
-      const token = String((authData as any).lease_token);
-      const authenticatedUserId = (authData as any).user?.id || masterUserId;
-      sessionStorage.setItem(ACTIVE_LEASE_STORAGE, token);
-      localStorage.setItem(ACTIVE_LEASE_STORAGE, token);
-      sessionStorage.setItem('groovelab_user_id', authenticatedUserId);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('groovelab_user_id', authenticatedUserId);
-      }
-      sessionStorage.setItem('groovelab_is_master_admin', 'true');
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('groovelab_is_master_admin', 'true');
-      }
-      return token;
-    }
-
-    // 3. Fallback: Try with canonical master UUID directly
-    if (masterUserId !== '88888888-8888-8888-8888-888888888888') {
-      const { data: fallbackAuth, error: fallbackErr } = await supabase.rpc('authenticate_by_credential', {
-        p_credential: '88888888-8888-8888-8888-888888888888',
-        p_school_id: targetSchoolId
-      });
-      if (!fallbackErr && fallbackAuth && (fallbackAuth as any).lease_token) {
-        const token = String((fallbackAuth as any).lease_token);
-        const canonUid = (fallbackAuth as any).user?.id || '88888888-8888-8888-8888-888888888888';
-        sessionStorage.setItem(ACTIVE_LEASE_STORAGE, token);
-        localStorage.setItem(ACTIVE_LEASE_STORAGE, token);
-        sessionStorage.setItem('groovelab_user_id', canonUid);
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('groovelab_user_id', canonUid);
-        }
-        sessionStorage.setItem('groovelab_is_master_admin', 'true');
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('groovelab_is_master_admin', 'true');
-        }
-        return token;
-      }
-    }
-
+    // [P0-1] Fail-Closed Doctrine: Master-Admin sessions MUST be established exclusively via
+    // login_master_admin (TOTP / Break-Glass Recovery Code) or authenticate_webauthn_credential (FIDO2 Passkey).
+    // Never self-mint a Master-Admin lease via authenticate_by_credential.
     return null;
   } catch (err) {
     console.warn('[SessionLease] ensureMasterAdminSessionLease notice:', err);

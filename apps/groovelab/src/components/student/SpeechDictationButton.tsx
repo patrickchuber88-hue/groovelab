@@ -1,19 +1,52 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Mic } from 'lucide-react';
-import { useVoiceToText } from '../../hooks/useVoiceToText';
+import { useDictationInput, useVoiceToText } from '../../hooks/useVoiceToText';
 
-export const SpeechDictationButton: React.FC<{
-  onTranscript: (text: string) => void;
+export interface SpeechDictationButtonProps {
+  value?: string;
+  onChange?: (val: string) => void;
+  onTranscript?: (text: string) => void;
   title?: string;
   size?: 'sm' | 'md';
-}> = ({ onTranscript, title = "Diktieren", size = 'sm' }) => {
-  const { isListening, toggleListening, error } = useVoiceToText({
+  joinWithNewline?: boolean;
+}
+
+export const SpeechDictationButton: React.FC<SpeechDictationButtonProps> = ({
+  value,
+  onChange,
+  onTranscript,
+  title = "Diktieren",
+  size = 'sm',
+  joinWithNewline = false
+}) => {
+  const isBoundToInput = value !== undefined && typeof onChange === 'function';
+
+  // 1. Kanonische Anbindung via useDictationInput (Zero Duplication & Silence Auto-Stop)
+  const dictationInput = useDictationInput({
+    value: value || '',
+    onChange: onChange || (() => {}),
+    joinWithNewline,
+    autoStopOnSilence: true,
+    silenceTimeoutMs: 2000
+  });
+
+  // 2. Fallback falls nur onTranscript übergeben wird
+  const legacyBaseRef = useRef<string>('');
+  const legacyVoice = useVoiceToText({
+    autoStopOnSilence: true,
+    silenceTimeoutMs: 2000,
+    onAutoStop: () => {
+      legacyBaseRef.current = '';
+    },
     onResult: (text) => {
-      if (text && text.trim()) {
+      if (text && text.trim() && onTranscript) {
         onTranscript(text.trim());
       }
     }
   });
+
+  const isListening = isBoundToInput ? dictationInput.isListening : legacyVoice.isListening;
+  const toggleListening = isBoundToInput ? dictationInput.toggleListening : legacyVoice.toggleListening;
 
   return (
     <button

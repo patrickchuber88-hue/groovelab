@@ -543,7 +543,9 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
             white-space: normal !important;
             overflow: visible !important;
             text-overflow: clip !important;
-            word-break: break-word !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+            hyphens: none !important;
           }
           .cg-sponsor-lead-text {
             font-size: 0.74rem !important;
@@ -747,7 +749,9 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
                 color: '#0f172a',
                 lineHeight: 1.25,
                 letterSpacing: '-0.01em',
-                wordBreak: 'break-word'
+                wordBreak: 'normal',
+                overflowWrap: 'break-word',
+                hyphens: 'none'
               }}
             >
               <span className="cg-sponsor-lead-text">Ermöglicht durch </span>
@@ -857,7 +861,7 @@ export const CampusSponsorIngressBanner: React.FC<CampusSponsorIngressBannerProp
               fontSize: '0.68rem',
               fontWeight: 800,
               background: '#ecfdf5',
-              border: '1px solid #10b981',
+              border: 'none',
               color: '#059669',
               padding: '3px 10px',
               borderRadius: '100px',

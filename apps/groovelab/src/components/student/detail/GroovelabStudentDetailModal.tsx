@@ -364,7 +364,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
                 <span style={{
                   background: 'rgba(34, 197, 94, 0.15)',
                   color: '#4ade80',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  border: 'none',
                   padding: '3px 10px',
                   borderRadius: '8px',
                   fontSize: '0.72rem',
@@ -415,7 +415,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div style={{
               background: 'rgba(234, 179, 8, 0.15)',
-              border: '1px solid rgba(234, 179, 8, 0.3)',
+              border: 'none',
               borderRadius: '14px',
               padding: '8px 14px',
               textAlign: 'center'
@@ -457,7 +457,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             <div style={{
               padding: '10px 16px',
               background: '#ecfdf5',
-              border: '1px solid #a7f3d0',
+              border: 'none',
               borderRadius: '12px',
               color: '#065f46',
               fontSize: '13px',
@@ -515,7 +515,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
             boxShadow: '0 2px 10px rgba(0,0,0,0.02)'
           }}>
             <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Music size={16} color="#eab308" /> Aktive GrooveLab Songs & Übungen
+              <Music size={16} color="#facc15" /> Aktive GrooveLab Songs & Übungen
             </h3>
 
             {activeSongs.length === 0 ? (
@@ -648,7 +648,7 @@ export const GroovelabStudentDetailModal: React.FC<GroovelabStudentDetailModalPr
                     padding: '10px 18px',
                     borderRadius: '12px',
                     background: '#fef2f2',
-                    border: '1px solid #fee2e2',
+                    border: 'none',
                     color: '#dc2626',
                     fontSize: '13px',
                     fontWeight: 800,

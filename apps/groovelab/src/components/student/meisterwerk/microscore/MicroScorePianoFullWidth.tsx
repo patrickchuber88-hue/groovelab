@@ -17,10 +17,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { getPitchHz } from './microScoreAudioSynthesizer';
+import { getPitchColorTheme } from './microScoreGridEngine';
 
 export interface MicroScorePianoFullWidthProps {
   activePitches: string[];
   clef?: 'treble' | 'bass' | 'percussion';
+  isColorGuide?: boolean;
   onPlayPreviewPitch?: (pitch: string) => void;
   onInsertPitch?: (pitch: string) => void;
   readOnly?: boolean;
@@ -208,6 +210,7 @@ function generatePianoKeys(viewMode: '88' | 'focus', isBassClef: boolean): { whi
 export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> = ({
   activePitches,
   clef,
+  isColorGuide = true,
   onPlayPreviewPitch,
   onInsertPitch,
   readOnly = false
@@ -229,8 +232,11 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
   }, [activePitches]);
 
   const handleKeyClick = (pitch: string) => {
-    if (onPlayPreviewPitch) onPlayPreviewPitch(pitch);
-    if (!readOnly && onInsertPitch) onInsertPitch(pitch);
+    if (!readOnly && onInsertPitch) {
+      onInsertPitch(pitch);
+    } else if (onPlayPreviewPitch) {
+      onPlayPreviewPitch(pitch);
+    }
   };
 
   const viewBox = `0 0 ${TOTAL_SVG_WIDTH} 130`;
@@ -371,14 +377,21 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
           {whiteKeys.map(k => {
             const isActive = normActive.includes(k.pitch);
             const isHovered = hoveredKey === k.pitch;
+            const keyTheme = getPitchColorTheme(k.pitch);
+            const activeFill = isColorGuide ? keyTheme.border : '#0f172a';
+            const isYellowKey = isColorGuide && (k.pitch.toUpperCase().startsWith('E') && !k.pitch.includes('#'));
 
             return (
               <g 
                 key={k.pitch}
-                onClick={() => handleKeyClick(k.pitch)}
+                onPointerDown={(e) => {
+                  if (e.pointerType === 'mouse' && e.button !== 0) return;
+                  e.preventDefault();
+                  handleKeyClick(k.pitch);
+                }}
                 onMouseEnter={() => setHoveredKey(k.pitch)}
                 onMouseLeave={() => setHoveredKey(null)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', touchAction: 'manipulation' }}
                 role="button"
                 tabIndex={0}
                 aria-label={`Taste ${k.pitch} (${k.isMiddleC ? 'Middle C' : k.name}), ${getPitchHz(k.pitch).toFixed(1)} Hertz`}
@@ -397,8 +410,8 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
                   height={WHITE_KEY_HEIGHT}
                   rx={2.5}
                   ry={2.5}
-                  fill={isActive ? '#6366f1' : isHovered ? '#f1f5f9' : '#ffffff'}
-                  stroke={isActive ? '#4f46e5' : '#cbd5e1'}
+                  fill={isActive ? activeFill : isHovered ? '#f1f5f9' : '#ffffff'}
+                  stroke={isActive ? activeFill : '#cbd5e1'}
                   strokeWidth={0.8}
                   filter={isActive ? 'url(#piano-key-glow)' : undefined}
                   style={{ transition: 'fill 0.1s ease, transform 0.08s ease' }}
@@ -426,7 +439,7 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
                     fontSize={isFocus ? "9.5" : "8.5"}
                     fontWeight="900"
                     fontFamily="'Plus Jakarta Sans', sans-serif"
-                    fill={isActive ? '#ffffff' : k.isMiddleC ? '#b45309' : '#64748b'}
+                    fill={isActive ? (isYellowKey ? '#0f172a' : '#ffffff') : k.isMiddleC ? '#b45309' : '#64748b'}
                     pointerEvents="none"
                   >
                     {`C${k.octave}`}
@@ -442,7 +455,7 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
                     fontSize="7.5"
                     fontWeight="800"
                     fontFamily="'Plus Jakarta Sans', sans-serif"
-                    fill={isActive ? '#ffffff' : '#94a3b8'}
+                    fill={isActive ? (isYellowKey ? '#0f172a' : '#ffffff') : '#94a3b8'}
                     pointerEvents="none"
                   >
                     {k.name}
@@ -456,14 +469,20 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
           {blackKeys.map(k => {
             const isActive = normActive.includes(k.pitch);
             const isHovered = hoveredKey === k.pitch;
+            const keyTheme = getPitchColorTheme(k.pitch);
+            const activeFill = isColorGuide ? keyTheme.border : '#4f46e5';
 
             return (
               <g 
                 key={k.pitch}
-                onClick={() => handleKeyClick(k.pitch)}
+                onPointerDown={(e) => {
+                  if (e.pointerType === 'mouse' && e.button !== 0) return;
+                  e.preventDefault();
+                  handleKeyClick(k.pitch);
+                }}
                 onMouseEnter={() => setHoveredKey(k.pitch)}
                 onMouseLeave={() => setHoveredKey(null)}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', touchAction: 'manipulation' }}
                 role="button"
                 tabIndex={0}
                 aria-label={`Schwarze Taste ${k.pitch}, ${getPitchHz(k.pitch).toFixed(1)} Hertz`}
@@ -482,8 +501,8 @@ export const MicroScorePianoFullWidth: React.FC<MicroScorePianoFullWidthProps> =
                   height={BLACK_KEY_HEIGHT}
                   rx={2}
                   ry={2}
-                  fill={isActive ? '#6366f1' : isHovered ? '#334155' : '#0f172a'}
-                  stroke={isActive ? '#4f46e5' : '#020617'}
+                  fill={isActive ? activeFill : isHovered ? '#334155' : '#0f172a'}
+                  stroke={isActive ? activeFill : '#020617'}
                   strokeWidth={0.8}
                   filter={isActive ? 'url(#piano-key-glow)' : 'url(#black-key-shadow)'}
                   style={{ transition: 'fill 0.1s ease' }}

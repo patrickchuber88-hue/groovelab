@@ -36,6 +36,35 @@ export class UniversalLatencyEngine {
   }
 
   /**
+   * Synchronizes the active route latency from AudioLatencyService without triggering a redundant cloud write.
+   */
+  public static syncActiveRouteLatency(effectiveMs: number, isCalibrated: boolean): void {
+    if (typeof window === 'undefined') return;
+    const clamped = Math.max(-100, Math.min(600, Math.round(effectiveMs)));
+    const changed = this.cachedLatencyMs !== clamped;
+    this.cachedLatencyMs = clamped;
+
+    try {
+      localStorage.setItem(MASTER_LATENCY_STORAGE_KEY, clamped.toString());
+      localStorage.setItem('groovelab_sync_offset_ms', clamped.toString());
+      localStorage.setItem('groovelab_latency_calibrated', isCalibrated ? 'true' : 'false');
+      localStorage.setItem('campus_timing_latency_offset', clamped.toString());
+    } catch (_) {}
+
+    if (changed) {
+      try {
+        window.dispatchEvent(new CustomEvent(LATENCY_UPDATED_EVENT, {
+          detail: {
+            latencyMs: clamped,
+            latencySec: clamped / 1000.0,
+            isCalibrated
+          }
+        }));
+      } catch (_) {}
+    }
+  }
+
+  /**
    * Returns the active hardware latency in milliseconds:
    * 1. Checks memory cache or explicit user calibration in localStorage (SSOT).
    * 2. Checks legacy keys for seamless backwards-compatibility.
@@ -49,30 +78,11 @@ export class UniversalLatencyEngine {
     }
 
     try {
-      // 🛡️ One-time self-healing migration (v2): Purge uncompensated v1 ScriptProcessor(4096) artifacts (96..180ms, e.g. 134ms on Mac)
-      if (localStorage.getItem('campus_latency_cal_v2_engine') !== '1') {
-        const detectedInit = detectDeviceLatencyInfo(audioCtx);
-        const masterInit = parseInt(localStorage.getItem(MASTER_LATENCY_STORAGE_KEY) || '', 10);
-        const loopInit = parseInt(localStorage.getItem('groovelab_sync_offset_ms') || '', 10);
-        if (!detectedInit.isBluetoothSuspected && ((masterInit > 95 && masterInit < 180) || (loopInit > 95 && loopInit < 180))) {
-          localStorage.removeItem(MASTER_LATENCY_STORAGE_KEY);
-          localStorage.removeItem('groovelab_sync_offset_ms');
-          localStorage.removeItem('campus_timing_latency_offset');
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i);
-            if (k && (k.startsWith('groovelab_latency_dev_') || k.startsWith('campus_audio_latency_speaker_'))) {
-              localStorage.removeItem(k);
-            }
-          }
-        }
-        localStorage.setItem('campus_latency_cal_v2_engine', '1');
-      }
-
       // 1. Primary SSOT key
       const masterSaved = localStorage.getItem(MASTER_LATENCY_STORAGE_KEY);
       if (masterSaved !== null) {
         const parsed = parseInt(masterSaved, 10);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 600) {
+        if (!isNaN(parsed) && parsed >= -100 && parsed <= 600) {
           this.cachedLatencyMs = parsed;
           this.attachDeviceChangeListener();
           return parsed;
@@ -83,7 +93,7 @@ export class UniversalLatencyEngine {
       const loopstationSaved = localStorage.getItem('groovelab_sync_offset_ms');
       if (loopstationSaved !== null) {
         const parsed = parseInt(loopstationSaved, 10);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 600) {
+        if (!isNaN(parsed) && parsed >= -100 && parsed <= 600) {
           this.cachedLatencyMs = parsed;
           this.attachDeviceChangeListener();
           return parsed;
@@ -93,7 +103,7 @@ export class UniversalLatencyEngine {
       const trainerSaved = localStorage.getItem('campus_timing_latency_offset');
       if (trainerSaved !== null) {
         const parsed = parseInt(trainerSaved, 10);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 600) {
+        if (!isNaN(parsed) && parsed >= -100 && parsed <= 600) {
           this.cachedLatencyMs = parsed;
           this.attachDeviceChangeListener();
           return parsed;
@@ -125,7 +135,7 @@ export class UniversalLatencyEngine {
   ): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    const clamped = Math.max(0, Math.min(600, Math.round(offsetMs)));
+    const clamped = Math.max(-100, Math.min(600, Math.round(offsetMs)));
     this.cachedLatencyMs = clamped;
 
     // 1. LocalStorage SSOT + Legacy Mirroring
@@ -146,20 +156,24 @@ export class UniversalLatencyEngine {
       }
     } catch (_) {}
 
-    // 3. Cloud Synchronization to Supabase (Student Profile)
+    // 3. Cloud Synchronization to Supabase via authoritative multi-device RPC
     if (studentId) {
       try {
-        await supabase
-          .from('students')
-          .update({
-            device_calibration: {
-              device_hash: fingerprint?.hash || 'default',
-              device_name: fingerprint?.name || 'Standard Audio-Gerät',
-              latency_ms: clamped,
-              calibrated_at: new Date().toISOString()
-            }
-          })
-          .eq('id', studentId);
+        const detected = detectDeviceLatencyInfo(audioCtx);
+        const profileKey = `${detected.detectedPlatform}_${detected.isBluetoothSuspected ? 'bluetooth' : 'speaker'}_${fingerprint?.hash || 'default'}`;
+        await (supabase.rpc as any)('save_user_audio_calibration', {
+          p_user_id: studentId,
+          p_profile_key: profileKey,
+          p_calibration: {
+            profile_key: profileKey,
+            device_hash: fingerprint?.hash || 'default',
+            device_name: fingerprint?.name || 'Standard Audio-Gerät',
+            route_type: detected.isBluetoothSuspected ? 'bluetooth' : 'speaker',
+            platform: detected.detectedPlatform,
+            latency_ms: clamped,
+            calibrated_at: new Date().toISOString()
+          }
+        });
       } catch (err) {
         console.warn('[UniversalLatencyEngine] Supabase device calibration sync error:', err);
       }
@@ -172,7 +186,8 @@ export class UniversalLatencyEngine {
           latencyMs: clamped,
           latencySec: clamped / 1000.0,
           fingerprint: fingerprint?.hash || 'default',
-          deviceName: fingerprint?.name || 'Audio-Gerät'
+          deviceName: fingerprint?.name || 'Audio-Gerät',
+          isCalibrated: true
         }
       }));
     } catch (_) {}

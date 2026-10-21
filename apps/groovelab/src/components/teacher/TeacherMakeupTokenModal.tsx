@@ -403,7 +403,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
           {errorMessage && (
             <div style={{
               background: '#fef2f2',
-              border: '1.5px solid #fecaca',
+              border: 'none',
               borderRadius: '16px',
               padding: '12px 16px',
               display: 'flex',
@@ -421,7 +421,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
           {successMessage && (
             <div style={{
               background: '#f0fdf4',
-              border: '1.5px solid #bbf7d0',
+              border: 'none',
               borderRadius: '16px',
               padding: '12px 16px',
               display: 'flex',
@@ -480,7 +480,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
               {/* Revisionssicherer Transparenz-Kasten */}
               <div style={{
                 background: '#eff6ff',
-                border: '1px solid #bfdbfe',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '14px 16px',
                 fontSize: '0.78rem',
@@ -951,7 +951,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{
                 background: '#fffbeb',
-                border: '1.5px solid #fde68a',
+                border: 'none',
                 borderRadius: '20px',
                 padding: '18px',
                 display: 'flex',

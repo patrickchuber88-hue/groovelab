@@ -32,9 +32,9 @@ export interface AuthoritativeHomeworkWidgetProps extends UseAuthoritativeHomewo
 }
 
 const cardRowStyle: React.CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #f1f5f9',
-  boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+  background: '#f8fafc',
+  border: 'none',
+  boxShadow: 'none',
   padding: '10px 14px',
   borderRadius: '14px',
   display: 'flex',
@@ -44,10 +44,10 @@ const cardRowStyle: React.CSSProperties = {
 };
 
 const getReflStyle = (refl?: 'super' | 'wackelig' | 'hilfe') => ({
-  color: refl === 'super' ? '#ffffff' : refl === 'wackelig' ? '#b45309' : refl === 'hilfe' ? '#b91c1c' : '#64748b',
-  background: refl === 'super' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : refl === 'wackelig' ? '#fef3c7' : refl === 'hilfe' ? '#fee2e2' : '#f1f5f9',
-  border: refl === 'super' ? 'none' : refl === 'wackelig' ? '1px solid #fde68a' : refl === 'hilfe' ? '1px solid #fca5a5' : '1px solid #e2e8f0',
-  boxShadow: refl === 'super' ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
+  color: refl === 'super' ? '#ffffff' : refl === 'wackelig' ? '#b45309' : refl === 'hilfe' ? '#b91c1c' : '#334155',
+  background: refl === 'super' ? '#16a34a' : refl === 'wackelig' ? '#fef3c7' : refl === 'hilfe' ? '#fee2e2' : '#e2e8f0',
+  border: 'none',
+  boxShadow: 'none'
 });
 
 export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetProps> = ({
@@ -82,7 +82,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
   const plan = passedPlan || contextPlan || internalPlan;
   const {
     books, songs, generalNotes, audioTracks, microScores, studentQuestion,
-    taskReflections, setTaskReflection, hasActiveHomework
+    taskReflections, setTaskReflection, hasActiveHomework, isCarriedOver, carriedOverWeek
   } = plan;
 
   const safeSongs = (songs || []).filter(s =>
@@ -349,7 +349,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
           padding: '10px 16px', minHeight: '48px',
           background: theme === 'dark' ? '#1e293b' : '#ffffff',
-          border: theme === 'dark' ? '1px solid #334154' : '1.5px solid #10b981',
+          border: 'none',
           borderRadius: '16px', boxShadow: 'none',
           cursor: onOpenHomework ? 'pointer' : 'default', transition: 'all 0.15s ease',
           boxSizing: 'border-box', ...style
@@ -358,19 +358,19 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, flexWrap: 'wrap' }}>
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff',
+            display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#16a34a', color: '#ffffff',
             fontSize: '0.76rem', fontWeight: 900, padding: '4px 10px', borderRadius: '100px', flexShrink: 0
           }}>
             <Music size={13} strokeWidth={2.5} />
-            <span>Wochen-Fahrplan</span>
+            <span>{isCarriedOver ? `Letzte Hausaufgabe (${carriedOverWeek ? `KW ${carriedOverWeek}` : 'Vorwoche'})` : 'Wochen-Fahrplan'}</span>
           </div>
 
           {books.map((b, idx) => (
             <div key={`sb-b-${idx}`} style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 800,
               color: theme === 'dark' ? '#f8fafc' : '#0f172a',
-              background: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc',
-              border: '1px solid #e2e8f0', padding: '3px 9px', borderRadius: '8px'
+              background: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+              border: 'none', padding: '3px 9px', borderRadius: '8px'
             }}>
               <BookOpen size={13} color="#e11d48" />
               <span>{b.title}</span>
@@ -384,14 +384,26 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               <div key={`sb-s-${idx}`} style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 800,
                 color: theme === 'dark' ? '#f8fafc' : '#0f172a',
-                background: theme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc',
-                border: '1px solid #e2e8f0', padding: '3px 9px', borderRadius: '8px'
+                background: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+                border: 'none', padding: '3px 9px', borderRadius: '8px'
               }}>
                 <Music size={13} color={sColor.text || '#0f172a'} />
                 <span>{s.cleanTitle}</span>
               </div>
             );
           })}
+
+          {microScores && microScores.map((ms: any, idx: number) => (
+            <div key={`sb-ms-${ms.id || idx}`} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.84rem', fontWeight: 800,
+              color: theme === 'dark' ? '#f8fafc' : '#0f172a',
+              background: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+              border: 'none', padding: '3px 9px', borderRadius: '8px'
+            }}>
+              <Music size={13} color="#0f172a" />
+              <span>{ms.title || 'Notenschnipsel'}</span>
+            </div>
+          ))}
 
           {studentQuestion && (
             <div style={{
@@ -406,7 +418,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           {activeAudioTracks.length > 0 && (
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', fontWeight: 800,
-              color: '#15803d', background: '#e6f4ea', padding: '3px 8px', borderRadius: '8px'
+              color: '#137333', background: '#e6f4ea', padding: '3px 8px', borderRadius: '8px', border: 'none'
             }}>
               <Headphones size={12} />
               <span>{activeAudioTracks.length === 1 ? '1 Aufnahme' : `${activeAudioTracks.length} Aufnahmen`}</span>
@@ -415,7 +427,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
         </div>
 
         {onOpenHomework && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.80rem', fontWeight: 850, color: '#16a34a', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.80rem', fontWeight: 850, color: '#137333', flexShrink: 0 }}>
             <span>Aufgaben ansehen →</span>
             <ChevronRight size={16} />
           </div>
@@ -436,23 +448,23 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', padding: '12px 14px',
-        background: isDark ? 'rgba(15, 23, 42, 0.75)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #e2e8f0',
-        borderRadius: '16px', boxShadow: isDark ? '0 4px 16px rgba(0, 0, 0, 0.3)' : '0 2px 8px rgba(0, 0, 0, 0.04)',
+        background: isDark ? '#1e293b' : '#ffffff',
+        border: 'none',
+        borderRadius: '16px', boxShadow: 'none',
         boxSizing: 'border-box', ...style
       }} className={className}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Music size={14} color="#16a34a" strokeWidth={2.4} />
             <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Wochen-Fahrplan
+              {isCarriedOver ? `Letzte Hausaufgabe (${carriedOverWeek ? `KW ${carriedOverWeek}` : 'Vorwoche'})` : 'Wochen-Fahrplan'}
             </span>
           </div>
           {activeAudioTracks.length > 0 && (
             <span style={{
               fontSize: '0.72rem', fontWeight: 800,
               color: '#ffffff',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: '#16a34a',
               padding: '2px 8px', borderRadius: '100px'
             }}>
               🎧 {activeAudioTracks.length} {activeAudioTracks.length === 1 ? 'Aufnahme' : 'Aufnahmen'}
@@ -470,13 +482,13 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                   width: '24px',
                   height: '24px',
                   borderRadius: '7px',
-                  background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  background: '#ffe4e6',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#e11d48',
-                  boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                  boxShadow: 'none',
                   flexShrink: 0
                 }}>
                   <BookOpen size={12} strokeWidth={2.4} />
@@ -490,7 +502,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                     fontWeight: 850,
                     color: '#15803d',
                     background: '#dcfce7',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     padding: '2px 8px',
                     borderRadius: '99px',
                     whiteSpace: 'nowrap',
@@ -523,13 +535,13 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                   width: '24px',
                   height: '24px',
                   borderRadius: '7px',
-                  background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  background: songColor.from,
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: songColor.text || '#0f172a',
-                  boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`,
+                  boxShadow: 'none',
                   flexShrink: 0
                 }}>
                   <Music size={12} strokeWidth={2.4} />
@@ -553,6 +565,41 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                   studentId={studentId || studentUser?.id}
                   taskId={taskId}
                   label={s.cleanTitle}
+                  variant="compact_hud"
+                  theme={theme}
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        {microScores && microScores.map((ms: any, idx: number) => {
+          const msId = ms.id || `ms-${idx}`;
+          const msTitle = ms.title || 'Notenschnipsel';
+          return (
+            <div key={`hud-ms-${msId}-${idx}`} style={hudRow}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                <MicroScoreSnippetButton
+                  studentId={studentId || studentUser?.id}
+                  taskId={msId}
+                  taskTitle={msTitle}
+                  defaultInstrument={ms.instrument || studentUser?.instrument}
+                  initialSnippet={ms}
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: isDark ? '#f8fafc' : '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {msTitle}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 650, color: isDark ? '#94a3b8' : '#64748b' }}>
+                    {ms.tempoBpm || 80} BPM · {ms.barsCount || 2} Takte Notenschnipsel
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <StudentHomeworkStatusButton
+                  studentId={studentId || studentUser?.id}
+                  taskId={msId}
+                  label={msTitle}
                   variant="compact_hud"
                   theme={theme}
                 />
@@ -586,7 +633,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           </span>
           {activeAudioTracks.length > 0 && (
             <span style={{
-              fontSize: '0.72rem', fontWeight: 850, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              fontSize: '0.72rem', fontWeight: 850, color: '#ffffff', background: '#16a34a',
               border: 'none', padding: '2px 8px', borderRadius: '100px',
               display: 'inline-flex', alignItems: 'center', gap: '4px'
             }} title={`${activeAudioTracks.length} Aufnahme(n) vorhanden`}>
@@ -600,7 +647,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           fontSize: isMusicStandMode ? '0.78rem' : '0.74rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap'
         }}>
           <Music size={12} color="#16a34a" strokeWidth={2.4} />
-          <span>Dein Wochen-Fahrplan</span>
+          <span>{isCarriedOver ? `📌 Letzte Hausaufgabe (${carriedOverWeek ? `KW ${carriedOverWeek}` : 'Vorwoche'})` : 'Dein Wochen-Fahrplan'}</span>
         </div>
       </div>
 
@@ -622,10 +669,10 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.85)',
+                background: '#ffe4e6',
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#e11d48', boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)', flexShrink: 0
+                color: '#e11d48', boxShadow: 'none', flexShrink: 0
               }}>
                 <BookOpen size={14} strokeWidth={2.4} />
               </div>
@@ -635,7 +682,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               {pageRangeText && (
                 <span style={{
                   fontSize: '0.76rem', fontWeight: 850, color: '#15803d', background: '#dcfce7',
-                  border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '99px', whiteSpace: 'nowrap', flexShrink: 0
+                  border: 'none', padding: '2px 8px', borderRadius: '99px', whiteSpace: 'nowrap', flexShrink: 0
                 }}>
                   {pageRangeText.startsWith('S.') ? pageRangeText : `S. ${pageRangeText}`}
                 </span>
@@ -681,10 +728,10 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
               <div style={{
                 width: '28px', height: '28px', borderRadius: '8px',
-                background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                border: '1px solid rgba(255, 255, 255, 0.85)',
+                background: songColor.from,
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: songColor.text || '#0f172a', boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0,0,0,0.06)'}`, flexShrink: 0
+                color: songColor.text || '#0f172a', boxShadow: 'none', flexShrink: 0
               }}>
                 <Music size={14} strokeWidth={2.4} />
               </div>
@@ -720,27 +767,59 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       {/* 3.5 Notenschnipsel (MicroScores 1–4 Takte) */}
       {microScores && microScores.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {microScores.map((ms: any, msIdx: number) => (
-            <div key={`hero-ms-${ms.id || msIdx}`} style={cardRowStyle}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                <MicroScoreSnippetButton
-                  studentId={studentId}
-                  taskId={ms.id}
-                  taskTitle={ms.title}
-                  defaultInstrument={ms.instrument}
-                  initialSnippet={ms}
-                />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
-                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.90rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {ms.title}
-                  </span>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {ms.tempoBpm || 80} BPM • {ms.barsCount || 2} Takte Notenschnipsel
-                  </span>
+          {microScores.map((ms: any, msIdx: number) => {
+            const msId = ms.id || `ms-${msIdx}`;
+            const msTitle = ms.title || 'Notenschnipsel';
+            const taskId = msId;
+            const refl = taskReflections[taskId]?.status;
+            const rStyle = getReflStyle(refl);
+            return (
+              <div
+                key={`hero-ms-${msId}-${msIdx}`}
+                style={{ ...cardRowStyle, cursor: onOpenHomework ? 'pointer' : 'default' }}
+                onClick={() => onOpenHomework?.()}
+                role={onOpenHomework ? "button" : undefined}
+                tabIndex={onOpenHomework ? 0 : undefined}
+                aria-label={onOpenHomework ? `Notenschnipsel ${msTitle} im Aufgabenheft öffnen` : undefined}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                  <MicroScoreSnippetButton
+                    studentId={studentId}
+                    taskId={msId}
+                    taskTitle={msTitle}
+                    defaultInstrument={ms.instrument}
+                    initialSnippet={ms}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.90rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {msTitle}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                      {ms.tempoBpm || 80} BPM • {ms.barsCount || 2} Takte Notenschnipsel
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); cycleReflection(taskId, msTitle, refl); }}
+                    title={`Reflexion für Notenschnipsel ${msTitle} umschalten (Klappt / Wackelig / Hilfe)`}
+                    aria-label={`Reflexion für Notenschnipsel ${msTitle} umschalten`}
+                    style={{
+                      fontSize: '0.78rem', fontWeight: 850, minHeight: '36px', padding: '4px 10px', borderRadius: '100px',
+                      color: rStyle.color, background: rStyle.background, border: rStyle.border,
+                      flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    {refl === 'super' ? <Check size={12} strokeWidth={3} /> : refl === 'wackelig' ? <AlertTriangle size={12} strokeWidth={2.5} /> : refl === 'hilfe' ? <HelpCircle size={12} strokeWidth={2.5} /> : <Sparkles size={12} />}
+                    <span>{refl === 'super' ? 'Klappt' : refl === 'wackelig' ? 'Wackelig' : refl === 'hilfe' ? 'Hilfe' : 'Status'}</span>
+                  </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -750,7 +829,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           {safeGeneralNotes.map((noteItem, nIdx) => (
             <div key={`hero-gn-${nIdx}`} style={cardRowStyle}>
               <div style={{
-                width: '28px', height: '28px', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                width: '28px', height: '28px', borderRadius: '8px', background: '#16a34a',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0
               }}>
                 <FileText size={14} strokeWidth={2.4} />
@@ -774,7 +853,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           aria-label={onOpenQuestionModal ? "Deine Frage an die Lehrkraft bearbeiten" : undefined}
           style={{
             display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.88rem', padding: '10px 14px',
-            borderRadius: '14px', background: '#fffdf0', border: '1px solid #fde047', boxShadow: 'none',
+            borderRadius: '14px', background: '#fef3c7', border: 'none', boxShadow: 'none',
             cursor: onOpenQuestionModal ? 'pointer' : 'default', transition: 'all 0.15s ease'
           }}
           className={onOpenQuestionModal ? "hover-scale-mini" : undefined}
@@ -806,8 +885,8 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
       {/* 7. Audio Quickie Mini-Player */}
       {activeAudioTracks.length > 0 && (
         <div style={{
-          background: hasAudioError ? '#fef2f2' : '#f8fafc',
-          border: hasAudioError ? '1.5px solid #fca5a5' : '1.5px solid #e2e8f0',
+          background: hasAudioError ? '#fef2f2' : '#f1f5f9',
+          border: 'none',
           borderRadius: '16px', padding: '10px 14px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginTop: '4px'
         }}>
@@ -838,9 +917,9 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               }}
               style={{
                 width: '40px', height: '40px', borderRadius: '50%',
-                background: hasAudioError ? '#fee2e2' : (isPlayingAudio ? '#16a34a' : '#ffffff'),
-                color: hasAudioError ? '#ef4444' : (isPlayingAudio ? '#ffffff' : '#16a34a'),
-                border: hasAudioError ? '1.5px solid #fca5a5' : '1.5px solid #bbf7d0',
+                background: hasAudioError ? '#fee2e2' : (isPlayingAudio ? '#16a34a' : '#dcfce7'),
+                color: hasAudioError ? '#ef4444' : (isPlayingAudio ? '#ffffff' : '#15803d'),
+                border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', flexShrink: 0, boxShadow: 'none', transition: 'all 0.15s ease'
               }}
@@ -870,8 +949,8 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenRecordings(); }}
                     style={{
-                      fontSize: '0.68rem', fontWeight: 900, color: '#15803d', background: '#e6f4ea',
-                      border: '1px solid #bbf7d0', borderRadius: '100px', padding: '2px 8px', cursor: 'pointer',
+                      fontSize: '0.68rem', fontWeight: 900, color: '#15803d', background: '#dcfce7',
+                      border: 'none', borderRadius: '100px', padding: '2px 8px', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', gap: '2px', transition: 'all 0.15s ease'
                     }}
                     className="hover-scale-mini"
@@ -902,8 +981,8 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                   onClick={(e) => handleRetryAudio(activeAudioTracks[0].url, e)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    fontSize: '0.72rem', fontWeight: 800, color: '#475569',
-                    background: '#f8fafc', border: '1px solid #cbd5e1',
+                    fontSize: '0.72rem', fontWeight: 800, color: '#0f172a',
+                    background: '#e2e8f0', border: 'none',
                     borderRadius: '8px', padding: '4px 8px', cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -920,7 +999,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '4px',
                     fontSize: '0.72rem', fontWeight: 800, color: '#ef4444',
-                    background: '#fef2f2', border: '1px solid #fca5a5',
+                    background: '#fee2e2', border: 'none',
                     borderRadius: '8px', padding: '4px 8px', cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -933,7 +1012,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
                 </button>
               </div>
             ) : (
-              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#64748b', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', background: '#ffffff', padding: '3px 8px', borderRadius: '8px', border: 'none', flexShrink: 0 }}>
                 {isPlayingAudio && audioCurrentTime > 0
                   ? `${formatSeconds(audioCurrentTime)} / ${formatSeconds(audioDuration || activeAudioTracks[0].duration)}`
                   : formatSeconds(activeAudioTracks[0].duration)}
@@ -957,7 +1036,7 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenHomework(); } }}
               style={{
                 padding: isMusicStandMode ? '16px 14px' : '14px 12px', minHeight: '48px', borderRadius: '18px',
-                border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)', color: '#ffffff',
+                border: 'none', background: '#34a853', color: '#ffffff',
                 fontSize: isMusicStandMode ? '1.02rem' : '0.94rem', fontWeight: 950, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 boxShadow: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'

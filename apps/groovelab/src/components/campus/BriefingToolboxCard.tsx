@@ -721,7 +721,7 @@ export const BriefingToolboxCard: React.FC = () => {
                       ? (isDown ? '#34a853' : '#0f172a') 
                       : '#f1f5f9',
                     border: isCurrent 
-                      ? (isDown ? '2px solid #22c55e' : '2px solid #334155') 
+                      ? (isDown ? '2px solid #34a853' : '2px solid #334155') 
                       : '1px solid #e2e8f0',
                     transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
                     transform: isCurrent ? 'scale(1.05)' : 'scale(1)',
@@ -1088,7 +1088,7 @@ export const BriefingToolboxCard: React.FC = () => {
                     bottom: 0,
                     width: '14px',
                     borderRadius: '100px',
-                    background: isInTune ? '#34a853' : (centsDiff < 0 ? '#ea4335' : '#eab308'),
+                    background: isInTune ? '#34a853' : (centsDiff < 0 ? '#ea4335' : '#facc15'),
                     left: `${Math.max(5, Math.min(95, 50 + centsDiff))}%`,
                     transform: 'translateX(-50%)',
                     transition: 'left 0.1s ease-out',

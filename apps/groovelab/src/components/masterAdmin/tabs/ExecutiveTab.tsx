@@ -813,7 +813,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                     }} />
                     <div style={{
                       width: `${(measuredGroovelabActive24h / (measuredCampusActive24h + measuredGroovelabActive24h)) * 100}%`,
-                      background: '#eab308',
+                      background: '#facc15',
                       transition: 'width 0.4s ease'
                     }} />
                   </>
@@ -1027,7 +1027,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {pendingStorageSchools.length === 0 && pendingUsers.length === 0 ? (
-                <div style={{ padding: '20px 16px', borderRadius: '16px', background: '#f0fdf4', border: '1px solid #dcfce7', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ padding: '20px 16px', borderRadius: '16px', background: '#f0fdf4', border: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <CheckCircle size={22} color="#15803d" style={{ flexShrink: 0 }} />
                   <div>
                     <strong style={{ fontSize: '0.86rem', color: '#15803d', display: 'block' }}>Alle Systeme synchron</strong>
@@ -1039,7 +1039,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               ) : (
                 <>
                   {pendingStorageSchools.length > 0 && (
-                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fffbeb', border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fffbeb', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <strong style={{ fontSize: '0.80rem', color: '#92400e' }}>
                           {pendingStorageSchools.length} Speicher-Anforderung(en)
@@ -1055,7 +1055,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                   )}
 
                   {pendingUsers.length > 0 && (
-                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fef2f2', border: '1px solid #fecaca', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ padding: '12px', borderRadius: '14px', background: '#fef2f2', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <strong style={{ fontSize: '0.80rem', color: '#991b1b', display: 'block' }}>
                           {pendingUsers.length} Schülerfreischaltung(en)

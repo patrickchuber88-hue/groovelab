@@ -94,21 +94,57 @@ export function StudentBriefingRightSidebar({
   feedInteractions = [],
   activeSection = 'all'
 }: StudentBriefingRightSidebarProps) {
+  const isTabletSlideOver = !isMobileSheet && typeof window !== 'undefined' && (
+    window.innerWidth <= 1280 ||
+    (typeof document !== 'undefined' && (
+      Number(document.documentElement.getAttribute('data-sim-width')) > 0 &&
+      Number(document.documentElement.getAttribute('data-sim-width')) <= 1280
+    )) ||
+    (typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-tablet')))
+  );
+
   return (
+    <>
+      {isTabletSlideOver && !isRightSidebarCollapsed && (
+        <div
+          onClick={() => handleToggleRightSidebar(true)}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.35)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 1099
+          }}
+        />
+      )}
             <div style={{ 
+              position: isTabletSlideOver ? 'fixed' : undefined,
+              top: isTabletSlideOver ? 0 : undefined,
+              right: isTabletSlideOver ? 0 : undefined,
+              bottom: isTabletSlideOver ? 0 : undefined,
+              zIndex: isTabletSlideOver ? 1100 : undefined,
+              background: isTabletSlideOver ? 'rgba(255, 255, 255, 0.98)' : undefined,
+              backdropFilter: isTabletSlideOver ? 'blur(24px)' : undefined,
+              WebkitBackdropFilter: isTabletSlideOver ? 'blur(24px)' : undefined,
+              boxShadow: (isTabletSlideOver && !isRightSidebarCollapsed) ? '-12px 0 40px rgba(15, 23, 42, 0.18)' : undefined,
+              borderLeft: (isTabletSlideOver && !isRightSidebarCollapsed) ? '1px solid #e2e8f0' : undefined,
+              padding: isTabletSlideOver ? (isRightSidebarCollapsed ? '0px' : '20px 18px 40px 18px') : undefined,
+              maxHeight: isTabletSlideOver ? '100dvh' : undefined,
               display: 'flex', 
               flexDirection: 'column', 
               gap: isMobileSheet ? '16px' : '24px',
-              width: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
-              minWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
-              maxWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : '340px'),
+              width: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : (isTabletSlideOver ? '360px' : '340px')),
+              minWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : (isTabletSlideOver ? '360px' : '340px')),
+              maxWidth: isMobileSheet ? '100%' : (isRightSidebarCollapsed ? '0px' : (isTabletSlideOver ? '360px' : '340px')),
               opacity: isMobileSheet ? 1 : (isRightSidebarCollapsed ? 0 : 1),
-              transform: isMobileSheet ? 'none' : (isRightSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)'),
+              transform: isMobileSheet ? 'none' : (isRightSidebarCollapsed ? 'translateX(100%)' : 'translateX(0)'),
               pointerEvents: isMobileSheet ? 'auto' : (isRightSidebarCollapsed ? 'none' : 'auto'),
-              overflowY: isMobileSheet ? 'visible' : (isRightSidebarCollapsed ? 'hidden' : 'visible'),
+              overflowY: isMobileSheet ? 'visible' : (isRightSidebarCollapsed ? 'hidden' : (isTabletSlideOver ? 'auto' : 'visible')),
               overflowX: 'hidden',
               boxSizing: 'border-box',
-              transition: isMobileSheet ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              transition: isMobileSheet ? 'none' : 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
             }}>
               {/* Sidebar Header with Collapse Button - Nur auf Desktop anzeigen */}
               {!isMobileSheet && (
@@ -162,26 +198,30 @@ export function StudentBriefingRightSidebar({
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handleToggleRightSidebar(true)}
-                    aria-label="Sidebar einklappen"
-                    title="Sidebar einklappen"
+                    aria-label="Sidebar schließen"
+                    title="Sidebar schließen"
                     style={{
-                      width: '28px',
-                      height: '28px',
+                      width: isTabletSlideOver ? '44px' : '32px',
+                      height: isTabletSlideOver ? '44px' : '32px',
+                      minWidth: isTabletSlideOver ? '44px' : '32px',
+                      minHeight: isTabletSlideOver ? '44px' : '32px',
                       background: 'rgba(52, 168, 83, 0.10)',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: isTabletSlideOver ? '12px' : '8px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
                       color: '#34a853',
                       transition: 'all 0.15s ease',
-                      flexShrink: 0
+                      flexShrink: 0,
+                      touchAction: 'manipulation'
                     }}
                     className="hover-scale"
                   >
-                    <ChevronRight size={16} color="#34a853" />
+                    <ChevronRight size={18} color="#34a853" />
                   </button>
                 </div>
               )}
@@ -260,27 +300,19 @@ export function StudentBriefingRightSidebar({
                         const unreadCount = getOccurrenceUnreadCount(occ);
                         const hasMsg = checkOccurrenceHasMessages(occ);
 
-                        // 🎨 0,1% Goldstandard: 3-Farben-Doktrin (Regulär = Grün, Verschoben = Gelb/Amber, Ausfall = Rot)
-                        const calendarHeaderBg = isCancelled ? '#ef4444' : (isRescheduled ? '#eab308' : '#34a853');
+                        // 🎨 0,1% Goldstandard: 3-Farben-Doktrin (Regulär = Campus-Grün #34a853, Verschoben = GrooveLab-Gelb #facc15, Ausfall = Rot)
+                        const calendarHeaderBg = isCancelled ? '#ef4444' : (isRescheduled ? '#facc15' : '#34a853');
                         const cardBg = isCancelled 
-                          ? 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)' 
+                          ? '#ef4444' 
                           : isRescheduled 
-                            ? 'linear-gradient(135deg, #fef08a 0%, #eab308 100%)' 
-                            : 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.03) 100%)';
-                        const cardBorder = isCancelled
-                          ? 'none'
-                          : isRescheduled
-                            ? 'none'
-                            : '1px solid rgba(52, 168, 83, 0.22)';
-                        const cardShadow = isCancelled
-                          ? '0 4px 10px rgba(239, 68, 68, 0.15)'
-                          : isRescheduled
-                            ? '0 4px 10px rgba(234, 179, 8, 0.12)'
-                            : 'none';
-                        const titleColor = isCancelled ? '#ffffff' : (isRescheduled ? '#78350f' : '#1e293b');
-                        const subtitleColor = isCancelled ? 'rgba(255, 255, 255, 0.95)' : (isRescheduled ? 'rgba(120, 53, 15, 0.95)' : '#475569');
-                        const roomColor = isCancelled ? '#fee2e2' : (isRescheduled ? '#b45309' : '#15803d');
-                        const badgeBg = isCancelled ? '#000000' : (isRescheduled ? (isPendingProposal ? '#b45309' : '#000000') : '#34a853');
+                            ? '#fef9c3' 
+                            : '#e6f4ea';
+                        const cardBorder = 'none';
+                        const cardShadow = 'none';
+                        const titleColor = isCancelled ? '#ffffff' : (isRescheduled ? '#0f172a' : '#137333');
+                        const subtitleColor = isCancelled ? '#ffffff' : (isRescheduled ? '#0f172a' : '#137333');
+                        const roomColor = isCancelled ? '#fee2e2' : (isRescheduled ? '#854d0e' : '#137333');
+                        const badgeBg = isCancelled ? '#0f172a' : (isRescheduled ? (isPendingProposal ? '#854d0e' : '#0f172a') : '#34a853');
                         const badgeColor = '#ffffff';
                         const badgeText = isCancelled ? 'Ausfall' : (isRescheduled ? (isPendingProposal ? 'Vorschlag' : 'Verschoben') : 'Regulär');
 
@@ -329,7 +361,7 @@ export function StudentBriefingRightSidebar({
                           >
                             {/* Kalender-Tag-Widget */}
                             <div style={{ width: '48px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', textAlign: 'center', flexShrink: 0 }}>
-                              <div style={{ background: calendarHeaderBg, color: 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>
+                              <div style={{ background: calendarHeaderBg, color: isRescheduled ? '#0f172a' : 'white', fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 900, padding: '4px 0', textTransform: 'uppercase' }}>
                                 {d.toLocaleDateString('de-DE', { month: 'short' })}
                               </div>
                               <div style={{ background: 'white', color: '#1e293b', fontSize: isMusicStandMode ? '1.35rem' : '1.2rem', fontWeight: 900, padding: '6px 0' }}>
@@ -413,8 +445,8 @@ export function StudentBriefingRightSidebar({
                         if (effectiveLevel === 'junior') {
                           return (
                             <div style={{
-                              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                              border: '1.5px solid #bbf7d0',
+                              background: 'rgba(52, 168, 83, 0.10)',
+                              border: 'none',
                               borderRadius: '20px',
                               padding: '20px 16px',
                               textAlign: 'center',
@@ -429,7 +461,8 @@ export function StudentBriefingRightSidebar({
                                 width: '46px',
                                 height: '46px',
                                 borderRadius: '16px',
-                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 50%, #ca8a04 100%)',
+                                background: '#facc15',
+                                color: '#0f172a',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -496,8 +529,8 @@ export function StudentBriefingRightSidebar({
                         // Teen & Pro Level: Clean, high-end, calm
                         return (
                           <div style={{
-                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                            border: '1px solid #e2e8f0',
+                            background: '#f8fafc',
+                            border: 'none',
                             borderRadius: '18px',
                             padding: '18px 16px',
                             textAlign: 'center',
@@ -505,7 +538,7 @@ export function StudentBriefingRightSidebar({
                             flexDirection: 'column',
                             alignItems: 'center',
                             gap: '8px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                            boxShadow: 'none',
                             margin: '6px 0'
                           }}>
                             <div style={{
@@ -625,7 +658,7 @@ export function StudentBriefingRightSidebar({
                             padding: '12px', 
                             borderRadius: '12px', 
                             background: cardBg, 
-                            border: `1px solid ${cardBorder}`, 
+                            border: 'none', 
                             display: 'flex', 
                             flexDirection: 'column', 
                             gap: '8px',
@@ -660,7 +693,7 @@ export function StudentBriefingRightSidebar({
                                       fontSize: '0.82rem', 
                                       fontWeight: 800, 
                                       cursor: 'pointer',
-                                      boxShadow: `0 2px 6px ${(occ.status === 'scheduled' && occ.original_date && occ.date === occ.original_date) ? 'rgba(52, 168, 83, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                                      boxShadow: 'none',
                                       transition: 'all 0.2s',
                                       flexShrink: 0,
                                       position: 'relative',
@@ -695,7 +728,7 @@ export function StudentBriefingRightSidebar({
                                       style={{
                                         background: '#fef3c7',
                                         color: '#b45309',
-                                        border: '1px solid #fde68a',
+                                        border: 'none',
                                         minHeight: '40px',
                                         padding: '8px 14px',
                                         borderRadius: '12px',
@@ -796,7 +829,7 @@ export function StudentBriefingRightSidebar({
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '10px',
                       background: '#e6f4ea',
-                      border: '1px solid #e6f4ea',
+                      border: 'none',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0
                     }}>
@@ -829,11 +862,11 @@ export function StudentBriefingRightSidebar({
                           onClick={() => handleOpenContributions && handleOpenContributions(goal.title || 'Klassen-Übe-Ziel', goal.minutes)}
                           onMouseOver={e => {
                             e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(52, 168, 83, 0.22)';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                           onMouseOut={e => {
                             e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(52, 168, 83, 0.12)';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                           style={{
                             position: 'relative',
@@ -1133,7 +1166,7 @@ export function StudentBriefingRightSidebar({
                                             padding: '8px 12px',
                                             borderRadius: '8px',
                                             background: btnBg,
-                                            border: `1.5px solid ${btnBorder}`,
+                                            border: isAnswered ? 'none' : `1.5px solid ${btnBorder}`,
                                             color: btnColor,
                                             fontSize: '0.78rem',
                                             fontWeight: isSelectedByMe || isCorrectOption ? 700 : 500,
@@ -1280,9 +1313,8 @@ export function StudentBriefingRightSidebar({
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '4px',
-                                  background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                                  border: '1px solid',
-                                  borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
+                                  background: userHasThumbsUp ? 'rgba(52, 168, 83, 0.10)' : 'transparent',
+                                  border: userHasThumbsUp ? 'none' : '1px solid #e2e8f0',
                                   color: userHasThumbsUp ? '#34a853' : '#64748b',
                                   padding: '3px 8px',
                                   borderRadius: '9999px',
@@ -1305,6 +1337,6 @@ export function StudentBriefingRightSidebar({
               </div>
               )}
             </div>
-
+    </>
   );
 }

@@ -97,10 +97,12 @@ export function useSimulatedTime() {
       }
     };
     window.addEventListener('storage', handleStorage);
+    const intervalId = window.setInterval(sync, 15000);
 
     return () => {
       window.removeEventListener(EVENT_NAME, sync);
       window.removeEventListener('storage', handleStorage);
+      window.clearInterval(intervalId);
     };
   }, [sync]);
 

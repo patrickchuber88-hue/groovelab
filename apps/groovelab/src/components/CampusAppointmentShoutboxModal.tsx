@@ -21,7 +21,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
-import { isWebAuthnSupported, getSanitizedRpId } from '../utils/webauthn';
+import { isWebAuthnSupported, getSanitizedRpId, extractWebAuthnAssertionPayload } from '../utils/webauthn';
 import { isQuietHoursActive } from '../utils/chatRespectGuard';
 import { CampusDynamicAvatar } from './CampusDirectMessages';
 import { CampusUnifiedChatMessage, isChatMessageSystem } from './messages/CampusUnifiedChatMessage';
@@ -604,10 +604,12 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
         occurrence?.school_id;
 
+      const assertionPayload = extractWebAuthnAssertionPayload(assertion);
       const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
         p_credential_id: assertion.id,
         p_challenge: chalData.challenge,
-        p_school_id: effectiveSchoolId || null
+        p_school_id: effectiveSchoolId || null,
+        ...assertionPayload
       });
 
       if (authErr || !authResult?.success) {
@@ -1105,15 +1107,15 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               </span>
 
               {isCanceled ? (
-                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(239, 68, 68, 0.25)", border: "1px solid rgba(252, 165, 165, 0.45)", color: "#fecaca", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(239, 68, 68, 0.25)", border: 'none', color: "#fecaca", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
                   <X size={10} strokeWidth={3} /> <span>Entfällt</span>
                 </span>
               ) : isRescheduled ? (
-                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(245, 158, 11, 0.25)", border: "1px solid rgba(253, 230, 138, 0.45)", color: "#fef08a", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(245, 158, 11, 0.25)", border: 'none', color: "#fef08a", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
                   <RotateCcw size={9} strokeWidth={2.6} /> <span>Verlegt</span>
                 </span>
               ) : (
-                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(16, 185, 129, 0.22)", border: "1px solid rgba(16, 185, 129, 0.40)", color: "#a7f3d0", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ fontSize: "0.66rem", fontWeight: 800, background: "rgba(16, 185, 129, 0.22)", border: 'none', color: "#a7f3d0", padding: "2px 8px", borderRadius: "100px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                   <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
                   <span>Planmäßig</span>
                 </span>
@@ -1150,7 +1152,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             padding: isMobile ? '10px 14px' : '12px 16px',
             borderRadius: '16px',
             background: '#fff5f5',
-            border: '1px solid #fecaca',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -1249,7 +1251,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             </div>
           )}
           {isFrozen && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fee2f2', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
+            <div style={{ background: '#fef2f2', border: 'none', color: '#991b1b', padding: '10px 14px', borderRadius: '12px', fontSize: '0.84rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', textAlign: 'center' }}>
               <Lock size={16} /> <span>Shoutbox eingefroren (Schreibschutz nach 48h aktiv)</span>
             </div>
           )}
@@ -1506,7 +1508,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       fontSize: isMobile ? '0.78rem' : '0.84rem',
                       fontWeight: 800,
                       background: '#eff6ff',
-                      border: '1px solid #bfdbfe',
+                      border: 'none',
                       padding: '4px 12px',
                       borderRadius: '100px'
                     }}>
@@ -1593,7 +1595,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   alignItems: 'center',
                   gap: '6px',
                   background: '#fffbeb',
-                  border: '1px solid #fef3c7',
+                  border: 'none',
                   borderRadius: '100px',
                   padding: '4px 12px',
                   marginBottom: '8px',
@@ -1787,7 +1789,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 height: '50px',
                 borderRadius: '16px',
                 background: '#eff6ff',
-                border: '1px solid #bfdbfe',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1827,7 +1829,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     fontWeight: 750,
                     marginBottom: '10px',
                     background: '#fef2f2',
-                    border: '1px solid #fecaca',
+                    border: 'none',
                     padding: '6px 12px',
                     borderRadius: '10px',
                     width: '100%',
@@ -1979,7 +1981,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                     padding: '10px 14px',
                     minHeight: '44px',
                     borderRadius: '14px',
-                    border: '1px solid #bfdbfe',
+                    border: 'none',
                     background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                     color: '#1d4ed8',
                     fontSize: '0.84rem',

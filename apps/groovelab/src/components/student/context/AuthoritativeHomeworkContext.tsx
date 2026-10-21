@@ -623,7 +623,11 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
     };
 
     // 1. Identify weekly snapshot containers (sorted newest first)
-    const candidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+    const candidates = (progressItems || []).filter((item: any) =>
+      item.topic_name?.startsWith('Hausaufgabe KW ') &&
+      item.is_current_homework !== false &&
+      Boolean(item.homework_notes || item.teacher_notes)
+    );
     candidates.sort((a: any, b: any) => {
       const wA = getItemWeek(a), wB = getItemWeek(b);
       if (wA && wB && wA !== wB) return wB.localeCompare(wA);

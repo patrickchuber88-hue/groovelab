@@ -22,7 +22,7 @@ export interface MeisterwerkLogbuchTabProps {
   setPlayingAudioUrl: (url: string | null) => void;
   notifyHomeworkChange: () => void;
   getSongColor: (title: string) => any;
-  renderSongVinylCover: (color: any, size?: any) => React.ReactNode;
+  renderSongVinylCover: (color: any, size?: any, isMastered?: boolean, iconType?: any, variant?: any, showVinylPeek?: boolean, ...args: any[]) => React.ReactNode;
   isRecordingAudio: boolean;
   activeRecordingSongId: string | null;
   selectedActiveSongId: string | null;
@@ -70,7 +70,9 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
         <div style={{
           flex: 1,
           padding: isMobileOrSim ? '20px 16px 100px 16px' : (useNotebookLayout ? '32px 32px 80px 60px' : '32px 32px 80px 32px'),
-          overflowY: 'auto',
+          overflowY: 'visible',
+          minHeight: '100%',
+          boxSizing: 'border-box',
           display: 'flex',
           flexDirection: 'column',
           gap: '24px',
@@ -113,18 +115,64 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '1.25rem' }}>🏆</span>
-            <span style={{
-              fontSize: '1rem',
-              fontWeight: 900,
-              color: '#0f172a',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif'
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '4px',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)'
+              }}>
+                <Award size={22} strokeWidth={2.4} />
+              </div>
+              <div>
+                <div style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 900,
+                  color: '#0f172a',
+                  letterSpacing: '-0.02em',
+                  fontFamily: '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  Meine Meisterwerke
+                </div>
+                <div style={{
+                  fontSize: '0.78rem',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  letterSpacing: '-0.01em'
+                }}>
+                  Musikalische Audio-Biografie &amp; offizielle Meilensteine (DIN 66398 LK 4)
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              background: '#eef2ff',
+              border: '1px solid #c7d2fe',
+              boxShadow: 'none',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              color: '#4338ca'
             }}>
-              Meine Meisterwerke
-            </span>
+              <span>🔒 Revisionssicheres Meilenstein-Archiv</span>
+            </div>
           </div>
 
           {(() => {
@@ -330,7 +378,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
             return (
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(0, 1.35fr) minmax(0, 0.95fr)',
+                gridTemplateColumns: isMobileOrSim ? '1fr' : 'minmax(0, 1.28fr) minmax(0, 0.95fr)',
                 gap: '24px',
                 width: '100%',
                 marginTop: '8px',
@@ -342,51 +390,70 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                   flexDirection: 'column',
                   gap: '16px'
                 }}>
-                  <h3 style={{
-                    fontSize: '1rem',
-                    fontWeight: 800,
-                    color: useNotebookLayout ? '#34a853' : '#0f172a',
-                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '2px solid #e2e8f0',
-                    paddingBottom: '8px',
-                    margin: 0,
+                  <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px'
+                    justifyContent: 'space-between',
+                    paddingBottom: '8px',
+                    borderBottom: useNotebookLayout ? '2px solid #32483e' : '1.5px solid #f1f5f9'
                   }}>
-                    <span>🎵</span> Meisterwerk-Stücke &amp; Aufnahmen
-                  </h3>
+                    <h3 style={{
+                      fontSize: '0.96rem',
+                      fontWeight: 800,
+                      color: useNotebookLayout ? '#34a853' : '#0f172a',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span>🎵</span> Meisterwerk-Stücke &amp; Aufnahmen
+                    </h3>
+                    {masteredSongs.length > 0 && (
+                      <span style={{
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        background: '#eef2ff',
+                        color: '#4338ca',
+                        border: '1px solid #c7d2fe'
+                      }}>
+                        {masteredSongs.length} {masteredSongs.length === 1 ? 'Meisterwerk' : 'Meisterwerke'}
+                      </span>
+                    )}
+                  </div>
                   
                   {masteredSongs.length === 0 ? (
                     <div style={{
-                      padding: '36px 20px',
+                      padding: '28px 24px',
                       textAlign: 'center',
                       border: useNotebookLayout ? '1.5px dashed #32483e' : '1.5px solid #e2e8f0',
-                      borderRadius: '20px',
+                      borderRadius: '18px',
                       background: useNotebookLayout ? 'rgba(0,0,0,0.1)' : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       gap: '14px'
                     }}>
                       <div style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '14px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        width: '52px',
+                        height: '52px',
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
                         color: 'white',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: 'none'
+                        boxShadow: '0 4px 14px rgba(99, 102, 241, 0.28)'
                       }}>
-                        <Award size={24} strokeWidth={2.4} />
+                        <Award size={26} strokeWidth={2.4} />
                       </div>
-                      <div style={{ maxWidth: '380px' }}>
-                        <div style={{ fontSize: '0.96rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em', marginBottom: '4px' }}>
-                          Dein Meisterwerk Audio-Tresor
+                      <div style={{ maxWidth: '420px' }}>
+                        <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', marginBottom: '6px' }}>
+                          Dein persönlicher Meisterwerk Audio-Tresor
                         </div>
-                        <div style={{ fontSize: '0.80rem', color: '#64748b', lineHeight: 1.45 }}>
+                        <div style={{ fontSize: '0.84rem', color: '#64748b', lineHeight: 1.5, fontWeight: 500 }}>
                           Spiele ein Stück im Unterricht fehlerfrei vor. Sobald du es meisterst, schaltet deine Lehrkraft hier deine offizielle <strong>Gold-Urkunde</strong> und die <strong>Studio-Aufnahme</strong> frei!
                         </div>
                       </div>
@@ -394,15 +461,15 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: '#f0fdf4',
-                        border: '1px solid #bbf7d0',
-                        color: '#166534',
-                        fontSize: '0.70rem',
-                        fontWeight: 700,
-                        padding: '5px 12px',
-                        borderRadius: '10px'
+                        background: '#eef2ff',
+                        border: '1px solid #c7d2fe',
+                        color: '#4338ca',
+                        fontSize: '0.72rem',
+                        fontWeight: 750,
+                        padding: '6px 14px',
+                        borderRadius: '12px'
                       }}>
-                        <span>🔒 Revisionssicheres Meilenstein-Archiv</span>
+                        <span>✨ Bereit für deinen ersten Studio-Meilenstein</span>
                       </div>
                     </div>
                   ) : (
@@ -414,32 +481,50 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                           key={`m-song-${idx}`} 
                           style={{
                             background: '#ffffff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '16px',
-                            padding: '12px 16px',
+                            border: '1.5px solid #e2e8f0',
+                            borderRadius: '18px',
+                            padding: '14px 18px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '12px',
-                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                            minHeight: '64px',
+                            gap: '16px',
+                            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.03)',
+                            minHeight: '74px',
                             boxSizing: 'border-box'
                           }}
                         >
                           {/* Left: Vinyl Cover + Title */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                            {renderSongVinylCover(songColor, 'sm')}
-                            <div style={{
-                              fontSize: '0.90rem',
-                              color: '#0f172a',
-                              fontWeight: 900,
-                              letterSpacing: '-0.02em',
-                              fontFamily: '"Helvetica Neue", Helvetica, Inter, Arial, sans-serif',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {skill.artist} - {skill.title}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', minWidth: 0, flex: 1 }}>
+                            {renderSongVinylCover(songColor, 'md', true, 'music', 'squircle', true)}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{
+                                fontSize: '0.96rem',
+                                color: '#0f172a',
+                                fontWeight: 900,
+                                letterSpacing: '-0.02em',
+                                fontFamily: '"Plus Jakarta Sans", -apple-system, sans-serif',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {skill.title}
+                              </div>
+                              <div style={{
+                                fontSize: '0.76rem',
+                                color: '#64748b',
+                                fontWeight: 650,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                              }}>
+                                <span>{skill.artist}</span>
+                                {skill.instrument && (
+                                  <>
+                                    <span>•</span>
+                                    <span>{skill.instrument}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -456,7 +541,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                                 style={{
                                   background: '#fef2f2',
                                   color: '#dc2626',
-                                  border: '1.5px solid #f87171',
+                                  border: 'none',
                                   borderRadius: '10px',
                                   padding: '6px 12px',
                                   fontSize: '0.72rem',
@@ -486,9 +571,9 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                                   startRecordingAudio(skill.id, `${skill.artist} - ${skill.title}`, true);
                                 }}
                                 style={{
-                                  background: '#f0fdf4',
-                                  color: '#166534',
-                                  border: '1px solid #bbf7d0',
+                                  background: '#eef2ff',
+                                  color: '#4338ca',
+                                  border: '1px solid #c7d2fe',
                                   borderRadius: '10px',
                                   padding: '6px 11px',
                                   fontSize: '0.72rem',
@@ -524,7 +609,7 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                               style={{
                                 background: '#fef3c7',
                                 color: '#92400e',
-                                border: '1px solid #fde68a',
+                                border: 'none',
                                 borderRadius: '10px',
                                 padding: '6px 12px',
                                 fontSize: '0.74rem',
@@ -544,12 +629,12 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
                             {/* 🏆 3. Meisterwerk Badge */}
                             <span style={{
                               fontSize: '0.72rem',
-                              background: '#dcfce7',
-                              color: '#15803d',
+                              background: '#eef2ff',
+                              color: '#4338ca',
                               padding: '6px 11px',
                               borderRadius: '10px',
                               fontWeight: 800,
-                              border: '1px solid #bbf7d0',
+                              border: '1px solid #c7d2fe',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '5px',
@@ -604,15 +689,22 @@ export function MeisterwerkLogbuchTab(props: MeisterwerkLogbuchTabProps) {
 
                     {masteredBooksList.length === 0 ? (
                       <div style={{
-                        padding: '24px 16px',
+                        padding: '18px 16px',
                         textAlign: 'center',
-                        border: useNotebookLayout ? '1px dashed #32483e' : '1px dashed #cbd5e1',
+                        border: useNotebookLayout ? '1px dashed #32483e' : '1.5px solid #e2e8f0',
                         borderRadius: '16px',
-                        color: useNotebookLayout ? '#8fa399' : '#64748b',
-                        fontSize: '0.82rem',
-                        background: useNotebookLayout ? 'rgba(0,0,0,0.06)' : '#f8fafc'
+                        color: '#64748b',
+                        fontSize: '0.80rem',
+                        fontWeight: 600,
+                        background: useNotebookLayout ? 'rgba(0,0,0,0.06)' : '#ffffff',
+                        boxShadow: useNotebookLayout ? 'none' : '0 2px 8px rgba(0,0,0,0.02)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
                       }}>
-                        Noch keine Meisterwerk-Lehrwerke vorhanden.
+                        <BookOpen size={16} strokeWidth={2} color="#94a3b8" />
+                        <span>Noch keine Meisterwerk-Lehrwerke vorhanden</span>
                       </div>
                     ) : (
                       masteredBooksList.map((item, idx) => {

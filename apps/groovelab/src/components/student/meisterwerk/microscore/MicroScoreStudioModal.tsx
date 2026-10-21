@@ -14,10 +14,16 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Square, Save, Music, Sparkles, Check, Minus, Plus, ChevronDown, Headphones, Pencil, BookOpen, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Play, Square, Save, Music, Sparkles, Check, Minus, Plus, ChevronDown, ChevronLeft, ChevronRight, Headphones, Pencil, BookOpen, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
 import { MicroScoreDuration, MicroScoreInstrument, MicroScoreNote, MicroScoreSnippet, MicroScoreDisplayMode, MicroScoreTimeSignature } from './microScore.types';
 import { MicroScoreAudioSynthesizer, durationToSixteenths } from './microScoreAudioSynthesizer';
-import { getDidacticNoteDurationSec } from './microScoreGridEngine';
+import {
+  getDidacticNoteDurationSec,
+  getSequentialFrontierSlot,
+  getBeatLabel,
+  getSpokenBeatLabel,
+  durationToSixteenthCount
+} from './microScoreGridEngine';
 import { MicroScoreStaffNotation } from './MicroScoreStaffNotation';
 import { pitchToBestFretAndString, getInstrumentChordVoicing } from './guitarFretboardEngine';
 import { MicroScoreBaukastenDock } from './MicroScoreBaukastenDock';
@@ -25,19 +31,22 @@ import { MicroScorePlayerBar, getInstrumentTheme } from './MicroScorePlayerBar';
 import { MicroScoreChallengeEngine } from './MicroScoreChallengeEngine';
 import { MicroScoreCelebrationModal } from './MicroScoreCelebrationModal';
 import { playTriumphantXpChime } from '../../../../utils/campusXpEffects';
-import { normalizeInstrumentToKey, resolveSnippetForInstrument } from '../../../../services/canonicalScoreEngine';
+import { normalizeInstrumentToKey, resolveSnippetForInstrument, getSnippetArrangementLabel } from '../../../../services/canonicalScoreEngine';
 import { MicroScoreInstrumentVisualizer } from './MicroScoreInstrumentVisualizer';
 import { VDM_DRUM_PRESETS, VdmDrumPreset, QUICK_TITLE_CHIPS, INSTRUMENT_OPTIONS } from './vdmDrumPresets';
+import { isDrumFootPitch } from './microScoreDrumPolyphonyEngine';
 import { calculateActiveMicroScoreNotes } from './microScoreActiveNotesHelper';
 import { useMicroScoreViewport } from './useMicroScoreViewport';
 import { MicroScoreOrientationLock } from './MicroScoreOrientationLock';
-import { MicroScoreViewModeSwitcher, MicroScoreViewMode } from './MicroScoreViewModeSwitcher';
-import { MicroScoreTemplateChipsBar } from './MicroScoreTemplateChipsBar';
+import { MicroScoreViewMode } from './MicroScoreViewModeSwitcher';
+import { MicroScoreStudioHeader } from './MicroScoreStudioHeader';
 
 export interface MicroScoreStudioModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialSnippet?: MicroScoreSnippet | null;
+  snippetList?: MicroScoreSnippet[];
+  initialSnippetIndex?: number;
   studentId?: string | null;
   taskId?: string;
   taskTitle?: string;
@@ -50,6 +59,8 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
   isOpen,
   onClose,
   initialSnippet,
+  snippetList,
+  initialSnippetIndex,
   studentId,
   taskId,
   taskTitle,
@@ -78,12 +89,19 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     await toggleFullscreen();
   }, [toggleFullscreen]);
 
-  // 🎨 0,1% Goldstandard Apple Studio States
+  // 🎨 0,1% Goldstandard Apple Studio States (Farb-Guide beim Drumkit standardmäßig aktiviert!)
   const [showTemplates, setShowTemplates] = useState(false);
+  const [isDrumColorGuide, setIsDrumColorGuide] = useState(true);
+  // 🏛️ Kanonisches Original-Schnipsel (C-Score SSOT) bewahren, damit mehrfacher Instrumentenwechsel (z. B. Piano -> Drums -> Gitarre) 100% verlustfrei bleibt!
+  const canonicalSourceRef = useRef<MicroScoreSnippet | null>(initialSnippet || null);
+
   const [snippet, setSnippet] = useState<MicroScoreSnippet>(() => {
     const userInst = normalizeInstrumentToKey(defaultInstrument);
     if (initialSnippet) {
-      if (initialSnippet.instrument === 'universal' && userInst !== 'universal') {
+      const isInitialDrum = initialSnippet.instrument === 'drums' || initialSnippet.clef === 'percussion';
+      // Autoritativer Instrumenten-Autoload: Wenn das Benutzerfach ein spezifisches Instrument ist (z. B. Gitarre, Bass etc.),
+      // adaptiere jedes Schnipsel (egal ob universal oder Klavier-Übung wie Hanon No. 1) verlustfrei auf das Benutzerfach!
+      if (!isInitialDrum && userInst !== 'universal' && initialSnippet.instrument !== userInst) {
         return resolveSnippetForInstrument(initialSnippet, userInst);
       }
       return initialSnippet;
@@ -105,6 +123,53 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     };
   });
 
+  // 🏛️ Synchronisiere Zustand, wenn initialSnippet sich von außen ändert oder "Notenschnipsel erstellen" (initialSnippet == null) geöffnet wird
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialSnippet) {
+      canonicalSourceRef.current = initialSnippet;
+      const userInst = normalizeInstrumentToKey(defaultInstrument);
+      const isInitialDrum = initialSnippet.instrument === 'drums' || initialSnippet.clef === 'percussion';
+      if (!isInitialDrum && userInst !== 'universal' && initialSnippet.instrument !== userInst) {
+        setSnippet(resolveSnippetForInstrument(initialSnippet, userInst));
+      } else {
+        setSnippet(initialSnippet);
+      }
+      if (initialSnippet.displayMode) {
+        setDisplayMode(initialSnippet.displayMode);
+      }
+      setActiveTab((initialSnippet.notes && initialSnippet.notes.length > 0) ? 'practice' : 'write');
+      setActiveBar(0);
+      setActiveFraction(0);
+      setUndoHistory([]);
+    } else {
+      // 🛡️ Strict Blank-Canvas Axiom: "Notenschnipsel erstellen" öffnet IMMER im 100% leeren Zustand!
+      canonicalSourceRef.current = null;
+      const userInst = normalizeInstrumentToKey(defaultInstrument);
+      const inst = userInst !== 'universal' ? userInst : 'piano';
+      const defaultTitle = taskTitle ? taskTitle : 'Neuer Noten-Schnipsel';
+      setSnippet({
+        id: `snippet-${Date.now()}`,
+        title: defaultTitle,
+        instrument: inst,
+        timeSignature: '4/4',
+        tempoBpm: 80,
+        barsCount: 2,
+        displayMode: (inst === 'guitar' || inst === 'bass') ? 'both' : 'notes',
+        clef: (inst === 'bass' || inst === 'trombone') ? 'bass' : (inst === 'drums' ? 'percussion' : 'treble'),
+        notes: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        taskId: taskId || undefined,
+        studentId: studentId || undefined
+      });
+      setActiveTab('write');
+      setActiveBar(0);
+      setActiveFraction(0);
+      setUndoHistory([]);
+    }
+  }, [isOpen, initialSnippet, defaultInstrument, taskTitle, taskId, studentId]);
+
   // 🌟 Harmonische Übungs-Erkennung (Dreiklänge, Kadenzen, Akkorde, Dur/Moll)
   const isHarmonicExercise = useMemo(() => {
     if (snippet.category && (snippet.category === 'Akkorde' || snippet.category === 'Tonleitern')) return true;
@@ -115,22 +180,8 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     if (harmonicKeywords.some(kw => titleLower.includes(kw))) return true;
     return false;
   }, [snippet.category, snippet.vdmFolder, snippet.chords, snippet.title]);
-  const availableInstrumentOptions = useMemo(() => {
-    if (isHarmonicExercise) {
-      return INSTRUMENT_OPTIONS.filter(opt => opt.value !== 'drums');
-    }
-    return INSTRUMENT_OPTIONS;
-  }, [isHarmonicExercise]);
-  // Fail-Safe: Falls Schlagzeug in einer harmonischen Übung angewählt war, sofort umschalten
-  useEffect(() => {
-    if (isHarmonicExercise && snippet.instrument === 'drums') {
-      setSnippet(prev => ({
-        ...prev,
-        instrument: 'piano',
-        clef: 'treble'
-      }));
-    }
-  }, [isHarmonicExercise, snippet.instrument]);
+  // 🌟 0,1% Goldstandard: Für jeden Notenschnipsel sind ausnahmslos alle Instrumente anwählbar
+  const availableInstrumentOptions = INSTRUMENT_OPTIONS;
   const applyDrumPreset = (preset: VdmDrumPreset) => {
     setSnippet(prev => ({
       ...prev,
@@ -160,11 +211,11 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
   const [isDottedMode, setIsDottedMode] = useState(false);
   const [viewMode, setViewMode] = useState<MicroScoreViewMode>(() => {
     const isStr = snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings';
-    return isStr ? (snippet.displayMode === 'tabs' ? 'tabs' : 'fretboard') : 'both';
+    return isStr ? (snippet.displayMode === 'notes' ? 'notes' : 'tabs') : 'both';
   });
   const [displayMode, setDisplayMode] = useState<MicroScoreDisplayMode>(() => {
     if (initialSnippet?.displayMode) return initialSnippet.displayMode;
-    return snippet.instrument === 'guitar' ? 'both' : 'notes';
+    return (snippet.instrument === 'guitar' || snippet.instrument === 'bass') ? 'both' : 'notes';
   });
 
   // ♬ 0,1% Smart-Akkord & Vorzeichen States
@@ -206,15 +257,28 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
   const theme = getInstrumentTheme(snippet.instrument);
   const synthRef = useRef<MicroScoreAudioSynthesizer | null>(null);
   const playTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const visualTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const snippetRef = useRef<MicroScoreSnippet>(snippet);
   snippetRef.current = snippet;
+  const isMetronomeActiveRef = useRef<boolean>(isMetronomeActive);
+  isMetronomeActiveRef.current = isMetronomeActive;
+  const isLoopingRef = useRef<boolean>(isLooping);
+  isLoopingRef.current = isLooping;
+  const isChallengeOpenRef = useRef<boolean>(isChallengeOpen);
+  isChallengeOpenRef.current = isChallengeOpen;
 
-  // Initialisiere Audio-Synthesizer
+  // Initialisiere Audio-Synthesizer & Preload der Studio-Drum-Samples
   useEffect(() => {
-    synthRef.current = new MicroScoreAudioSynthesizer();
+    const s = new MicroScoreAudioSynthesizer();
+    synthRef.current = s;
+    try {
+      s.init();
+    } catch {}
     return () => {
-      if (synthRef.current) synthRef.current.stopAll();
+      s.stopAll();
       if (playTimerRef.current) clearInterval(playTimerRef.current);
+      visualTimeoutsRef.current.forEach(clearTimeout);
+      visualTimeoutsRef.current = [];
     };
   }, []);
   // Mute-Zustand des Instruments synchronisieren
@@ -263,12 +327,56 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     const filtered = snippet.notes.filter(n => n.barIndex !== activeBar);
     setSnippet(prev => ({ ...prev, notes: filtered }));
   };
-  const advanceCursor = useCallback((fromBar = activeBar, fromFraction = activeFraction) => {
-    const stepMap: Record<MicroScoreDuration, number> = { '1': 16, '2': 8, '4': 4, '8': 2, '16': 1 };
-    let step = stepMap[activeDuration] || 4;
-    if (isTripletMode) step = Math.max(1, Math.round((step * 2) / 3));
-    else if (isDottedMode) step = Math.floor(step * 1.5);
 
+  // Kompletten Schnipsel leeren (1-Klick Blank-Canvas Reset)
+  const handleClearAllNotes = () => {
+    if (readOnly || snippet.notes.length === 0) return;
+    setUndoHistory(prev => [...prev.slice(-15), snippet.notes]);
+    setSnippet(prev => ({ ...prev, notes: [], description: '' }));
+    setActiveBar(0);
+    setActiveFraction(0);
+  };
+
+  // 🥁 1-Tap Groove-Kombi (setzt Fuß- und Handstimme gleichzeitig auf den aktiven Schlag und rückt weiter)
+  const handleInsertDrumCombo = (pitches: string[]) => {
+    if (readOnly || pitches.length === 0) return;
+    const didDuration = getDidacticNoteDurationSec(activeDuration, snippet.tempoBpm, isDottedMode, isTripletMode);
+    const filtered = snippet.notes.filter(
+      n => !(n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5)
+    );
+    const comboNotes: MicroScoreNote[] = pitches.map((p, idx) => ({
+      id: `note-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+      barIndex: activeBar,
+      beatFraction: activeFraction,
+      duration: activeDuration,
+      pitch: p,
+      isTriplet: isTripletMode,
+      isDotted: isDottedMode
+    }));
+    const nextNotes = [...filtered, ...comboNotes];
+    handleUpdateNotes(nextNotes);
+    synthRef.current?.playChordNow(snippet.instrument, pitches, didDuration, 0.72);
+    advanceCursor(activeBar, activeFraction, nextNotes);
+  };
+
+  // 🧲 0,1% Goldstandard: Magnetischer Schritt-für-Schritt-Cursor entlang der aktiven Raster-Platzhalter
+  const advanceCursor = useCallback((fromBar = activeBar, fromFraction = activeFraction, nextNotesOverride?: MicroScoreNote[]) => {
+    const candidateNotes = nextNotesOverride ?? snippet.notes;
+    const frontier = getSequentialFrontierSlot(
+      candidateNotes,
+      snippet.barsCount,
+      snippet.timeSignature,
+      activeDuration,
+      isDottedMode,
+      isTripletMode
+    );
+    if (!frontier.isScoreFull) {
+      setActiveBar(frontier.barIndex);
+      setActiveFraction(frontier.fraction);
+      return;
+    }
+
+    const step = durationToSixteenthCount(activeDuration, isDottedMode, isTripletMode);
     const fractionsPerBar = snippet.timeSignature === '3/4' || snippet.timeSignature === '6/8' ? 12 : snippet.timeSignature === '2/4' ? 8 : 16;
 
     let nextFraction = fromFraction + step;
@@ -277,16 +385,38 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
       nextFraction = nextFraction - fractionsPerBar;
       nextBar = fromBar + 1;
       if (nextBar >= snippet.barsCount) {
-        if (snippet.barsCount < 4) {
-          setSnippet(prev => ({ ...prev, barsCount: Math.min(4, prev.barsCount + 1) }));
-        } else {
-          nextBar = 0;
-        }
+        nextBar = 0;
       }
     }
     setActiveFraction(nextFraction);
     setActiveBar(nextBar);
-  }, [activeBar, activeFraction, activeDuration, isTripletMode, isDottedMode, snippet.barsCount, snippet.timeSignature]);
+  }, [activeBar, activeFraction, activeDuration, isTripletMode, isDottedMode, snippet.barsCount, snippet.timeSignature, snippet.notes]);
+
+  // 🎼 0,1% Goldstandard: Explizites Hinzufügen des nächsten Takts (max. 4 Takte)
+  const handleAddBar = useCallback(() => {
+    if (readOnly || snippet.barsCount >= 4) return;
+    const newCount = snippet.barsCount + 1;
+    setSnippet(prev => ({ ...prev, barsCount: newCount }));
+    setActiveBar(snippet.barsCount); // Fokus direkt auf Zählzeit 1 des neuen Takts
+    setActiveFraction(0);
+  }, [readOnly, snippet.barsCount]);
+
+  // 🎼 Takt entfernen (mindestens 1 Takt bleibt erhalten)
+  const handleRemoveBar = useCallback((barIdx?: number) => {
+    if (readOnly || snippet.barsCount <= 1) return;
+    const targetBar = barIdx !== undefined ? barIdx : snippet.barsCount - 1;
+    setUndoHistory(prev => [...prev.slice(-15), snippet.notes]);
+    setSnippet(prev => ({
+      ...prev,
+      barsCount: Math.max(1, prev.barsCount - 1),
+      notes: prev.notes.filter(n => n.barIndex !== targetBar).map(n => {
+        if (n.barIndex > targetBar) return { ...n, barIndex: n.barIndex - 1 };
+        return n;
+      })
+    }));
+    setActiveBar(prev => (prev >= snippet.barsCount - 1 ? Math.max(0, snippet.barsCount - 2) : prev));
+    setActiveFraction(0);
+  }, [readOnly, snippet.barsCount, snippet.notes]);
 
   const handleAdvanceCursor = useCallback(() => advanceCursor(), [advanceCursor]);
   const handleToggleChordMode = () => setIsChordMode(prev => !prev);
@@ -318,8 +448,8 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
           const newPitch = `${letter}${newAcc}${oct}`;
           let newFret = n.fret;
           let newStringIndex = n.stringIndex;
-          if (snippet.instrument === 'guitar' || snippet.instrument === 'bass') {
-            const best = pitchToBestFretAndString(newPitch, n.stringIndex, snippet.instrument === 'bass');
+          if (snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings') {
+            const best = pitchToBestFretAndString(newPitch, n.stringIndex, snippet.instrument);
             if (best) {
               newFret = best.fret;
               newStringIndex = best.stringIndex;
@@ -363,7 +493,7 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     current.push(restNote);
     handleUpdateNotes(current);
     if (!isChordMode) {
-      advanceCursor(activeBar, activeFraction);
+      advanceCursor(activeBar, activeFraction, current);
     }
   };
 
@@ -379,15 +509,13 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
   ) => {
     if (readOnly) return;
 
-    setActiveBar(barIdx);
-    setActiveFraction(fractionIdx);
-
     const didDuration = getDidacticNoteDurationSec(activeDuration, snippet.tempoBpm, isDottedMode, isTripletMode);
 
     if (isChordMode && !forceSinglePitch) {
       // Smart Akkord-Modus: Generiere fertigen Akkord für das Instrument
       const voicingNotes = getInstrumentChordVoicing(pitch, chordQuality, snippet.instrument);
       if (voicingNotes.length > 0) {
+        // ⚡ 0,1% Audio-First: Zuerst den Akkord bei t = 0.0 ms abfeuern!
         synthRef.current?.playChordNow(snippet.instrument, voicingNotes.map(v => v.pitch), didDuration, 0.75);
 
         const newNotes: MicroScoreNote[] = voicingNotes.map(v => ({
@@ -405,29 +533,17 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
         const filtered = snippet.notes.filter(
           n => !(n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5)
         );
-        handleUpdateNotes([...filtered, ...newNotes]);
-        if (advanceOverride === true) {
-          advanceCursor(barIdx, fractionIdx);
-        }
+        const nextChordNotes = [...filtered, ...newNotes];
+        React.startTransition(() => {
+          setActiveBar(barIdx);
+          setActiveFraction(fractionIdx);
+          handleUpdateNotes(nextChordNotes);
+          if (advanceOverride === true) {
+            advanceCursor(barIdx, fractionIdx, nextChordNotes);
+          }
+        });
         return;
       }
-    }
-
-    // Normaler Modus oder Manuelles Schichten / Polyphonie (SSOT: Explizite Saite/Bund priorisieren)
-    let fret: number | undefined = explicitFret;
-    let stringIndex: number | undefined = explicitStringIndex;
-    if ((snippet.instrument === 'guitar' || snippet.instrument === 'bass') && (fret === undefined || stringIndex === undefined)) {
-      const usedStrings = snippet.notes
-        .filter(n => n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5 && n.stringIndex !== undefined)
-        .map(n => n.stringIndex!);
-      const best = pitchToBestFretAndString(pitch, activeString, snippet.instrument === 'bass', usedStrings);
-      if (best) {
-        fret = best.fret;
-        stringIndex = best.stringIndex;
-        setActiveString(best.stringIndex);
-      }
-    } else if (stringIndex !== undefined) {
-      setActiveString(stringIndex);
     }
 
     const currentSlotNotes = snippet.notes.filter(
@@ -437,42 +553,73 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     const existingSamePitch = currentSlotNotes.find(n => n.pitch === pitch);
     if (existingSamePitch) {
       const filtered = snippet.notes.filter(n => n.id !== existingSamePitch.id);
-      handleUpdateNotes(filtered);
+      React.startTransition(() => {
+        setActiveBar(barIdx);
+        setActiveFraction(fractionIdx);
+        handleUpdateNotes(filtered);
+      });
       return;
     }
+
+    // ⚡ 0,1% Audio-First Doktrin: Sofortiger WebAudio-Start bei t = 0.0 ms VOR jedem React-State-Update!
+    synthRef.current?.playToneNow(snippet.instrument, pitch, didDuration, 0.72);
+
+    // Normaler Modus oder Manuelles Schichten / Polyphonie (SSOT: Explizite Saite/Bund priorisieren)
+    let fret: number | undefined = explicitFret;
+    let stringIndex: number | undefined = explicitStringIndex;
+    if ((snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings') && (fret === undefined || stringIndex === undefined)) {
+      const usedStrings = currentSlotNotes
+        .filter(n => n.stringIndex !== undefined)
+        .map(n => n.stringIndex!);
+      const best = pitchToBestFretAndString(pitch, activeString, snippet.instrument, usedStrings);
+      if (best) {
+        fret = best.fret;
+        stringIndex = best.stringIndex;
+      }
+    }
+
+    const shouldStackOnSlot = isChordMode || forceSinglePitch || snippet.instrument === 'drums';
+    const existingPrimary =
+      snippet.instrument === 'drums'
+        ? currentSlotNotes.find(
+            n => n.pitch !== 'REST' && isDrumFootPitch(n.pitch) === isDrumFootPitch(pitch)
+          )
+        : currentSlotNotes.find(n => n.pitch !== 'REST') || currentSlotNotes[0];
 
     const newNote: MicroScoreNote = {
       id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       barIndex: barIdx,
       beatFraction: fractionIdx,
-      duration: activeDuration,
+      duration: existingPrimary ? existingPrimary.duration : activeDuration,
       pitch,
       fret,
       stringIndex,
-      isTriplet: isTripletMode,
-      isDotted: isDottedMode
+      isTriplet: existingPrimary ? existingPrimary.isTriplet : isTripletMode,
+      isDotted: existingPrimary ? existingPrimary.isDotted : isDottedMode
     };
 
-    const withoutRests = snippet.notes.filter(
-      n => !(n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5 && n.pitch === 'REST')
-    );
-    const updatedNotes = [...withoutRests, newNote];
-    handleUpdateNotes(updatedNotes);
-
-    const resultingSlot = updatedNotes.filter(
-      n => n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5
-    );
-    if (resultingSlot.length > 1) {
-      synthRef.current?.playChordNow(snippet.instrument, resultingSlot.map(n => n.pitch), didDuration, 0.7);
-    } else {
-      synthRef.current?.playToneNow(snippet.instrument, pitch, didDuration, 0.7);
-    }
+    const baseNotes = shouldStackOnSlot
+      ? snippet.notes.filter(
+          n => !(n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5 && n.pitch === 'REST')
+        )
+      : snippet.notes.filter(
+          n => !(n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5)
+        );
+    const updatedNotes = [...baseNotes, newNote];
 
     // Melodischer Auto-Advance: Bei normaler Melodie-Eingabe gleitet der Cursor zum nächsten Slot
     const shouldAdvance = advanceOverride !== undefined ? advanceOverride : !isChordMode;
-    if (shouldAdvance) {
-      advanceCursor(barIdx, fractionIdx);
-    }
+    React.startTransition(() => {
+      setActiveBar(barIdx);
+      setActiveFraction(fractionIdx);
+      if (stringIndex !== undefined) {
+        setActiveString(stringIndex);
+      }
+      handleUpdateNotes(updatedNotes);
+      if (shouldAdvance) {
+        advanceCursor(barIdx, fractionIdx, updatedNotes);
+      }
+    });
   }, [
     readOnly, 
     isChordMode,
@@ -498,7 +645,7 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     handleInsertDirectStaffNote(activeBar, activeFraction, pitch, false, true);
   };
 
-  // 0,1% Smart Backspace: Aktuelle Note löschen oder einen Slot zurückgehen
+  // 0,1% Smart Backspace: Aktuelle Note löschen oder unabhängig vom gewählten Raster die zuletzt eingegebene Note löschen
   const handleDeleteTouchNote = () => {
     if (readOnly) return;
     const currentSlotNotes = snippet.notes.filter(
@@ -509,34 +656,29 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
         n => !(n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5)
       );
       handleUpdateNotes(filtered);
-    } else {
-      const stepMap: Record<MicroScoreDuration, number> = { '1': 16, '2': 8, '4': 4, '8': 2, '16': 1 };
-      let step = stepMap[activeDuration] || 4;
-      const fractionsPerBar = snippet.timeSignature === '3/4' || snippet.timeSignature === '6/8' ? 12 : snippet.timeSignature === '2/4' ? 8 : 16;
-      let prevFraction = activeFraction - step;
-      let prevBar = activeBar;
-      if (prevFraction < 0) {
-        if (prevBar > 0) {
-          prevBar -= 1;
-          prevFraction = fractionsPerBar - step;
-        } else {
-          prevFraction = 0;
-        }
-      }
-      setActiveBar(prevBar);
-      setActiveFraction(prevFraction);
-      const filtered = snippet.notes.filter(
-        n => !(n.barIndex === prevBar && Math.abs(n.beatFraction - prevFraction) < 0.5)
+    } else if (snippet.notes.length > 0) {
+      const sortedNotes = [...snippet.notes].sort(
+        (a, b) => a.barIndex * 16 + a.beatFraction - (b.barIndex * 16 + b.beatFraction)
       );
-      if (filtered.length !== snippet.notes.length) {
+      const lastNote = sortedNotes[sortedNotes.length - 1];
+      if (lastNote) {
+        const filtered = snippet.notes.filter(
+          n => !(n.barIndex === lastNote.barIndex && Math.abs(n.beatFraction - lastNote.beatFraction) < 0.5)
+        );
         handleUpdateNotes(filtered);
+        setActiveBar(lastNote.barIndex);
+        setActiveFraction(lastNote.beatFraction);
       }
     }
   };
 
   // Instrumenten-Wechsel mit kanonischer Projektion (Tabs, Bünde, Schlüssel) & Realtime-Audio
+  // Nutzt canonicalSourceRef (sofern die Noten nicht manuell editiert wurden), damit Piano <-> Drums <-> Gitarre 100% reversibel bleibt!
   const handleInstrumentChange = (newInst: MicroScoreInstrument) => {
-    const resolved = resolveSnippetForInstrument(snippet, newInst);
+    const baseSource = (undoHistory.length === 0 && canonicalSourceRef.current && canonicalSourceRef.current.id === snippet.id)
+      ? canonicalSourceRef.current
+      : snippet;
+    const resolved = resolveSnippetForInstrument(baseSource, newInst);
     snippetRef.current = resolved;
     setSnippet(resolved);
     setDisplayMode(resolved.displayMode || (newInst === 'guitar' || newInst === 'bass' ? 'both' : 'notes'));
@@ -593,10 +735,58 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
       clearInterval(playTimerRef.current);
       playTimerRef.current = null;
     }
+    if (visualTimeoutsRef.current.length > 0) {
+      visualTimeoutsRef.current.forEach(clearTimeout);
+      visualTimeoutsRef.current = [];
+    }
     if (synthRef.current) {
       synthRef.current.stopAll();
     }
   }, []);
+
+  // 🏛️ 0,1% Goldstandard: Vorherige / Nächste Übung Navigation State & Handlers
+  const [currentListIndex, setCurrentListIndex] = useState<number>(() => {
+    if (initialSnippetIndex !== undefined && initialSnippetIndex >= 0) return initialSnippetIndex;
+    if (snippetList && initialSnippet) {
+      const idx = snippetList.findIndex(s => s.id === initialSnippet.id);
+      return idx >= 0 ? idx : 0;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (initialSnippetIndex !== undefined && initialSnippetIndex >= 0) {
+      setCurrentListIndex(initialSnippetIndex);
+    } else if (snippetList && initialSnippet) {
+      const idx = snippetList.findIndex(s => s.id === initialSnippet.id);
+      if (idx >= 0) setCurrentListIndex(idx);
+    }
+  }, [initialSnippetIndex, snippetList, initialSnippet]);
+
+  const hasMultipleSnippets = Boolean(snippetList && snippetList.length > 1);
+  const canGoPrev = hasMultipleSnippets && currentListIndex > 0;
+  const canGoNext = hasMultipleSnippets && snippetList ? currentListIndex < (snippetList.length - 1) : false;
+
+  const handleNavigateSnippet = useCallback((newIndex: number) => {
+    if (!snippetList || newIndex < 0 || newIndex >= snippetList.length) return;
+    setCurrentListIndex(newIndex);
+    const targetSnippet = snippetList[newIndex];
+    canonicalSourceRef.current = targetSnippet;
+    setUndoHistory([]);
+    const userInst = normalizeInstrumentToKey(defaultInstrument);
+    const isTargetDrum = targetSnippet.instrument === 'drums' || targetSnippet.clef === 'percussion';
+    const nextSnippet = (!isTargetDrum && userInst !== 'universal' && targetSnippet.instrument !== userInst)
+      ? resolveSnippetForInstrument(targetSnippet, userInst)
+      : targetSnippet;
+
+    setSnippet(nextSnippet);
+    if (nextSnippet.displayMode) {
+      setDisplayMode(nextSnippet.displayMode);
+    }
+    setActiveBar(0);
+    setActiveFraction(0);
+    stopPlayback();
+  }, [snippetList, defaultInstrument, stopPlayback]);
 
   const handleManualStop = useCallback(() => {
     const wasChallenge = isChallengeOpen && isPlaying;
@@ -611,72 +801,103 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
   const startPlayback = useCallback(() => {
     if (!synthRef.current) return;
     const synth = synthRef.current;
-    synth.init();
+
+    // 🛡️ Verhindert parallele Doppel-Timer bei schnellem Re-Trigger (Leertaste / Speed-Wechsel)
+    if (playTimerRef.current) {
+      clearInterval(playTimerRef.current);
+      playTimerRef.current = null;
+    }
+    if (visualTimeoutsRef.current.length > 0) {
+      visualTimeoutsRef.current.forEach(clearTimeout);
+      visualTimeoutsRef.current = [];
+    }
+    synth.stopAll();
+
+    const ctx = synth.init();
 
     setIsPlaying(true);
     setIsAbortedNotice(false);
 
     let curBar = 0;
     let curFraction = 0;
+    let isStopped = false;
     setActiveBar(0);
     setActiveFraction(0);
     setPlayheadPos({ bar: 0, fraction: 0 });
 
     const effectiveBpm = snippet.tempoBpm * speedRate;
     const beatSec = 60 / effectiveBpm;
-    const sixteenthMs = Math.round((beatSec / 4) * 1000);
+    const exactSixteenthSec = beatSec / 4;
 
     const fractionsPerBar = snippet.timeSignature === '3/4' || snippet.timeSignature === '6/8' ? 12 : snippet.timeSignature === '2/4' ? 8 : 16;
     const beatsPerBar = snippet.timeSignature === '3/4' ? 3 : snippet.timeSignature === '2/4' ? 2 : snippet.timeSignature === '6/8' ? 6 : 4;
 
     const fractionsPerBeat = fractionsPerBar / beatsPerBar;
-    let isPreRollActive = isChallengeOpen;
+    let isPreRollActive = isChallengeOpenRef.current;
     let preRollFraction = 0;
 
-    playTimerRef.current = setInterval(() => {
-      // 🌟 0,1% Goldstandard Vorzähler: Exakt 1 voller Takt Vorlauf mit atomarem Reset
+    // 🏛️ 0,1% Goldstandard W3C Two-Clock Lookahead Scheduler (Chris Wilson Pattern):
+    // 20ms High-Frequency Polling mit 90ms Audio-Lookahead-Fenster -> 0,00ms Jitter & 100% Gleichlauf von Klick & Beat
+    const LOOKAHEAD_WINDOW_SEC = 0.090;
+    const SCHEDULER_INTERVAL_MS = 20;
+    let nextStepAudioTime = ctx.currentTime + 0.024;
+
+    const scheduleSingleStep = (scheduleBaseTime: number) => {
+      const nowAudioTime = synth.init().currentTime;
+      const visualDelayMs = Math.max(0, Math.round((scheduleBaseTime - nowAudioTime) * 1000));
+
+      // 🌟 0,1% Goldstandard Vorzähler: Exakt 1 voller Takt Vorlauf auf demselben Hardware-Clock-Raster
       if (isPreRollActive) {
-        if (preRollFraction % fractionsPerBeat === 0) {
-          const beatNum = Math.floor(preRollFraction / fractionsPerBeat) + 1;
-          setCountInInfo({ currentBeat: beatNum, totalBeats: beatsPerBar });
-          synth.scheduleMetronomeClick(synth.init().currentTime, beatNum === 1);
-        }
-        preRollFraction += 1;
-        if (preRollFraction >= fractionsPerBar) {
-          isPreRollActive = false;
-          setCountInInfo(null);
-          curBar = 0;
-          curFraction = 0;
-          // Atomarer Übergang: Gehe direkt in Song-Playback auf Zählzeit 1.0 (Tick 0)
-        } else {
+        if (preRollFraction < fractionsPerBar) {
+          if (preRollFraction % fractionsPerBeat === 0) {
+            const beatNum = Math.floor(preRollFraction / fractionsPerBeat) + 1;
+            synth.scheduleMetronomeClick(scheduleBaseTime, beatNum === 1);
+            if (visualDelayMs <= 8) {
+              setCountInInfo({ currentBeat: beatNum, totalBeats: beatsPerBar });
+            } else {
+              const tId = setTimeout(() => {
+                if (!isStopped) setCountInInfo({ currentBeat: beatNum, totalBeats: beatsPerBar });
+              }, visualDelayMs);
+              visualTimeoutsRef.current.push(tId);
+            }
+          }
+          preRollFraction += 1;
           return;
         }
+        isPreRollActive = false;
+        if (visualDelayMs <= 8) {
+          setCountInInfo(null);
+        } else {
+          const tId = setTimeout(() => {
+            if (!isStopped) setCountInInfo(null);
+          }, visualDelayMs);
+          visualTimeoutsRef.current.push(tId);
+        }
+        curBar = 0;
+        curFraction = 0;
       }
 
-      // Metronom-Klick passend zur Taktart (Echtzeit-Ref)
+      const stepBar = curBar;
+      const stepFraction = curFraction;
       const activeSnippet = snippetRef.current;
       const activeInst = activeSnippet.instrument;
       let isBeatClick = false;
       let isAccent = false;
       if (activeSnippet.timeSignature === '6/8') {
-        isBeatClick = curFraction === 0 || curFraction === 6;
-        isAccent = curFraction === 0;
+        isBeatClick = stepFraction === 0 || stepFraction === 6;
+        isAccent = stepFraction === 0;
       } else {
-        isBeatClick = curFraction % 4 === 0;
-        isAccent = curFraction === 0;
+        isBeatClick = stepFraction % 4 === 0;
+        isAccent = stepFraction === 0;
       }
-      const nowAudioTime = synth.init().currentTime;
-      // 0,1% W3C Web Audio Standard: 40ms Lookahead-Puffer gegen JS-Jitter & Safari AudioParam Dropouts
-      const scheduleBaseTime = nowAudioTime + 0.040;
 
-      if (isBeatClick && isMetronomeActive) {
+      if (isBeatClick && isMetronomeActiveRef.current) {
         synth.scheduleMetronomeClick(scheduleBaseTime, isAccent);
       }
 
-      // Polyphone Noten/Akkorde an dieser Zählzeit abspielen mit Live-Instrumenten-Sound
       try {
         const notesAtPos = activeSnippet.notes.filter(
-          n => n.barIndex === curBar && Math.abs(n.beatFraction - curFraction) < 0.5
+          n => n.barIndex === stepBar && Math.abs(n.beatFraction - stepFraction) < 0.5
         );
         const pitchedNotes = notesAtPos.filter(n => n.pitch !== 'REST');
 
@@ -684,7 +905,7 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
           const polyVolume = 0.65 / Math.sqrt(Math.max(1, pitchedNotes.length));
           pitchedNotes.forEach((n, idx) => {
             const sixteenthCount = durationToSixteenths(n.duration, n.isDotted, n.isTriplet);
-            const noteDurationSec = (sixteenthCount * (beatSec / 4)) * 0.92;
+            const noteDurationSec = (sixteenthCount * exactSixteenthSec) * 0.92;
             const delay = activeInst === 'guitar' ? idx * 0.012 : 0;
             synth.scheduleToneAtTime(
               activeInst,
@@ -698,29 +919,62 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
       } catch (err) {
         console.warn('[MicroScoreStudioModal] Audio Scheduling Fail-Closed Intercepted:', err);
       } finally {
-        // 🛡️ 0,1% Goldstandard: Garantierte State-Fortschreibung (Verhindert Silent Event Loop Freeze)
-        setActiveBar(curBar);
-        setActiveFraction(curFraction);
-        setPlayheadPos({ bar: curBar, fraction: curFraction });
+        // Visuellen Playhead & Stick-Impact exakt auf den Audio-Zeitstempel synchronisieren
+        if (visualDelayMs <= 8) {
+          setActiveBar(stepBar);
+          setActiveFraction(stepFraction);
+          setPlayheadPos({ bar: stepBar, fraction: stepFraction });
+        } else {
+          const tId = setTimeout(() => {
+            if (!isStopped) {
+              setActiveBar(stepBar);
+              setActiveFraction(stepFraction);
+              setPlayheadPos({ bar: stepBar, fraction: stepFraction });
+            }
+          }, visualDelayMs);
+          visualTimeoutsRef.current.push(tId);
+        }
 
         curFraction += 1;
         if (curFraction >= fractionsPerBar) {
           curFraction = 0;
           curBar += 1;
           if (curBar >= activeSnippet.barsCount) {
-            if (isLooping && !isChallengeOpen) {
+            if (isLoopingRef.current && !isChallengeOpenRef.current) {
               curBar = 0;
             } else {
-              stopPlayback();
-              if (isChallengeOpen) {
-                evaluateChallengeCompletion();
-              }
+              isStopped = true;
+              const endDelayMs = Math.max(20, Math.round((scheduleBaseTime + exactSixteenthSec - nowAudioTime) * 1000));
+              const stopTId = setTimeout(() => {
+                stopPlayback();
+                if (isChallengeOpenRef.current) {
+                  evaluateChallengeCompletion();
+                }
+              }, endDelayMs);
+              visualTimeoutsRef.current.push(stopTId);
             }
           }
         }
       }
-    }, sixteenthMs);
-  }, [snippet, speedRate, isLooping, isMetronomeActive, isChallengeOpen, stopPlayback, evaluateChallengeCompletion]);
+    };
+
+    const lookaheadTick = () => {
+      if (isStopped) return;
+      const nowAudioTime = synth.init().currentTime;
+      // Falls Tab im Hintergrund war (> 350ms Rückstand), sanft auf aktuelle Audio-Zeit synchronisieren
+      if (nextStepAudioTime < nowAudioTime - 0.050) {
+        nextStepAudioTime = nowAudioTime + 0.020;
+      }
+      while (!isStopped && nextStepAudioTime < nowAudioTime + LOOKAHEAD_WINDOW_SEC) {
+        const scheduleTime = Math.max(nowAudioTime + 0.004, nextStepAudioTime);
+        scheduleSingleStep(scheduleTime);
+        nextStepAudioTime += exactSixteenthSec;
+      }
+    };
+
+    lookaheadTick();
+    playTimerRef.current = setInterval(lookaheadTick, SCHEDULER_INTERVAL_MS);
+  }, [snippet, speedRate, stopPlayback, evaluateChallengeCompletion]);
 
   // Zurück zum Taktanfang
   const handleRewind = useCallback(() => {
@@ -756,12 +1010,131 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     }
   };
 
+  // 🎹 0,1% Goldstandard: DAW- & Studio-Shortcuts (Space, Metronom, Loop, Blättern, Speed, Save, Esc)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+
+      // 1. Space: Play / Stopp Toggle (DAW Standard — Capture-Phase schützt gegen Button-/Pad-/Select-Fokus-Kollisionen)
+      if (e.code === 'Space' || e.key === ' ') {
+        // Text-Eingabefelder (Titel, Notizen) haben absoluten Vorrang für reguläre Leerzeichen
+        if (
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            (target as any).isContentEditable)
+        ) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.repeat) return;
+        if (target && (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.getAttribute('role') === 'button' || target.getAttribute('role') === 'tab')) {
+          target.blur();
+        }
+        if (isPlaying) {
+          handleManualStop();
+        } else {
+          startPlayback();
+        }
+        return;
+      }
+
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          (target as any).isContentEditable)
+      ) {
+        return;
+      }
+
+      // 2. Pfeiltasten links / rechts: Vorherige / Nächste Übung
+      if (e.key === 'ArrowLeft' && canGoPrev) {
+        e.preventDefault();
+        handleNavigateSnippet(currentListIndex - 1);
+        return;
+      } else if (e.key === 'ArrowRight' && canGoNext) {
+        e.preventDefault();
+        handleNavigateSnippet(currentListIndex + 1);
+        return;
+      }
+
+      // 3. M: Metronom Klick an / aus
+      if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setIsMetronomeActive(prev => !prev);
+        return;
+      }
+
+      // 4. L: Loop Modus an / aus
+      if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setIsLooping(prev => !prev);
+        return;
+      }
+
+      // 5. 1 / 2 / 3: Übegeschwindigkeit (0.8x, 1.0x, 1.2x)
+      if (!e.metaKey && !e.ctrlKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setSpeedRate(0.8);
+          return;
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setSpeedRate(1.0);
+          return;
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setSpeedRate(1.2);
+          return;
+        }
+      }
+
+      // 6. Cmd + S / Ctrl + S: Speichern
+      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+
+      // 7. Escape: Bei Playback -> Stopp, sonst Modal schließen
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (isPlaying) {
+          handleManualStop();
+        } else {
+          onClose();
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [
+    isOpen,
+    isPlaying,
+    canGoPrev,
+    canGoNext,
+    currentListIndex,
+    startPlayback,
+    handleManualStop,
+    handleNavigateSnippet,
+    handleSave,
+    onClose
+  ]);
+
   if (!isOpen) return null;
 
-  const isStringOrPlucked = snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings';
+  const isStringOrPlucked = snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings' || snippet.instrument === 'ukulele';
   const isGuitar = isStringOrPlucked;
 
-  // 0,1% Didaktische Sichtbarkeit: Entweder Tabs ODER Griffbrett (nie beides!)
+  // 0,1% Duales Fokus-Modell: Noten + maximal 1 visuelle Übersetzungshilfe (entweder Tabulatur ODER Griffbrett/Visualizer)
   const showInstrumentVisualizer = isMobileLandscape
     ? (viewMode === 'fretboard' || viewMode === 'keys' || viewMode === 'drums')
     : (viewMode === 'both' || viewMode === 'fretboard' || viewMode === 'keys' || viewMode === 'drums');
@@ -771,11 +1144,12 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     : (viewMode === 'notes' || viewMode === 'tabs' || viewMode === 'fretboard' || viewMode === 'both');
 
   const effectiveDisplayMode: MicroScoreDisplayMode = useMemo(() => {
-    // 🛡️ Fail-Closed: Wenn Griffbrett sichtbar ist, dürfen NIEMALS Tabs gerendert werden!
-    if (isStringOrPlucked && showInstrumentVisualizer) return 'notes';
-    if (viewMode === 'tabs') return 'both'; // Tab-Modus -> Notensystem + Tabulatur
+    // 🛡️ Fail-Closed Dual-Focus: Wenn 'fretboard' gewählt ist -> Noten + Griffbrett (ohne Tabulatur-Zwischenzeile).
+    // Wenn 'tabs' gewählt ist -> Noten + Tabulatur (ohne Griffbrett).
+    if (isStringOrPlucked && viewMode === 'fretboard') return 'notes';
+    if (viewMode === 'tabs' || viewMode === 'both') return 'both';
     return 'notes';
-  }, [viewMode, isStringOrPlucked, showInstrumentVisualizer]);
+  }, [viewMode, isStringOrPlucked]);
 
   const modalContent = (
     <div
@@ -829,462 +1203,56 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
         {/* ========================================================================= */}
         {/* 1. HEADER: Cupertino Squircle, Titel & Direkte Apple Transport-Controls    */}
         {/* ========================================================================= */}
-        <div
-          style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid #f1f5f9',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            background: '#ffffff'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-            {/* Linke Seite: Apple Monochrome Squircle + Titel */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '220px' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '11px',
-                  background: theme.primary,
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: `0 2px 10px ${theme.glow}`,
-                  flexShrink: 0
-                }}
-              >
-                <Music size={18} color="#ffffff" strokeWidth={2.5} />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                {taskId || taskTitle ? (
-                  <>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                      <BookOpen size={12} strokeWidth={2.2} />
-                      <span>Hausaufgabe · Noten-Schnipsel</span>
-                    </span>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontSize: '1.14rem',
-                        fontWeight: 900,
-                        color: '#0f172a',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        fontFamily: 'inherit'
-                      }}
-                      title={snippet.title}
-                    >
-                      {snippet.title}
-                    </h2>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="text"
-                      value={snippet.title}
-                      onChange={e => setSnippet(prev => ({ ...prev, title: e.target.value }))}
-                      disabled={readOnly}
-                      placeholder="Schnipsel benennen (z. B. Tonleiter, Rhythmus-Drill)"
-                      aria-label="Titel des Micro-Score Schnipsels"
-                      style={{
-                        fontSize: '1.12rem',
-                        fontWeight: 900,
-                        color: '#0f172a',
-                        border: 'none',
-                        outline: 'none',
-                        background: 'transparent',
-                        width: '100%',
-                        fontFamily: 'inherit',
-                        padding: 0
-                      }}
-                    />
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => setShowTemplates(prev => !prev)}
-                        style={{
-                          border: '1px solid #e2e8f0',
-                          background: showTemplates ? '#f1f5f9' : '#ffffff',
-                          color: '#64748b',
-                          borderRadius: '99px',
-                          padding: '3px 8px',
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          flexShrink: 0
-                        }}
-                        title="Vorlagen-Namen anzeigen"
-                      >
-                        <Sparkles size={11} color="#64748b" />
-                        <span>Vorlagen</span>
-                        <ChevronDown size={10} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Rechte Seite: Modus-Tabs + Fertig + Schließen (direkt nebeneinander) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* 🌟 2-Tab Segment: 🎧 Üben & Mitspielen vs. ✍️ Noten bearbeiten */}
-              <div
-                role="tablist"
-                aria-label="Micro-Score Arbeitsmodus"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: '#f1f5f9',
-                  borderRadius: '12px',
-                  padding: '3px',
-                  gap: '3px'
-                }}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'practice'}
-                  onClick={() => {
-                    setActiveTab('practice');
-                    if (isPlaying) stopPlayback();
-                  }}
-                  style={{
-                    border: 'none',
-                    background: activeTab === 'practice' ? theme.primary : 'transparent',
-                    color: activeTab === 'practice' ? '#ffffff' : '#64748b',
-                    borderRadius: '9px',
-                    padding: '6px 14px',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease',
-                    boxShadow: activeTab === 'practice' ? `0 2px 8px ${theme.glow}` : 'none'
-                  }}
-                >
-                  <Headphones size={15} strokeWidth={2.2} color="currentColor" />
-                  <span>Üben & Mitspielen</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'write'}
-                  onClick={() => {
-                    setActiveTab('write');
-                    if (isPlaying) stopPlayback();
-                  }}
-                  style={{
-                    border: 'none',
-                    background: activeTab === 'write' ? '#4f46e5' : 'transparent',
-                    color: activeTab === 'write' ? '#ffffff' : '#64748b',
-                    borderRadius: '9px',
-                    padding: '6px 14px',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.15s ease',
-                    boxShadow: activeTab === 'write' ? '0 2px 8px rgba(79,70,229,0.3)' : 'none'
-                  }}
-                >
-                  <Pencil size={15} strokeWidth={2.2} color="currentColor" />
-                  <span>Noten bearbeiten</span>
-                </button>
-              </div>
-
-              {/* Fertig / Speichern Button (direkt oben rechts neben Noten bearbeiten) */}
-              {!readOnly && (
-                <button
-                  type="button"
-                  role="button"
-                  tabIndex={0}
-                  onClick={handleSave}
-                  style={{
-                    border: 'none',
-                    background: savedSuccess ? '#059669' : '#4f46e5',
-                    color: '#ffffff',
-                    borderRadius: '10px',
-                    height: '32px',
-                    padding: '0 12px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: savedSuccess ? '0 2px 10px rgba(5,150,105,0.3)' : '0 2px 10px rgba(79,70,229,0.35)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Schnipsel speichern"
-                >
-                  {savedSuccess ? <Check size={13} strokeWidth={3} /> : <Save size={13} />}
-                  <span>{savedSuccess ? 'Gespeichert! ✓' : 'Fertig'}</span>
-                </button>
-              )}
-
-              {/* Vollbild-Umschalter (Fullscreen / Maximize) */}
-              <button
-                type="button"
-                role="button"
-                tabIndex={0}
-                onClick={handleToggleFullscreen}
-                aria-label={isStudioMaximized ? "Vollbild verkleinern" : "Vollbild aktivieren"}
-                title={isStudioMaximized ? "Vollbild verkleinern (F)" : "Vollbildmodus aktivieren (F)"}
-                style={{
-                  border: 'none',
-                  background: isStudioMaximized ? '#e0e7ff' : '#f1f5f9',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: isStudioMaximized ? '#4f46e5' : '#475569',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {isStudioMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-              </button>
-
-              {/* Schließen Button */}
-              <button
-                type="button"
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  stopPlayback();
-                  onClose();
-                }}
-                aria-label="Schließen"
-                style={{
-                  border: 'none',
-                  background: '#f1f5f9',
-                  borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569',
-                  transition: 'background 0.15s ease'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-
-          {/* Row 2: Zusätzliche Audio- & Noten-Einstellungen (Takte, Taktart, BPM, Instrument) & 0,1% Header Transport Deck */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', paddingTop: '6px', borderTop: '1px solid #f1f5f9' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {/* Wenn im Schreib-Modus: Taktanzahl, Taktart, BPM Stepper & Preview */}
-              {activeTab === 'write' && (
-                <>
-                  {/* Taktanzahl 1–4 Segmented Pill */}
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '11px', padding: '3px', gap: '2px' }}>
-                    {[1, 2, 3, 4].map(bars => (
-                      <button
-                        key={bars}
-                        type="button"
-                        onClick={() => {
-                          if (readOnly) return;
-                          setSnippet(prev => ({ ...prev, barsCount: bars }));
-                          if (activeBar >= bars) setActiveBar(bars - 1);
-                        }}
-                        style={{
-                          border: 'none',
-                          background: snippet.barsCount === bars ? theme.primary : 'transparent',
-                          color: snippet.barsCount === bars ? '#ffffff' : '#64748b',
-                          borderRadius: '8px',
-                          padding: '4px 9px',
-                          fontSize: '0.74rem',
-                          fontWeight: snippet.barsCount === bars ? 900 : 700,
-                          cursor: readOnly ? 'default' : 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: snippet.barsCount === bars ? `0 1px 4px ${theme.glow}` : 'none'
-                        }}
-                        title={`${bars} ${bars === 1 ? 'Takt' : 'Takte'}`}
-                      >
-                        {bars}T
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Taktart */}
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      value={snippet.timeSignature}
-                      onChange={e => setSnippet(prev => ({ ...prev, timeSignature: e.target.value as MicroScoreTimeSignature }))}
-                      disabled={readOnly}
-                      style={{ height: '32px', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0 24px 0 8px', fontSize: '0.74rem', fontWeight: 800, background: '#ffffff', color: '#0f172a', cursor: readOnly ? 'default' : 'pointer', appearance: 'none', outline: 'none' }}
-                      title="Taktart auswählen"
-                    >
-                      <option value="4/4">4/4</option>
-                      <option value="3/4">3/4</option>
-                      <option value="2/4">2/4</option>
-                      <option value="6/8">6/8</option>
-                    </select>
-                    <ChevronDown size={12} style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
-                  </div>
-
-                  {/* Tempo Stepper */}
-                  <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '2px 4px', gap: '3px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setSnippet(prev => ({ ...prev, tempoBpm: Math.max(40, prev.tempoBpm - 2) }))}
-                      disabled={readOnly}
-                      title="2 BPM langsamer"
-                      style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
-                    >
-                      <Minus size={12} strokeWidth={2.5} />
-                    </button>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
-                      {snippet.tempoBpm} <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b' }}>BPM</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setSnippet(prev => ({ ...prev, tempoBpm: Math.min(240, prev.tempoBpm + 2) }))}
-                      disabled={readOnly}
-                      title="2 BPM schneller"
-                      style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
-                    >
-                      <Plus size={12} strokeWidth={2.5} />
-                    </button>
-                  </div>
-
-                  {/* Kompakter Vorschau-Button im Schreibmodus */}
-                  <button
-                    type="button"
-                    onClick={isPlaying ? stopPlayback : startPlayback}
-                    style={{ border: 'none', background: isPlaying ? '#dc2626' : '#0f172a', color: '#ffffff', borderRadius: '10px', height: '32px', padding: '0 12px', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.15)', transition: 'all 0.15s ease' }}
-                    title={isPlaying ? 'Wiedergabe stoppen' : 'Schnipsel abspielen'}
-                  >
-                    {isPlaying ? <Square size={12} fill="#ffffff" /> : <Play size={12} fill="#ffffff" />}
-                    <span>{isPlaying ? 'Stopp' : 'Anhören'}</span>
-                  </button>
-                </>
-              )}
-
-              {/* Instrument Dropdown (Immer sichtbar) */}
-              <div style={{ position: 'relative' }}>
-                <select
-                  value={snippet.instrument}
-                  onChange={e => handleInstrumentChange(e.target.value as MicroScoreInstrument)}
-                  disabled={readOnly}
-                  style={{
-                    height: '32px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '10px',
-                    padding: '0 26px 0 8px',
-                    fontSize: '0.74rem',
-                    fontWeight: 800,
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: readOnly ? 'default' : 'pointer',
-                    appearance: 'none',
-                    outline: 'none'
-                  }}
-                  title="Instrument wechseln"
-                >
-                  {availableInstrumentOptions.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  size={12}
-                  style={{
-                    position: 'absolute',
-                    right: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    color: '#64748b'
-                  }}
-                />
-              </div>
-
-              {/* 🌟 2027 0,1% Goldstandard Universeller Didaktik-Tab-Schalter */}
-              <MicroScoreViewModeSwitcher
-                instrument={snippet.instrument}
-                activeMode={viewMode}
-                onSelectMode={setViewMode}
-                isMobileLandscape={isMobileLandscape}
-                themeColor={theme.primary}
-                readOnly={readOnly}
-              />
-            </div>
-
-            {/* 🌟 2027 0,1% Goldstandard Header Transport Deck im Übe-Modus */}
-            {activeTab === 'practice' && (
-              <MicroScorePlayerBar
-                variant="header"
-                isPlaying={isPlaying}
-                onTogglePlay={isPlaying ? handleManualStop : startPlayback}
-                onRewind={handleRewind}
-                isLooping={isLooping}
-                onToggleLoop={() => setIsLooping(prev => !prev)}
-                speedRate={speedRate}
-                onChangeSpeed={(speed) => {
-                  setSpeedRate(speed);
-                  if (isPlaying) {
-                    stopPlayback();
-                    setTimeout(() => startPlayback(), 60);
-                  }
-                }}
-                isMetronomeActive={isMetronomeActive}
-                onToggleMetronome={() => setIsMetronomeActive(prev => !prev)}
-                soloSample={soloSample}
-                onToggleSoloSample={() => setSoloSample(prev => !prev)}
-                instrument={snippet.instrument}
-                tempoBpm={snippet.tempoBpm}
-                isChallengeOpen={isChallengeOpen}
-                onToggleChallenge={() => {
-                  setIsChallengeOpen(prev => {
-                    const next = !prev;
-                    if (next) {
-                      setChallengeHits({});
-                    } else {
-                      if (isPlaying) stopPlayback();
-                      setCountInInfo(null);
-                    }
-                    return next;
-                  });
-                }}
-                readOnly={readOnly}
-              />
-            )}
-          </div>
-
-          {/* Quick-Chips Leiste & VdM Drum Vorlagen (bei Toggle eingeblendet) */}
-          {showTemplates && (
-            <MicroScoreTemplateChipsBar
-              instrument={snippet.instrument}
-              currentTitle={snippet.title}
-              onSelectDrumPreset={applyDrumPreset}
-              onSelectTitleChip={(chip) => {
-                setSnippet(prev => ({ ...prev, title: chip }));
-                setShowTemplates(false);
-              }}
-              readOnly={readOnly}
-            />
-          )}
-        </div>
+        <MicroScoreStudioHeader
+          snippet={snippet}
+          setSnippet={setSnippet}
+          theme={theme}
+          taskId={taskId}
+          taskTitle={taskTitle}
+          readOnly={readOnly}
+          showTemplates={showTemplates}
+          setShowTemplates={setShowTemplates}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isPlaying={isPlaying}
+          stopPlayback={stopPlayback}
+          startPlayback={startPlayback}
+          handleManualStop={handleManualStop}
+          handleRewind={handleRewind}
+          handleSave={handleSave}
+          savedSuccess={savedSuccess}
+          hasMultipleSnippets={hasMultipleSnippets}
+          snippetList={snippetList}
+          currentListIndex={currentListIndex}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          handleNavigateSnippet={handleNavigateSnippet}
+          isStudioMaximized={isStudioMaximized}
+          handleToggleFullscreen={handleToggleFullscreen}
+          onClose={onClose}
+          activeBar={activeBar}
+          setActiveBar={setActiveBar}
+          availableInstrumentOptions={availableInstrumentOptions}
+          handleInstrumentChange={handleInstrumentChange}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          isMobileLandscape={isMobileLandscape}
+          isLooping={isLooping}
+          setIsLooping={setIsLooping}
+          speedRate={speedRate}
+          setSpeedRate={setSpeedRate}
+          isMetronomeActive={isMetronomeActive}
+          setIsMetronomeActive={setIsMetronomeActive}
+          soloSample={soloSample}
+          setSoloSample={setSoloSample}
+          isChallengeOpen={isChallengeOpen}
+          setIsChallengeOpen={setIsChallengeOpen}
+          setChallengeHits={setChallengeHits}
+          setCountInInfo={setCountInInfo}
+          applyDrumPreset={applyDrumPreset}
+          isColorGuide={isDrumColorGuide}
+          onToggleColorGuide={(val) => setIsDrumColorGuide(prev => typeof val === 'boolean' ? val : !prev)}
+        />
 
         {/* ========================================================================= */}
         {/* 2. LEINWAND (CANVAS): Urtext Notensatz & 2-Zeilen Apple Baukasten-Dock     */}
@@ -1340,9 +1308,107 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
                 onUpdateBarsCount={(newCount) => {
                   setSnippet(prev => ({ ...prev, barsCount: Math.min(4, newCount) }));
                 }}
+                onAddBar={handleAddBar}
+                onRemoveBar={handleRemoveBar}
                 onInsertPitchDirectly={handleInsertDirectStaffNote}
+                isDrumColorGuide={isDrumColorGuide}
                 readOnly={readOnly || activeTab === 'practice'}
               />
+
+              {/* 🌟 Prominente Floating Edge-Paddles für 1-Klick-Navigation (nur im Übe-Modus, kein versehentliches Wegblättern beim Editieren) */}
+              {activeTab === 'practice' && hasMultipleSnippets && canGoPrev && snippetList && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNavigateSnippet(currentListIndex - 1);
+                  }}
+                  aria-label="Vorherige Übung"
+                  title={`Vorherige Übung: ${snippetList[currentListIndex - 1]?.title || ''}`}
+                  style={{
+                    position: 'absolute',
+                    left: isMobile ? '2px' : '-16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 30,
+                    width: isMobile ? '32px' : '42px',
+                    height: isMobile ? '44px' : '58px',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.10)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#0f172a',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)';
+                    e.currentTarget.style.boxShadow = '0 6px 22px rgba(0, 0, 0, 0.16)';
+                    e.currentTarget.style.borderColor = '#94a3b8';
+                    e.currentTarget.style.background = '#ffffff';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.10)';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                  }}
+                >
+                  <ChevronLeft size={isMobile ? 18 : 22} strokeWidth={2.8} />
+                </button>
+              )}
+
+              {activeTab === 'practice' && hasMultipleSnippets && canGoNext && snippetList && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNavigateSnippet(currentListIndex + 1);
+                  }}
+                  aria-label="Nächste Übung"
+                  title={`Nächste Übung: ${snippetList[currentListIndex + 1]?.title || ''}`}
+                  style={{
+                    position: 'absolute',
+                    right: isMobile ? '2px' : '-16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 30,
+                    width: isMobile ? '32px' : '42px',
+                    height: isMobile ? '44px' : '58px',
+                    background: 'rgba(255, 255, 255, 0.95)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.10)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#0f172a',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)';
+                    e.currentTarget.style.boxShadow = '0 6px 22px rgba(0, 0, 0, 0.16)';
+                    e.currentTarget.style.borderColor = '#94a3b8';
+                    e.currentTarget.style.background = '#ffffff';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.08)';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                  }}
+                >
+                  <ChevronRight size={isMobile ? 18 : 22} strokeWidth={2.8} />
+                </button>
+              )}
 
               {/* 🌟 100% Weltreise Einzähler (Count-In) Overlay */}
               {countInInfo && (
@@ -1390,6 +1456,9 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
                 activeNotes={currentActiveNotes}
                 playheadPos={playheadPos}
                 clef={snippet.clef}
+                isDrumColorGuide={isDrumColorGuide}
+                onToggleDrumColorGuide={() => setIsDrumColorGuide(prev => !prev)}
+                isSoloStage={!showStaffNotation}
                 onPlayPreviewPitch={(p) => synthRef.current?.playToneNow(snippet.instrument, p, getDidacticNoteDurationSec(activeDuration, snippet.tempoBpm, isDottedMode, isTripletMode), 0.7)}
                 onInsertPitch={activeTab === 'write' ? (p, sIdx, f) => handleInsertDirectStaffNote(activeBar, activeFraction, p, undefined, false, sIdx, f) : undefined}
                 readOnly={readOnly}
@@ -1402,7 +1471,7 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
             <div
               style={{
                 background: '#fffbeb',
-                border: '1px solid #fde68a',
+                border: 'none',
                 color: '#92400e',
                 borderRadius: '12px',
                 padding: '10px 14px',
@@ -1419,44 +1488,105 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
           )}
 
           {/* 🌟 2027 0,1% Goldstandard Baukasten Dock (nur im Noten-Bearbeiten-Modus) */}
-          {activeTab === 'write' && (
-            <MicroScoreBaukastenDock
-              activeDuration={activeDuration}
-              onSelectDuration={setActiveDuration}
-              isDotted={isDottedMode}
-              onToggleDotted={() => {
-                setIsDottedMode(prev => {
-                  const next = !prev;
-                  if (next) setIsTripletMode(false);
-                  return next;
-                });
-              }}
-              isTriplet={isTripletMode}
-              onToggleTriplet={() => {
-                setIsTripletMode(prev => {
-                  const next = !prev;
-                  if (next) setIsDottedMode(false);
-                  return next;
-                });
-              }}
-              onInsertRest={handleInsertTouchRest}
-              onUndo={handleUndo}
-              canUndo={undoHistory.length > 0}
-              onDeleteNote={handleDeleteTouchNote}
-              onAdvanceCursor={handleAdvanceCursor}
-              onInsertPitch={handleInsertTouchPitch}
-              onInsertPitchStack={handleInsertTouchPitchStack}
-              defaultOctave={snippet.instrument === 'bass' ? 2 : 4}
-              activeAccidental={activeAccidental}
-              onToggleAccidental={handleToggleAccidental}
-              isChordMode={isChordMode}
-              onToggleChordMode={handleToggleChordMode}
-              chordQuality={chordQuality}
-              onToggleChordQuality={handleToggleChordQuality}
-              instrument={snippet.instrument}
-              readOnly={readOnly}
-            />
-          )}
+          {activeTab === 'write' && (() => {
+            const activeStepLen = durationToSixteenthCount(activeDuration, isDottedMode, isTripletMode);
+            const currentBeatLabel = getBeatLabel(activeFraction, snippet.timeSignature, activeStepLen);
+            const spokenBeat = getSpokenBeatLabel(currentBeatLabel);
+            const activeStepBadge = `Takt ${activeBar + 1} · ${spokenBeat}`;
+
+            return (
+              <MicroScoreBaukastenDock
+                activeDuration={activeDuration}
+                onSelectDuration={(newDur) => {
+                  setActiveDuration(newDur);
+                  const isCurrentOccupied = snippet.notes.some(
+                    n => n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5
+                  );
+                  if (!isCurrentOccupied) {
+                    const frontier = getSequentialFrontierSlot(
+                      snippet.notes,
+                      snippet.barsCount,
+                      snippet.timeSignature,
+                      newDur,
+                      isDottedMode,
+                      isTripletMode
+                    );
+                    if (!frontier.isScoreFull) {
+                      setActiveBar(frontier.barIndex);
+                      setActiveFraction(frontier.fraction);
+                    }
+                  }
+                }}
+                isDotted={isDottedMode}
+                onToggleDotted={() => {
+                  const nextDotted = !isDottedMode;
+                  const nextTriplet = nextDotted ? false : isTripletMode;
+                  setIsDottedMode(nextDotted);
+                  if (nextDotted) setIsTripletMode(false);
+                  const isCurrentOccupied = snippet.notes.some(
+                    n => n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5
+                  );
+                  if (!isCurrentOccupied) {
+                    const frontier = getSequentialFrontierSlot(
+                      snippet.notes,
+                      snippet.barsCount,
+                      snippet.timeSignature,
+                      activeDuration,
+                      nextDotted,
+                      nextTriplet
+                    );
+                    if (!frontier.isScoreFull) {
+                      setActiveBar(frontier.barIndex);
+                      setActiveFraction(frontier.fraction);
+                    }
+                  }
+                }}
+                isTriplet={isTripletMode}
+                onToggleTriplet={() => {
+                  const nextTriplet = !isTripletMode;
+                  const nextDotted = nextTriplet ? false : isDottedMode;
+                  setIsTripletMode(nextTriplet);
+                  if (nextTriplet) setIsDottedMode(false);
+                  const isCurrentOccupied = snippet.notes.some(
+                    n => n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5
+                  );
+                  if (!isCurrentOccupied) {
+                    const frontier = getSequentialFrontierSlot(
+                      snippet.notes,
+                      snippet.barsCount,
+                      snippet.timeSignature,
+                      activeDuration,
+                      nextDotted,
+                      nextTriplet
+                    );
+                    if (!frontier.isScoreFull) {
+                      setActiveBar(frontier.barIndex);
+                      setActiveFraction(frontier.fraction);
+                    }
+                  }
+                }}
+                onInsertRest={handleInsertTouchRest}
+                onUndo={handleUndo}
+                canUndo={undoHistory.length > 0}
+                onClearAll={handleClearAllNotes}
+                hasNotes={snippet.notes.length > 0}
+                onDeleteNote={handleDeleteTouchNote}
+                activeStepBadge={activeStepBadge}
+                onInsertPitch={handleInsertTouchPitch}
+                onInsertPitchStack={handleInsertTouchPitchStack}
+                onInsertDrumCombo={handleInsertDrumCombo}
+                defaultOctave={snippet.instrument === 'bass' ? 2 : 4}
+                activeAccidental={activeAccidental}
+                onToggleAccidental={handleToggleAccidental}
+                isChordMode={isChordMode}
+                onToggleChordMode={handleToggleChordMode}
+                chordQuality={chordQuality}
+                onToggleChordQuality={handleToggleChordQuality}
+                instrument={snippet.instrument}
+                readOnly={readOnly}
+              />
+            );
+          })()}
         </div>
       </div>
 

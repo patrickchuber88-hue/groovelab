@@ -22,6 +22,7 @@ export interface MeisterwerkDocumentationModalProps {
   initialLehrwerkId?: string;
   initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
   initialModalTab?: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography';
+  initialHubTab?: 'modules' | 'protocol';
   onProfileClick?: (student: Student) => void;
   readOnly?: boolean;
   isEmbed?: boolean;

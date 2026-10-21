@@ -548,7 +548,7 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
                     <div style={{ display: 'flex', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
                       {[
                         { hex: '#3b82f6', label: 'Blau' },
-                        { hex: '#eab308', label: 'Gelb' },
+                        { hex: '#facc15', label: 'Gelb' },
                         { hex: '#64748b', label: 'Grau' },
                         { hex: '#34a853', label: 'Grün' },
                         { hex: '#a855f7', label: 'Lila' },

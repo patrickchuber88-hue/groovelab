@@ -112,7 +112,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
               <div style={{
                 padding: '10px 14px',
                 background: '#fef2f2',
-                border: '1px solid #fecaca',
+                border: 'none',
                 borderRadius: '14px',
                 color: '#dc2626',
                 fontSize: '0.8rem',

@@ -281,7 +281,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
               fontSize: '0.78rem',
               fontWeight: 750,
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               padding: '6px 12px',
               borderRadius: '100px',
               marginBottom: '14px'

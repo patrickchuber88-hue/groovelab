@@ -145,7 +145,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Live Applaus Info */}
         <div style={{
           background: '#ecfdf5',
-          border: '1.5px solid #10b981',
+          border: 'none',
           borderRadius: '20px',
           padding: '16px',
           display: 'flex',

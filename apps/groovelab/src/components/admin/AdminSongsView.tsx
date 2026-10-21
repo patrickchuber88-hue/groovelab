@@ -113,7 +113,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
   handleMediathekTouchEnd,
   handleToggleSongCampusActive,
 }) => {
-    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
 
     // 🛡️ 0,1% Goldstandard Bounded Context: Campus Mediathek isoliert 100% Campus-Repertoire
     const campusSongs = useMemo(() => {
@@ -291,13 +291,15 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
     };
 
     return (
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', width: '100%' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {/* Left Side: Main Mediathek Area */}
         <div 
           className="glass-panel" 
           style={{ 
             flex: 1,
             minWidth: 0,
+            maxWidth: '100%',
+            boxSizing: 'border-box',
             background: 'white', 
             borderRadius: '20px', 
             border: '1px solid rgba(0, 0, 0, 0.05)', 
@@ -305,7 +307,8 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
             display: 'flex', 
             flexDirection: 'column', 
-            gap: '24px' 
+            gap: '24px',
+            overflowX: 'hidden'
           }}
         >
           {/* Header Area */}
@@ -624,7 +627,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
 
                   {!bulkModeSongs ? (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret / Band</label>
                           <input required aria-label="Interpret / Band" placeholder="z.B. Nirvana" value={newSong.artist} onChange={e => setNewSong({...newSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
@@ -658,7 +661,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                                     justifyContent: 'space-between',
                                     padding: '16px 12px',
                                     borderRadius: '20px',
-                                    border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                                    border: isSelected ? '2px solid #facc15' : '1.5px solid #e2e8f0',
                                     background: isSelected 
                                       ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
                                       : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -802,7 +805,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                         </div>
                       )}
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Media Link (Spotify / YouTube)</label>
                           <input aria-label="Media Link (Spotify / YouTube)" placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={newSong.media_link} onChange={e => setNewSong({...newSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
@@ -841,7 +844,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
               {editingSong && (
                 <form onSubmit={handleUpdateSong} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#fefdeb', border: '1px solid #fef08a', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.02)' }}>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#854d0e', margin: 0 }}>Song bearbeiten</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Interpret</label>
                       <input required aria-label="Interpret" placeholder="Interpret" value={editingSong.artist} onChange={e => setEditingSong({...editingSong, artist: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
@@ -852,7 +855,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Media Link (Spotify / YouTube)</label>
                       <input aria-label="Media Link (Spotify / YouTube)" placeholder="https://open.spotify.com/... oder https://youtube.com/..." value={editingSong.media_link || ''} onChange={e => setEditingSong({...editingSong, media_link: e.target.value})} style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600 }} />
@@ -886,7 +889,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                                 justifyContent: 'space-between',
                                 padding: '16px 12px',
                                 borderRadius: '20px',
-                                border: isSelected ? '2px solid #eab308' : '1.5px solid #e2e8f0',
+                                border: isSelected ? '2px solid #facc15' : '1.5px solid #e2e8f0',
                                 background: isSelected 
                                   ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' 
                                   : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -1129,7 +1132,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                               title="Interaktive Noten auf Tomplay öffnen"
                               style={{
                                 background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
+                                border: 'none',
                                 width: '38px',
                                 height: '38px',
                                 borderRadius: '10px',
@@ -1148,7 +1151,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                             onClick={(e) => { e.stopPropagation(); handleDeleteSong(song.id); }} 
                             aria-label={`Song ${song.title} von ${song.artist} löschen`}
                             title="Song löschen"
-                            style={{ background: '#fff1f2', border: '1px solid #fecaca', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ background: '#fff1f2', border: 'none', width: '38px', height: '38px', borderRadius: '10px', cursor: 'pointer', color: '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1377,7 +1380,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                             }} 
                             style={{ 
                               background: '#fff1f2', 
-                              border: '1px solid #fecaca', 
+                              border: 'none', 
                               width: '38px', 
                               height: '38px', 
                               borderRadius: '10px', 
@@ -1423,6 +1426,7 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
               userId={userId}
               schoolId={admin?.school_id || (admin?.schools as any)?.id}
               students={students}
+              userInstrument={admin?.instrument || admin?.groovelab_instrument}
             />
           </div>
         </div>

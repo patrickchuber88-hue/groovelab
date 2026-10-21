@@ -156,17 +156,89 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
   const teacherNotesTextareaRef = useRef<HTMLTextAreaElement>(null);
   const studentNotesSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
+  // 🎙️ Prominente Diktier-Transkription & Snapshot-Governance (0,1% Goldstandard)
+  const dictationBaseTextRef = useRef<string>('');
+  const dictationTargetRef = useRef<'student' | 'teacher'>('student');
+
+  const {
+    isListening: isHeroListening,
+    startListening: startHeroVoice,
+    stopListening: stopHeroVoice,
+    resetTranscript
+  } = useVoiceToText({
+    autoStopOnSilence: true,
+    silenceTimeoutMs: 2000,
+    onAutoStop: () => {
+      dictationBaseTextRef.current = '';
+    },
+    onResult: (liveFormattedText: string) => {
+      const cleanSpoken = (liveFormattedText || '').trim();
+      if (!cleanSpoken) return;
+      const base = dictationBaseTextRef.current.trim();
+      const separator = base ? '\n' : '';
+      const next = base ? `${base}${separator}${cleanSpoken}` : cleanSpoken;
+
+      if (dictationTargetRef.current === 'student') {
+        latestGeneralHomeworkNotesRef.current = next;
+        setGeneralHomeworkNotes(next);
+        const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+        const noteLines = next.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+        const combined = [...specialNotes, ...noteLines];
+        setHomeworkNotesList(combined);
+        try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
+      } else {
+        latestTeacherNotesRef.current = next;
+        setTeacherNotes(next);
+        try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
+      }
+      triggerDebouncedAutoSave(400);
+    }
+  });
+
+  const stopHeroListening = useCallback(() => {
+    stopHeroVoice();
+    dictationBaseTextRef.current = '';
+  }, [stopHeroVoice]);
+
+  const toggleHeroListening = useCallback(async () => {
+    if (isHeroListening) {
+      stopHeroListening();
+    } else {
+      dictationTargetRef.current = activeNoteTarget;
+      const currentVal = activeNoteTarget === 'student'
+        ? (latestGeneralHomeworkNotesRef.current !== undefined ? latestGeneralHomeworkNotesRef.current : generalHomeworkNotes)
+        : (latestTeacherNotesRef.current !== undefined ? latestTeacherNotesRef.current : teacherNotes);
+      dictationBaseTextRef.current = (currentVal || '').trim();
+      resetTranscript();
+      await startHeroVoice();
+    }
+  }, [isHeroListening, activeNoteTarget, latestGeneralHomeworkNotesRef, generalHomeworkNotes, latestTeacherNotesRef, teacherNotes, resetTranscript, startHeroVoice, stopHeroListening]);
+
+  // 🛡️ Lifecycle- & Privacy-Guards (Sofortiger Mikrofon-Stopp bei Schließen, Escape oder Tab-Wechsel)
+  useEffect(() => {
+    if (!isNotesSheetOpen && isHeroListening) {
+      stopHeroListening();
+    }
+  }, [isNotesSheetOpen, isHeroListening, stopHeroListening]);
+
+  useEffect(() => {
+    if (isHeroListening) {
+      stopHeroListening();
+    }
+  }, [activeNoteTarget]);
+
   // Escape-Key Schließen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isHeroListening) stopHeroListening();
         if (isNotesSheetOpen) setIsNotesSheetOpen(false);
         if (isAudioSheetOpen && !isRecordingAudio) setIsAudioSheetOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isNotesSheetOpen, isAudioSheetOpen, isRecordingAudio]);
+  }, [isNotesSheetOpen, isAudioSheetOpen, isRecordingAudio, isHeroListening, stopHeroListening]);
 
   // Automatisch Audio-Sheet öffnen, wenn eine Aufnahme aktiv ist
   useEffect(() => {
@@ -184,40 +256,6 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
     : hasTeacherNotes
     ? 'Interne Notiz aktiv'
     : 'Notiz hinzufügen';
-
-  // 🎙️ Prominente Diktier-Transkription (0,1% Goldstandard)
-  const handleTranscriptReceived = useCallback((text: string) => {
-    if (!text || !text.trim()) return;
-    const cleanSpoken = text.trim();
-    if (activeNoteTarget === 'student') {
-      const current = latestGeneralHomeworkNotesRef.current !== undefined
-        ? latestGeneralHomeworkNotesRef.current
-        : generalHomeworkNotes;
-      const trimmed = current.trim();
-      const next = trimmed ? `${trimmed}\n${cleanSpoken}` : cleanSpoken;
-      latestGeneralHomeworkNotesRef.current = next;
-      setGeneralHomeworkNotes(next);
-      const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-      const noteLines = next.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-      const combined = [...specialNotes, ...noteLines];
-      setHomeworkNotesList(combined);
-      try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-    } else {
-      const current = latestTeacherNotesRef.current !== undefined
-        ? latestTeacherNotesRef.current
-        : teacherNotes;
-      const trimmed = current.trim();
-      const next = trimmed ? `${trimmed}\n${cleanSpoken}` : cleanSpoken;
-      latestTeacherNotesRef.current = next;
-      setTeacherNotes(next);
-      try { localStorage.setItem(`campus_teacher_notes_${student.id}`, next); } catch {}
-    }
-    triggerDebouncedAutoSave(350);
-  }, [activeNoteTarget, generalHomeworkNotes, homeworkNotesList, latestGeneralHomeworkNotesRef, latestTeacherNotesRef, setGeneralHomeworkNotes, setHomeworkNotesList, setTeacherNotes, student.id, teacherNotes, triggerDebouncedAutoSave]);
-
-  const { isListening: isHeroListening, toggleListening: toggleHeroListening } = useVoiceToText({
-    onResult: handleTranscriptReceived
-  });
 
   const audioStatusLabel = audioNotesCount > 0
     ? `${audioNotesCount} ${audioNotesCount === 1 ? 'Aufnahme' : 'Aufnahmen'}`
@@ -508,6 +546,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
               <button
                 type="button"
                 onClick={() => {
+                  if (isHeroListening) stopHeroListening();
                   triggerImmediateAutoSave();
                   setIsNotesSheetOpen(false);
                 }}
@@ -962,6 +1001,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                 role="button"
                 tabIndex={0}
                 onClick={() => {
+                  if (isHeroListening) stopHeroListening();
                   triggerImmediateAutoSave();
                   setIsNotesSheetOpen(false);
                 }}
@@ -1200,7 +1240,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                     </button>
 
                     {/* Vertikaler Trenner */}
-                    <div style={{ width: '1px', height: '18px', background: isRecordingMetronomeActive ? '#eab308' : '#cbd5e1', flexShrink: 0 }} />
+                    <div style={{ width: '1px', height: '18px', background: isRecordingMetronomeActive ? '#facc15' : '#cbd5e1', flexShrink: 0 }} />
 
                     {/* Rechter Teil: BPM Trigger für Popover */}
                     <button
@@ -1272,7 +1312,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                         type="button"
                         onClick={() => playMetronomeTick(true)}
                         style={{
-                          background: '#fefce8', border: '1px solid #fef08a', borderRadius: '8px',
+                          background: '#fefce8', border: 'none', borderRadius: '8px',
                           padding: '6px', fontSize: '0.72rem', fontWeight: 750, cursor: 'pointer', color: '#713f12'
                         }}
                       >
@@ -1390,7 +1430,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                   fontSize: '0.70rem',
                   color: '#713f12',
                   background: '#fefce8',
-                  border: '1px solid #fef08a',
+                  border: 'none',
                   padding: '8px 12px',
                   borderRadius: '10px',
                   display: 'flex',
@@ -1400,7 +1440,7 @@ export const TeacherHomeworkActionDock: React.FC<TeacherHomeworkActionDockProps>
                   boxSizing: 'border-box'
                 }}
               >
-                <Lock size={12} color="#eab308" style={{ flexShrink: 0 }} />
+                <Lock size={12} color="#facc15" style={{ flexShrink: 0 }} />
                 <span>
                   <strong>Didaktischer Audio-Tresor:</strong> Dient ausschließlich dem 1:1-Übungsgebrauch für diesen Schüler.
                 </span>

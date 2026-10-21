@@ -1300,7 +1300,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                          
                          {/* GROOVELAB ORIGINAL Stamp Look (Inverted) */}
                          <div style={{ 
-                            background: `#eab308`, 
+                            background: `#facc15`, 
                             color: 'black', 
                             padding: '4px 12px', 
                             borderRadius: '4px', 
@@ -1544,7 +1544,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   fontWeight: 900, 
                                   color: '#34a853', 
                                   background: 'rgba(52, 168, 83, 0.15)',
-                                  border: '1px solid rgba(52, 168, 83, 0.3)',
+                                  border: 'none',
                                   padding: '4px 10px', 
                                   borderRadius: '10px'
                                 }}>
@@ -1614,7 +1614,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   <span style={{ 
                                     background: 'rgba(168, 85, 247, 0.15)', 
                                     color: '#c084fc', 
-                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    border: 'none',
                                     padding: '4px 10px', 
                                     borderRadius: '8px', 
                                     fontSize: '0.6rem', 
@@ -1685,7 +1685,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                           width: '64px', height: '64px', borderRadius: '18px', 
                                           background: u ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)', 
                                           border: isPendingOffer 
-                                            ? (isMe ? '3px dashed #eab308' : '2px dashed rgba(234, 179, 8, 0.4)')
+                                            ? (isMe ? '3px dashed #facc15' : '2px dashed rgba(250, 204, 21, 0.4)')
                                             : ((isMe || isMastered) ? `3px solid #ef4444` : (u ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)')),
                                           boxShadow: 'none',
                                           display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
@@ -1719,7 +1719,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                           )}
                                         </div>
                                         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                          <div style={{ fontSize: '0.65rem', fontWeight: 950, color: isPendingOffer ? '#eab308' : (u ? 'white' : 'rgba(255,255,255,0.3)'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                          <div style={{ fontSize: '0.65rem', fontWeight: 950, color: isPendingOffer ? '#facc15' : (u ? 'white' : 'rgba(255,255,255,0.3)'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
                                             {u ? u.first_name : instLabel}
                                           </div>
                                           {(u || isPendingOffer) && (
@@ -1816,7 +1816,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                     <h4 style={{ ...widgetHeaderStyle, fontSize: '0.8rem', margin: 0 }}>
                       <Zap size={16} /> Shoutbox <span style={{ opacity: 0.5, fontWeight: 700, fontSize: '0.65rem', marginLeft: '4px' }}>(Mitglieder)</span>
                     </h4>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '100px', padding: '2px 8px', fontSize: '0.62rem', color: '#4ade80', fontWeight: 750 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(34, 197, 94, 0.12)', border: 'none', borderRadius: '100px', padding: '2px 8px', fontSize: '0.62rem', color: '#4ade80', fontWeight: 750 }}>
                       <ShieldCheck size={11} /> Band-Knigge
                     </div>
                   </div>
@@ -1827,7 +1827,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                     alignItems: 'center',
                     gap: '6px',
                     background: 'rgba(52, 168, 83, 0.1)',
-                    border: '1px solid rgba(52, 168, 83, 0.25)',
+                    border: 'none',
                     borderRadius: '10px',
                     padding: '6px 10px',
                     fontSize: '0.64rem',
@@ -1895,7 +1895,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
 
                         if (isFlagged && isTeacherOrCoach) {
                           return (
-                            <div key={msg.id} style={{ display: "flex", flexDirection: "column", gap: "6px", background: "rgba(239,68,68,0.12)", padding: "10px 12px", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.4)" }}>
+                            <div key={msg.id} style={{ display: "flex", flexDirection: "column", gap: "6px", background: "rgba(239,68,68,0.12)", padding: "10px 12px", borderRadius: "12px", border: 'none' }}>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                 <span style={{ fontSize: "0.65rem", fontWeight: 900, color: "#f87171", display: "flex", alignItems: "center", gap: "4px" }}>
                                   <Flag size={11} /> Gemeldete Nachricht (Zur Prüfung)
@@ -1904,7 +1904,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   <button
                                     onClick={(e) => { e.stopPropagation(); unflagShoutMessage(msg.id); }}
                                     title="Freigeben"
-                                    style={{ background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)", color: "#4ade80", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
+                                    style={{ background: "rgba(34,197,94,0.2)", border: 'none', color: "#4ade80", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
                                     className="hover-scale"
                                   >
                                     ✓ Freigeben
@@ -1912,7 +1912,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   <button
                                     onClick={(e) => { e.stopPropagation(); deleteShoutMessage(msg.id); }}
                                     title="Löschen"
-                                    style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.4)", color: "#f87171", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
+                                    style={{ background: "rgba(239,68,68,0.2)", border: 'none', color: "#f87171", borderRadius: "6px", padding: "2px 8px", fontSize: "0.62rem", fontWeight: 800, cursor: "pointer" }}
                                     className="hover-scale"
                                   >
                                     <Trash2 size={10} style={{ display: "inline", marginRight: "2px" }} /> Löschen
@@ -2425,7 +2425,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <h4 style={{ ...widgetHeaderStyle, marginBottom: 0 }}><Users size={16} /> Besetzung</h4>
                       {(selectedBandForProfile.coach || selectedBandForProfile.coach_id) && (
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 950, color: '#eab308', background: 'rgba(234,179,8,0.1)', padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(234,179,8,0.2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', fontWeight: 950, color: '#854d0e', background: '#fef9c3', padding: '4px 10px', borderRadius: '6px', border: 'none', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             <Award size={10} fill="currentColor" /> Bandcoach: {selectedBandForProfile.coach?.first_name || 'Zugewiesen'}
                          </div>
                       )}
@@ -2516,7 +2516,7 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                      <button
                                        type="button"
                                        onClick={() => handleRemoveMember(uid, u?.first_name || m.external_name || 'Mitglied', m.instruments)}
-                                       style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '50%', width: '36px', height: '36px', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', marginLeft: 'auto', touchAction: 'manipulation', flexShrink: 0 }}
+                                       style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '50%', width: '36px', height: '36px', minWidth: '36px', minHeight: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', marginLeft: 'auto', touchAction: 'manipulation', flexShrink: 0 }}
                                        className="hover-scale"
                                        title={user.id === uid ? "Platz freigeben" : "Aus Band entfernen"}
                                      >

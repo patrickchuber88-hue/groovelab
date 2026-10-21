@@ -517,7 +517,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                         {student.isNewlyActivated && (
-                          <span style={{ fontSize: '0.62rem', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #dbeafe', padding: '3px 8px', borderRadius: '100px', fontWeight: 800 }}>
+                          <span style={{ fontSize: '0.62rem', background: '#eff6ff', color: '#1d4ed8', border: 'none', padding: '3px 8px', borderRadius: '100px', fontWeight: 800 }}>
                             Neu in diesem Monat
                           </span>
                         )}
@@ -804,7 +804,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               </div>
 
               {/* 2-Option Cards Selector */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px' }}>
                 {/* Option 1: Eltern-Direktabrechnung */}
                 <div
                   role="button"
@@ -948,7 +948,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               {selectedSwitchTargetPayer === 'student' && billingPayer === 'school' && (
                 <div style={{
                   background: '#ecfdf5',
-                  border: '1.5px solid #10b981',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '16px 20px',
                   display: 'flex',
@@ -1002,7 +1002,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               {selectedSwitchTargetPayer === 'school' && billingPayer === 'student' && (
                 <div style={{
                   background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
-                  border: '1.5px solid #d8b4fe',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '16px 20px',
                   display: 'flex',
@@ -1342,7 +1342,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               {currentSchoolProfile?.storage_pending_downgrade_gb !== null && currentSchoolProfile?.storage_pending_downgrade_gb !== undefined && (
                 <div style={{
                   background: '#fffbeb',
-                  border: '1.5px solid #fde68a',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '14px 18px',
                   display: 'flex',
@@ -1408,7 +1408,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               {selectedStorageAddonGb < activeBookedGb && (
                 <div style={{
                   background: '#fefce8',
-                  border: '1.5px solid #fef08a',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '14px 18px',
                   display: 'flex',
@@ -1516,7 +1516,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                 {(currentSchoolProfile?.is_trial || currentSchoolProfile?.status === 'trial') && selectedStorageAddonGb > activeBookedGb && (
                   <div style={{
                     background: 'linear-gradient(90deg, #fefce8 0%, #fef9c3 100%)',
-                    border: '1.5px solid #fde047',
+                    border: 'none',
                     borderRadius: '14px',
                     padding: '12px 16px',
                     display: 'flex',
@@ -2142,7 +2142,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                   
                   <div style={{ 
                     background: '#fffbeb', 
-                    border: '1px solid #fde68a', 
+                    border: 'none', 
                     borderRadius: '12px', 
                     padding: '12px 14px', 
                     fontSize: '0.74rem', 
@@ -2343,7 +2343,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
               <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
                 Deine Vorteile auf einen Blick:
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.72rem', color: '#475569' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', fontSize: '0.72rem', color: '#475569' }}>
                 <div>✓ Sofortige Freischaltung für alle</div>
                 <div>✓ Co-Terminus bis 31. August</div>
                 <div>✓ Revisionssicherer Audit-Trail</div>
@@ -2354,7 +2354,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
             {/* PAngV Pricing Breakdown Box */}
             <div style={{
               background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-              border: '1.5px solid #bbf7d0',
+              border: 'none',
               borderRadius: '16px',
               padding: '16px',
               display: 'flex',
@@ -2468,7 +2468,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
                 }}
                 className="hover-scale"
                 style={{
-                  background: upgradeTargetModule === 'campus' ? '#34a853' : '#eab308',
+                  background: upgradeTargetModule === 'campus' ? '#34a853' : '#facc15',
                   color: upgradeTargetModule === 'campus' ? '#ffffff' : '#0f172a',
                   border: 'none',
                   borderRadius: '11px',

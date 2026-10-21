@@ -283,7 +283,7 @@ export const PublicContractVerificationView: React.FC = () => {
               {/* Official Seal Banner */}
               <div className="print-card" style={{
                 backgroundColor: '#ecfdf5',
-                border: '2px solid #10b981',
+                border: 'none',
                 borderRadius: '20px',
                 padding: '24px',
                 display: 'flex',
@@ -569,7 +569,7 @@ export const PublicContractVerificationView: React.FC = () => {
           {!loading && verificationResult && !verificationResult.isValid && (
             <div className="print-card" style={{
               backgroundColor: '#fef2f2',
-              border: '2px solid #f87171',
+              border: 'none',
               borderRadius: '20px',
               padding: '28px',
               display: 'flex',

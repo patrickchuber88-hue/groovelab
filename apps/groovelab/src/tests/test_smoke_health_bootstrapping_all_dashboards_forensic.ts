@@ -192,7 +192,7 @@ assertHealth(
   'TEACHER',
   'TCH-BOOT-02',
   'Student Live Lab Dynamic Lazy Bootstrapping',
-  routerSrc.includes('isStudent && hasVisitedLiveLab') &&
+  (routerSrc.includes('isStudent && hasVisitedLiveLab') || routerSrc.includes('isStudent && (hasVisitedLiveLab')) &&
   routerSrc.includes('<TeacherDashboard') &&
   routerSrc.includes('viewMode="student"') &&
   routerSrc.includes('activePlatform="groovelab"'),

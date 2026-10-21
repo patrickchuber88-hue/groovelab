@@ -152,12 +152,12 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
               const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
 
               let cardBg = '#f8fafc';
-              let cardBorder = '1px solid #e2e8f0';
+              let cardBorder = 'none';
               let dateHeaderBg = '#10b981';
               let iconComponent: React.ReactNode = <Check size={11} strokeWidth={2.5} />;
-              let iconBg = '#ecfdf5';
-              let iconColor = '#059669';
-              let iconBorder = '1px solid #10b981';
+              let iconBg = '#d1fae5';
+              let iconColor = '#047857';
+              let iconBorder = 'none';
               let textColor = '#0f172a';
               let subTextColor = '#64748b';
               let commentButtonBg = '#ffffff';
@@ -183,107 +183,107 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                 dateHeaderBg = '#ef4444';
                 iconComponent = <X size={11} strokeWidth={2.5} />;
                 iconBg = '#fee2e2';
-                iconColor = '#991b1b';
-                iconBorder = '1px solid #fca5a5';
-                textColor = '#991b1b';
+                iconColor = '#b91c1c';
+                iconBorder = 'none';
+                textColor = '#b91c1c';
                 subTextColor = '#b91c1c';
                 commentButtonBg = '#ffffff';
                 commentButtonColor = '#ef4444';
 
-                cardBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-                cardBorder = '1px solid #fca5a5';
+                cardBg = '#fee2e2';
+                cardBorder = 'none';
               } else if (isRoomChanged) {
-                dateHeaderBg = '#7c3aed';
-                textColor = '#6b21a8';
-                subTextColor = '#7c3aed';
+                dateHeaderBg = '#a855f7';
+                textColor = '#7e22ce';
+                subTextColor = '#a855f7';
                 commentButtonBg = '#ffffff';
-                commentButtonColor = '#7c3aed';
+                commentButtonColor = '#a855f7';
 
                 if (isConfirmed) {
-                  cardBg = '#faf5ff';
-                  cardBorder = '1.5px solid #7c3aed';
+                  cardBg = '#f3e8ff';
+                  cardBorder = 'none';
                   iconComponent = <Check size={11} strokeWidth={2.5} />;
                   iconBg = '#f3e8ff';
-                  iconColor = '#6b21a8';
-                  iconBorder = '1px solid #ddd6fe';
+                  iconColor = '#7e22ce';
+                  iconBorder = 'none';
                 } else {
-                  cardBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
-                  cardBorder = '1.5px dashed #7c3aed';
+                  cardBg = '#f3e8ff';
+                  cardBorder = 'none';
                   iconComponent = <Hourglass size={10} />;
                   iconBg = '#f3e8ff';
-                  iconColor = '#7c3aed';
-                  iconBorder = '1px solid #ddd6fe';
+                  iconColor = '#7e22ce';
+                  iconBorder = 'none';
                 }
               } else if (isReactivated) {
                 dateHeaderBg = '#10b981';
                 iconComponent = <Check size={11} strokeWidth={2.5} />;
-                iconBg = '#ecfdf5';
-                iconColor = '#059669';
-                iconBorder = '1px solid #10b981';
-                textColor = '#065f46';
-                subTextColor = '#059669';
+                iconBg = '#d1fae5';
+                iconColor = '#047857';
+                iconBorder = 'none';
+                textColor = '#047857';
+                subTextColor = '#047857';
                 commentButtonBg = '#ffffff';
                 commentButtonColor = '#10b981';
-                cardBg = '#ecfdf5';
-                cardBorder = '1.5px solid #10b981';
+                cardBg = '#d1fae5';
+                cardBorder = 'none';
               } else if (isRescheduled) {
                 if (isGroup) {
-                  dateHeaderBg = '#0284c7';
+                  dateHeaderBg = '#0ea5e9';
                   textColor = '#0369a1';
-                  subTextColor = '#0284c7';
+                  subTextColor = '#0ea5e9';
                   commentButtonBg = '#ffffff';
-                  commentButtonColor = '#0284c7';
+                  commentButtonColor = '#0ea5e9';
 
                   if (isConfirmed) {
-                    cardBg = '#f0f9ff';
-                    cardBorder = '1.5px solid #0284c7';
+                    cardBg = '#e0f2fe';
+                    cardBorder = 'none';
                     iconComponent = <Check size={11} strokeWidth={2.5} />;
-                    iconBg = '#ecfdf5';
-                    iconColor = '#059669';
-                    iconBorder = '1px solid #10b981';
+                    iconBg = '#d1fae5';
+                    iconColor = '#047857';
+                    iconBorder = 'none';
                   } else {
-                    cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
-                    cardBorder = '1.5px dashed #0284c7';
+                    cardBg = '#e0f2fe';
+                    cardBorder = 'none';
                     iconComponent = <Hourglass size={10} />;
                     iconBg = '#e0f2fe';
-                    iconColor = '#0284c7';
-                    iconBorder = '1px solid #bae6fd';
+                    iconColor = '#0369a1';
+                    iconBorder = 'none';
                   }
                 } else {
-                  dateHeaderBg = '#eab308';
+                  dateHeaderBg = '#facc15';
                   textColor = '#854d0e';
-                  subTextColor = '#a16207';
+                  subTextColor = '#854d0e';
                   commentButtonBg = '#ffffff';
-                  commentButtonColor = '#ca8a04';
+                  commentButtonColor = '#854d0e';
 
                   if (isConfirmed) {
-                    cardBg = '#fffbeb';
-                    cardBorder = '1.5px solid #eab308';
+                    cardBg = '#fef9c3';
+                    cardBorder = 'none';
                     iconComponent = <Check size={11} strokeWidth={2.5} />;
-                    iconBg = '#ecfdf5';
-                    iconColor = '#059669';
-                    iconBorder = '1px solid #10b981';
+                    iconBg = '#d1fae5';
+                    iconColor = '#047857';
+                    iconBorder = 'none';
                   } else {
-                    cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                    cardBorder = '1.5px dashed #eab308';
+                    cardBg = '#fef9c3';
+                    cardBorder = 'none';
                     iconComponent = <Hourglass size={10} />;
-                    iconBg = '#fef3c7';
-                    iconColor = '#b45309';
-                    iconBorder = '1px solid #fde68a';
+                    iconBg = '#fef9c3';
+                    iconColor = '#854d0e';
+                    iconBorder = 'none';
                   }
                 }
               } else if (isPending) {
-                cardBg = '#f5f3ff';
-                cardBorder = '1px solid #ddd6fe';
-                dateHeaderBg = '#8b5cf6';
+                cardBg = '#f3e8ff';
+                cardBorder = 'none';
+                dateHeaderBg = '#a855f7';
                 iconComponent = <Hourglass size={10} />;
-                iconBg = '#ede9fe';
-                iconColor = '#6d28d9';
-                iconBorder = '1px solid #c4b5fd';
-                textColor = '#5b21b6';
-                subTextColor = '#6d28d9';
+                iconBg = '#f3e8ff';
+                iconColor = '#7e22ce';
+                iconBorder = 'none';
+                textColor = '#7e22ce';
+                subTextColor = '#7e22ce';
                 commentButtonBg = '#ffffff';
-                commentButtonColor = '#7c3aed';
+                commentButtonColor = '#a855f7';
               }
 
               const displayStudentName = (() => {
@@ -367,7 +367,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     background: 'white',
                     boxSizing: 'border-box'
                   }}>
-                    <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '9.5px', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div style={{ background: dateHeaderBg, color: dateHeaderBg === '#facc15' ? '#0f172a' : '#ffffff', fontSize: '9.5px', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                       {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
                     </div>
                     <div style={{ color: '#1e293b', fontSize: '15px', fontWeight: 900, padding: '2px 0 3px 0', lineHeight: 1 }}>
@@ -452,7 +452,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                           borderRadius: '10px',
                           background: '#fee2e2',
                           color: '#dc2626',
-                          border: '1px solid #fca5a5',
+                          border: 'none',
                           cursor: 'pointer',
                           flexShrink: 0,
                           transition: 'all 0.15s ease',
@@ -526,7 +526,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                 width: '100%',
                 marginTop: '10px',
                 background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                border: 'none',
                 borderRadius: '8px',
                 padding: '6px 12px',
                 fontSize: '0.72rem',
@@ -594,38 +594,38 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
               const isConfirmed = (b.is_confirmed === true || b.status === 'confirmed' || b.status === 'approved') && b.status !== 'pending' && b.status !== 'unconfirmed';
               const isPending = !isCancelled && !isRescheduled && !isConfirmed;
 
-              let cardBg = isConfirmed ? '#faf5ff' : '#f8fafc';
-              let dateHeaderBg = '#8b5cf6';
+              let cardBg = isConfirmed ? '#f3e8ff' : '#f8fafc';
+              let dateHeaderBg = '#a855f7';
               let label = isConfirmed ? 'Bestätigt' : 'Gebucht';
-              let labelBg = isConfirmed ? '#ede9fe' : 'rgba(139, 92, 246, 0.12)';
-              let labelTextColor = isConfirmed ? '#6d28d9' : '#7c3aed';
-              let textColor = isConfirmed ? '#4c1d95' : '#0f172a';
+              let labelBg = '#f3e8ff';
+              let labelTextColor = '#7e22ce';
+              let textColor = isConfirmed ? '#7e22ce' : '#0f172a';
               let subTextColor = '#64748b';
 
               if (isCancelled) {
-                cardBg = '#fef2f2';
+                cardBg = '#fee2e2';
                 dateHeaderBg = '#ef4444';
                 label = 'Ausfall';
                 labelBg = '#ef4444';
                 labelTextColor = '#ffffff';
-                textColor = '#991b1b';
+                textColor = '#b91c1c';
                 subTextColor = '#b91c1c';
               } else if (isRescheduled) {
-                cardBg = '#fefce8';
-                dateHeaderBg = '#eab308';
+                cardBg = '#fef9c3';
+                dateHeaderBg = '#facc15';
                 label = 'Verschoben';
-                labelBg = '#eab308';
-                labelTextColor = '#ffffff';
+                labelBg = '#facc15';
+                labelTextColor = '#0f172a';
                 textColor = '#854d0e';
-                subTextColor = '#a16207';
+                subTextColor = '#854d0e';
               } else if (isPending) {
-                cardBg = 'repeating-linear-gradient(-45deg, #f5f3ff 0px, #f5f3ff 8px, #ede9fe 8px, #ede9fe 16px)';
-                dateHeaderBg = '#8b5cf6';
+                cardBg = '#f3e8ff';
+                dateHeaderBg = '#a855f7';
                 label = 'Unter Vorbehalt';
-                labelBg = 'rgba(139, 92, 246, 0.12)';
-                labelTextColor = '#6d28d9';
-                textColor = '#5b21b6';
-                subTextColor = '#6d28d9';
+                labelBg = '#f3e8ff';
+                labelTextColor = '#7e22ce';
+                textColor = '#7e22ce';
+                subTextColor = '#7e22ce';
               }
 
               const rName = (b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : '');
@@ -644,7 +644,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     borderRadius: '12px', 
                     padding: '8px 12px', 
                     cursor: 'pointer',
-                    border: isPending ? '2px dashed #8b5cf6' : (isConfirmed ? '1.5px solid #8b5cf6' : '1px solid #e2e8f0'),
+                    border: 'none',
                     transition: 'all 0.15s ease',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                   }}
@@ -661,7 +661,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     flexShrink: 0,
                     background: 'white'
                   }}>
-                    <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>
+                    <div style={{ background: dateHeaderBg, color: dateHeaderBg === '#facc15' ? '#0f172a' : '#ffffff', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>
                       {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
                     </div>
                     <div style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 900, padding: '2px 0', lineHeight: 1 }}>
@@ -732,7 +732,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                 width: '100%',
                 marginTop: '10px',
                 background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                border: 'none',
                 borderRadius: '8px',
                 padding: '6px 12px',
                 fontSize: '0.72rem',
@@ -999,9 +999,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               display: 'flex', 
                               flexDirection: 'column', 
                               gap: '10px',
-                              border: '1px solid #f1f5f9',
+                              border: item.priority === 'critical' ? 'none' : '1px solid #f1f5f9',
                               borderLeft: `4px solid ${item.priority === 'critical' ? '#ef4444' : '#34a853'}`,
-                              background: item.priority === 'critical' ? '#fff5f5' : '#ffffff',
+                              background: item.priority === 'critical' ? '#fee2e2' : '#ffffff',
                               borderRadius: '12px',
                               padding: '14px',
                               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)'
@@ -1016,7 +1016,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                                   </p>
                                 )}
                               </div>
-                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: item.priority === 'critical' ? '#fee2e2' : '#e6f4ea', color: item.priority === 'critical' ? '#ef4444' : '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: item.priority === 'critical' ? '#ef4444' : '#dcfce7', color: item.priority === 'critical' ? '#ffffff' : '#15803d', display: 'inline-flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
                                 <AlertCircle size={11} /> {item.priority === 'critical' ? 'Kritisch' : 'Aktion erforderlich'}
                               </span>
                             </div>
@@ -1033,7 +1033,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                                   gap: '6px',
                                   fontSize: '0.72rem',
                                   fontWeight: 700,
-                                  color: '#2563eb',
+                                  color: '#3b82f6',
                                   textDecoration: 'none'
                                 }}
                               >
@@ -1044,7 +1044,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                             {/* Questionnaire Expansion / Form */}
                             {isQuestionnaire ? (
                               isResponding ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: 'none', marginTop: '4px' }}>
                                   {item.questions.map((qItem: any, qIdx: number) => {
                                     const qKey = typeof qItem === 'string' ? qItem : qItem.text;
                                     const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
@@ -1068,7 +1068,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                                                   style={{
                                                     padding: '4px 10px',
                                                     borderRadius: '8px',
-                                                    border: isSelected ? '1.5px solid #34a853' : '1px solid #cbd5e1',
+                                                    border: isSelected ? 'none' : '1px solid #cbd5e1',
                                                     background: isSelected ? '#34a853' : '#ffffff',
                                                     color: isSelected ? '#ffffff' : '#475569',
                                                     fontWeight: isSelected ? 800 : 600,
@@ -1175,7 +1175,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                   );
                 }
                 return doneItems.map(item => (
-                  <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px 12px', background: '#f8fafc', borderRadius: '8px', border: 'none' }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>{item.title}</div>
                   </div>
                 ));
@@ -1192,7 +1192,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
             border: '1px solid #e2e8f0'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <Sparkles size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
+              <Sparkles size={18} color={activePlatform === 'campus' ? '#34a853' : '#facc15'} />
               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
             </div>
 
@@ -1303,10 +1303,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                              border: '1px solid',
-                              borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
-                              color: userHasThumbsUp ? '#34a853' : '#64748b',
+                              background: userHasThumbsUp ? '#dcfce7' : 'transparent',
+                              border: userHasThumbsUp ? 'none' : '1px solid #e2e8f0',
+                              color: userHasThumbsUp ? '#15803d' : '#64748b',
                               padding: '3px 8px',
                               borderRadius: '9999px',
                               fontSize: '0.7rem',
@@ -1314,7 +1313,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
+                            <ThumbsUp size={11} color={userHasThumbsUp ? '#15803d' : '#64748b'} />
                             <span>{thumbsUpCount}</span>
                           </button>
                           <button 
@@ -1323,10 +1322,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              background: userHasHeart ? '#fce8e6' : 'transparent',
-                              border: '1px solid',
-                              borderColor: userHasHeart ? '#ea4335' : '#e2e8f0',
-                              color: userHasHeart ? '#ea4335' : '#64748b',
+                              background: userHasHeart ? '#fee2e2' : 'transparent',
+                              border: userHasHeart ? 'none' : '1px solid #e2e8f0',
+                              color: userHasHeart ? '#b91c1c' : '#64748b',
                               padding: '3px 8px',
                               borderRadius: '9999px',
                               fontSize: '0.7rem',
@@ -1334,7 +1332,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            <Heart size={11} color={userHasHeart ? '#ea4335' : '#64748b'} fill={userHasHeart ? '#ea4335' : 'transparent'} />
+                            <Heart size={11} color={userHasHeart ? '#ef4444' : '#64748b'} fill={userHasHeart ? '#ef4444' : 'transparent'} />
                             <span>{heartCount}</span>
                           </button>
                         </div>
@@ -1379,10 +1377,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                              border: '1px solid',
-                              borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
-                              color: userHasThumbsUp ? '#34a853' : '#64748b',
+                              background: userHasThumbsUp ? '#dcfce7' : 'transparent',
+                              border: userHasThumbsUp ? 'none' : '1px solid #e2e8f0',
+                              color: userHasThumbsUp ? '#15803d' : '#64748b',
                               padding: '3px 8px',
                               borderRadius: '9999px',
                               fontSize: '0.7rem',
@@ -1390,7 +1387,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
+                            <ThumbsUp size={11} color={userHasThumbsUp ? '#15803d' : '#64748b'} />
                             <span>{thumbsUpCount}</span>
                           </button>
                           <button 
@@ -1399,10 +1396,9 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               gap: '4px',
-                              background: userHasHeart ? '#fce8e6' : 'transparent',
-                              border: '1px solid',
-                              borderColor: userHasHeart ? '#ea4335' : '#e2e8f0',
-                              color: userHasHeart ? '#ea4335' : '#64748b',
+                              background: userHasHeart ? '#fee2e2' : 'transparent',
+                              border: userHasHeart ? 'none' : '1px solid #e2e8f0',
+                              color: userHasHeart ? '#b91c1c' : '#64748b',
                               padding: '3px 8px',
                               borderRadius: '9999px',
                               fontSize: '0.7rem',
@@ -1410,7 +1406,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                               cursor: 'pointer'
                             }}
                           >
-                            <Heart size={11} color={userHasHeart ? '#ea4335' : '#64748b'} fill={userHasHeart ? '#ea4335' : 'transparent'} />
+                            <Heart size={11} color={userHasHeart ? '#ef4444' : '#64748b'} fill={userHasHeart ? '#ef4444' : 'transparent'} />
                             <span>{heartCount}</span>
                           </button>
                         </div>

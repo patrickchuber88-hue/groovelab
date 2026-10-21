@@ -368,16 +368,28 @@ export function useStudentProfile({
     }
   }, [isAdultStudent, studentId, onTabChange]);
 
-  // Mobile viewport detection
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
+  // Mobile viewport detection (Simulator & Real Device aware, excluding Tablet/iPad)
+  const computeIsStudentMobile = () => {
     if (typeof window === 'undefined') return false;
+    if (typeof document !== 'undefined') {
+      const simCat = document.documentElement.getAttribute('data-sim-category');
+      if (simCat === 'mobile' || document.querySelector('.sim-viewport-mobile')) return true;
+      if (simCat === 'tablet' || document.querySelector('.sim-viewport-tablet')) return false;
+      const simW = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simW > 0) return simW <= 768;
+    }
     return window.innerWidth <= 768;
-  });
+  };
+  const [isMobile, setIsMobile] = useState<boolean>(computeIsStudentMobile);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => setIsMobile(computeIsStudentMobile());
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
 
   // Toasts

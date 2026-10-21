@@ -21,6 +21,7 @@ import { playCountInBeep } from '../MeisterwerkAudioPlayers';
 import { SharedAudioEngine } from '../../../../utils/sharedAudioEngine';
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle } from '../../../../utils/audioNamingHelper';
 import { UniversalLatencyEngine } from '../../../../utils/universalLatencyEngine';
+import { audioLatencyService } from '../../../../services/audioLatencyService';
 import { 
   STUDIO_RECORDING_TAIL_DECAY_MS, 
   applyBufferTailFadeOut,
@@ -450,7 +451,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
         // ⚡ Optimistic instant persistence into IndexedDB (< 15ms)
         await storeBlob(localBlobKey, processedBlob).catch(() => {});
 
-        const isTeacherActor = Boolean(isTeacherModeRef.current);
+        const isTeacherActor = Boolean(isTeacherModeRef.current || isTeacherSelf);
         const isStudentSession = !isTeacherActor;
         const currentAudioLabel = overrideLabel || audioLabelRef.current || '';
 
@@ -694,6 +695,9 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
   };
 
   const startRecordingAudio = async (overrideSongId?: any, overrideLabel?: string, isMasterworkSong = false) => {
+    if (Boolean(isRecordingMetronomeActiveRef.current) && audioLatencyService.requestCalibrationPromptIfNeeded('Metronom- / PlayAlong-Aufnahme', () => { startRecordingAudio(overrideSongId, overrideLabel, isMasterworkSong); })) {
+      return;
+    }
     // ⚡ Synchrones WebAudio Pre-Unlocking & Session Audio Routing (Safari/iOS Fix)
     try {
       const ctx = SharedAudioEngine.getContext();

@@ -147,7 +147,7 @@ export const TagesKompassPreflight: React.FC<TagesKompassPreflightProps> = ({
               fontWeight: 750,
               color: '#15803d',
               background: '#dcfce7',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               padding: '2px 8px',
               borderRadius: '100px'
             }}>

@@ -31,7 +31,7 @@ export interface AdminDeviceSetupViewProps {
 export function AdminDeviceSetupView({ 
   rooms, 
   stations, 
-  brandColor = '#eab308', 
+  brandColor = '#facc15', 
   activeSessions, 
   students, 
   school,
@@ -520,7 +520,7 @@ export function AdminDeviceSetupView({
       title: 'Betriebszeiten & Studio-Zeiten',
       subtitle: hours.enforce_hours !== false ? 'Strikte Öffnungszeiten aktiv' : 'Flexible Öffnungszeiten',
       badge: hours.enforce_hours !== false ? 'Strikte Zeiten' : 'Flexibel',
-      gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+      gradient: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
       shadowColor: 'rgba(234, 179, 8, 0.35)',
       icon: Clock
     },
@@ -547,7 +547,7 @@ export function AdminDeviceSetupView({
       title: 'Anwesenheit & Protokolle',
       subtitle: 'Check-Ins & Probenhistorie (CSV)',
       badge: 'Export',
-      gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
+      gradient: 'linear-gradient(135deg, #facc15 0%, #a16207 100%)',
       shadowColor: 'rgba(234, 179, 8, 0.35)',
       icon: Activity
     },
@@ -556,7 +556,7 @@ export function AdminDeviceSetupView({
       title: 'Systemwartung & Bereinigung',
       subtitle: 'Wochenplan bereinigen & Reset',
       badge: 'Wartung',
-      gradient: 'linear-gradient(135deg, #eab308 0%, #854d0e 100%)',
+      gradient: 'linear-gradient(135deg, #facc15 0%, #854d0e 100%)',
       shadowColor: 'rgba(234, 179, 8, 0.35)',
       icon: AlertCircle
     },
@@ -575,7 +575,7 @@ export function AdminDeviceSetupView({
     <div style={{ marginTop: '0px', display: 'flex', flexDirection: 'column', gap: '24px', width: '100%', boxSizing: 'border-box' }}>
       <div>
         <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#fefce8', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
             <Sliders size={22} strokeWidth={2.4} />
           </div>
           <span>GrooveLab-Einstellungen</span>
@@ -656,7 +656,7 @@ export function AdminDeviceSetupView({
                   fontWeight: 800,
                   color: '#ca8a04',
                   background: '#fefce8',
-                  border: '1px solid #fef08a',
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: '100px'
                 }}>
@@ -677,7 +677,7 @@ export function AdminDeviceSetupView({
           justifyContent: 'space-between',
           gap: isMobile ? '10px' : '0',
           padding: isMobile ? '12px 16px' : '16px 32px',
-          border: '1px solid #fef08a',
+          border: 'none',
           background: '#fefce8',
           borderRadius: isMobile ? '16px' : '20px',
           boxSizing: 'border-box',
@@ -694,7 +694,7 @@ export function AdminDeviceSetupView({
             style={{
               padding: '10px 24px',
               width: isMobile ? '100%' : 'auto',
-              background: '#eab308',
+              background: '#facc15',
               color: '#0f172a',
               border: 'none',
               borderRadius: '10px',
@@ -717,7 +717,7 @@ export function AdminDeviceSetupView({
         background: '#fefce8', 
         borderRadius: '20px', 
         padding: '18px 24px', 
-        border: '1.5px solid #fef08a',
+        border: 'none',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -725,7 +725,7 @@ export function AdminDeviceSetupView({
         gap: '12px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#eab308', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: '#facc15', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BookOpen size={20} />
           </div>
           <div>
@@ -741,7 +741,7 @@ export function AdminDeviceSetupView({
           type="button"
           onClick={() => setIsHelpCenterOpen(true)}
           style={{
-            background: '#eab308',
+            background: '#facc15',
             color: '#0f172a',
             border: 'none',
             padding: '9px 18px',
@@ -807,7 +807,7 @@ export function AdminDeviceSetupView({
                   width: '42px',
                   height: '42px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                  background: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -871,7 +871,7 @@ export function AdminDeviceSetupView({
                       style={{ 
                         padding: '14px',
                         borderRadius: '14px',
-                        border: `2px solid ${hours.enforce_hours !== false ? '#eab308' : '#e2e8f0'}`,
+                        border: `2px solid ${hours.enforce_hours !== false ? '#facc15' : '#e2e8f0'}`,
                         background: hours.enforce_hours !== false ? '#fefce8' : '#ffffff',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -888,7 +888,7 @@ export function AdminDeviceSetupView({
                       style={{ 
                         padding: '14px',
                         borderRadius: '14px',
-                        border: `2px solid ${hours.enforce_hours === false ? '#eab308' : '#e2e8f0'}`,
+                        border: `2px solid ${hours.enforce_hours === false ? '#facc15' : '#e2e8f0'}`,
                         background: hours.enforce_hours === false ? '#fefce8' : '#ffffff',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -973,7 +973,7 @@ export function AdminDeviceSetupView({
                               type="button"
                               onClick={() => setHours({...hours, [day.id]: {...(hours[day.id] || {}), active: !isActive, start: hours[day.id]?.start || '08:00', end: hours[day.id]?.end || '20:00'}})}
                               className={`app-binary-switch ${isActive ? 'active' : ''}`}
-                              style={{ backgroundColor: isActive ? '#eab308' : undefined, flexShrink: 0 }}
+                              style={{ backgroundColor: isActive ? '#facc15' : undefined, flexShrink: 0 }}
                             >
                               <div className="app-binary-switch-knob" />
                             </button>
@@ -991,7 +991,7 @@ export function AdminDeviceSetupView({
                   {/* Info Header Card */}
                   <div style={{ 
                     background: '#fefce8', 
-                    border: '1px solid #fef08a', 
+                    border: 'none', 
                     borderRadius: '16px', 
                     padding: '18px', 
                     display: 'flex', 
@@ -1047,7 +1047,7 @@ export function AdminDeviceSetupView({
                         padding: '8px 14px',
                         borderRadius: '10px',
                         background: '#fefce8',
-                        border: '1px solid #fef08a',
+                        border: 'none',
                         color: '#854d0e',
                         fontWeight: 850,
                         fontSize: '0.75rem',
@@ -1070,7 +1070,7 @@ export function AdminDeviceSetupView({
                   {/* GrooveLab Terminal Setup PIN Card */}
                   <div style={{ 
                     background: '#fefce8', 
-                    border: '1.5px solid #fef08a', 
+                    border: 'none', 
                     borderRadius: '18px', 
                     padding: '20px', 
                     display: 'flex', 
@@ -1087,7 +1087,7 @@ export function AdminDeviceSetupView({
                         </p>
                       </div>
                       {kioskPinSavedFeedback && (
-                        <div style={{ background: '#ecfdf5', border: '1px solid #10b981', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ background: '#ecfdf5', border: 'none', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Check size={14} /> PIN erfolgreich gespeichert!
                         </div>
                       )}
@@ -1168,7 +1168,7 @@ export function AdminDeviceSetupView({
                         disabled={isSavingKioskPin || kioskPin.length !== 4}
                         onClick={() => handleSaveKioskPin()}
                         style={{
-                          background: '#eab308',
+                          background: '#facc15',
                           color: '#0f172a',
                           border: 'none',
                           borderRadius: '10px',
@@ -1195,7 +1195,7 @@ export function AdminDeviceSetupView({
                   {effectiveSchool?.groovelab_kiosk_token && (
                     <div style={{ 
                       background: '#fefce8', 
-                      border: '1.5px solid #fef08a', 
+                      border: 'none', 
                       borderRadius: '18px', 
                       padding: '18px', 
                       display: 'flex', 
@@ -1236,7 +1236,7 @@ export function AdminDeviceSetupView({
                             setTimeout(() => setCopiedKioskLink(false), 2000);
                           }}
                           style={{
-                            background: '#eab308',
+                            background: '#facc15',
                             color: '#0f172a',
                             border: 'none',
                             borderRadius: '10px',
@@ -1271,7 +1271,7 @@ export function AdminDeviceSetupView({
                             padding: '8px 14px',
                             borderRadius: '10px',
                             border: 'none',
-                            background: selectedRoomId === r.id ? '#eab308' : '#f1f5f9',
+                            background: selectedRoomId === r.id ? '#facc15' : '#f1f5f9',
                             color: selectedRoomId === r.id ? '#0f172a' : '#64748b',
                             fontWeight: 800,
                             fontSize: '0.8rem',
@@ -1360,7 +1360,7 @@ export function AdminDeviceSetupView({
                       onClick={handleExportAllPresenceCSV}
                       style={{
                         width: 'fit-content',
-                        background: '#eab308',
+                        background: '#facc15',
                         color: '#0f172a',
                         border: 'none',
                         padding: '12px 22px',
@@ -1525,7 +1525,7 @@ export function AdminDeviceSetupView({
                     padding: '8px 20px',
                     borderRadius: '10px',
                     border: 'none',
-                    background: isSettingsDirty ? '#eab308' : '#cbd5e1',
+                    background: isSettingsDirty ? '#facc15' : '#cbd5e1',
                     color: isSettingsDirty ? '#0f172a' : '#94a3b8',
                     fontSize: '0.82rem',
                     fontWeight: 900,

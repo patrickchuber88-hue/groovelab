@@ -5,7 +5,7 @@ import {
   Building, User, Check, Shield, GraduationCap, 
   Music, Zap, ArrowRight, ArrowLeft, Lock, Mail, MapPin, Key,
   CheckCircle, Fingerprint, Download, Copy, Sparkles, Smartphone, Link, X,
-  ShieldCheck, Eye, EyeOff
+  ShieldCheck, Eye, EyeOff, FileText
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics } from '../utils/webauthn';
 import { inlineAllImagesInElement } from './IDBadgeCard';
@@ -18,6 +18,7 @@ import { generateHandoverUrl } from '../utils/cryptoAuth';
 import { logSecurityEvent } from '../services/auditLogService';
 import { computeSha256, ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS } from '../legal/legalContent';
 import { downloadAppleWalletPass } from '../services/wallet/appleWalletPassService';
+import { generatePrincipalWelcomeDossierPDF } from '../utils/principalWelcomeDossierPdf';
 
 
 interface SchoolSelfOnboardingModalProps {
@@ -59,9 +60,55 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
   const [isB2BConfirmed, setIsB2BConfirmed] = useState(false);
   const [isAgbAvvConfirmed, setIsAgbAvvConfirmed] = useState(false);
+  const [downloadingDossier, setDownloadingDossier] = useState(false);
 
   // Clean Zip Code Helper
   const cleanZip = zipCode.trim().replace(/^(DE|D|AT|A|CH)-?/i, '').trim();
+
+  // Real-Time Subdomain Slug Vorschau
+  const computedSlug = React.useMemo(() => {
+    if (!schoolName.trim()) return '';
+    let slug = schoolName
+      .toLowerCase()
+      .trim()
+      .replace(/[äöüß]/g, (match) => {
+        const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+        return mapping[match] || match;
+      })
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (isSubdomainReserved(slug)) {
+      slug = `${slug}-musikschule`;
+    }
+    return slug;
+  }, [schoolName]);
+
+  const handleDownloadWelcomeDossier = async () => {
+    if (!createdData) return;
+    setDownloadingDossier(true);
+    try {
+      await generatePrincipalWelcomeDossierPDF({
+        schoolName: createdData.school?.name || schoolName,
+        subdomain: createdData.school?.subdomain || computedSlug || 'schule',
+        adminFirstName: createdData.user?.first_name || firstName,
+        adminLastName: createdData.user?.last_name || lastName,
+        adminEmail: email.trim().toLowerCase(),
+        schoolNumber: createdData.school?.school_number || 1,
+        generatedPin: createdData.generatedPin,
+        qrToken: createdData.user?.qr_token || '',
+        street,
+        houseNumber,
+        zipCode: cleanZip,
+        city,
+        country
+      });
+    } catch (e) {
+      console.error('Fehler beim Generieren des Willkommensdossiers:', e);
+    } finally {
+      setDownloadingDossier(false);
+    }
+  };
 
   // Form Validation (5 core essentials)
   const isZipValid = country === 'Deutschland' 
@@ -501,7 +548,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
           {error && (
             <div style={{
               background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
+              border: 'none',
               padding: '12px 16px',
               borderRadius: '14px',
               color: '#b91c1c',
@@ -573,6 +620,25 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   className="lean-input"
                   autoFocus
                 />
+                {computedSlug && (
+                  <div style={{
+                    marginTop: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.74rem',
+                    color: '#15803d',
+                    fontWeight: 700,
+                    background: '#f0fdf4',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    animation: 'fadeIn 0.2s ease-out'
+                  }}>
+                    <Sparkles size={13} color="#16a34a" />
+                    <span>Ihre Schul-Webadresse: <strong style={{ color: '#166534', fontFamily: 'monospace' }}>https://{computedSlug}.campus-groovelab.de</strong></span>
+                  </div>
+                )}
               </div>
 
               {/* Schulleiter Vor- & Nachname */}
@@ -893,7 +959,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
               {/* Notfall-PIN Box (Sicherheits-getrennt vom Ausweis) */}
               <div style={{
                 background: '#fffbeb',
-                border: '1.5px solid #fef3c7',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '10px 14px',
                 textAlign: 'left',
@@ -1044,6 +1110,33 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   <Smartphone size={13} /> Apple Wallet
                 </button>
               </div>
+
+              {/* Offizielles Schulleitungs-Willkommensdossier (PDF) */}
+              <button
+                type="button"
+                onClick={handleDownloadWelcomeDossier}
+                disabled={downloadingDossier}
+                style={{
+                  width: '100%',
+                  maxWidth: '310px',
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  fontWeight: 800,
+                  fontSize: '0.78rem',
+                  cursor: downloadingDossier ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <FileText size={15} color="#15803d" />
+                <span>{downloadingDossier ? 'Dossier wird erstellt...' : '📄 Willkommens-Dossier & Pass (PDF)'}</span>
+              </button>
 
               {/* Primary Launch Button into Admin Dashboard */}
               <button

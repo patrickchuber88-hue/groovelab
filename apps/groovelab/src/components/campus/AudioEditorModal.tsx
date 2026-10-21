@@ -925,7 +925,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                   {/* 3. Subtle Reference Pins from Audio Timeline Notes (SoundCloud-Style) */}
                   {duration > 0 && timelineNotes.map((note) => {
                     const markerPct = Math.max(0, Math.min(100, (note.time / duration) * 100));
-                    const pinColor = note.tag === 'tip' ? '#eab308' : note.tag === 'bar' ? '#3b82f6' : note.tag === 'highlight' ? '#ec4899' : '#f97316';
+                    const pinColor = note.tag === 'tip' ? '#facc15' : note.tag === 'bar' ? '#3b82f6' : note.tag === 'highlight' ? '#ec4899' : '#f97316';
                     return (
                       <div
                         key={note.id}

@@ -78,6 +78,11 @@ export function useSecretaryStaff({
   const [newTeacherContractEndsAt, setNewTeacherContractEndsAt] = useState<string>('');
   const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
   const [showAddCoachModal, setShowAddCoachModal] = useState<boolean>(false);
+  const [coachSearchQuery, setCoachSearchQuery] = useState<string>('');
+  const [coachFilterInstrument, setCoachFilterInstrument] = useState<string>('All');
+  const [coachModalSearchQuery, setCoachModalSearchQuery] = useState<string>('');
+  const [showManualCreateCoach, setShowManualCreateCoach] = useState<boolean>(false);
+  const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [coachFirstName, setCoachFirstName] = useState<string>('');
   const [coachLastName, setCoachLastName] = useState<string>('');
   const [coachEmail, setCoachEmail] = useState<string>('');
@@ -702,6 +707,16 @@ export function useSecretaryStaff({
     setShowAddTeacherModal,
     showAddCoachModal,
     setShowAddCoachModal,
+    coachSearchQuery,
+    setCoachSearchQuery,
+    coachFilterInstrument,
+    setCoachFilterInstrument,
+    coachModalSearchQuery,
+    setCoachModalSearchQuery,
+    showManualCreateCoach,
+    setShowManualCreateCoach,
+    selectedCoachProfile,
+    setSelectedCoachProfile,
     coachFirstName,
     setCoachFirstName,
     coachLastName,

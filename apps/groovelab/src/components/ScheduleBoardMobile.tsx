@@ -642,10 +642,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     hoverBg = 'rgba(234, 67, 53, 0.12)';
     textAccentColor = '#ea4335';
   } else if (isGroovelab) {
-    brandColor = '#eab308'; // GrooveLab Yellow
-    lightBg = 'rgba(234, 179, 8, 0.06)';
-    hoverBg = 'rgba(234, 179, 8, 0.12)';
-    textAccentColor = '#ca8a04'; // Dark yellow text
+    brandColor = '#facc15'; // GrooveLab Yellow
+    lightBg = '#fef9c3';
+    hoverBg = 'rgba(250, 204, 21, 0.16)';
+    textAccentColor = '#854d0e'; // Dark yellow text
   }
 
   // Guided Tour Configuration & State for Designer
@@ -4992,7 +4992,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         </div>
 
         {onboardingError && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ background: '#fef2f2', border: 'none', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <AlertCircle size={14} />
             <span>{onboardingError}</span>
           </div>
@@ -5033,7 +5033,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 background: '#f0fdf4',
                 color: '#15803d',
                 fontWeight: 800,
@@ -5065,7 +5065,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               style={{
                 padding: '6px 12px',
                 borderRadius: '8px',
-                border: '1px solid #e0f2fe',
+                border: 'none',
                 background: '#f0f9ff',
                 color: '#0369a1',
                 fontWeight: 800,
@@ -5102,7 +5102,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 style={{
                   padding: '6px 12px',
                   borderRadius: '8px',
-                  border: '1px solid #fed7aa',
+                  border: 'none',
                   background: '#fff7ed',
                   color: '#c2410c',
                   fontWeight: 800,
@@ -5691,11 +5691,11 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   disabled={submitting || boards.length === 0}
                   style={{
                     background: isCampus 
-                      ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                      ? '#34a853'
                       : (isGroovelab 
-                        ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
-                        : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
-                    color: 'white', border: 'none', fontWeight: 800, padding: '8px 16px',
+                        ? '#facc15' 
+                        : '#ea4335'),
+                    color: isGroovelab ? '#0f172a' : 'white', border: 'none', fontWeight: 800, padding: '8px 16px',
                     borderRadius: '10px', fontSize: '0.78rem', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: '6px',
                     opacity: (submitting || boards.length === 0) ? 0.5 : 1,
@@ -5725,7 +5725,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             onboardingOverlayContent
           ) : showCelebration ? (
         <div className="animation-slide-up" style={{ background: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(30px) saturate(190%)', WebkitBackdropFilter: 'blur(30px) saturate(190%)', borderRadius: '28px', padding: '40px', textAlign: 'center', border: '1px solid rgba(255, 255, 255, 0.5)', boxShadow: '0 20px 50px rgba(0,0,0,0.04)', maxWidth: '480px', margin: '40px auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: '1px solid rgba(52, 168, 83, 0.25)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
+          <div style={{ height: '72px', width: '72px', background: 'rgba(52, 168, 83, 0.15)', border: 'none', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#34a853' }}>
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
@@ -5743,7 +5743,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               setActiveTab('calendar');
               loadInitialData();
             }}
-            style={{ background: 'linear-gradient(135deg, #eab308 0%, #d97706 100%)', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
+            style={{ background: '#facc15', color: '#0f172a', border: 'none', fontWeight: 700, padding: '12px 28px', borderRadius: '14px', fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'none' }}
           >
             Zurück zur Ansicht
           </button>
@@ -5830,7 +5830,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               width: '6px',
                               height: '6px',
                               borderRadius: '50%',
-                              background: '#22c55e',
+                              background: '#34a853',
                               display: 'inline-block',
                               boxShadow: 'none',
                               flexShrink: 0
@@ -6035,7 +6035,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           {scheduleStatus === 'pending' && (
             <div className="animation-slide-down" style={{
               background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-              border: '1.5px solid #f59e0b',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 14px',
               fontSize: '0.78rem',
@@ -6083,7 +6083,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           {hasUnsubmittedEdits && (
             <div className="animation-slide-down" style={{
               background: '#fef3c7',
-              border: '1px solid #f59e0b',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 14px',
               fontSize: '0.78rem',
@@ -6442,7 +6442,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               e.stopPropagation();
                               setShowDayPickerMenu(!showDayPickerMenu);
                             }}
-                            style={{ textAlign: 'center', cursor: 'pointer', padding: '6px 12px', borderRadius: '12px', background: '#e6f4ea', border: '1px solid #a7f3d0', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: 'calc(100% - 90px)' }}
+                            style={{ textAlign: 'center', cursor: 'pointer', padding: '6px 12px', borderRadius: '12px', background: '#e6f4ea', border: 'none', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: 'calc(100% - 90px)' }}
                           >
                             <div style={{ fontSize: '0.92rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
                             <ChevronDown size={14} color="#166534" />
@@ -6566,14 +6566,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                         if (totalAssigned > 360 && maxContinuous > 360) {
                           return (
-                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: 'none', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <AlertCircle size={12} strokeWidth={2.4} color="#991b1b" aria-hidden="true" style={{ flexShrink: 0 }} />
                               <span>Gesetzliche Pflichtpause fehlt (über 6 Std. ohne Pause)</span>
                             </div>
                           );
                         } else if (maxContinuous > 180) {
                           return (
-                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fefce8', border: 'none', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <Lightbulb size={12} strokeWidth={2.4} color="#854d0e" aria-hidden="true" style={{ flexShrink: 0 }} />
                               <span>Pause empfohlen (über 3 Std. am Stück)</span>
                             </div>
@@ -7130,7 +7130,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                         right: 0,
                                         top: `${top}px`,
                                         height: `${height}px`,
-                                        border: '2px solid #8b5cf6',
+                                        border: 'none',
                                         background: 'repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.08) 8px, rgba(139, 92, 246, 0.18) 8px, rgba(139, 92, 246, 0.18) 16px)',
                                         zIndex: 4,
                                         pointerEvents: 'none',
@@ -7194,7 +7194,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                 top: `${Math.max(cardTopPx, 0)}px`,
                                 height: `${Math.max(cardHeightPx, 32)}px`,
                                 background: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
-                                border: '1px solid #fef08a',
+                                border: 'none',
                                 borderLeft: '4px solid #f59e0b',
                                 borderRadius: '10px',
                                 padding: '4px 8px',
@@ -7478,13 +7478,13 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBg = hasConflict
                           ? '#ef4444'
                           : (isInsideWunsch
-                              ? (isGroovelabTheme ? '#eab308' : '#22c55e')
+                              ? (isGroovelabTheme ? '#facc15' : '#34a853')
                               : '#ffffff');
 
                         const cardBorder = hasConflict
                           ? '1px solid #dc2626'
                           : (isInsideWunsch
-                              ? (isGroovelabTheme ? '1px solid #ca8a04' : '1px solid #16a34a')
+                              ? (isGroovelabTheme ? '1px solid #facc15' : '1px solid #34a853')
                               : (isSelected 
                                   ? `1.5px solid ${cardPrimaryColor}`
                                   : '1px solid rgba(0, 0, 0, 0.08)'));
@@ -7492,27 +7492,33 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         const cardBorderLeft = hasConflict
                           ? '4px solid #b91c1c'
                           : (isInsideWunsch
-                              ? '1px solid #16a34a'
+                              ? (isGroovelabTheme ? '1px solid #facc15' : '1px solid #34a853')
                               : (isSelected
                                   ? `4px solid ${cardPrimaryColor}`
                                   : '1px solid rgba(0, 0, 0, 0.08)'));
 
-                        const textColor = hasConflict || isInsideWunsch
+                        const textColor = hasConflict
                           ? '#ffffff'
-                          : '#1d1d1f';
+                          : (isInsideWunsch
+                              ? (isGroovelabTheme ? '#0f172a' : '#ffffff')
+                              : '#1d1d1f');
 
-                        const badgeBg = hasConflict || isInsideWunsch
+                        const badgeBg = hasConflict
                           ? 'rgba(255, 255, 255, 0.25)'
-                          : 'rgba(0, 0, 0, 0.05)';
+                          : (isInsideWunsch
+                              ? (isGroovelabTheme ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.25)')
+                              : 'rgba(0, 0, 0, 0.05)');
 
-                        const badgeColor = hasConflict || isInsideWunsch
+                        const badgeColor = hasConflict
                           ? '#ffffff'
-                          : '#6e6e73';
+                          : (isInsideWunsch
+                              ? (isGroovelabTheme ? '#0f172a' : '#ffffff')
+                              : '#6e6e73');
 
                         const cardShadow = hasConflict
                           ? '0 2px 8px rgba(239, 68, 68, 0.15)'
                           : (isInsideWunsch
-                              ? '0 2px 8px rgba(34, 197, 94, 0.18)'
+                              ? (isGroovelabTheme ? '0 2px 8px rgba(250, 204, 21, 0.25)' : '0 2px 8px rgba(52, 168, 83, 0.25)')
                               : (isSelected
                                   ? '0 4px 14px rgba(0, 0, 0, 0.08)'
                                   : '0 2px 8px rgba(0, 0, 0, 0.04)'));
@@ -7525,13 +7531,13 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                           const groupBg = hasConflict
                             ? '#ef4444'
                             : (isInsideWunsch
-                                ? (isGroovelabTheme ? '#eab308' : '#22c55e')
+                                ? (isGroovelabTheme ? '#facc15' : '#34a853')
                                 : '#ffffff');
 
                           const groupBorder = hasConflict
                             ? '1px solid #dc2626'
                             : (isInsideWunsch
-                                ? (isGroovelabTheme ? '1px solid #ca8a04' : '1px solid #16a34a')
+                                ? (isGroovelabTheme ? '1px solid #facc15' : '1px solid #34a853')
                                 : (draggedStudentId === bs.id ? '2px dashed #f59e0b' : (isGroupSelected ? '2px solid #16a34a' : '1px solid rgba(0, 0, 0, 0.08)')));
 
                           const groupBorderLeft = hasConflict
@@ -7887,7 +7893,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                                   >
                                     <span>{displayAssignedTime}</span>
                                     {isLiveShiftedPreview && (
-                                      <span style={{ fontSize: '0.55rem', fontWeight: 900, background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.5)', color: '#d97706', padding: '0px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                                      <span style={{ fontSize: '0.55rem', fontWeight: 900, background: 'rgba(245, 158, 11, 0.2)', border: 'none', color: '#d97706', padding: '0px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                                         Neu
                                       </span>
                                     )}
@@ -8117,7 +8123,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
               {boards.length === 0 && (
                 <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.4)', border: '1.5px dashed rgba(0, 0, 0, 0.08)', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px', textAlign: 'center', minHeight: '400px' }}>
-                  <Sparkles size={28} style={{ color: '#eab308', marginBottom: '12px' }} />
+                  <Sparkles size={28} style={{ color: '#facc15', marginBottom: '12px' }} />
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1d1d1f' }}>Noch keine Unterrichtstage</h4>
                   <p style={{ color: '#86868b', fontSize: '0.78rem', fontWeight: 500, marginTop: '6px', maxWidth: '300px', lineHeight: 1.35 }}>
                     Klicke oben auf „Tag anlegen“, um geplante Unterrichtstage hinzuzufügen.
@@ -8283,7 +8289,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                             const hasSperrzeit = sPrefs.some((p: any) => p.preference_type === 'gesperrt');
                             if (hasSperrzeit) {
                               return (
-                                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
+                                <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', border: 'none', padding: '1.5px 6px', borderRadius: '5px', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'flex', alignItems: 'center', gap: '3px', pointerEvents: 'none' }} title="Dieser Schüler konnte wegen Sperrzeit-Kollision nicht eingeteilt werden. Sende erneut den Onboarding-Link oder erweitere deine Unterrichtszeiten.">
                                   <Ban size={9} color="#dc2626" />
                                   <span>Sperrzeit-Konflikt</span>
                                 </span>
@@ -8323,7 +8329,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                               padding: '6px 8px',
                               borderRadius: '6px',
                               background: '#fffbeb',
-                              border: '1px solid #fde68a',
+                              border: 'none',
                               color: '#b45309',
                               fontSize: '0.62rem',
                               fontWeight: 650,
@@ -8928,7 +8934,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                       value={editingBreak.startTime}
                       onChange={(e) => setEditingBreak(prev => prev ? { ...prev, startTime: e.target.value } : null)}
                       style={{
-                        flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1.5px solid #fde047',
+                        flex: 1, padding: '8px 12px', borderRadius: '8px', border: 'none',
                         fontSize: '0.95rem', fontWeight: 700, color: '#b45309', outline: 'none', background: '#fefce8'
                       }}
                     />
@@ -8956,7 +8962,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         type="button"
                         onClick={() => setEditingBreak(prev => prev ? { ...prev, duration: dur } : null)}
                         style={{
-                          padding: '8px', borderRadius: '8px', border: editingBreak.duration === dur ? '2px solid #eab308' : '1px solid #e5e7eb',
+                          padding: '8px', borderRadius: '8px', border: editingBreak.duration === dur ? '2px solid #facc15' : '1px solid #e5e7eb',
                           background: editingBreak.duration === dur ? '#fefce8' : '#ffffff',
                           color: editingBreak.duration === dur ? '#b45309' : '#374151',
                           fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.2s'
@@ -8989,7 +8995,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                       setEditingBreak(null);
                     }}
                     style={{
-                      flex: 1, padding: '10px', borderRadius: '10px', background: '#eab308', color: '#0f172a',
+                      flex: 1, padding: '10px', borderRadius: '10px', background: '#facc15', color: '#0f172a',
                       border: 'none', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', boxShadow: 'none'
                     }}
                   >
@@ -9188,7 +9194,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     height: '44px',
                     borderRadius: '12px',
                     background: '#fef3c7',
-                    border: '1px solid #fde68a',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -9287,7 +9293,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               {/* Explanatory Callout */}
               <div style={{
                 background: '#fefce8',
-                border: '1px solid #fef08a',
+                border: 'none',
                 borderRadius: '12px',
                 padding: '10px 14px',
                 fontSize: '0.76rem',
@@ -9337,12 +9343,12 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     padding: '11px 16px',
                     borderRadius: '12px',
                     background: isCampus
-                      ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
+                      ? '#34a853'
                       : (isGroovelab
-                        ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)'
-                        : 'linear-gradient(135deg, #ea4335 0%, #c62828 100%)'),
+                        ? '#facc15'
+                        : '#ea4335'),
                     border: 'none',
-                    color: '#ffffff',
+                    color: isGroovelab ? '#0f172a' : '#ffffff',
                     fontSize: '0.82rem',
                     fontWeight: 800,
                     cursor: 'pointer',
@@ -9401,7 +9407,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     height: '44px',
                     borderRadius: '12px',
                     background: '#e6f4ea',
-                    border: '1px solid #ceead6',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -9443,7 +9449,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               {/* Hero Overall Score Badge */}
               <div style={{
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%)',
-                border: '1.5px solid #bbf7d0',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '18px 22px',
                 display: 'flex',
@@ -9517,8 +9523,8 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                 {/* 3. Wunschzeiten */}
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '0.75rem', fontWeight: 800 }}>
-                    <Star size={13} fill="#22c55e" color="#16a34a" /> Wunschzeiten
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#137333', fontSize: '0.75rem', fontWeight: 800 }}>
+                    <Star size={13} fill="#34a853" color="#34a853" /> Wunschzeiten
                   </div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f' }}>
                     {autoScheduleReportData.wunschHits} / {autoScheduleReportData.studentsWithWunsch ?? autoScheduleReportData.totalAssigned}
@@ -9608,7 +9614,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 height: '56px',
                 borderRadius: '16px',
                 background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                border: '1px solid #bbf7d0',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -9641,7 +9647,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   <div style={{
                     height: '100%',
                     width: `${solverProgress}%`,
-                    background: 'linear-gradient(90deg, #34a853 0%, #22c55e 100%)',
+                    background: '#34a853',
                     borderRadius: '10px',
                     transition: 'width 0.15s ease-out',
                     boxShadow: 'none'
@@ -9885,7 +9891,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   </button>
                 </div>
 
-                <button type="button" onClick={() => { handleAutoAssign(); setShowDesignerToolsSheet(false); }} style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: '#e6f4ea', border: '1px solid #a7f3d0', color: '#166534', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <button type="button" onClick={() => { handleAutoAssign(); setShowDesignerToolsSheet(false); }} style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: '#e6f4ea', border: 'none', color: '#166534', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Sparkles size={16} color="#34a853" />
                   <span>Automatisch zuteilen (4-Phasen-Assistent)</span>
                 </button>
@@ -9913,7 +9919,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Aktionen & Einreichen</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {undoStack.length > 0 && (
-                    <button type="button" onClick={() => { handleUndo(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button type="button" onClick={() => { handleUndo(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#eff6ff', border: 'none', color: '#1d4ed8', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <RotateCcw size={16} color="#2563eb" />
                       <span>Rückgängig (Letzte Änderung)</span>
                     </button>
@@ -9927,7 +9933,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     <Send size={15} color="#2563eb" />
                     <span>Onboarding-Link für Eltern kopieren</span>
                   </button>
-                  <button type="button" onClick={() => { handleResetAllAssignments(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button type="button" onClick={() => { handleResetAllAssignments(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#fef2f2', border: 'none', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Trash2 size={16} color="#991b1b" />
                     <span>Alle Zuteilungen zurücksetzen</span>
                   </button>
@@ -10045,7 +10051,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   width: '100%',
                   padding: '12px',
                   borderRadius: '12px',
-                  border: '1px solid #fecaca',
+                  border: 'none',
                   background: '#fef2f2',
                   color: '#991b1b',
                   fontWeight: 800,

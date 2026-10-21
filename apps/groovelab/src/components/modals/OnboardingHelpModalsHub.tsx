@@ -228,7 +228,7 @@ export const OnboardingHelpModalsHub: React.FC<OnboardingHelpModalsHubProps> = (
               {school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Probezeit:</span>
-                  <span style={{ fontSize: '0.85rem', color: '#eab308', fontWeight: 800 }}>
+                  <span style={{ fontSize: '0.85rem', color: '#854d0e', fontWeight: 800 }}>
                     {trialDaysLeft > 0 ? `${trialDaysLeft} Tage verbleibend` : 'Abgelaufen'}
                   </span>
                 </div>

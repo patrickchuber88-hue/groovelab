@@ -40,7 +40,8 @@ const guards = [
   { id: 'PARENT_PORTAL_GOVERNANCE', name: 'Parental Governance & Child Protection Guard (OWASP/BGB/DSGVO)', cmd: 'node', args: ['scripts/parent_portal_governance_guard.mjs'] },
   { id: 'TEST_FACADE_GUARD', name: 'AST Mock-Facade & Test Authenticity Guard', cmd: 'node', args: ['scripts/test_facade_guard.mjs'] },
   { id: 'SW_INTEGRITY', name: 'PWA Service Worker & Cache Integrity Guard (Build-Buster/Edge)', cmd: 'node', args: ['scripts/verify_sw_integrity.mjs'] },
-  { id: 'EXOCORTEX_INTEGRITY', name: 'Exocortex & Product Bible Integrity Guard (0,1% Goldstandard)', cmd: 'node', args: ['scripts/product_bible_guard.mjs', '--check'] }
+  { id: 'EXOCORTEX_INTEGRITY', name: 'Exocortex & Product Bible Integrity Guard (0,1% Goldstandard)', cmd: 'node', args: ['scripts/product_bible_guard.mjs', '--check'] },
+  { id: 'BSI_360_MATRIX', name: 'BSI 360° Cybersecurity Evaluation Matrix (6 Domänen / 24 Checks)', cmd: 'node', args: ['scripts/bsi_360_cybersecurity_matrix_guard.mjs'] }
 ];
 
 function runGuardAsync(guard) {

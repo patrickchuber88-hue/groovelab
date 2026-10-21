@@ -297,6 +297,15 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
     );
   }
 
+  const headerGradient = 
+    activeModalTab === 'logbook'
+      ? 'linear-gradient(135deg, #3730a3 0%, #6366f1 100%)' // Indigo: Meine Meisterwerke
+      : activeModalTab === 'stickeralbum'
+      ? 'linear-gradient(135deg, #c2410c 0%, #f97316 100%)' // Orange: Meilensteine / Sticker-Album
+      : activeModalTab === 'audiobiography'
+      ? 'linear-gradient(135deg, #065f46 0%, #10b981 100%)' // Emerald: Audio-Biografie
+      : 'linear-gradient(135deg, #2e8b57 0%, #4338ca 100%)'; // Default: Aufgabenheft / Campus
+
   return (
     <>
       <div
@@ -305,13 +314,16 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             ? 'max(8px, env(safe-area-inset-top, 8px)) 14px 8px 14px'
             : 'max(11px, env(safe-area-inset-top, 11px)) 22px 11px 22px',
           minHeight: isMobileOrSim ? '48px' : '54px',
-          background: 'linear-gradient(135deg, #2e8b57 0%, #4338ca 100%)',
+          background: headerGradient,
+          transition: 'background 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
           backdropFilter: 'none',
           borderBottom: '1px solid rgba(255, 255, 255, 0.18)',
           borderRadius: '0',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
+          position: 'sticky',
+          top: 0,
           zIndex: 50,
           boxShadow: '0 2px 10px rgba(0, 0, 0, 0.12)'
         }}
@@ -391,86 +403,66 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                 >
                   {displayedStudentName}
                 </h2>
-                {!isTeacherSandbox && !isTeacherTools && !isTeacherSelf ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOnboardingStep(0);
-                        setShowProtokollOnboarding(true);
-                      }}
-                      title="Anleitung & Onboarding anzeigen"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.18)',
-                        border: '1px solid rgba(255, 255, 255, 0.28)',
-                        color: '#ffffff',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        padding: 0,
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-                        transition: 'all 0.2s ease',
-                        flexShrink: 0
-                      }}
-                      className="hover-scale"
-                    >
-                      <Info size={13} color="#ffffff" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAgeUiInfoModal(true)}
-                      title="Altersstufe & Berechtigungen anzeigen"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: 'rgba(255, 255, 255, 0.18)',
-                        backdropFilter: 'blur(12px)',
-                        WebkitBackdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.32)',
-                        borderRadius: '100px',
-                        padding: '2px 8px',
-                        color: '#ffffff',
-                        fontSize: '0.70rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                        flexShrink: 0
-                      }}
-                      className="hover-scale"
-                    >
-                      <span>
-                        {uiLevel === 'junior'
-                          ? '🧒 Junior (6–10 J.)'
-                          : uiLevel === 'teen'
-                          ? '⚡ Teen (11–15 J.)'
-                          : '🎓 Pro (ab 16 J.)'}
-                      </span>
-                    </button>
-                  </>
-                ) : (
-                  <span
+                <button
+                  type="button"
+                  onClick={() => setShowAgeUiInfoModal(true)}
+                  title="Altersstufe & Berechtigungen anzeigen"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    background: 'rgba(255, 255, 255, 0.18)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.32)',
+                    borderRadius: '100px',
+                    padding: '2px 8px',
+                    color: '#ffffff',
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                >
+                  <span>
+                    {uiLevel === 'junior'
+                      ? '🧒 Junior (6–10 J.)'
+                      : uiLevel === 'teen'
+                      ? '⚡ Teen (11–15 J.)'
+                      : '🎓 Pro (ab 16 J.)'}
+                  </span>
+                </button>
+                {!isTeacherSandbox && !isTeacherTools && !isTeacherSelf && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnboardingStep(0);
+                      setShowProtokollOnboarding(true);
+                    }}
+                    title="Anleitung & Onboarding anzeigen"
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
                       background: 'rgba(255, 255, 255, 0.18)',
-                      border: '1px solid rgba(255, 255, 255, 0.32)',
-                      borderRadius: '100px',
-                      padding: '2px 8px',
+                      border: '1px solid rgba(255, 255, 255, 0.28)',
                       color: '#ffffff',
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s ease',
                       flexShrink: 0
                     }}
+                    className="hover-scale"
                   >
-                    Lehrkraft
-                  </span>
+                    <Info size={13} color="#ffffff" />
+                  </button>
                 )}
               </div>
               {(activeViewMode === 'recordings' || activeModalTab === 'audiobiography') && (

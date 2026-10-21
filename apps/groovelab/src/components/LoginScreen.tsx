@@ -6,7 +6,7 @@ import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId, authenticateMasterBiometricPasskey } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId, authenticateMasterBiometricPasskey, extractWebAuthnAssertionPayload } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
 import { setLocalhostDevLegalBypassed } from './LegalConsentGate';
@@ -676,10 +676,10 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return '#eab308'; // Yellow
+  if (num === 1 || num === 2) return '#facc15'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
-  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  if (num === 7 || num === 8) return '#facc15'; // Yellow
   return '#64748b';
 };
 
@@ -1210,7 +1210,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#facc15' }}>
               <School size={28} />
             </div>
             <div>
@@ -1361,7 +1361,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
               {/* Admin Ausweis Card */}
               <div style={{
-                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                background: '#0f172a',
                 borderRadius: '32px',
                 padding: '24px',
                 width: '320px',
@@ -1372,7 +1372,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: 'white',
                 border: '1px solid rgba(255,255,255,0.08)'
               }}>
-                <div style={{ fontSize: '10px', fontWeight: 900, color: '#eab308', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>Groovelab Admin-Ausweis</div>
+                <div style={{ fontSize: '10px', fontWeight: 900, color: '#facc15', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '16px' }}>Groovelab Admin-Ausweis</div>
                 
                 {/* QR Code Container */}
                 <div style={{
@@ -1431,7 +1431,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     padding: '14px',
                     borderRadius: '16px',
                     border: 'none',
-                    background: '#eab308',
+                    background: '#facc15',
                     color: '#0f172a',
                     fontWeight: 800,
                     cursor: 'pointer',
@@ -1479,7 +1479,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     flex: 2,
     padding: '14px',
     borderRadius: '12px',
-    background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+    background: '#facc15',
     border: 'none',
     color: '#0f172a',
     fontWeight: 800,
@@ -1967,6 +1967,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       if (isGroovelabKiosk && effectiveSchool?.groovelab_kiosk_token) {
         localStorage.setItem('groovelab_kiosk_token', effectiveSchool.groovelab_kiosk_token);
       }
+      // [P0-1] Ensure verified Stage-2 PIN session lease is bound in sessionStorage before role switching or presence queries
+      if (!sessionStorage.getItem('gl_active_session_lease_id') && user?.id) {
+        try {
+          await registerClientSessionLease(user, effectiveSchool?.id || user.school_id || null);
+        } catch {}
+      }
       const rolesArray = Array.isArray(user.roles) ? user.roles : [];
       const hasAdminRole = rolesArray.includes('admin');
       const hasSecretaryRole = rolesArray.includes('secretary');
@@ -2042,7 +2048,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           }
 
           // Enforce activation check (must have at least one active module)
-          if (!user.is_campus_active && !user.is_groovelab_active) {
+          const isCampusActive = user.is_campus_active ?? true;
+          const isGroovelabActive = user.is_groovelab_active ?? false;
+
+          if (!isCampusActive && !isGroovelabActive) {
             if (user.role === 'student') {
               const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
               sessionStorage.setItem('groovelab_user_id', user.id);
@@ -2059,8 +2068,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
           if (isGroovelabKiosk) {
-            if (!user.is_groovelab_active) {
-              if (user.is_campus_active) {
+            if (!isGroovelabActive) {
+              if (isCampusActive) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 if (user.role === 'teacher') {
                   sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -2076,8 +2085,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               sessionStorage.setItem('groovelab_active_platform', 'groovelab');
             }
           } else {
-            if (!user.is_campus_active) {
-              if (user.is_groovelab_active) {
+            if (!isCampusActive) {
+              if (isGroovelabActive) {
                 sessionStorage.setItem('groovelab_active_platform', 'groovelab');
               } else {
                 const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
@@ -3141,12 +3150,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
 
       const credentialId = assertion.id;
+      const assertionPayload = extractWebAuthnAssertionPayload(assertion);
 
       // 3. Authenticate credential and receive verified lease & sanitized profile via server RPC
       const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
         p_credential_id: credentialId,
         p_challenge: chalData.challenge,
-        p_school_id: schoolData?.id || null
+        p_school_id: schoolData?.id || null,
+        ...assertionPayload
       });
 
       if (authErr || !authResult?.success || !authResult?.user) {
@@ -3194,8 +3205,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     });
   };
 
-  const handlePinLogin = async (pin: string) => {
-    if (!pin.trim() || loading) return;
+  const handlePinLogin = async (pinOrUser: string | any) => {
+    if (!pinOrUser || loading) return;
+    if (typeof pinOrUser === 'object' && pinOrUser.id) {
+      // 🛡️ 0,1% Goldstandard: Pre-verified student from Stage 1 (ID + Birthday Day)
+      setPinVerificationUser(pinOrUser);
+      setPinVerificationIsWithinRoom(true);
+      setPinVerificationInput('');
+      setPinVerificationAttempts(0);
+      setLoading(false);
+      return;
+    }
+    const pin = typeof pinOrUser === 'string' ? pinOrUser : '';
+    if (!pin.trim()) return;
     if (pinLockoutSeconds > 0) {
       setError(`Sicherheitssperre: Zu viele Fehlversuche. Bitte warte noch ${pinLockoutSeconds} Sekunden.`);
       return;
@@ -3976,7 +3998,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
                 
                 <div style={{ fontSize: '0.75rem', color: isSecretary ? '#5f6368' : '#94a3b8', marginBottom: '2px', fontWeight: 600 }}>Schule</div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#34a853' : '#eab308' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: isSecretary ? '#34a853' : '#facc15' }}>
                   {schoolName || 'GrooveLab Academy'}
                 </div>
               </div>
@@ -3991,7 +4013,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               }}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#34a853' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#34a853' : '#facc15',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
                 cursor: 'pointer', boxShadow: 'none',
                 transition: 'all 0.2s', outline: 'none'
@@ -4024,10 +4046,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{
-              background: isSecretary ? '#e6f4ea' : '#eab308', 
+              background: isSecretary ? '#e6f4ea' : '#facc15', 
               padding: '10px', borderRadius: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: isSecretary ? '0 4px 12px rgba(19, 115, 51, 0.08)' : 'none'
+              boxShadow: 'none'
             }}>
               {isSecretary ? (
                 <School size={24} color="#34a853" strokeWidth={2.5} />
@@ -4047,7 +4069,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {isSecretary 
               ? `Du wurdest eingeladen, als Administrator/Verwaltung für die Schule `
               : `Du wurdest eingeladen, als Coach für die Schule `}
-            <strong style={{ color: isSecretary ? '#34a853' : '#eab308' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
+            <strong style={{ color: isSecretary ? '#34a853' : '#facc15' }}>{loadingSchool ? 'wird geladen...' : (schoolName || 'Campus-Groovelab Academy')}</strong> beizutreten.
           </p>
 
           <form onSubmit={async (e) => {
@@ -4145,7 +4167,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
                     ? `1px solid ${firstNameFocused ? '#34a853' : '#dadce0'}` 
-                    : `1px solid ${firstNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
+                    : `1px solid ${firstNameFocused ? '#facc15' : 'rgba(255,255,255,0.08)'}`,
                   boxShadow: firstNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
@@ -4169,7 +4191,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   background: isSecretary ? '#f8fafc' : 'rgba(255,255,255,0.05)', 
                   border: isSecretary 
                     ? `1px solid ${lastNameFocused ? '#34a853' : '#dadce0'}` 
-                    : `1px solid ${lastNameFocused ? '#eab308' : 'rgba(255,255,255,0.08)'}`,
+                    : `1px solid ${lastNameFocused ? '#facc15' : 'rgba(255,255,255,0.08)'}`,
                   boxShadow: lastNameFocused && isSecretary ? '0 0 0 3px rgba(19, 115, 51, 0.12)' : 'none',
                   color: isSecretary ? '#1d1d1f' : 'white', fontSize: '0.95rem', outline: 'none',
                   fontWeight: 600,
@@ -4183,7 +4205,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               disabled={signingUp}
               style={{
                 marginTop: '8px', padding: '14px 20px', borderRadius: '100px',
-                background: isSecretary ? '#34a853' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
+                background: isSecretary ? '#34a853' : '#facc15',
                 border: 'none', color: isSecretary ? '#ffffff' : '#0f172a', fontWeight: 800, fontSize: '0.95rem',
                 cursor: 'pointer', boxShadow: 'none',
                 transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -4216,10 +4238,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       alignItems: 'center',
       justifyContent: 'flex-start',
       fontFamily: '"Outfit", "Inter", -apple-system, sans-serif',
-      background: isGroovelabKiosk ? '#ca8a04' : '#0a361c', // Chalkboard yellow/green
-      backgroundImage: isGroovelabKiosk 
-        ? 'radial-gradient(circle at 50% 50%, #fef08a 0%, #ca8a04 100%)' 
-        : 'radial-gradient(circle at 50% 50%, #11572e 0%, #062413 100%)',
+      background: isGroovelabKiosk ? '#facc15' : '#062413',
       color: isGroovelabKiosk ? '#062413' : 'white',
       zIndex: 9999,
       overflowY: 'auto',
@@ -4283,7 +4302,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         </div>
 
         {parentOnboardingError && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '12px 16px', borderRadius: '16px', color: '#991b1b', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+          <div style={{ background: '#fef2f2', border: 'none', padding: '12px 16px', borderRadius: '16px', color: '#991b1b', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
             <AlertCircle size={16} style={{ color: '#ef4444', flexShrink: 0 }} /> 
             <span>{parentOnboardingError}</span>
           </div>
@@ -4686,7 +4705,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         {parentOnboardingStep === 'preferences' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             {isAlreadyOnboarded && (
-              <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '12px 16px', borderRadius: '16px', color: '#b45309', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
+              <div style={{ background: '#fffbeb', border: 'none', padding: '12px 16px', borderRadius: '16px', color: '#b45309', fontSize: '13px', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
                 <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0 }} /> 
                 <span>Du hast deinen Stundenplan bereits eingerichtet. Wenn du fortfährst, werden deine bisherigen Wunschzeiten und Notizen überschrieben.</span>
               </div>
@@ -4728,7 +4747,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                         style={{
                           padding: '6px 8px',
                           borderRadius: '10px',
-                          border: '1.5px solid #fecdd3',
+                          border: 'none',
                           background: '#fff1f2',
                           color: '#e11d48',
                           fontSize: '11.5px',
@@ -5036,8 +5055,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             {/* PWA INSTALLATION BANNER */}
             <div style={{
               width: '100%',
-              background: '#f0f9f1',
-              border: '1px solid rgba(52, 168, 83, 0.25)',
+              background: '#dcfce7',
+              border: 'none',
               borderRadius: '20px',
               padding: '12px',
               boxSizing: 'border-box',
@@ -5269,7 +5288,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Safari / iOS */}
               {isIOS && isStandalone ? (
-                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <div style={{ background: 'rgba(239, 68, 68, 0.05)', padding: '16px', borderRadius: '18px', border: 'none' }}>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 800, color: '#fca5a5' }}>
                      iPad / iPhone Home-Bildschirm App (PWA)
                   </h4>
@@ -5362,7 +5381,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             boxSizing: 'border-box'
           }}>
             <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(255, 255, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', width: '100%', justifyContent: 'center' }}>
-              <Tablet size={14} style={{ color: '#eab308' }} />
+              <Tablet size={14} style={{ color: '#facc15' }} />
               Groovelab QR-Code scannen
             </div>
 
@@ -5584,7 +5603,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
 
                 {error && (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: 'none', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
                     {error}
                   </div>
                 )}
@@ -5597,7 +5616,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     width: '100%',
                     padding: '16px',
                     borderRadius: '16px',
-                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    background: '#0f172a',
                     color: '#ffffff',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
                     fontSize: '1rem',
@@ -5611,7 +5630,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     gap: '12px'
                   }}
                 >
-                  <Fingerprint size={22} color="#eab308" />
+                  <Fingerprint size={22} color="#facc15" />
                   <span>{adminLoginLoading ? 'Verifiziere Passkey...' : 'Mit Passkey anmelden (Touch ID)'}</span>
                 </button>
 
@@ -5701,7 +5720,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       padding: '14px',
                       borderRadius: '14px',
                       background: '#f8fafc',
-                      border: '2px solid #22c55e',
+                      border: '2px solid #34a853',
                       color: '#0f172a',
                       fontSize: '1.4rem',
                       fontWeight: 900,
@@ -5714,7 +5733,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
 
                 {error && (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: 'none', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
                     {error}
                   </div>
                 )}
@@ -5726,7 +5745,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     width: '100%',
                     padding: '14px',
                     borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    background: '#34a853',
                     color: '#ffffff',
                     border: 'none',
                     fontSize: '0.95rem',
@@ -5821,7 +5840,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 </div>
 
                 {error && (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: 'none', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
                     {error}
                   </div>
                 )}
@@ -5833,7 +5852,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     width: '100%',
                     padding: '14px',
                     borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                    background: '#ef4444',
                     color: '#ffffff',
                     border: 'none',
                     fontSize: '0.95rem',
@@ -5911,11 +5930,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
+                background: '#dcfce7',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#34a853'
+                color: '#15803d'
               }}>
                 <span style={{ fontSize: '28px' }}>👋</span>
               </div>
@@ -5957,7 +5976,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   width: '100%',
                   padding: '16px',
                   borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                  background: '#34a853',
                   color: '#ffffff',
                   border: 'none',
                   fontSize: '1rem',
@@ -6091,8 +6110,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               width: '56px',
               height: '56px',
               borderRadius: '16px',
-              background: lockoutNotice.type === 'trial_expired' ? '#fef3c7' : '#fee2e2',
-              border: `1px solid ${lockoutNotice.type === 'trial_expired' ? '#fde68a' : '#fca5a5'}`,
+              background: lockoutNotice.type === 'trial_expired' ? '#fef9c3' : '#fee2e2',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'

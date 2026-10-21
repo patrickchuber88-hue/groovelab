@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
-  Eye, EyeOff, FileText, GraduationCap, Plus, Scale, Search,
+  Eye, EyeOff, FileText, GraduationCap, Plus, Search,
   ShieldAlert, Sliders, Trash2, UserCheck, Users
 } from 'lucide-react';
-import { resolveUserCampusId } from '../../utils/campusIdHelper';
-import { HerrenbergComplianceModal } from './modals/HerrenbergComplianceModal';
+import { resolveUserCampusId, normalizeCampusIdToNumeric } from '../../utils/campusIdHelper';
+import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 
 export interface SecretaryEmployeesViewProps {
   employees: any[];
@@ -83,11 +83,11 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
   handleToggleRole,
   handleUpdateEmployeeRole,
 }) => {
-  const [showHerrenbergModal, setShowHerrenbergModal] = useState(false);
+  const [copiedPassEmployeeId, setCopiedPassEmployeeId] = useState<string | null>(null);
   const filteredEmployees = employees.filter(emp => {
             const firstName = (emp.first_name || '').toLowerCase();
             const lastName = (emp.last_name || '').toLowerCase();
-            const pin = (emp.ausweis_nummer || '').toLowerCase();
+            const pin = normalizeCampusIdToNumeric(emp.ausweis_nummer || '').toLowerCase();
             const query = employeeSearchQuery.toLowerCase().trim();
             
             const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || pin.includes(query);
@@ -138,31 +138,6 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        aria-label="Herrenberg-Compliance und Enthaftungs-Cockpit öffnen"
-                        onClick={() => setShowHerrenbergModal(true)}
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          borderRadius: '12px', 
-                          padding: '8px 16px', 
-                          fontSize: '0.8rem', 
-                          fontWeight: 800,
-                          background: '#ecfdf5',
-                          color: '#065f46',
-                          border: '1.5px solid #10b981',
-                          cursor: 'pointer',
-                          fontFamily: 'Urbanist',
-                          boxShadow: 'none',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <Scale size={15} style={{ color: '#059669' }} />
-                        Herrenberg-Cockpit
-                      </button>
-
-                      <button
-                        type="button"
                         aria-label="Sammel-Onboarding CSV ein- oder ausklappen"
                         onClick={() => setIsEmployeeCsvExpanded(!isEmployeeCsvExpanded)}
                         style={{ 
@@ -175,7 +150,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                           fontWeight: 800,
                           background: isEmployeeCsvExpanded ? '#fce8e6' : '#ffffff',
                           color: isEmployeeCsvExpanded ? '#ea4335' : '#475569',
-                          border: isEmployeeCsvExpanded ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
+                          border: isEmployeeCsvExpanded ? '1.5px solid transparent' : '1.5px solid #cbd5e1',
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
                           boxShadow: isEmployeeCsvExpanded ? '0 4px 10px rgba(234,67,53,0.15)' : 'none',
@@ -231,8 +206,8 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
 
                         return (
                           <div style={{
-                            background: 'rgba(234, 67, 53, 0.03)',
-                            border: '1.5px solid rgba(234, 67, 53, 0.12)',
+                            background: 'rgba(234, 67, 53, 0.05)',
+                            border: 'none',
                             borderRadius: '16px',
                             padding: '12px 16px',
                             display: 'flex',
@@ -541,7 +516,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         borderRadius: '10px',
                                         background: hasAdmin ? '#fce8e6' : '#ffffff',
                                         color: hasAdmin ? '#ea4335' : '#475569',
-                                        border: hasAdmin ? '1.5px solid #ea4335' : '1.5px dashed #cbd5e1',
+                                        border: hasAdmin ? '1.5px solid transparent' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '75px',
@@ -568,7 +543,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         borderRadius: '10px',
                                         background: hasSecretary ? '#f1f5f9' : '#ffffff',
                                         color: hasSecretary ? '#334155' : '#475569',
-                                        border: hasSecretary ? '1.5px solid #334155' : '1.5px dashed #cbd5e1',
+                                        border: hasSecretary ? '1.5px solid transparent' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '85px',
@@ -595,7 +570,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                         borderRadius: '10px',
                                         background: hasTeacher ? '#e6f4ea' : '#ffffff',
                                         color: hasTeacher ? '#34a853' : '#475569',
-                                        border: hasTeacher ? '1.5px solid #34a853' : '1.5px dashed #cbd5e1',
+                                        border: hasTeacher ? '1.5px solid transparent' : '1.5px dashed #cbd5e1',
                                         fontSize: '0.7rem',
                                         fontWeight: 700,
                                         minWidth: '75px',
@@ -629,28 +604,55 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                               </span>
                             </div>
 
-                            {/* Monospace PIN */}
+                            {/* Autoritativer Sicherheits- & Auth-Status (Zero-Secret-Leakage / OWASP ASVS L3) */}
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: '0.58rem', color: '#475569', textTransform: 'uppercase', fontWeight: 800 }}>Mitarbeiter-PIN</span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                                <strong style={{ fontSize: '0.88rem', fontFamily: 'monospace', color: '#4b5563' }}>
-                                  {emp.ausweis_nummer 
-                                    ? (revealedPins[emp.id] ? emp.ausweis_nummer : '••••') 
-                                    : 'Keine'}
-                                </strong>
-                                {emp.ausweis_nummer && (
-                                  <button
-                                    type="button"
-                                    aria-label={revealedPins[emp.id] ? `PIN für ${emp.first_name} ${emp.last_name} verbergen` : `PIN für ${emp.first_name} ${emp.last_name} anzeigen`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setRevealedPins(prev => ({ ...prev, [emp.id]: !prev[emp.id] }));
-                                    }}
-                                    style={{ background: 'transparent', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#64748b' }}
-                                    title={revealedPins[emp.id] ? 'PIN verbergen' : 'PIN anzeigen'}
-                                  >
-                                    {revealedPins[emp.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                  </button>
+                              <span style={{ fontSize: '0.58rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.04em' }}>Sicherheit</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                                {emp.is_pin_activated || emp.has_personal_pin ? (
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '8px',
+                                    background: '#ecfdf5',
+                                    color: '#047857',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    border: 'none'
+                                  }} title="Persönliche 4-stellige Schnell-PIN ist serverseitig aktiv">
+                                    🛡️ PIN Aktiv
+                                  </span>
+                                ) : (emp.is_active ?? true) ? (
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '8px',
+                                    background: '#f8fafc',
+                                    color: '#475569',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    border: '1px solid #e2e8f0'
+                                  }} title="Ausweis-Authentifizierung aktiv (Passkey/PIN kann vom Mitarbeiter im Profil eingerichtet werden)">
+                                    🔑 Ausweis-Auth
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    padding: '3px 8px',
+                                    borderRadius: '8px',
+                                    background: '#fffbeb',
+                                    color: '#b45309',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    border: 'none'
+                                  }} title="Erst-Onboarding noch ausstehend">
+                                    ⏳ Onboarding
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -662,24 +664,30 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                                 aria-label={`Mitarbeiter-Pass für ${emp.first_name} ${emp.last_name} in Zwischenablage kopieren`}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (emp.ausweis_nummer) {
-                                    navigator.clipboard.writeText(emp.ausweis_nummer);
-                                    alert(`Mitarbeiter-PIN für ${emp.first_name} (${emp.ausweis_nummer}) wurde in die Zwischenablage kopiert.`);
+                                  const token = emp.teacher_qr_token || emp.qr_token || emp.ausweis_nummer;
+                                  if (token) {
+                                    const link = getCanonicalQrLandingUrl(token);
+                                    navigator.clipboard.writeText(link);
+                                    setCopiedPassEmployeeId(emp.id);
+                                    setTimeout(() => setCopiedPassEmployeeId(null), 2500);
                                   } else {
-                                    alert('Keine PIN vorhanden.');
+                                    alert('Kein Ausweis-Token vorhanden.');
                                   }
                                 }}
                                 style={{
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#ea4335',
+                                  background: copiedPassEmployeeId === emp.id ? '#ecfdf5' : 'transparent',
+                                  border: copiedPassEmployeeId === emp.id ? '1px solid #a7f3d0' : 'none',
+                                  color: copiedPassEmployeeId === emp.id ? '#047857' : '#ea4335',
+                                  padding: '4px 8px',
+                                  borderRadius: '8px',
                                   fontSize: '0.8rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  fontFamily: 'Urbanist'
+                                  fontFamily: 'Urbanist',
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
-                                Pass teilen
+                                {copiedPassEmployeeId === emp.id ? '✓ Link kopiert!' : 'Pass teilen'}
                               </button>
                               {emp.id !== userId && (currentUserProfile?.role === 'admin' || emp.role !== 'admin') ? (
                                 <button
@@ -746,7 +754,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                         {/* Modal Body */}
                         <form onSubmit={handleCreateEmployee}>
                           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                                 <input
@@ -879,7 +887,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             border: isHovered 
                               ? '2px dashed #dc2626' 
                               : isActive 
-                                ? '1.5px solid #dc2626' 
+                                ? '1.5px solid transparent' 
                                 : '1.5px solid #cbd5e1',
                             background: isHovered 
                               ? '#fef2f2' 
@@ -969,7 +977,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             border: isHovered 
                               ? '2px dashed #dc2626' 
                               : isActive 
-                                ? '1.5px solid #dc2626' 
+                                ? '1.5px solid transparent' 
                                 : '1.5px solid #cbd5e1',
                             background: isHovered 
                               ? '#fef2f2' 
@@ -1059,7 +1067,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             border: isHovered 
                               ? '2px dashed #dc2626' 
                               : isActive 
-                                ? '1.5px solid #dc2626' 
+                                ? '1.5px solid transparent' 
                                 : '1.5px solid #cbd5e1',
                             background: isHovered 
                               ? '#fef2f2' 
@@ -1149,7 +1157,7 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                             border: isHovered 
                               ? '2px dashed #dc2626' 
                               : isActive 
-                                ? '1.5px solid #dc2626' 
+                                ? '1.5px solid transparent' 
                                 : '1.5px solid #cbd5e1',
                             background: isHovered 
                               ? '#fef2f2' 
@@ -1206,11 +1214,6 @@ export const SecretaryEmployeesView: React.FC<SecretaryEmployeesViewProps> = ({
                 </div>
 
               </div>
-
-              <HerrenbergComplianceModal
-                isOpen={showHerrenbergModal}
-                onClose={() => setShowHerrenbergModal(false)}
-              />
             </div>
           );
 

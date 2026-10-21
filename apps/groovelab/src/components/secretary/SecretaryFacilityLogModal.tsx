@@ -210,7 +210,7 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #fecaca',
+              border: 'none',
               boxShadow: 'none'
             }}>
               <Wrench size={22} />
@@ -657,7 +657,7 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
                           <span style={{
                             background: '#ecfdf5',
                             color: '#059669',
-                            border: '1px solid #10b981',
+                            border: 'none',
                             borderRadius: '6px',
                             padding: '1px 7px',
                             fontSize: '0.68rem',
@@ -672,7 +672,7 @@ export const SecretaryFacilityLogModal: React.FC<SecretaryFacilityLogModalProps>
                           <span style={{
                             background: '#fee2e2',
                             color: '#dc2626',
-                            border: '1px solid #fca5a5',
+                            border: 'none',
                             borderRadius: '6px',
                             padding: '1px 7px',
                             fontSize: '0.68rem',

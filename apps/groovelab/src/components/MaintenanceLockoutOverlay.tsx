@@ -110,7 +110,7 @@ export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps>
       iconColor = '#ca8a04';
       badgeBg = 'rgba(234, 179, 8, 0.18)';
       badgeText = '#854d0e';
-      buttonBg = '#eab308';
+      buttonBg = '#facc15';
       buttonText = '#000000';
     }
 
@@ -373,7 +373,7 @@ export const MaintenanceLockoutOverlay: React.FC<MaintenanceLockoutOverlayProps>
             alignItems: 'center',
             gap: '6px',
             background: 'rgba(245, 158, 11, 0.15)',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
+            border: 'none',
             color: '#fbbf24',
             padding: '4px 12px',
             borderRadius: '100px',

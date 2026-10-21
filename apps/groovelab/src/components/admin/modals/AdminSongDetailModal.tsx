@@ -817,7 +817,7 @@ export const AdminSongDetailModal: React.FC<AdminSongDetailModalProps> = ({
                     {selectedStudentForProgress && selectedSongSkill && (
                       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         {/* 2. Lesson Notes Log */}
-                        <div style={{ background: '#fffbeb', border: '1.5px solid #fef08a', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ background: '#fffbeb', border: 'none', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#18181b', display: 'flex', alignItems: 'center', gap: '5px' }}>
                             🗓️ Hausaufgaben & Übetipps
                           </span>

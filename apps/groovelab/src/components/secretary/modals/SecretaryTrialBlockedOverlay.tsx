@@ -55,7 +55,7 @@ export const SecretaryTrialBlockedOverlay: React.FC<SecretaryTrialBlockedOverlay
           height: '64px',
           borderRadius: '20px',
           background: 'rgba(239, 68, 68, 0.08)',
-          border: '1px solid rgba(239, 68, 68, 0.15)',
+          border: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

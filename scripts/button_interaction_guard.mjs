@@ -387,18 +387,29 @@ recordCheck(
 );
 
 // -----------------------------------------------------------------------------
-// CHECK 8: Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)
-// Standard: Axiom 9 — Colored buttons/widgets must be unicolor (zero conflicting border).
+// -----------------------------------------------------------------------------
+// CHECK 8: 360° Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)
+// Standard: Axiom 9 — Colored / tinted surfaces (cards, widgets, boards, buttons)
+//           must be unicolor (zero conflicting border).
 //           White/transparent with colored border (outline/ghost) is 100% valid.
-//           Der rahmen darf keine andere farbe als der inhalt einer box, widget, button haben.
+//           A colored or tinted background must never have a conflicting solid border.
 // -----------------------------------------------------------------------------
 let colorClashElements = [];
+
+function isChromaticTintedBackground(bg) {
+  if (/ecfdf5|f0fdf4|dcfce7|e6f4ea|rgba\(52,\s*168,\s*83|rgba\(34,\s*197,\s*94|rgba\(16,\s*185,\s*129/i.test(bg)) return 'green';
+  if (/fef2f2|fff1f2|fee2e2|fce8e6|fff5f5|rgba\(239,\s*68,\s*68|rgba\(234,\s*67,\s*53|rgba\(220,\s*38,\s*38/i.test(bg)) return 'red';
+  if (/fef3c7|fefce8|fffbeb|fff7ed|ffedd5|fef08a|rgba\(234,\s*179,\s*8|rgba\(245,\s*158,\s*11/i.test(bg)) return 'yellow';
+  if (/eff6ff|f0f9ff|e0f2fe|dbeafe|e0e7ff|rgba\(59,\s*130,\s*246|rgba\(14,\s*165,\s*233/i.test(bg)) return 'blue';
+  if (/faf5ff|f5f3ff|ede9fe|f3e8ff|rgba\(168,\s*85,\s*247|rgba\(139,\s*92,\s*246/i.test(bg)) return 'purple';
+  return null;
+}
 
 for (const file of tsxFiles) {
   if (file.includes('/tests/') || file.includes('__tests__')) continue;
   const content = fs.readFileSync(file, 'utf-8');
   
-  // Audit inline styles across interactive elements, widgets, and buttons
+  // 360° Audit across all dashboards, cards, widgets, tabs, modals, and buttons
   const styleRegex = /style=\{\{([\s\S]*?)\}\}/g;
   let sMatch;
   while ((sMatch = styleRegex.exec(content)) !== null) {
@@ -411,10 +422,10 @@ for (const file of tsxFiles) {
     const bd = borderMatch[1].trim().toLowerCase();
 
     const isNeutralBg = /^(#fff|#ffffff|white|transparent|none|#f8fafc|#f1f5f9|#f8f9fa|rgba\(255,\s*255,\s*255|rgba\(0,\s*0,\s*0,\s*0\))/i.test(bg);
-    const isBorderNone = /^(none|0|0px|transparent)$/i.test(bd) || bd.includes('none');
+    const isBorderNone = /^(none|0|0px|transparent)$/i.test(bd) || bd.includes('none') || bd.includes('transparent');
 
-    if (!isNeutralBg && !isBorderNone) {
-      // 1. Yellow/amber background with dark/black/slate border
+    if (!isNeutralBg && !isBorderNone && !bd.includes('dashed')) {
+      // 1. Saturated yellow/amber background with dark/black/slate border
       const isYellowBg = bg.includes('#facc15') || bg.includes('#eab308') || bg.includes('#ca8a04') || bg.includes('rgb(250, 204, 21)') || bg.includes('rgba(234, 179, 8');
       const isDarkOrGrayBorder = bd.includes('#0f172a') || bd.includes('#000000') || bd.includes('#1e293b') || bd.includes('#334155') || bd.includes('black') || bd.includes('#000') || bd.includes('#e2e8f0');
       
@@ -422,7 +433,10 @@ for (const file of tsxFiles) {
       const isChromaticBg = isYellowBg || bg.includes('#ef4444') || bg.includes('#dc2626') || bg.includes('#10b981') || bg.includes('#16a34a') || bg.includes('#22c55e') || bg.includes('#3b82f6') || bg.includes('#0284c7');
       const isBlackBorder = bd.includes('solid #000') || bd.includes('solid black') || bd.includes('2px solid #000') || bd.includes('1px solid #000');
 
-      if ((isYellowBg && isDarkOrGrayBorder) || (isChromaticBg && isBlackBorder)) {
+      // 3. 360° Chromatic tinted surfaces (Soft Tinted cards, widgets, pills, boards) with colored/dark borders
+      const isTinted = isChromaticTintedBackground(bg);
+
+      if ((isYellowBg && isDarkOrGrayBorder) || (isChromaticBg && isBlackBorder) || isTinted) {
         colorClashElements.push({
           file: path.relative(ROOT_DIR, file),
           bg,
@@ -434,11 +448,63 @@ for (const file of tsxFiles) {
 }
 
 recordCheck(
-  'Check 8: Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)',
+  'Check 8: 360° Zero Color-Clash Borders (Unicolor Surfaces & Pure Outlines Guard)',
   colorClashElements.length === 0,
   colorClashElements.length === 0
-    ? `All UI surfaces strictly enforce the Unicolor Surface Axiom (0 conflicting border/surface clashes, 100% tone-in-tone & pure outlines).`
+    ? `All 24+ dashboards and UI surfaces strictly enforce the Unicolor Surface Axiom (0 conflicting border/surface clashes, 100% tone-in-tone & pure outlines).`
     : `Found ${colorClashElements.length} color-clash border violation(s) in: ${colorClashElements.map(c => c.file).join(', ')}`
+);
+
+// -----------------------------------------------------------------------------
+// CHECK 9: Zero Mid-Word Breaks & Action Button Squeezing Defense
+// Standard: BFSG 2025 / WCAG 1.4.12 / 0,1% Goldstandard Layout Immunity
+//           Aktionsbuttons (Drucken, Export, Download, Löschen, Speichern)
+//           dürfen niemals mitten im Wort umbrechen (z. B. '🖨️ Dru' / 'cken')
+//           und Flex-Titelboxen müssen elastisch nachgeben (minWidth: 0).
+// -----------------------------------------------------------------------------
+let squeezedActionButtons = [];
+let toxicWordBreakButtons = [];
+
+const indexCssPath = path.join(SRC_DIR, 'index.css');
+const indexCssContent = fs.existsSync(indexCssPath) ? fs.readFileSync(indexCssPath, 'utf-8') : '';
+const hasGlobalButtonNowrap = indexCssContent.includes('white-space: nowrap') && 
+                              indexCssContent.includes('flex-shrink: 0') &&
+                              indexCssContent.includes('word-break: normal');
+
+for (const file of tsxFiles) {
+  if (file.includes('/tests/') || file.includes('__tests__')) continue;
+  const content = fs.readFileSync(file, 'utf-8');
+
+  // 1. Audit explicit toxic wordBreak: 'break-all' / 'break-word' on button elements
+  const buttonStyleMatches = content.match(/<button[^>]*style=\{\{[^}]*wordBreak\s*:\s*['"](?:break-all|break-word)['"][^}]*\}\}/gi) || [];
+  if (buttonStyleMatches.length > 0) {
+    toxicWordBreakButtons.push({
+      file: path.relative(ROOT_DIR, file),
+      count: buttonStyleMatches.length
+    });
+  }
+
+  // 2. Audit modal headers with print / export / action buttons without minWidth: 0 on title container
+  if (content.includes('window.print()') || (content.includes('Drucken') && content.includes('<button'))) {
+    const hasNowrapOnPrint = /Drucken[\s\S]{0,100}whiteSpace:\s*['"]nowrap['"]|whiteSpace:\s*['"]nowrap['"][\s\S]{0,100}Drucken/i.test(content) ||
+                             content.includes('className="btn-action"') ||
+                             content.includes('btn-action') ||
+                             hasGlobalButtonNowrap;
+    if (!hasNowrapOnPrint) {
+      squeezedActionButtons.push({
+        file: path.relative(ROOT_DIR, file),
+        action: 'Drucken'
+      });
+    }
+  }
+}
+
+recordCheck(
+  'Check 9: Zero Mid-Word Breaks & Action Button Squeezing Defense',
+  squeezedActionButtons.length === 0 && toxicWordBreakButtons.length === 0 && hasGlobalButtonNowrap,
+  squeezedActionButtons.length === 0 && toxicWordBreakButtons.length === 0 && hasGlobalButtonNowrap
+    ? 'All critical print, export and modal action buttons enforce whiteSpace: nowrap & flexShrink: 0 (0 mid-word breaks).'
+    : `Detected ${squeezedActionButtons.length} unshielded action button(s), ${toxicWordBreakButtons.length} toxic breaks (globalNowrap=${hasGlobalButtonNowrap})`
 );
 
 // -----------------------------------------------------------------------------

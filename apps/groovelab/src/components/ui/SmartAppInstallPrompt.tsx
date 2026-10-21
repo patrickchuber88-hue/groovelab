@@ -320,7 +320,7 @@ export const SmartAppInstallPrompt: React.FC<SmartAppInstallPromptProps> = ({
             <div style={{
               background: '#f0fdf4',
               borderRadius: '14px',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',

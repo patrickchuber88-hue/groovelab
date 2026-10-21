@@ -606,7 +606,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                       touchAction: 'manipulation'
                     }} 
                   >
-                    {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+                    {copied ? <Check size={14} color="#34a853" /> : <Copy size={14} />}
                     {copied ? 'Zugangs-Link in Zwischenablage kopiert!' : 'Zugangs-Link für Schüler kopieren'}
                   </button>
                 )}
@@ -688,7 +688,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               width: '100%',
               padding: '20px',
               borderRadius: '24px',
-              border: '1.5px solid #fecdd3',
+              border: 'none',
               background: '#fff1f2',
               color: '#e11d48',
               fontWeight: 900,

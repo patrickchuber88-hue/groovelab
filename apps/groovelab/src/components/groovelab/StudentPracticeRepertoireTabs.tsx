@@ -3,7 +3,6 @@ import { Award, Search, Check, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor as defaultBrandColor } from '../../constants/instruments';
 import { normalizeInstrument } from '../../utils/instruments';
-import { AuthoritativeHomeworkWidget } from '../student/homework/AuthoritativeHomeworkWidget';
 import { SpacedRepetitionRepertoireCard } from './SpacedRepetitionRepertoireCard';
 
 const GroupedSongCard = lazy(() => import('../GroupedSongCard').then(m => ({ default: m.GroupedSongCard })));
@@ -227,16 +226,6 @@ export function StudentPracticeRepertoireTabs({
             })}
           </div>
 
-          {/* 🎵 Authoritatives Wochen-Fahrplan Banner (100% synchron mit Briefing Board) */}
-          <AuthoritativeHomeworkWidget
-            variant="stage_banner"
-            studentId={user?.id}
-            studentUser={user}
-            activeSongSkills={practiceSongs}
-            onOpenHomework={() => onTabChange?.('homework_book')}
-            style={{ marginBottom: '24px' }}
-          />
-
           {/* Search and Alpha Filter Navigation */}
           <div style={{ marginBottom: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -407,16 +396,6 @@ export function StudentPracticeRepertoireTabs({
     return (
       <ErrorBoundary>
         <section className="exercises-section animation-slide-up" style={{ padding: isMobile ? '12px' : '24px' }}>
-          {/* 🎵 Authoritatives Wochen-Fahrplan Banner (100% synchron mit Briefing Board) */}
-          <AuthoritativeHomeworkWidget
-            variant="stage_banner"
-            studentId={user?.id}
-            studentUser={user}
-            activeSongSkills={practiceSongs}
-            onOpenHomework={() => onTabChange?.('homework_book')}
-            style={{ marginBottom: '20px' }}
-          />
-
           <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
             <div style={{ marginBottom: isMobile ? '16px' : '24px' }}>
               <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>

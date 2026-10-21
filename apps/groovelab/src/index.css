@@ -23,19 +23,17 @@
   font-family: "Helvetica Neue Light", "Helvetica Neue", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, "Plus Jakarta Sans", "Inter", "Segoe UI", Roboto, Arial, sans-serif !important;
 }
 
-/* Master Admin Enterprise Utilities */
+/* Master Admin Enterprise Utilities (Google Android Material 3 Solid Surface) */
 .master-glass-card {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: #ffffff;
+  border: none;
   border-radius: 20px;
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .master-glass-card:hover {
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08), 0 8px 20px -4px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 .master-stat-badge {
@@ -71,17 +69,18 @@
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 
-  /* Brand */
-  --primary-color: #eab308;
-  --brand-yellow: #eab308;
+  /* Brand (Campus-Grün #34a853 & GrooveLab-Gelb #facc15 Standard) */
+  --primary-color: #facc15;
+  --brand-yellow: #facc15;
+  --brand-yellow-light: #fef9c3;
   --brand-green: #34a853;
   --brand-green-dark: #34a853;
   --brand-green-light: rgba(52, 168, 83, 0.1);
   --brand-green-border: rgba(52, 168, 83, 0.2);
-  --brand-red: #ea4335;
-  --brand-red-dark: #c5221f;
-  --brand-red-light: rgba(234, 67, 53, 0.1);
-  --brand-red-border: rgba(234, 67, 53, 0.2);
+  --brand-red: #ef4444;
+  --brand-red-dark: #b91c1c;
+  --brand-red-light: #fee2e2;
+  --brand-red-border: transparent;
 
   /* Apple-Style Minimal Scrollbars */
   --scrollbar-size: 6px;
@@ -129,13 +128,18 @@
   --radius-xl: 36px; /* Slightly reduced large wrapper radius */
   --radius-pill: 100px;
 
-  /* Liquid Glass (Clean Swiss Poster style - transparent pure white overlays) */
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-bg-strong: rgba(255, 255, 255, 0.95);
-  --glass-border: rgba(0, 0, 0, 0.04);
-  --glass-blur: blur(20px) saturate(1.4);
-  --glass-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.80);
-  --glass-shadow-lg: 0 12px 36px 0 rgba(0, 0, 0, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.90);
+  /* Google Android Material 3 Solid & Tonal Surface Tokens (Notenschnipsel Palette) */
+  --surface-tonal-neutral: #f1f5f9;
+  --surface-tonal-green: rgba(52, 168, 83, 0.10);
+  --surface-tonal-indigo: #e0e7ff;
+  --surface-tonal-amber: #fef9c3;
+  --surface-tonal-red: #fee2e2;
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: transparent;
+  --glass-blur: none;
+  --glass-shadow: none;
+  --glass-shadow-lg: none;
 
   /* Canonical Z-Index Stacking Tokens (5-Tier Governance Standard) */
   --z-base: 1;
@@ -155,7 +159,7 @@
   --z-system-critical-alert: 999999;
 
   /* Legacy */
-  --surface-glass: rgba(255, 255, 255, 0.85);
+  --surface-glass: #ffffff;
 }
 }
 
@@ -213,7 +217,7 @@
   textarea:focus-visible,
   [role="button"]:focus-visible,
   [tabindex="0"]:focus-visible {
-    outline: 2px solid var(--primary-color, #eab308) !important;
+    outline: 2px solid var(--primary-color, #facc15) !important;
     outline-offset: 2px !important;
   }
 
@@ -266,7 +270,7 @@
     font-weight: 800;
     font-size: 0.95rem;
     border-radius: 14px;
-    border: 2px solid var(--primary-color, #eab308);
+    border: 2px solid var(--primary-color, #facc15);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     text-decoration: none;
     transition: top 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -307,16 +311,42 @@
     outline-offset: 2px !important;
   }
 
-  /* 4. Zero Text Collision & Text Spacing Immunity (WCAG 1.4.12 / 0.1% Goldstandard) */
-  p, span, h1, h2, h3, h4, h5, h6, a, label, li, td, th, blockquote {
+  /* 4. Zero Text Collision & Anti-Mid-Word-Split Immunity (WCAG 1.4.12 / 0.1% Goldstandard) */
+  p, blockquote, .prose-break-words {
     overflow-wrap: break-word;
     word-break: break-word;
   }
   p, li, td, th, blockquote {
     line-height: 1.45;
   }
-  h1, h2, h3, h4, h5, h6 {
+  /* Prevent ugly mid-word chopping (e.g. "dokume-ntierte", "Schutzsc-hild") in spans, badges, labels, links & tables */
+  span, a, label, li, td, th, .badge-pill {
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
+  }
+  h1, h2, h3, h4, h5, h6,
+  .swiss-h1, .swiss-h2, .swiss-h3 {
     line-height: 1.15;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    -webkit-hyphens: none !important;
+  }
+
+  /* 4a. Universal Button & Action Element Wrap Immunity (0,1% Goldstandard) */
+  button:not(.btn-allow-wrap), [role="button"]:not(.btn-allow-wrap), .btn-action {
+    white-space: nowrap;
+    flex-shrink: 0;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+  }
+  button *, [role="button"] * {
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
   }
 
   /* 5. High-Contrast Mode & Windows Forced Colors (WCAG 1.4.3 & 1.4.6) */
@@ -425,18 +455,16 @@
 }
 
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(20px) saturate(1.4) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  background: #ffffff !important;
+  border: none !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: none !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .liquid-glass:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: none !important;
 }
 
 /* ── Base ── */
@@ -538,18 +566,16 @@ body {
 
 /* ── Liquid Glass Components ── */
 
-/* Card */
+/* Card (Google Android Material 3 Solid Surface) */
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  background: #ffffff;
+  border: none;
   border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow);
-  transition: box-shadow 0.25s ease, transform 0.2s ease;
+  box-shadow: none;
+  transition: transform 0.2s ease;
 }
 .glass-card:hover {
-  box-shadow: var(--glass-shadow-lg);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -594,20 +620,18 @@ body {
   box-shadow: var(--glass-shadow-lg);
 }
 
-/* Floating chip / pill */
+/* Floating chip / pill (Google Android Solid Tonal Pill) */
 .glass-chip {
-  background: rgba(255,255,255,0.82);
-  backdrop-filter: blur(12px) saturate(1.3);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  border: 1px solid rgba(255,255,255,0.6);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  background: var(--surface-tonal-neutral, #f1f5f9);
+  border: none;
+  box-shadow: none;
   border-radius: var(--radius-pill);
 }
 
 /* ── Swiss Stat Card ── */
 .swiss-stat {
   background: white;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-md);
   padding: 16px 18px;
   display: flex;
@@ -646,15 +670,15 @@ body {
 .swiss-btn-primary {
   background: var(--text-main);
   color: white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  box-shadow: none;
 }
-.swiss-btn-primary:hover { background: #2d3748; box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
+.swiss-btn-primary:hover { background: #1e293b; box-shadow: none; }
 .swiss-btn-outline {
-  background: white;
+  background: var(--surface-tonal-neutral, #f1f5f9);
   color: var(--text-main);
-  border: 1.5px solid var(--border);
+  border: none;
 }
-.swiss-btn-outline:hover { border-color: var(--text-main); background: var(--bg-subtle); }
+.swiss-btn-outline:hover { background: #e2e8f0; }
 
 /* ── Swiss Divider ── */
 .swiss-divider {
@@ -800,7 +824,7 @@ body {
 @keyframes active-avatar-glow {
   0% {
     box-shadow: none;
-    border-color: #eab308;
+    border-color: #facc15;
   }
   100% {
     box-shadow: none;
@@ -818,7 +842,7 @@ body {
 }
 
 .musician-card-stage.active .musician-avatar-stage {
-  background: linear-gradient(135deg, #eab308, #ca8a04);
+  background: linear-gradient(135deg, #facc15, #ca8a04);
   transform: translateY(-15px);
   animation: active-avatar-glow 1.8s ease-in-out infinite alternate;
 }
@@ -927,7 +951,7 @@ body {
 
 
 .btn-rock-primary {
-  background: linear-gradient(135deg, #eab308 0%, #d97706 100%);
+  background: linear-gradient(135deg, #facc15 0%, #d97706 100%);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1443,6 +1467,12 @@ button, a, [role="button"], [onClick] {
   }
 }
 
+.sim-viewport-mobile .campus-grid,
+.sim-viewport-tablet-portrait .campus-grid {
+  grid-template-columns: 1fr !important;
+  gap: 20px !important;
+}
+
 /* ── Roentgen Matrix View Interaction Behavior ── */
 @keyframes card-shake {
   0%, 100% { transform: translateX(0); }
@@ -1456,8 +1486,8 @@ button, a, [role="button"], [onClick] {
 
 .roentgen-preferred {
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.42), rgba(16, 185, 129, 0.28)) !important;
-  border: 2px dashed #16a34a !important;
-  border-left: 6px solid #15803d !important;
+  border: 2px dashed #10b981 !important;
+  border-left: 6px solid #065f46 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
   pointer-events: none !important;
@@ -1491,6 +1521,10 @@ button, a, [role="button"], [onClick] {
   transform: translateY(-1.5px) translateZ(0) !important;
   filter: brightness(1.015);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+}
+.hover-scale:focus-visible {
+  outline: 2.5px solid #8b5cf6 !important;
+  outline-offset: 2px !important;
 }
 
 .hover-scale-mini {
@@ -1724,6 +1758,16 @@ select option {
   }
 }
 
+.sim-viewport-mobile .rooms-board-grid,
+.sim-viewport-tablet-portrait .rooms-board-grid {
+  grid-template-columns: 1fr !important;
+  gap: 16px !important;
+}
+.sim-viewport-mobile .rooms-board-grid > div:last-child,
+.sim-viewport-tablet-portrait .rooms-board-grid > div:last-child {
+  grid-column: span 1 !important;
+}
+
 /* iOS Safe Area & Mobile Cockpit Enhancements */
 @supports (padding: env(safe-area-inset-bottom)) {
   .ios-safe-bottom,
@@ -1870,7 +1914,9 @@ select option {
 /* Hide Mobile Bottom Nav on Desktop by default */
 .cg-mobile-bottom-nav,
 .meisterwerk-mobile-bottom-dock,
-.campus-events-mobile-bottom-dock {
+.campus-events-mobile-bottom-dock,
+.student-briefing-mobile-bottom-dock,
+.mobile-briefing-bottom-dock {
   display: none !important;
 }
 
@@ -1902,8 +1948,15 @@ select option {
 
   .meisterwerk-mobile-bottom-dock,
   .campus-events-mobile-bottom-dock,
-  .student-briefing-mobile-bottom-dock {
+  .student-briefing-mobile-bottom-dock,
+  .mobile-briefing-bottom-dock {
     display: flex !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    z-index: 900 !important;
   }
 
   .main-wrapper {
@@ -2027,7 +2080,23 @@ select option {
 
 .sim-viewport-landscape .sidebar-nav {
   display: flex !important;
-  --sidebar-width: var(--sidebar-width-collapsed);
+}
+
+.sim-viewport-landscape .sidebar-nav.is-collapsed {
+  --sidebar-width: var(--sidebar-width-collapsed) !important;
+  width: var(--sidebar-width-collapsed) !important;
+  min-width: var(--sidebar-width-collapsed) !important;
+  max-width: var(--sidebar-width-collapsed) !important;
+  overflow-x: hidden !important;
+}
+
+.sim-viewport-landscape .sidebar-nav:not(.is-collapsed) {
+  --sidebar-width: var(--sidebar-width-expanded) !important;
+  width: var(--sidebar-width-expanded) !important;
+  min-width: var(--sidebar-width-expanded) !important;
+  max-width: var(--sidebar-width-expanded) !important;
+  z-index: 1050 !important;
+  box-shadow: 12px 0 36px rgba(15, 23, 42, 0.14) !important;
 }
 
 .sim-viewport-mobile .cg-mobile-bottom-nav,
@@ -2043,9 +2112,11 @@ select option {
 .sim-viewport-mobile .campus-events-mobile-bottom-dock,
 .sim-viewport-mobile.sim-viewport-portrait .campus-events-mobile-bottom-dock,
 .sim-viewport-mobile .student-briefing-mobile-bottom-dock,
-.sim-viewport-mobile.sim-viewport-portrait .student-briefing-mobile-bottom-dock {
+.sim-viewport-mobile.sim-viewport-portrait .student-briefing-mobile-bottom-dock,
+.sim-viewport-mobile .mobile-briefing-bottom-dock,
+.sim-viewport-mobile.sim-viewport-portrait .mobile-briefing-bottom-dock {
   display: flex !important;
-  position: absolute !important;
+  position: fixed !important;
   bottom: 0 !important;
   left: 0 !important;
   right: 0 !important;
@@ -2066,7 +2137,10 @@ select option {
 .sim-viewport-tablet-landscape .campus-events-mobile-bottom-dock,
 .sim-viewport-tablet .student-briefing-mobile-bottom-dock,
 .sim-viewport-tablet-portrait .student-briefing-mobile-bottom-dock,
-.sim-viewport-tablet-landscape .student-briefing-mobile-bottom-dock {
+.sim-viewport-tablet-landscape .student-briefing-mobile-bottom-dock,
+.sim-viewport-tablet .mobile-briefing-bottom-dock,
+.sim-viewport-tablet-portrait .mobile-briefing-bottom-dock,
+.sim-viewport-tablet-landscape .mobile-briefing-bottom-dock {
   display: none !important;
 }
 
@@ -2275,32 +2349,60 @@ select option {
   color: #ca8a04 !important;
 }
 
-/* 3. iPad / Tablet Rail Mode (.sim-viewport-tablet & 769px-1024px) */
+/* 3. iPad / Tablet Rail Mode (.sim-viewport-tablet & 769px-1180px) */
 .sim-viewport-tablet .sidebar-nav {
   display: flex !important;
-  --sidebar-width: var(--sidebar-width-collapsed);
 }
 
-@media (min-width: 769px) and (max-width: 1024px) {
+.sim-viewport-tablet .sidebar-nav.is-collapsed {
+  --sidebar-width: var(--sidebar-width-collapsed) !important;
+  width: var(--sidebar-width-collapsed) !important;
+  min-width: var(--sidebar-width-collapsed) !important;
+  max-width: var(--sidebar-width-collapsed) !important;
+  overflow-x: hidden !important;
+}
+
+.sim-viewport-tablet .sidebar-nav:not(.is-collapsed) {
+  --sidebar-width: var(--sidebar-width-expanded) !important;
+  width: var(--sidebar-width-expanded) !important;
+  min-width: var(--sidebar-width-expanded) !important;
+  max-width: var(--sidebar-width-expanded) !important;
+  z-index: 1050 !important;
+  box-shadow: 12px 0 36px rgba(15, 23, 42, 0.14) !important;
+}
+
+@media (min-width: 769px) and (max-width: 1180px) {
   .sidebar-nav {
     display: flex !important;
-    --sidebar-width: var(--sidebar-width-collapsed);
+  }
+  .sidebar-nav.is-collapsed {
+    --sidebar-width: var(--sidebar-width-collapsed) !important;
+    width: var(--sidebar-width-collapsed) !important;
+    min-width: var(--sidebar-width-collapsed) !important;
+    max-width: var(--sidebar-width-collapsed) !important;
+    overflow-x: hidden !important;
   }
   .sidebar-nav:not(.is-collapsed) {
     --sidebar-width: var(--sidebar-width-expanded) !important;
+    width: var(--sidebar-width-expanded) !important;
+    min-width: var(--sidebar-width-expanded) !important;
+    max-width: var(--sidebar-width-expanded) !important;
+    z-index: 1050 !important;
+    box-shadow: 12px 0 36px rgba(15, 23, 42, 0.14) !important;
   }
   .main-wrapper {
     margin-left: 0 !important;
     flex: 1 !important;
     min-width: 0 !important;
-    width: calc(100% - var(--sidebar-width)) !important;
+    width: calc(100% - var(--sidebar-width-collapsed)) !important;
     overflow-x: hidden !important;
   }
   .cg-mobile-top-header,
   .cg-mobile-bottom-nav,
   .student-briefing-mobile-bottom-dock,
   .meisterwerk-mobile-bottom-dock,
-  .campus-events-mobile-bottom-dock {
+  .campus-events-mobile-bottom-dock,
+  .mobile-briefing-bottom-dock {
     display: none !important;
   }
 }
@@ -2489,9 +2591,8 @@ a:focus-visible,
 }
 
 @media (min-width: 769px) {
-  body:not(.sim-viewport-mobile):not(.sim-viewport-portrait) .mediathek-pill-bar,
   body:not(.sim-viewport-mobile):not(.sim-viewport-portrait) .mediathek-swipe-dots {
-    display: none;
+    display: none !important;
   }
 }
 

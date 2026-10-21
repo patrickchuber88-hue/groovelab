@@ -42,6 +42,10 @@ export function useSecretaryStudents({
   const [studentFilterInstrument, setStudentFilterInstrument] = useState<string>('All');
   const [studentFilterTeacher, setStudentFilterTeacher] = useState<string>('All');
   const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
+  const [groovelabStudentSearchQuery, setGroovelabStudentSearchQuery] = useState<string>('');
+  const [groovelabStudentFilterInstrument, setGroovelabStudentFilterInstrument] = useState<string>('All');
+  const [groovelabStudentModalSearchQuery, setGroovelabStudentModalSearchQuery] = useState<string>('');
+  const [showManualCreateGroovelabStudent, setShowManualCreateGroovelabStudent] = useState<boolean>(false);
   const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
   const [studentCsvText, setStudentCsvText] = useState<string>('');
   const [bulkImportDuration, setBulkImportDuration] = useState<number>(30);
@@ -52,6 +56,7 @@ export function useSecretaryStudents({
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
+  const [activeContextMenu, setActiveContextMenu] = useState<{ student: any; top: number; right: number } | null>(null);
 
   // Bulk Modals
   const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
@@ -871,6 +876,14 @@ export function useSecretaryStudents({
     setFrozenStudents,
     studentSearchQuery,
     setStudentSearchQuery,
+    groovelabStudentSearchQuery,
+    setGroovelabStudentSearchQuery,
+    groovelabStudentFilterInstrument,
+    setGroovelabStudentFilterInstrument,
+    groovelabStudentModalSearchQuery,
+    setGroovelabStudentModalSearchQuery,
+    showManualCreateGroovelabStudent,
+    setShowManualCreateGroovelabStudent,
     studentFilterInstrument,
     setStudentFilterInstrument,
     studentFilterTeacher,
@@ -890,6 +903,8 @@ export function useSecretaryStudents({
     setDeleteStudentModalData,
     copiedStudentId,
     setCopiedStudentId,
+    activeContextMenu,
+    setActiveContextMenu,
     showAddStudentModal,
     setShowAddStudentModal,
     showAddGroovelabStudentModal,

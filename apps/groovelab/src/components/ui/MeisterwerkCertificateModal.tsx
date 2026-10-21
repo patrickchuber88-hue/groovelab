@@ -393,7 +393,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
               <div style={{ 
                 background: '#fef3c7', 
                 color: '#92400e', 
-                border: '1px solid #fde68a', 
+                border: 'none', 
                 borderRadius: '12px', 
                 padding: '4px 14px', 
                 fontSize: '0.76rem', 

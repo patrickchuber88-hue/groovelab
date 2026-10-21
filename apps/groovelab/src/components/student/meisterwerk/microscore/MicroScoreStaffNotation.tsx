@@ -23,6 +23,9 @@ import {
 import { 
   GUITAR_STRINGS, 
   BASS_STRINGS,
+  VIOLIN_STRINGS,
+  getInstrumentStrings,
+  isStringOrPluckedInstrument,
   fretAndStringToPitch, 
   pitchToBestFretAndString, 
   pitchToMidi, 
@@ -33,10 +36,10 @@ import { SMUFL_GLYPHS } from '../worldtour/worldTourMusicGlyphs';
 import { durationToSixteenths } from './microScoreAudioSynthesizer';
 import { 
   calculateMeasureBeatSlots, 
-  getMeasureProgress, 
   getTimeSignatureFractions,
   getPitchColorTheme,
-  getPitchLetter
+  getPitchLetter,
+  getSequentialFrontierSlot
 } from './microScoreGridEngine';
 import { MicroScoreBeatGridOverlay } from './MicroScoreBeatGridOverlay';
 import {
@@ -64,85 +67,30 @@ interface MicroScoreStaffNotationProps {
   onClearBar?: (barIdx: number) => void;
   onPlayPreviewNote?: (pitch: string) => void;
   onUpdateBarsCount?: (barsCount: number) => void;
+  onAddBar?: () => void;
+  onRemoveBar?: (barIdx: number) => void;
   onInsertPitchDirectly?: (bar: number, fraction: number, pitch: string) => void;
+  isDrumColorGuide?: boolean;
   readOnly?: boolean;
 }
-
-// 🎼 Diatonische Basen für mathematisch deterministische Urtext-Notensatz-Engine (2027 0,1% Goldstandard)
-// Stufen: C=0, D=1, E=2, F=3, G=4, A=5, B/H=6
-const DIATONIC_STEP_MAP: Record<string, number> = {
-  'C': 0, 'D': 1, 'E': 2, 'F': 3, 'G': 4, 'A': 5, 'B': 6, 'H': 6
-};
 
 import { 
   PERCUSSION_PITCH_Y, 
   isCymbalPitch, 
   isDrumFootPitch, 
+  getCanonicalDrumPieceColor,
+  getCanonicalDrumCalloutName,
   renderDrumPolyphonySlot 
 } from './microScoreDrumPolyphonyEngine';
 import { renderStaffRest } from './microScoreRestRenderer';
-
-export function getStaffY(pitch: string, isBass: boolean, isDrum: boolean = false): number {
-  if (!pitch || pitch === 'REST') return 25;
-  if (isDrum) {
-    const raw = pitch.trim().toUpperCase();
-    if (PERCUSSION_PITCH_Y[raw] !== undefined) return PERCUSSION_PITCH_Y[raw];
-    const match = raw.match(/^([A-G][#B]?)(-?\d+)$/);
-    if (match) {
-      const key = `${match[1]}${match[2]}`;
-      if (PERCUSSION_PITCH_Y[key] !== undefined) return PERCUSSION_PITCH_Y[key];
-    }
-    return 18.75; // Snare Fallback
-  }
-
-  // 🎼 Mathematisch deterministische Urtext-Diatonik (100% lückenlos von C0 bis C9):
-  // Treble: Top Line F5 (Stufe 38) = 0px
-  // Bass:   Top Line A3 (Stufe 26) = 0px
-  // Jede diatonische Stufe (Linie <-> Zwischenraum) = 6.25px (12.5px Linienabstand / 2)
-  const match = pitch.trim().match(/^([A-Ga-gHh])[#bB♮]?(-?\d+)$/);
-  if (!match) return isBass ? 25 : 37.5;
-  const letter = match[1].toUpperCase();
-  const octave = parseInt(match[2], 10);
-  const step = DIATONIC_STEP_MAP[letter] ?? 0;
-  const diatonicIndex = octave * 7 + step;
-
-  const topStaffIndex = isBass ? 26 : 38; // 26 = A3, 38 = F5
-  return (topStaffIndex - diatonicIndex) * 6.25;
-}
-
-// Diatonische Stufen-Tabellen für direkte Notenlinien-Klicks (6.25px-Raster)
-const TREBLE_DIATONIC_PITCHES = [
-  'C6', 'B5', 'A5', 'G5', 'F5', 'E5', 'D5', 'C5', 'B4', 'A4', 'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3'
-];
-
-const BASS_DIATONIC_PITCHES = [
-  'G4', 'F4', 'E4', 'D4', 'C4', 'B3', 'A3', 'G3', 'F3', 'E3', 'D3', 'C3', 'B2', 'A2', 'G2', 'F2', 'E2', 'D2', 'C2'
-];
-
-export function yToStaffPitch(svgY: number, staffTopY: number, isBass: boolean, isDrum: boolean = false): string {
-  const relY = svgY - staffTopY;
-  if (isDrum) {
-    if (relY <= -9.375) return 'A5';     // Crash (Hilfslinie oben)
-    if (relY <= -3.125) return 'G5';     // Hi-Hat (über System)
-    if (relY <= 3.125) return 'F5';      // Ride (5. Linie)
-    if (relY <= 9.375) return 'E5';      // High Tom (4. Zwischenraum)
-    if (relY <= 15.625) return 'D5';     // Mid Tom (4. Linie)
-    if (relY <= 25.0) return 'C5';       // Snare Drum (3. Zwischenraum)
-    if (relY <= 37.5) return 'A4';       // Floor Tom (2. Zwischenraum)
-    if (relY <= 50.0) return 'F4';       // Bass Drum / Kick (1. Zwischenraum)
-    return 'D3';                         // Hi-Hat Pedal (unter System)
-  }
-  const k = Math.round(relY / 6.25);
-  if (isBass) {
-    const idx = Math.max(0, Math.min(BASS_DIATONIC_PITCHES.length - 1, k + 6));
-    return BASS_DIATONIC_PITCHES[idx];
-  } else {
-    const idx = Math.max(0, Math.min(TREBLE_DIATONIC_PITCHES.length - 1, k + 4));
-    return TREBLE_DIATONIC_PITCHES[idx];
-  }
-}
-
-const SCALE_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+import {
+  getStaffY,
+  yToStaffPitch,
+  transposePitchSemitones,
+  MicroScoreAddBarElement,
+  MicroScoreClefHeader
+} from './microScoreStaffHelpers';
+export { getStaffY, yToStaffPitch };
 
 export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = ({
   snippet,
@@ -162,7 +110,10 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
   onClearBar,
   onPlayPreviewNote,
   onUpdateBarsCount,
+  onAddBar,
+  onRemoveBar,
   onInsertPitchDirectly,
+  isDrumColorGuide = true,
   readOnly = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,7 +134,7 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
   isDottedModeRef.current = isDottedMode;
 
   // Streich- und Zupfinstrumente unterstützen alle 3 Modi; andere Instrumente ausschließlich echte Notenlinien
-  const isStringOrPlucked = snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings';
+  const isStringOrPlucked = snippet.instrument === 'guitar' || snippet.instrument === 'bass' || snippet.instrument === 'strings' || snippet.instrument === 'ukulele';
   const effectiveDisplayMode: MicroScoreDisplayMode = useMemo(() => {
     if (!isStringOrPlucked) return 'notes';
     return propDisplayMode || snippet.displayMode || 'both';
@@ -195,8 +146,8 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
   const isBassClef = snippet.clef === 'bass' || (!snippet.clef && (snippet.instrument === 'trombone' || snippet.instrument === 'bass'));
   const isDrumClef = snippet.clef === 'percussion' || (!snippet.clef && snippet.instrument === 'drums');
 
-  // Dimensionen & Layout-Metriken (2027 0,1% Goldstandard)
-  const staffTopY = 58; // Großzügige Zone für Takt-Header (y=12..28) & Akkordsymbole (y=47)
+  // Dimensionen & Layout-Metriken (2027 0,1% Goldstandard: staffTopY = 68 garantiert 0% Überlappung zwischen hohen Crash-Balken und Takt-Badge)
+  const staffTopY = 68;
   const staffHeight = 50; // 5 Linien à 12.5px (25% Vergrößerung für perfekte Tablet-Lesbarkeit)
 
   // Finde tiefste Note im gesamten Snippet zur dynamischen Kollisionsvermeidung
@@ -214,39 +165,17 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
 
   const tabTopY = showStaff ? staffTopY + Math.max(staffHeight + 42, maxPitchedNoteRelY + 38) : 58;
   const tabStringSpacing = 14; // 14px für optimale Lesbarkeit zweistelliger Bünde
-  const tabLinesCount = snippet.instrument === 'bass' || snippet.instrument === 'strings' ? 4 : 6;
+  const tabLinesCount = snippet.instrument === 'bass' || snippet.instrument === 'strings' || snippet.instrument === 'ukulele' ? 4 : 6;
   const tabHeight = (tabLinesCount - 1) * tabStringSpacing;
 
   const rulerY = showTabs
     ? tabTopY + tabHeight + 24
-    : staffTopY + Math.max(staffHeight + 46, maxPitchedNoteRelY + 22);
+    : staffTopY + Math.max(staffHeight + 34, maxPitchedNoteRelY + 18);
 
-  const totalHeight = rulerY + 24;
+  const totalHeight = rulerY + 16;
 
   // Halbton-Transposition
-  const transposePitch = useCallback((pitch: string, delta: number): string => {
-    if (!pitch || pitch === 'REST') return 'C4';
-    const match = pitch.trim().toUpperCase().match(/^([A-H][#B♮]?)(-?\d+)$/);
-    if (!match) return 'C4';
-    let noteName = match[1].replace('♮', '');
-    let octave = parseInt(match[2], 10);
-    if (noteName === 'DB') noteName = 'C#';
-    if (noteName === 'EB') noteName = 'D#';
-    if (noteName === 'GB') noteName = 'F#';
-    if (noteName === 'AB') noteName = 'G#';
-    if (noteName === 'BB') noteName = 'A#';
-    if (noteName === 'H') noteName = 'B';
-
-    let idx = SCALE_NOTES.indexOf(noteName);
-    if (idx === -1) idx = 0;
-
-    let newTotal = octave * 12 + idx + delta;
-    let newOctave = Math.floor(newTotal / 12);
-    let newIdx = ((newTotal % 12) + 12) % 12;
-    newOctave = Math.max(2, Math.min(6, newOctave));
-
-    return `${SCALE_NOTES[newIdx]}${newOctave}`;
-  }, []);
+  const transposePitch = useCallback((pitch: string, delta: number): string => transposePitchSemitones(pitch, delta), []);
 
   // 1. Auto-Focus auf Notations-Canvas beim Öffnen (Löst Safari/A11y Input-Trap)
   useEffect(() => {
@@ -273,24 +202,35 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
     return base;
   }, []);
 
-  // 🎼 Automatische Takterkennung & Taktübergang (Point 3: Wenn Takt voll ist, nahtlos in nächsten Takt leiten)
-  const advanceCursor = useCallback((targetBar: number, targetFraction: number, targetString: number) => {
+  // 🎼 0,1% Goldstandard: Magnetischer Schritt-für-Schritt-Cursor entlang der Raster-Platzhalter
+  const advanceCursor = useCallback((targetBar: number, targetFraction: number, targetString: number, nextNotesOverride?: MicroScoreNote[]) => {
+    const candidateNotes = nextNotesOverride ?? notesRef.current;
+    const frontier = getSequentialFrontierSlot(
+      candidateNotes,
+      barsCountRef.current,
+      snippet.timeSignature,
+      activeDurationRef.current,
+      isDottedModeRef.current,
+      isTripletModeRef.current
+    );
+    if (!frontier.isScoreFull) {
+      onSelectPosition(frontier.barIndex, frontier.fraction, targetString);
+      return;
+    }
+
     const step = getStepSize();
+    const totalFractions = getTimeSignatureFractions(snippet.timeSignature);
     let nextFraction = targetFraction + step;
     let nextBar = targetBar;
-    if (nextFraction >= 16) {
-      nextFraction = nextFraction - 16;
+    if (nextFraction >= totalFractions) {
+      nextFraction = nextFraction - totalFractions;
       nextBar = targetBar + 1;
       if (nextBar >= barsCountRef.current) {
-        if (barsCountRef.current < 4 && onUpdateBarsCount) {
-          onUpdateBarsCount(barsCountRef.current + 1);
-        } else {
-          nextBar = 0; // Wrap around bei erreichter Maximaltaktanzahl
-        }
+        nextBar = 0;
       }
     }
     onSelectPosition(nextBar, nextFraction, targetString);
-  }, [getStepSize, onSelectPosition, onUpdateBarsCount]);
+  }, [getStepSize, onSelectPosition, snippet.timeSignature]);
 
   // 🎹 Tastatur-First Event-Handling (0,1% Goldstandard)
   useEffect(() => {
@@ -308,29 +248,41 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
         n => n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5
       );
 
-      // 1. Horizontale Navigation (← / →)
-      if (e.key === 'ArrowRight') {
+      // 1. Horizontale Navigation (← / →) strikt entlang der belegten Noten + aktivem Ziel-Platzhalter
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        const step = getStepSize();
-        let nextFraction = activeFraction + step;
-        let nextBar = activeBar;
-        if (nextFraction >= 16) {
-          nextFraction = nextFraction - 16;
-          nextBar = (activeBar + 1) % barsCountRef.current;
+        const frontier = getSequentialFrontierSlot(
+          currentNotes,
+          barsCountRef.current,
+          snippet.timeSignature,
+          activeDurationRef.current,
+          isDottedModeRef.current,
+          isTripletModeRef.current
+        );
+        const navigableMap = new Map<string, { bar: number; fraction: number }>();
+        currentNotes.forEach(n => {
+          const k = `${n.barIndex}-${Math.round(n.beatFraction * 10)}`;
+          navigableMap.set(k, { bar: n.barIndex, fraction: n.beatFraction });
+        });
+        if (!frontier.isScoreFull) {
+          const fk = `${frontier.barIndex}-${Math.round(frontier.fraction * 10)}`;
+          navigableMap.set(fk, { bar: frontier.barIndex, fraction: frontier.fraction });
         }
-        onSelectPosition(nextBar, nextFraction, activeString);
-        return;
-      }
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const step = getStepSize();
-        let prevFraction = activeFraction - step;
-        let prevBar = activeBar;
-        if (prevFraction < 0) {
-          prevFraction = Math.max(0, 16 - step);
-          prevBar = activeBar === 0 ? barsCountRef.current - 1 : activeBar - 1;
+        const navigable = Array.from(navigableMap.values()).sort(
+          (a, b) => a.bar * 16 + a.fraction - (b.bar * 16 + b.fraction)
+        );
+        if (navigable.length === 0) return;
+
+        const curIdx = navigable.findIndex(
+          pos => pos.bar === activeBar && Math.abs(pos.fraction - activeFraction) < 0.5
+        );
+        if (e.key === 'ArrowLeft') {
+          const targetIdx = curIdx > 0 ? curIdx - 1 : 0;
+          onSelectPosition(navigable[targetIdx].bar, navigable[targetIdx].fraction, activeString);
+        } else {
+          const targetIdx = curIdx >= 0 && curIdx < navigable.length - 1 ? curIdx + 1 : navigable.length - 1;
+          onSelectPosition(navigable[targetIdx].bar, navigable[targetIdx].fraction, activeString);
         }
-        onSelectPosition(prevBar, prevFraction, activeString);
         return;
       }
 
@@ -391,7 +343,7 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
           }
         }
 
-        const calcPitch = fretAndStringToPitch(activeString, targetFret, snippet.instrument === 'bass');
+        const calcPitch = fretAndStringToPitch(activeString, targetFret, snippet.instrument);
         onPlayPreviewNote?.(calcPitch);
 
         const newNote: MicroScoreNote = {
@@ -416,13 +368,13 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
 
         if (isSecondDigit) {
           // Zweistelliger Bund abgeschlossen -> sofort vorrücken
-          advanceCursor(activeBar, activeFraction, activeString);
+          advanceCursor(activeBar, activeFraction, activeString, updated);
         } else {
           // Erste Ziffer: 650ms Puffer für eventuelle zweite Ziffer (z.B. 10, 12, 14, 15)
           if (fretBufferRef.current?.timer) clearTimeout(fretBufferRef.current.timer);
           const timer = setTimeout(() => {
             fretBufferRef.current = null;
-            advanceCursor(activeBar, activeFraction, activeString);
+            advanceCursor(activeBar, activeFraction, activeString, updated);
           }, 650);
           fretBufferRef.current = {
             bar: activeBar,
@@ -435,9 +387,9 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
         return;
       }
 
-      // 5. Tonhöhen-Eingabe über Notennamen (C, D, E, F, G, A, B, H)
+      // 5. Tonhöhen-Eingabe über Notennamen (C, D, E, F, G, A, B, H) – bei Schlagzeug deaktiviert (Zero Key-Collision für Drum-Pads D, E, F, G, H, B)
       const validNoteKeys = ['c', 'd', 'e', 'f', 'g', 'a', 'b', 'h'];
-      if (validNoteKeys.includes(key)) {
+      if (!isDrumClef && validNoteKeys.includes(key)) {
         e.preventDefault();
         let noteName = key.toUpperCase();
         if (noteName === 'H') noteName = 'B';
@@ -475,14 +427,14 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
         }
         onUpdateNotes(updated);
 
-        advanceCursor(activeBar, activeFraction, assignedString ?? activeString);
+        advanceCursor(activeBar, activeFraction, assignedString ?? activeString, updated);
         return;
       }
 
-      // 6. Löschen / Pause einfügen (Backspace / Entf / R / Leertaste)
-      if (e.key === 'Backspace' || e.key === 'Delete' || key === 'r' || e.key === ' ') {
+      // 6. Löschen / Pause einfügen (Backspace / Entf / R; Leertaste bleibt global für Play/Stop reserviert)
+      if (e.key === 'Backspace' || e.key === 'Delete' || key === 'r') {
         e.preventDefault();
-        if (key === 'r' || e.key === ' ') {
+        if (key === 'r') {
           // Pause setzen
           const restNote: MicroScoreNote = {
             id: `rest-${Date.now()}`,
@@ -501,11 +453,35 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
           onUpdateNotes(updated);
 
           // Cursor nach Pause vorrücken
-          advanceCursor(activeBar, activeFraction, activeString);
+          advanceCursor(activeBar, activeFraction, activeString, updated);
         } else if (existingNoteIdx !== -1) {
-          // Note entfernen
-          const updated = currentNotes.filter((_, idx) => idx !== existingNoteIdx);
+          // Alle Noten an dieser Zählzeit entfernen
+          const updated = currentNotes.filter(
+            n => !(n.barIndex === activeBar && Math.abs(n.beatFraction - activeFraction) < 0.5)
+          );
           onUpdateNotes(updated);
+        } else if (currentNotes.length > 0) {
+          // 🧲 Smart-Backspace: Letzte eingegebene Note vor dem aktiven Platzhalter löschen & Cursor dorthin zurücksetzen
+          const sortedNotes = [...currentNotes].sort(
+            (a, b) => a.barIndex * 16 + a.beatFraction - (b.barIndex * 16 + b.beatFraction)
+          );
+          const lastNote = sortedNotes[sortedNotes.length - 1];
+          if (lastNote) {
+            const updated = currentNotes.filter(
+              n => !(n.barIndex === lastNote.barIndex && Math.abs(n.beatFraction - lastNote.beatFraction) < 0.5)
+            );
+            onUpdateNotes(updated);
+            onSelectPosition(lastNote.barIndex, lastNote.beatFraction, activeString);
+          }
+        }
+        return;
+      }
+
+      // 7. Takt anhängen via Taste '+' (sofern barsCount < 4)
+      if ((e.key === '+' || e.key === 'Add' || (e.key === '=' && e.shiftKey)) && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (barsCountRef.current < 4 && onAddBar) {
+          onAddBar();
         }
         return;
       }
@@ -526,19 +502,34 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
     onUpdateNotes, 
     onSelectPosition, 
     onPlayPreviewNote,
+    onAddBar,
     transposePitch,
     advanceCursor,
     getStepSize
   ]);
+
+  // 🧲 0,1% Goldstandard: Sequenzieller nächster freier Raster-Platzhalter (1 -> 2 -> 3 -> 3+ -> 4 -> 4+)
+  const sequentialFrontier = useMemo(
+    () =>
+      getSequentialFrontierSlot(
+        snippet.notes,
+        snippet.barsCount,
+        snippet.timeSignature,
+        activeDuration,
+        isDottedMode,
+        isTripletMode
+      ),
+    [snippet.notes, snippet.barsCount, snippet.timeSignature, activeDuration, isDottedMode, isTripletMode]
+  );
 
   // Takt-Breiten Berechnung (Dynamisch basierend auf Takten 1–4)
   const measureWidth = useMemo(() => {
     return Math.floor(660 / Math.max(1, snippet.barsCount));
   }, [snippet.barsCount]);
 
-  const leftMargin = 88; // 0,1% Goldstandard: Platz für Schlüssel (16..48), Taktart (64) und Puffer (88)
+  const leftMargin = 100; // 0,1% Goldstandard: Platz für Schlüssel (14..58), Taktart (68) und Puffer (100)
 
-  // Smarter Klick-Handler: Ermittelt präzise Staff-Notenhöhe ODER Tab-Saite per Y-Koordinate
+  // Smarter Klick-Handler: Noten können nur am aktiven sequenziellen Platzhalter eingegeben oder an bereits belegten Positionen editiert werden
   const handleSlotClick = useCallback((e: React.MouseEvent, barIdx: number, fractionIdx: number) => {
     e.stopPropagation();
     if (readOnly) return;
@@ -549,33 +540,59 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
     }
     containerRef.current?.focus();
 
+    const isOccupiedSlot = snippet.notes.some(
+      n => n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5
+    );
+
+    // 🧲 Magnetisches Einrasten: Neue Noten landen immer auf dem aktuellen sequenziellen Platzhalter;
+    // bereits gesetzte Noten (isOccupiedSlot) bleiben jederzeit direkt anklick- und editierbar.
+    const targetBar = isOccupiedSlot
+      ? barIdx
+      : (!sequentialFrontier.isScoreFull ? sequentialFrontier.barIndex : activeBar);
+    const targetFraction = isOccupiedSlot
+      ? fractionIdx
+      : (!sequentialFrontier.isScoreFull ? sequentialFrontier.fraction : activeFraction);
+
     if (svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect();
       const viewBoxHeight = totalHeight;
       const clientY = e.clientY - rect.top;
       const svgY = (clientY / rect.height) * viewBoxHeight;
 
-      // 1. Klick in die Notenlinien (Staff-Bereich) -> Direkte Tonhöhen-Eingabe!
-      if (showStaff && svgY >= staffTopY - 32 && svgY <= staffTopY + staffHeight + 70) {
-        const pitch = yToStaffPitch(svgY, staffTopY, isBassClef, isDrumClef);
-        if (onInsertPitchDirectly) {
-          onInsertPitchDirectly(barIdx, fractionIdx, pitch);
-          return;
+      // 1. Klick in die Notenlinien (Staff-Bereich, präzise auf das 5-Linien-System ± 14px begrenzt)
+      if (showStaff && svgY >= staffTopY - 14 && svgY <= staffTopY + staffHeight + 14) {
+        // Nur einfügen, wenn der Nutzer auf den aktiven Ziel-Takt oder eine bereits gesetzte Note klickt
+        if (isOccupiedSlot || barIdx === targetBar) {
+          const pitch = yToStaffPitch(svgY, staffTopY, isBassClef, isDrumClef);
+          if (onInsertPitchDirectly) {
+            onInsertPitchDirectly(targetBar, targetFraction, pitch);
+            return;
+          }
         }
       }
 
-      // 2. Klick in den Tabulatur-Bereich -> Saiten-Auswahl
+      // 2. Klick in den Tabulatur-Bereich -> Saiten-Auswahl am aktiven Platzhalter (und bei Zweitklick direkt Bund 0 setzen)
       if (showTabs && svgY >= tabTopY - 6 && svgY <= tabTopY + tabHeight + 8) {
         const clickedString = Math.max(0, Math.min(tabLinesCount - 1, Math.round((svgY - tabTopY) / tabStringSpacing)));
-        onSelectPosition(barIdx, fractionIdx, clickedString);
-        const strInfo = (snippet.instrument === 'bass' ? BASS_STRINGS : GUITAR_STRINGS)[clickedString];
+        const strInfo = getInstrumentStrings(snippet.instrument)[clickedString];
+        const isAlreadyFocusedString =
+          activeBar === targetBar &&
+          Math.abs(activeFraction - targetFraction) < 0.5 &&
+          activeString === clickedString;
+
+        if (isAlreadyFocusedString && strInfo?.openPitch && onInsertPitchDirectly) {
+          onInsertPitchDirectly(targetBar, targetFraction, strInfo.openPitch);
+          return;
+        }
+
+        onSelectPosition(targetBar, targetFraction, clickedString);
         if (strInfo?.openPitch) {
           onPlayPreviewNote?.(strInfo.openPitch);
         }
         return;
       }
     }
-    onSelectPosition(barIdx, fractionIdx, activeString);
+    onSelectPosition(targetBar, targetFraction, activeString);
   }, [
     readOnly, 
     showStaff, 
@@ -584,16 +601,25 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
     staffTopY, 
     staffHeight, 
     isBassClef, 
+    isDrumClef,
     tabTopY, 
     tabHeight, 
     tabLinesCount, 
     tabStringSpacing, 
     onSelectPosition, 
     activeString, 
+    activeBar,
+    activeFraction,
+    sequentialFrontier,
+    snippet.notes,
     onPlayPreviewNote, 
     onInsertPitchDirectly, 
     snippet.instrument
   ]);
+
+  // 0,1% Goldstandard: Explizites Hinzufügen des nächsten Takts (max. 4 Takte, UrhG § 51 Zitatgrenze)
+  const canAddBar = !readOnly && snippet.barsCount < 4 && !!onAddBar;
+  const addBarWidth = 74;
 
   return (
     <div 
@@ -619,7 +645,7 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
     >
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${leftMargin + snippet.barsCount * measureWidth + 24} ${totalHeight}`}
+        viewBox={`0 0 ${leftMargin + snippet.barsCount * measureWidth + (canAddBar ? addBarWidth + 24 : 24)} ${totalHeight}`}
         style={{
           width: '100%',
           height: 'auto',
@@ -639,94 +665,18 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
         </defs>
 
         {/* 1. Header-Symbole am linken Rand (Schlüssel, Taktart, TAB-Label) */}
-        <g id="staff-clef-header">
-          {/* Notenlinien im Header-Bereich (unter Schlüssel & Taktart) */}
-          {showStaff && (
-            <g id="staff-header-lines">
-              {[0, 12.5, 25, 37.5, 50].map(offset => (
-                <line
-                  key={`staff-header-line-${offset}`}
-                  x1={16}
-                  y1={staffTopY + offset}
-                  x2={leftMargin}
-                  y2={staffTopY + offset}
-                  stroke="#475569"
-                  strokeWidth="1.15"
-                />
-              ))}
-            </g>
-          )}
-
-          {/* TAB-Linien im Header-Bereich (unter T A B) */}
-          {showTabs && (
-            <g id="tab-header-lines">
-              {Array.from({ length: tabLinesCount }, (_, sIdx) => {
-                const lineY = tabTopY + sIdx * tabStringSpacing;
-                return (
-                  <line
-                    key={`tab-header-line-${sIdx}`}
-                    x1={16}
-                    y1={lineY}
-                    x2={leftMargin}
-                    y2={lineY}
-                    stroke="#64748b"
-                    strokeWidth="1.0"
-                  />
-                );
-              })}
-            </g>
-          )}
-
-          {showStaff && (
-            <>
-              {/* Notenschlüssel (SMuFL Bravura Pfad - skaliert auf 50px Notensystem) */}
-              <path
-                d={isBassClef ? SMUFL_GLYPHS.fClef : isDrumClef ? SMUFL_GLYPHS.percussionClef : SMUFL_GLYPHS.gClef}
-                transform={`translate(16, ${staffTopY + (isBassClef ? 12.5 : isDrumClef ? 25 : 37.5)}) scale(0.048, -0.048)`}
-                fill="#0f172a"
-              />
-              {/* Taktart dynamisch aus snippet.timeSignature mit 14px Respektabstand bei x=64 */}
-              {(() => {
-                const [timeSigTop, timeSigBottom] = (snippet.timeSignature || '4/4').split('/');
-                return (
-                  <>
-                    <text
-                      x="64"
-                      y={staffTopY + 20}
-                      fontSize="18"
-                      fontWeight="900"
-                      fontFamily="'Plus Jakarta Sans', sans-serif"
-                      fill="#0f172a"
-                      textAnchor="middle"
-                    >
-                      {timeSigTop || '4'}
-                    </text>
-                    <text
-                      x="64"
-                      y={staffTopY + 43}
-                      fontSize="18"
-                      fontWeight="900"
-                      fontFamily="'Plus Jakarta Sans', sans-serif"
-                      fill="#0f172a"
-                      textAnchor="middle"
-                    >
-                      {timeSigBottom || '4'}
-                    </text>
-                  </>
-                );
-              })()}
-            </>
-          )}
-
-          {/* TAB-Schriftzug für Gitarre/Bass */}
-          {showTabs && (
-            <g id="tab-label" transform={`translate(24, ${tabTopY})`}>
-              <text x="0" y="16" fontSize="13" fontWeight="900" fill="#475569" fontFamily="'Plus Jakarta Sans', sans-serif">T</text>
-              <text x="0" y="36" fontSize="13" fontWeight="900" fill="#475569" fontFamily="'Plus Jakarta Sans', sans-serif">A</text>
-              <text x="0" y="56" fontSize="13" fontWeight="900" fill="#475569" fontFamily="'Plus Jakarta Sans', sans-serif">B</text>
-            </g>
-          )}
-        </g>
+        <MicroScoreClefHeader
+          showStaff={showStaff}
+          showTabs={showTabs}
+          staffTopY={staffTopY}
+          leftMargin={leftMargin}
+          tabLinesCount={tabLinesCount}
+          tabTopY={tabTopY}
+          tabStringSpacing={tabStringSpacing}
+          isBassClef={isBassClef}
+          isDrumClef={isDrumClef}
+          timeSignature={snippet.timeSignature}
+        />
 
         {/* 2. Takte rendern (1 bis 4 Takte) */}
         {Array.from({ length: snippet.barsCount }, (_, barIdx) => {
@@ -751,80 +701,121 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
               )
             : [];
           const barBeamLookup = buildMelodicBeamLookup(barMelodicBeamGroups);
+          const totalFractionsInBar = getTimeSignatureFractions(snippet.timeSignature);
+          const barSlots = calculateMeasureBeatSlots(
+            snippet.notes,
+            barIdx,
+            snippet.timeSignature,
+            activeDuration,
+            activeFraction,
+            isDottedMode,
+            isTripletMode
+          );
 
           return (
             <g key={`bar-${barIdx}`} id={`bar-${barIdx}`}>
-              {/* 🌟 0,1% Goldstandard Zone 1: Takt-Header (Takt-Nummer Badge + Fortschritts-Pille, y=12..28) */}
-              {(() => {
-                const prog = getMeasureProgress(snippet.notes, barIdx, snippet.timeSignature);
-                return (
-                  <g id={`measure-header-${barIdx}`}>
-                    {/* Takt-Nummer Badge */}
-                    <rect
-                      x={barStartX + 2}
-                      y="12"
-                      width="18"
-                      height="16"
-                      rx="4"
-                      fill="#f1f5f9"
-                      stroke="#cbd5e1"
-                      strokeWidth="0.8"
-                    />
-                    <text
-                      x={barStartX + 11}
-                      y="23.5"
-                      fontSize="10"
-                      fontWeight="800"
-                      fill="#64748b"
-                      textAnchor="middle"
-                      fontFamily="'Plus Jakarta Sans', sans-serif"
-                    >
-                      {barIdx + 1}
-                    </text>
+              {/* 🌟 Apple-Simplicity Zone 1: Ruhiger Takt-Header (Dezente Takt-Nummer + Duplizieren/Entfernen, 0% Batterie-Clutter) */}
+              <g id={`measure-header-${barIdx}`}>
+                <text
+                  x={barStartX + 4}
+                  y="16.5"
+                  fontSize="9.2"
+                  fontWeight={isBarActive && !readOnly ? '900' : '800'}
+                  fill={isBarActive && !readOnly ? '#4f46e5' : '#64748b'}
+                  letterSpacing="0.02em"
+                  fontFamily="'Plus Jakarta Sans', sans-serif"
+                >
+                  Takt {barIdx + 1}
+                </text>
 
-                    {/* Grafische 4-Segment Fortschritts-Pille (bündig rechts neben Taktnummer) */}
-                    {!readOnly && (
-                      <g transform={`translate(${barStartX + 24}, 12)`}>
+                {!readOnly && (
+                  <g>
+                    {barIdx === 0 && snippet.barsCount > 1 && onDuplicateBar && (
+                      <g
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDuplicateBar(0);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDuplicateBar(0);
+                          }
+                        }}
+                        aria-label="Takt 1 kopieren"
+                        transform={`translate(${barStartX + 44}, 5)`}
+                      >
+                        <title>Takt 1 in nächsten Takt kopieren</title>
                         <rect
-                          width={prog.isFull ? 58 : 50}
-                          height="16"
-                          rx="4"
-                          fill={prog.isFull ? '#ecfdf5' : '#f8fafc'}
-                          stroke={prog.isFull ? '#10b981' : '#e2e8f0'}
+                          width="16"
+                          height="15"
+                          rx="4.5"
+                          fill="#f8fafc"
+                          stroke="#cbd5e1"
                           strokeWidth="0.8"
                         />
-                        {prog.isFull ? (
-                          <text
-                            x="29"
-                            y="11.5"
-                            fontSize="8.5"
-                            fontWeight="900"
-                            fill="#059669"
-                            textAnchor="middle"
-                            fontFamily="'Plus Jakarta Sans', sans-serif"
-                          >
-                            ✓ Voll
-                          </text>
-                        ) : (
-                          <g transform="translate(5, 3.5)">
-                            {prog.segments.map((isFilled, sIdx) => (
-                              <rect
-                                key={`seg-${barIdx}-${sIdx}`}
-                                x={sIdx * 10}
-                                y="0"
-                                width="7.5"
-                                height="9"
-                                rx="2"
-                                fill={isFilled ? '#3b82f6' : '#cbd5e1'}
-                              />
-                            ))}
-                          </g>
-                        )}
+                        <text
+                          x="8"
+                          y="11"
+                          fontSize="8.8"
+                          fontWeight="900"
+                          fill="#475569"
+                          textAnchor="middle"
+                          fontFamily="'Plus Jakarta Sans', sans-serif"
+                        >
+                          ⎘
+                        </text>
+                      </g>
+                    )}
+
+                    {barIdx === snippet.barsCount - 1 && snippet.barsCount > 1 && onRemoveBar && (
+                      <g
+                        role="button"
+                        tabIndex={0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveBar(barIdx);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onRemoveBar(barIdx);
+                          }
+                        }}
+                        aria-label={`Takt ${barIdx + 1} entfernen`}
+                        transform={`translate(${barStartX + 44}, 5)`}
+                      >
+                        <title>Takt {barIdx + 1} entfernen</title>
+                        <rect
+                          width="16"
+                          height="15"
+                          rx="4.5"
+                          fill="#fef2f2"
+                          stroke="#fca5a5"
+                          strokeWidth="0.8"
+                        />
+                        <text
+                          x="8"
+                          y="11"
+                          fontSize="8.8"
+                          fontWeight="900"
+                          fill="#ef4444"
+                          textAnchor="middle"
+                          fontFamily="'Plus Jakarta Sans', sans-serif"
+                        >
+                          ✕
+                        </text>
                       </g>
                     )}
                   </g>
-                );
-              })()}
+                )}
+              </g>
 
               {/* 🌟 0,1% Goldstandard Zone 2: Akkordsymbole (Harmonie-Lane bei y=47, 0% Kollision mit Taktnummer) */}
               {measureChords.map(chord => {
@@ -917,19 +908,11 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
 
               {/* 🌟 0,1% Goldstandard Beat-Grid & Ghost-Placeholder Overlay */}
               <MicroScoreBeatGridOverlay
-                slots={calculateMeasureBeatSlots(
-                  snippet.notes,
-                  barIdx,
-                  snippet.timeSignature,
-                  activeDuration,
-                  activeFraction,
-                  isDottedMode,
-                  isTripletMode
-                )}
+                slots={barSlots}
                 barIndex={barIdx}
                 barStartX={barStartX}
                 measureWidth={measureWidth}
-                totalFractions={getTimeSignatureFractions(snippet.timeSignature)}
+                totalFractions={totalFractionsInBar}
                 staffTopY={staffTopY}
                 staffHeight={staffHeight}
                 tabTopY={tabTopY}
@@ -942,35 +925,67 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                 activeFraction={activeFraction}
                 isPlaying={isPlaying}
                 readOnly={readOnly}
-                onSelectSlot={(bar, frac) => onSelectPosition(bar, frac, activeString)}
+                onSelectSlot={(bar, frac) => {
+                  const isOccupied = snippet.notes.some(
+                    n => n.barIndex === bar && Math.abs(n.beatFraction - frac) < 0.5
+                  );
+                  if (isOccupied) {
+                    onSelectPosition(bar, frac, activeString);
+                  } else if (!sequentialFrontier.isScoreFull) {
+                    onSelectPosition(sequentialFrontier.barIndex, sequentialFrontier.fraction, activeString);
+                  } else {
+                    onSelectPosition(bar, frac, activeString);
+                  }
+                }}
                 getStaffY={getStaffY}
                 isBassClef={isBassClef}
                 isDrumClef={isDrumClef}
+                hideActiveGhostHead={Boolean(
+                  hoverSlot &&
+                  hoverSlot.bar === barIdx &&
+                  Math.abs(hoverSlot.fraction - activeFraction) < 0.5
+                )}
               />
 
-              {/* Klickbare Zählzeiten-Slots & Noten in diesem Takt */}
-              {Array.from({ length: 16 }, (_, fractionIdx) => {
-                const fractionX = barStartX + 12 + (fractionIdx / 16) * (measureWidth - 24);
+              {/* 🧲 Strikte Raster-Platzhalter & gesetzte Noten (inkl. Apple Magnetic Catch-Zone über den freien Rest-Takt) */}
+              {barSlots.map((gridSlot) => {
+                const fractionIdx = gridSlot.fraction;
+                const fractionX = barStartX + 12 + (fractionIdx / totalFractionsInBar) * (measureWidth - 24);
                 const isSelectedSlot = activeBar === barIdx && Math.abs(activeFraction - fractionIdx) < 0.5;
 
                 // Finde alle Noten an dieser Position (Polyphonie / Akkorde)
-                const slotNotes = snippet.notes.filter(
-                  n => n.barIndex === barIdx && Math.abs(n.beatFraction - fractionIdx) < 0.5
-                );
+                const slotNotes = gridSlot.notes;
                 const hasNotes = slotNotes.length > 0;
-                const isRestSlot = slotNotes.some(n => n.pitch === 'REST');
+                const isRestSlot = gridSlot.hasRest;
                 const primaryNote = slotNotes[0];
 
+                const isSequentialTarget =
+                  !sequentialFrontier.isScoreFull &&
+                  barIdx === sequentialFrontier.barIndex &&
+                  Math.abs(fractionIdx - sequentialFrontier.fraction) < 0.5;
+                const canHoverOrClickSlot = !readOnly && (hasNotes || isSequentialTarget || isSelectedSlot);
+
+                // Magnetische Fangzone: Für den aktiven Ziel-Platzhalter erstreckt sich die Hover-/Klick-Zone
+                // über den gesamten noch freien Restbereich des Takts (0% horizontales Zielen nötig!)
+                const nextOccupiedInBar = barSlots.find(s => s.isOccupied && s.fraction > fractionIdx);
+                const catchEndX = nextOccupiedInBar
+                  ? barStartX + 12 + (nextOccupiedInBar.fraction / totalFractionsInBar) * (measureWidth - 24) - 14
+                  : barEndX - 4;
+                const hitRectWidth = (isSequentialTarget && !hasNotes)
+                  ? Math.max(26, catchEndX - (fractionX - 13))
+                  : 26;
+
                 const hitStatus = primaryNote ? noteHits[primaryNote.id] : undefined;
-                const noteDurationFrac = primaryNote
-                  ? durationToSixteenths(primaryNote.duration, primaryNote.isDotted, primaryNote.isTriplet)
+                const noteDurationFrac = slotNotes.length > 0
+                  ? Math.max(...slotNotes.map(sn => durationToSixteenths(sn.duration, sn.isDotted, sn.isTriplet)))
                   : 1;
                 const isCurrentlyPlaying = Boolean(
                   isPlaying && 
                   playheadPosition && 
                   playheadPosition.bar === barIdx && 
-                  playheadPosition.fraction >= fractionIdx && 
-                  playheadPosition.fraction < fractionIdx + noteDurationFrac &&
+                  (Math.abs(playheadPosition.fraction - fractionIdx) < 0.5 ||
+                    (playheadPosition.fraction >= fractionIdx && 
+                     playheadPosition.fraction < fractionIdx + noteDurationFrac - 0.1)) &&
                   !isRestSlot
                 );
                 const noteColor = isCurrentlyPlaying
@@ -981,19 +996,26 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                   ? '#f59e0b' 
                   : '#0f172a';
 
-                const isHoveredSlot = hoverSlot && hoverSlot.bar === barIdx && hoverSlot.fraction === fractionIdx;
+                const isHoveredSlot =
+                  canHoverOrClickSlot &&
+                  hoverSlot !== null &&
+                  hoverSlot.bar === barIdx &&
+                  Math.abs(hoverSlot.fraction - fractionIdx) < 0.5;
 
                 return (
                   <g 
                     key={`slot-${barIdx}-${fractionIdx}`}
-                    onClick={(e) => handleSlotClick(e, barIdx, fractionIdx)}
+                    onPointerDown={(e) => {
+                      if (e.pointerType === 'mouse' && e.button !== 0) return;
+                      handleSlotClick(e, barIdx, fractionIdx);
+                    }}
                     onMouseMove={(e) => {
-                      if (readOnly || !showStaff || !svgRef.current) return;
+                      if (!canHoverOrClickSlot || !showStaff || !svgRef.current) return;
                       const rect = svgRef.current.getBoundingClientRect();
                       const viewBoxHeight = totalHeight;
                       const clientY = e.clientY - rect.top;
                       const svgY = (clientY / rect.height) * viewBoxHeight;
-                      if (svgY >= staffTopY - 32 && svgY <= staffTopY + staffHeight + 70) {
+                      if (svgY >= staffTopY - 14 && svgY <= staffTopY + staffHeight + 14) {
                         const p = yToStaffPitch(svgY, staffTopY, isBassClef, isDrumClef);
                         setHoverSlot({ bar: barIdx, fraction: fractionIdx, pitch: p });
                       } else {
@@ -1003,28 +1025,69 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                     onMouseLeave={() => {
                       setHoverSlot(null);
                     }}
-                    style={{ cursor: readOnly ? 'default' : 'pointer' }}
+                    style={{ cursor: canHoverOrClickSlot ? 'pointer' : 'default' }}
                   >
-                    {/* Unsichtbare Klick-Fläche für diesen Beat */}
+                    {/* Magnetische Klick- & Hover-Fläche */}
                     <rect
-                      x={fractionX - 9}
+                      x={fractionX - 13}
                       y={showStaff ? staffTopY - 14 : tabTopY - 8}
-                      width="18"
+                      width={hitRectWidth}
                       height={totalHeight - staffTopY}
                       fill="transparent"
                     />
 
-                    {/* Hover-Vorschau bei Mausbewegung in die Notenlinien (Farbiger Kopf oder X-Kopf) */}
-                    {showStaff && isHoveredSlot && (!hasNotes || isRestSlot) && (() => {
+                    {/* Hover-Vorschau mit Apple Floating Callout Badge & Laser-Ziellinie (für Instrumenten-Tonhöhen & Drum-Bezeichnungen) */}
+                    {showStaff && isHoveredSlot && (() => {
                       const previewPitch = hoverSlot.pitch;
                       const ghostY = staffTopY + getStaffY(previewPitch, isBassClef, isDrumClef);
                       const isFootNote = isDrumClef && isDrumFootPitch(previewPitch);
                       const stemUp = isDrumClef ? !isFootNote : getStaffY(previewPitch, isBassClef, isDrumClef) > 25;
                       const previewTheme = getPitchColorTheme(previewPitch);
                       const previewLetter = getPitchLetter(previewPitch);
+                      const drumColorDef = getCanonicalDrumPieceColor(previewPitch);
+                      const drumGhostColor = isDrumClef ? drumColorDef.staffColor : '#475569';
+                      const activeAccentColor = isDrumClef
+                        ? (isDrumColorGuide ? drumGhostColor : '#0f172a')
+                        : (isDrumColorGuide ? previewTheme.border : '#0f172a');
+
+                      // Klarschrift-Bezeichnung: Bei Drums ('Snare', 'Kick', 'Hi-Hat'...), bei Instrumenten ('C', 'D', 'E', 'F', 'G', 'A', 'H')
+                      const calloutText = isDrumClef
+                        ? getCanonicalDrumCalloutName(previewPitch)
+                        : previewLetter;
+                      const pillWidth = isDrumClef
+                        ? Math.max(38, calloutText.length * 6.0 + 12)
+                        : Math.max(22, calloutText.length * 7.5 + 10);
+                      const placePillLeft = fractionX + 12 + pillWidth > barEndX - 4;
+                      const pillX = placePillLeft ? fractionX - 12 - pillWidth : fractionX + 12;
+                      const pillY = ghostY - 8.5;
+                      const isLightYellowPitch = !isDrumClef && isDrumColorGuide && (previewPitch.startsWith('E') || previewTheme.text === '#854d0e');
 
                       return (
-                        <g id="ghost-hover-note" opacity={0.78} style={{ pointerEvents: 'none' }}>
+                        <g id="ghost-hover-note" opacity={0.92} style={{ pointerEvents: 'none' }}>
+                          {/* Horizontale Laser-Ziellinie auf der aktuellen Tonhöhe quer über den Takt */}
+                          <line
+                            x1={barStartX + 4}
+                            y1={ghostY}
+                            x2={barEndX - 4}
+                            y2={ghostY}
+                            stroke={activeAccentColor}
+                            strokeWidth="1.0"
+                            strokeDasharray="3 3"
+                            opacity={0.45}
+                          />
+
+                          {/* Hilfslinie oben für Crash-Becken (A5) oder hohe/tiefe Melodietöne beim Zielen */}
+                          {isDrumClef && ghostY <= staffTopY - 12.5 + 3.125 && (
+                            <line
+                              x1={fractionX - 11}
+                              y1={staffTopY - 12.5}
+                              x2={fractionX + 11}
+                              y2={staffTopY - 12.5}
+                              stroke={drumGhostColor}
+                              strokeWidth="1.3"
+                            />
+                          )}
+
                           {isDrumClef && isCymbalPitch(previewPitch) ? (
                             <g>
                               <line
@@ -1032,8 +1095,8 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                 y1={ghostY - 5}
                                 x2={fractionX + 6}
                                 y2={ghostY + 5}
-                                stroke="#475569"
-                                strokeWidth="2.4"
+                                stroke={drumGhostColor}
+                                strokeWidth="2.5"
                                 strokeLinecap="round"
                               />
                               <line
@@ -1041,22 +1104,49 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                 y1={ghostY + 5}
                                 x2={fractionX + 6}
                                 y2={ghostY - 5}
-                                stroke="#475569"
-                                strokeWidth="2.4"
+                                stroke={drumGhostColor}
+                                strokeWidth="2.5"
                                 strokeLinecap="round"
                               />
+                              <text
+                                x={fractionX}
+                                y={ghostY + 2.0}
+                                fontSize="5.4"
+                                fontWeight="900"
+                                fill={drumGhostColor}
+                                stroke="#ffffff"
+                                strokeWidth="2.4"
+                                paintOrder="stroke"
+                                textAnchor="middle"
+                                fontFamily="'Plus Jakarta Sans', sans-serif"
+                              >
+                                {drumColorDef.shortCode}
+                              </text>
                             </g>
                           ) : (
                             <ellipse
                               cx={fractionX}
                               cy={ghostY}
-                              rx="7.0"
-                              ry="5.0"
+                              rx="7.4"
+                              ry="5.2"
                               transform={`rotate(-22 ${fractionX} ${ghostY})`}
-                              fill={activeDuration === '1' || activeDuration === '2' ? '#ffffff' : (isDrumClef ? '#475569' : previewTheme.border)}
-                              stroke={isDrumClef ? '#334155' : previewTheme.border}
-                              strokeWidth={activeDuration === '1' || activeDuration === '2' ? '2.2' : '0.6'}
+                              fill={activeDuration === '1' || activeDuration === '2' ? '#ffffff' : activeAccentColor}
+                              stroke={activeAccentColor}
+                              strokeWidth={activeDuration === '1' || activeDuration === '2' ? '2.2' : '0.8'}
                             />
+                          )}
+                          {isDrumClef && !isCymbalPitch(previewPitch) && (
+                            <text
+                              x={fractionX}
+                              y={ghostY + 2.1}
+                              fontSize="5.8"
+                              fontWeight="900"
+                              fill={activeDuration === '1' || activeDuration === '2' ? drumGhostColor : '#ffffff'}
+                              textAnchor="middle"
+                              fontFamily="'Plus Jakarta Sans', sans-serif"
+                            >
+                              {drumColorDef.shortCode}
+                            </text>
                           )}
                           {!isDrumClef && previewLetter && (
                             <text
@@ -1067,7 +1157,7 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                               fill={
                                 activeDuration === '1' || activeDuration === '2'
                                   ? previewTheme.text
-                                  : (previewPitch.startsWith('E') || previewTheme.text === '#854d0e' ? '#0f172a' : '#ffffff')
+                                  : (isLightYellowPitch ? '#0f172a' : '#ffffff')
                               }
                               textAnchor="middle"
                               fontFamily="'Plus Jakarta Sans', sans-serif"
@@ -1080,11 +1170,39 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                               x1={stemUp ? fractionX + 6.0 : fractionX - 6.0}
                               y1={ghostY}
                               x2={stemUp ? fractionX + 6.0 : fractionX - 6.0}
-                              y2={stemUp ? ghostY - 28 : ghostY + 28}
-                              stroke="#64748b"
+                              y2={stemUp ? ghostY - 26 : ghostY + 26}
+                              stroke={activeAccentColor}
                               strokeWidth="1.3"
                               strokeDasharray="3 2"
                             />
+                          )}
+
+                          {/* 🏷️ Apple Floating Callout Pill: Zeigt Tonhöhe (C, D, E...) bzw. Drum-Instrument (Snare, Kick, Hi-Hat...) glasklar neben dem Cursor */}
+                          {calloutText && (
+                            <g id="ghost-pitch-callout-pill">
+                              <rect
+                                x={pillX}
+                                y={pillY}
+                                width={pillWidth}
+                                height={17}
+                                rx={5.5}
+                                fill={activeAccentColor}
+                                stroke="#ffffff"
+                                strokeWidth="1.4"
+                                filter="url(#note-shadow)"
+                              />
+                              <text
+                                x={pillX + pillWidth / 2}
+                                y={pillY + 11.8}
+                                fontSize={isDrumClef ? '8.6' : '9.6'}
+                                fontWeight="900"
+                                fill={isLightYellowPitch ? '#0f172a' : '#ffffff'}
+                                textAnchor="middle"
+                                fontFamily="'Plus Jakarta Sans', sans-serif"
+                              >
+                                {calloutText}
+                              </text>
+                            </g>
                           )}
                         </g>
                       );
@@ -1133,6 +1251,8 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                 hitStatus,
                                 isSelectedSlot,
                                 isPlaying,
+                                readOnly,
+                                isDrumColorGuide,
                                 getStaffY,
                                 measureWidth,
                                 barStartX
@@ -1143,40 +1263,94 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                 const pitchedNotes = slotNotes.filter(n => n.pitch !== 'REST');
                                 if (pitchedNotes.length === 0) return null;
 
-                                const sortedNotes = [...pitchedNotes].sort(
+                                // 🏛️ 0,1% Goldstandard Noten-zu-TAB Paritätsgarantie:
+                                // Noten im System und Bünde in der TAB stimmen physikalisch immer zu 100% überein
+                                const harmonizedNotes = pitchedNotes.map(n => {
+                                  if (showTabs && n.fret !== undefined && n.stringIndex !== undefined && isStringOrPluckedInstrument(snippet.instrument)) {
+                                    const expected = fretAndStringToPitch(n.stringIndex, n.fret, snippet.instrument);
+                                    if (expected && expected !== n.pitch) {
+                                      return { ...n, pitch: expected };
+                                    }
+                                  }
+                                  return n;
+                                });
+
+                                // 🎼 Elaine Gould (Behind Bars, S. 313) / 0,1% Goldstandard:
+                                // Unisono-Töne (gleiche Tonhöhe auf verschiedenen Saiten, z.B. Ukulele A4 auf Saite 0 Bund 0 und Saite 3 Bund 2)
+                                // teilen sich im Notensystem EXAKT EINEN Notenkopf/Badge.
+                                // In der TAB-Zeile werden selbstverständlich weiterhin alle gegriffenen Saiten und Bünde abgebildet!
+                                const uniqueStaffNotes = harmonizedNotes.filter((note, idx, self) =>
+                                  self.findIndex(other => other.pitch === note.pitch) === idx
+                                );
+
+                                const sortedNotes = [...uniqueStaffNotes].sort(
                                   (a, b) => getStaffY(b.pitch, isBassClef, isDrumClef) - getStaffY(a.pitch, isBassClef, isDrumClef)
                                 );
 
                                 const staffYs = sortedNotes.map(n => staffTopY + getStaffY(n.pitch, isBassClef, isDrumClef));
                                 const minY = Math.min(...staffYs);
                                 const maxY = Math.max(...staffYs);
-                                const beamInfo = barBeamLookup.get(fractionIdx);
+                                const canonFractionIdx = Math.round(fractionIdx * 100) / 100;
+                                const beamInfo = barBeamLookup.get(canonFractionIdx) || barBeamLookup.get(fractionIdx);
                                 const isBeamed = Boolean(beamInfo?.isBeamed);
                                 const avgStaffRelY = sortedNotes.reduce((acc, n) => acc + getStaffY(n.pitch, isBassClef, isDrumClef), 0) / sortedNotes.length;
                                 const hasOnlyFootNotes = isDrumClef && sortedNotes.every(n => isDrumFootPitch(n.pitch));
                                 const stemUp = isDrumClef ? !hasOnlyFootNotes : (isBeamed ? beamInfo!.stemUp : avgStaffRelY > 25);
                                 const stemTipY = isBeamed ? beamInfo!.stemTipY : (stemUp ? minY - 28 : maxY + 28);
-                                const duration = sortedNotes[0].duration;
+                                const durationRank = (d: string) => d === '16' ? 1 : d === '8' ? 2 : d === '4' ? 3 : d === '2' ? 4 : 5;
+                                const duration = [...sortedNotes].sort((a, b) => durationRank(a.duration) - durationRank(b.duration))[0]?.duration || sortedNotes[0].duration;
                                 const isDotted = sortedNotes.some(n => n.isDotted);
+                                const getMelodicNoteColor = (pitch: string): string =>
+                                  isCurrentlyPlaying
+                                    ? '#6366f1'
+                                    : hitStatus === 'hit'
+                                    ? '#10b981'
+                                    : hitStatus === 'near'
+                                    ? '#f59e0b'
+                                    : isDrumColorGuide
+                                    ? getPitchColorTheme(pitch).border
+                                    : '#0f172a';
+                                const anchorNoteForStem = stemUp
+                                  ? sortedNotes[sortedNotes.length - 1]
+                                  : sortedNotes[0];
+                                const anchorStemColor = getMelodicNoteColor((anchorNoteForStem || sortedNotes[0]).pitch);
+
+                                // 🎼 Elaine Gould (Behind Bars) Seconds Displacement:
+                                // Liegen Notenköpfe im Sekundabstand (diff > 0.5 && diff <= 10px) an demselben Hals,
+                                // wird der versetzte Notenkopf horizontal verschoben (+11.5px),
+                                // damit Köpfe und Beschriftungen kollisionsfrei lesbar bleiben.
+                                const xOffsets: number[] = new Array(sortedNotes.length).fill(0);
+                                if (!isDrumClef) {
+                                  for (let i = 1; i < sortedNotes.length; i++) {
+                                    const diff = Math.abs(staffYs[i] - staffYs[i - 1]);
+                                    if (diff > 0.5 && diff <= 10.0 && xOffsets[i - 1] === 0) {
+                                      xOffsets[i] = stemUp ? 11.5 : -11.5;
+                                    }
+                                  }
+                                }
 
                                 return (
                                   <g>
                                     {/* Notenköpfe, Hilfslinien & Vorzeichen für jeden Ton im Akkord */}
                                     {sortedNotes.map((n, nIdx) => {
                                       const nY = staffTopY + getStaffY(n.pitch, isBassClef, isDrumClef);
+                                      const noteShiftX = xOffsets[nIdx] || 0;
+                                      const noteHeadX = fractionX + noteShiftX;
                                       const hasSharp = n.pitch.includes('#');
                                       const hasFlat = n.pitch.includes('b') || (n.pitch.length >= 2 && n.pitch[1] === 'B');
                                       const pitchTheme = getPitchColorTheme(n.pitch);
                                       const letter = getPitchLetter(n.pitch);
 
-                                      // 🎨 Farbiger Notenkopf: Treffer/Playback in Smaragdgrün, sonst didaktische Tonhöhen-Farbe
+                                      // 🎨 Farbiger Notenkopf (Boomwhacker) vs. Klassisch Schwarz (Urtext #0f172a)
                                       const headColor = isCurrentlyPlaying
                                         ? '#6366f1'
                                         : hitStatus === 'hit'
                                         ? '#10b981'
                                         : hitStatus === 'near'
                                         ? '#f59e0b'
-                                        : pitchTheme.border;
+                                        : isDrumColorGuide
+                                        ? pitchTheme.border
+                                        : '#0f172a';
 
                                       return (
                                         <g key={`head-${n.id || nIdx}`}>
@@ -1186,9 +1360,9 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                             nY >= staffTopY + ledgerRelY - 3.125 ? (
                                               <line
                                                 key={`ledger-below-${ledgerRelY}`}
-                                                x1={fractionX - 11}
+                                                x1={noteHeadX - 11}
                                                 y1={staffTopY + ledgerRelY}
-                                                x2={fractionX + 11}
+                                                x2={noteHeadX + 11}
                                                 y2={staffTopY + ledgerRelY}
                                                 stroke="#0f172a"
                                                 strokeWidth="1.2"
@@ -1200,9 +1374,9 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                             nY <= staffTopY + ledgerRelY + 3.125 && (!isDrumClef || ledgerRelY === -12.5) ? (
                                               <line
                                                 key={`ledger-above-${ledgerRelY}`}
-                                                x1={fractionX - 11}
+                                                x1={noteHeadX - 11}
                                                 y1={staffTopY + ledgerRelY}
-                                                x2={fractionX + 11}
+                                                x2={noteHeadX + 11}
                                                 y2={staffTopY + ledgerRelY}
                                                 stroke="#0f172a"
                                                 strokeWidth="1.2"
@@ -1261,11 +1435,11 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                             </g>
                                           ) : (
                                             <ellipse
-                                              cx={fractionX}
+                                              cx={noteHeadX}
                                               cy={nY}
                                               rx="7.0"
                                               ry="5.0"
-                                              transform={`rotate(-22 ${fractionX} ${nY})`}
+                                              transform={`rotate(-22 ${noteHeadX} ${nY})`}
                                               fill={duration === '1' || duration === '2' ? '#ffffff' : (isDrumClef ? (isCurrentlyPlaying ? '#6366f1' : hitStatus === 'hit' ? '#10b981' : '#0f172a') : headColor)}
                                               stroke={isDrumClef ? (isCurrentlyPlaying ? '#6366f1' : hitStatus === 'hit' ? '#10b981' : '#0f172a') : headColor}
                                               strokeWidth={duration === '1' || duration === '2' ? '2.2' : '0.6'}
@@ -1273,10 +1447,10 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                             />
                                           )}
 
-                                          {/* Didaktischer Tonhöhen-Buchstabe (C, D, E...) - Bei Drums NIEMALS Buchstaben im Notenkopf! */}
-                                          {!isDrumClef && letter && (
+                                          {/* Didaktischer Tonhöhen-Buchstabe (C, D, E...) im Modus Bunte Noten (im Modus Klassisch ausgeblendet) */}
+                                          {!isDrumClef && isDrumColorGuide && letter && (
                                             <text
-                                              x={fractionX}
+                                              x={noteHeadX}
                                               y={nY + 3.0}
                                               fontSize="8.8"
                                               fontWeight="900"
@@ -1296,11 +1470,11 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                           {/* Apple Cupertino Selektions-Highlight auf aktiver Note */}
                                           {isSelectedSlot && !isPlaying && (
                                             <ellipse
-                                              cx={fractionX}
+                                              cx={noteHeadX}
                                               cy={nY}
                                               rx="9.0"
                                               ry="7.0"
-                                              transform={`rotate(-22 ${fractionX} ${nY})`}
+                                              transform={`rotate(-22 ${noteHeadX} ${nY})`}
                                               fill="none"
                                               stroke={headColor}
                                               strokeWidth="1.6"
@@ -1317,35 +1491,79 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                         cx={fractionX + 11}
                                         cy={minY - 1}
                                         r="2.2"
-                                        fill={sortedNotes[0] ? getPitchColorTheme(sortedNotes[0].pitch).border : noteColor}
+                                        fill={anchorStemColor}
                                       />
                                     )}
 
-                                    {/* Geteilter Notenhals für Akkord (verbindet tiefste und höchste Note bzw. reicht bis zum Balken) */}
+                                    {/* Geteilter Notenhals für Einzelnote oder Akkord (pro Tonhöhe farbcodiert) */}
                                     {duration !== '1' && (
-                                      <line
-                                        x1={stemUp ? fractionX + 6.0 : fractionX - 6.0}
-                                        y1={stemUp ? maxY : minY}
-                                        x2={stemUp ? fractionX + 6.0 : fractionX - 6.0}
-                                        y2={stemTipY}
-                                        stroke={noteColor}
-                                        strokeWidth="1.5"
-                                      />
+                                      sortedNotes.length > 1 ? (
+                                        <g>
+                                          {stemUp
+                                            ? sortedNotes.slice(0, -1).map((noteSeg, segIdx) => {
+                                                const ySegStart = staffTopY + getStaffY(noteSeg.pitch, isBassClef, isDrumClef);
+                                                const ySegEnd = staffTopY + getStaffY(sortedNotes[segIdx + 1].pitch, isBassClef, isDrumClef);
+                                                return (
+                                                  <line
+                                                    key={`mel-stem-seg-up-${segIdx}`}
+                                                    x1={fractionX + 6.0}
+                                                    y1={ySegStart}
+                                                    x2={fractionX + 6.0}
+                                                    y2={ySegEnd}
+                                                    stroke={getMelodicNoteColor(noteSeg.pitch)}
+                                                    strokeWidth="1.65"
+                                                  />
+                                                );
+                                              })
+                                            : sortedNotes.slice(1).map((noteSeg, segIdx) => {
+                                                const ySegStart = staffTopY + getStaffY(noteSeg.pitch, isBassClef, isDrumClef);
+                                                const ySegEnd = staffTopY + getStaffY(sortedNotes[segIdx].pitch, isBassClef, isDrumClef);
+                                                return (
+                                                  <line
+                                                    key={`mel-stem-seg-down-${segIdx}`}
+                                                    x1={fractionX - 6.0}
+                                                    y1={ySegStart}
+                                                    x2={fractionX - 6.0}
+                                                    y2={ySegEnd}
+                                                    stroke={getMelodicNoteColor(noteSeg.pitch)}
+                                                    strokeWidth="1.65"
+                                                  />
+                                                );
+                                              })}
+                                          <line
+                                            x1={stemUp ? fractionX + 6.0 : fractionX - 6.0}
+                                            y1={stemUp ? minY : maxY}
+                                            x2={stemUp ? fractionX + 6.0 : fractionX - 6.0}
+                                            y2={stemTipY}
+                                            stroke={anchorStemColor}
+                                            strokeWidth="1.65"
+                                          />
+                                        </g>
+                                      ) : (
+                                        <line
+                                          x1={stemUp ? fractionX + 6.0 : fractionX - 6.0}
+                                          y1={stemUp ? maxY : minY}
+                                          x2={stemUp ? fractionX + 6.0 : fractionX - 6.0}
+                                          y2={stemTipY}
+                                          stroke={anchorStemColor}
+                                          strokeWidth="1.65"
+                                        />
+                                      )
                                     )}
 
-                                    {/* Achtel- / 16tel-Flagge an der Halsspitze (nur wenn NICHT gebalkt!) */}
+                                    {/* Achtel- / 16tel-Flagge an der Halsspitze (nur wenn NICHT gebalkt!) - feiner 0.032 Urtext-Maßstab */}
                                     {!isBeamed && duration === '8' && (
                                       <path
                                         d={stemUp ? SMUFL_GLYPHS.flag8thUp : SMUFL_GLYPHS.flag8thDown}
-                                        transform={`translate(${stemUp ? fractionX + 6.0 : fractionX - 6.0}, ${stemTipY}) scale(0.040, -0.040)`}
-                                        fill={noteColor}
+                                        transform={`translate(${stemUp ? fractionX + 6.0 : fractionX - 6.0}, ${stemTipY}) scale(0.032, -0.032)`}
+                                        fill={anchorStemColor}
                                       />
                                     )}
                                     {!isBeamed && duration === '16' && (
                                       <path
                                         d={stemUp ? SMUFL_GLYPHS.flag16thUp : SMUFL_GLYPHS.flag16thDown}
-                                        transform={`translate(${stemUp ? fractionX + 6.0 : fractionX - 6.0}, ${stemTipY}) scale(0.040, -0.040)`}
-                                        fill={noteColor}
+                                        transform={`translate(${stemUp ? fractionX + 6.0 : fractionX - 6.0}, ${stemTipY}) scale(0.032, -0.032)`}
+                                        fill={anchorStemColor}
                                       />
                                     )}
                                   </g>
@@ -1362,7 +1580,7 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                               let stringIdx = n.stringIndex;
                               let fret = n.fret;
                               if (stringIdx === undefined || fret === undefined) {
-                                const resolved = pitchToBestFretAndString(n.pitch, undefined, snippet.instrument === 'bass');
+                                const resolved = pitchToBestFretAndString(n.pitch, undefined, snippet.instrument);
                                 if (resolved) {
                                   stringIdx = resolved.stringIndex;
                                   fret = resolved.fret;
@@ -1371,6 +1589,15 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                               if (stringIdx === undefined || fret === undefined) return null;
                               const tabY = tabTopY + stringIdx * tabStringSpacing;
                               const isSelectedFret = isSelectedSlot && (stringIdx === activeString || activeString === undefined) && !isPlaying;
+                              const tabFretColor = isCurrentlyPlaying
+                                ? '#6366f1'
+                                : hitStatus === 'hit'
+                                ? '#10b981'
+                                : hitStatus === 'near'
+                                ? '#f59e0b'
+                                : isDrumColorGuide
+                                ? getPitchColorTheme(n.pitch).border
+                                : '#0f172a';
 
                               return (
                                 <g key={`tab-fret-${n.id}`}>
@@ -1385,13 +1612,13 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                                     stroke={isSelectedFret ? '#6366f1' : 'none'}
                                     strokeWidth={isSelectedFret ? '1.8' : '0'}
                                   />
-                                  {/* Bund-Ziffer */}
+                                  {/* Bund-Ziffer in synästhetischer Tonhöhen-Farbe */}
                                   <text
                                     x={fractionX}
                                     y={tabY + 4.2}
                                     fontSize="11.5"
                                     fontWeight="900"
-                                    fill={isSelectedFret ? '#0f172a' : noteColor}
+                                    fill={isSelectedFret ? '#0f172a' : tabFretColor}
                                     textAnchor="middle"
                                     fontFamily="'SF Mono', Monaco, monospace"
                                   >
@@ -1403,16 +1630,16 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                           </g>
                         )}
 
-                        {/* 3. Triolen-Klammer ('3') falls aktiv */}
-                        {slotNotes.some(n => n.isTriplet) && (
+                        {/* 3. Triolen-Klammer ('3') exakt einmalig zentriert über der mittleren Note der Triolengruppe */}
+                        {slotNotes.some(n => n.isTriplet) && Math.abs((fractionIdx % 4) - 1.33) < 0.3 && (
                           <g id="triplet-badge">
                             <text
                               x={fractionX}
-                              y={showStaff ? staffTopY - 6 : tabTopY - 6}
-                              fontSize="10"
+                              y={showStaff ? Math.min(staffTopY - 8, (barBeamLookup.get(Math.round(fractionIdx * 100) / 100)?.stemTipY ?? staffTopY) - 6) : tabTopY - 6}
+                              fontSize="10.5"
                               fontWeight="900"
                               fontStyle="italic"
-                              fill="#64748b"
+                              fill="#475569"
                               textAnchor="middle"
                               fontFamily="'Plus Jakarta Sans', sans-serif"
                             >
@@ -1426,20 +1653,41 @@ export const MicroScoreStaffNotation: React.FC<MicroScoreStaffNotationProps> = (
                 );
               })}
 
-              {/* 🌟 0,1% Goldstandard Melodic Beams Layer */}
+              {/* 🌟 0,1% Goldstandard Melodic Beams Layer (Bunt vs. Klassisch Schwarz #0f172a) */}
               {showStaff && !isDrumClef && (
-                <MicroScoreMelodicBeams beamGroups={barMelodicBeamGroups} />
+                <MicroScoreMelodicBeams
+                  beamGroups={barMelodicBeamGroups}
+                  color={isDrumColorGuide ? undefined : '#0f172a'}
+                />
               )}
             </g>
           );
         })}
 
-        {/* 3. Flüssiger Playback-Playhead während des Abspielens */}
+        {/* 🌟 0,1% Goldstandard: Explizites In-Canvas Element zum Hinzufügen des nächsten Takts (max. 4 Takte) */}
+        {canAddBar && (
+          <MicroScoreAddBarElement
+            barsCount={snippet.barsCount}
+            leftMargin={leftMargin}
+            measureWidth={measureWidth}
+            addBarWidth={addBarWidth}
+            showStaff={showStaff}
+            showTabs={showTabs}
+            staffTopY={staffTopY}
+            staffHeight={staffHeight}
+            tabTopY={tabTopY}
+            tabHeight={tabHeight}
+            onAddBar={onAddBar}
+          />
+        )}
+
+        {/* 3. Flüssiger Playback-Playhead während des Abspielens (100% synchron mit Taktart 4/4, 3/4, 2/4, 6/8) */}
         {isPlaying && playheadPosition && (
           <g id="playback-playhead">
             {(() => {
+              const totalPlayheadFractions = getTimeSignatureFractions(snippet.timeSignature);
               const headX = leftMargin + playheadPosition.bar * measureWidth + 12 + 
-                (playheadPosition.fraction / 16) * (measureWidth - 24);
+                (playheadPosition.fraction / totalPlayheadFractions) * (measureWidth - 24);
               return (
                 <line
                   x1={headX}

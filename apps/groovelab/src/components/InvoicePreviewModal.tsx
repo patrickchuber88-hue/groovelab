@@ -445,7 +445,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           {isPreview && (
             <div style={{
               background: '#f0f9ff',
-              border: '1px solid #bae6fd',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 16px',
               marginBottom: '16px',
@@ -814,12 +814,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
               
               {isAkt && billingPayer === 'student' && (
-                <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: '1px solid #e6f4ea', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.64rem', color: '#34a853', background: '#e6f4ea', border: 'none', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
                   <strong>Durchlaufender Posten:</strong> Dieses Guthaben gleicht sich zu 100% durch die Bereitstellungsgebühren der Eltern/Schüler aus. Keine effektiven Kosten für die Musikschule.
                 </div>
               )}
               {isAkt && billingPayer === 'school' && (
-                <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: '1px solid #fed7aa', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.64rem', color: '#ea580c', background: '#ffedd5', border: 'none', padding: '6px 10px', borderRadius: '8px', fontWeight: 700, width: '100%', marginTop: '8px', textAlign: 'center' }}>
                   <strong>Sammelabrechnung:</strong> Diese Cloud-Bereitstellungen werden direkt von der Musikschule getragen und über das Sammelzahlungs-Modell abgerechnet.
                 </div>
               )}
@@ -837,7 +837,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   padding: '16px', 
                   background: '#e6f4ea', 
                   borderRadius: '16px', 
-                  border: '1px solid #e6f4ea', 
+                  border: 'none', 
                   fontSize: '0.74rem', 
                   color: '#34a853', 
                   width: '100%',
@@ -854,7 +854,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   padding: '14px 18px', 
                   background: '#f0fdf4', 
                   borderRadius: '16px', 
-                  border: '1px solid #bbf7d0', 
+                  border: 'none', 
                   fontSize: '0.74rem', 
                   color: '#166534', 
                   width: '100%', 

@@ -3,10 +3,11 @@
  * 
  * Provides unified, cross-module hardware latency identification and storage.
  * Synchronizes per-device calibration between Loopstation, GrooveTrainer and PracticeCompanion,
- * persisting offsets to localStorage and Supabase student profiles.
+ * persisting offsets to localStorage and Supabase user profiles via save_user_audio_calibration.
  */
 
 import { supabase } from '../lib/supabase';
+import { audioLatencyService } from '../services/audioLatencyService';
 
 export interface DeviceAudioFingerprint {
   hash: string;
@@ -53,9 +54,11 @@ export async function getAudioDeviceFingerprint(sampleRate: number = 44100): Pro
 
 /**
  * Retrieves the calibrated latency offset for a given device hash.
- * Checks per-device storage first, then falls back to global offset if marked as calibrated.
  */
 export function getDeviceLatency(deviceHash: string): number | null {
+  if (audioLatencyService.isCurrentRouteCalibrated()) {
+    return audioLatencyService.getEffectiveLatencyMs();
+  }
   if (typeof localStorage === 'undefined') return null;
 
   try {
@@ -64,36 +67,20 @@ export function getDeviceLatency(deviceHash: string): number | null {
       const parsed = parseInt(savedPerDevice, 10);
       if (!isNaN(parsed)) return parsed;
     }
-
-    const globalSaved = localStorage.getItem('groovelab_sync_offset_ms');
-    const isCalibrated = localStorage.getItem('groovelab_latency_calibrated') === 'true';
-    if (globalSaved !== null && isCalibrated) {
-      const parsed = parseInt(globalSaved, 10);
-      if (!isNaN(parsed)) return parsed;
-    }
   } catch (_) {}
 
   return null;
 }
 
 /**
- * Checks if the current hardware device has already been calibrated.
+ * Checks if the current hardware device has already been calibrated for the active user.
  */
-export function isDeviceCalibrated(deviceHash: string): boolean {
-  if (typeof localStorage === 'undefined') return false;
-
-  try {
-    const savedPerDevice = localStorage.getItem(`groovelab_latency_dev_${deviceHash}`);
-    if (savedPerDevice !== null) return true;
-
-    return localStorage.getItem('groovelab_latency_calibrated') === 'true';
-  } catch (_) {
-    return false;
-  }
+export function isDeviceCalibrated(_deviceHash?: string): boolean {
+  return audioLatencyService.isCurrentRouteCalibrated();
 }
 
 /**
- * Persists the calibrated latency offset locally and in the Supabase student profile.
+ * Persists the calibrated latency offset locally and in the Supabase user profile.
  */
 export async function saveDeviceLatency(
   deviceHash: string,
@@ -101,29 +88,23 @@ export async function saveDeviceLatency(
   offsetVal: number,
   studentId?: string
 ): Promise<void> {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem('groovelab_sync_offset_ms', offsetVal.toString());
-      localStorage.setItem('groovelab_latency_calibrated', 'true');
-      if (deviceHash) {
-        localStorage.setItem(`groovelab_latency_dev_${deviceHash}`, offsetVal.toString());
-      }
-    } catch (_) {}
-  }
+  audioLatencyService.setManualLatencyMs(offsetVal, 'manual_slider');
 
   if (studentId) {
     try {
-      await supabase
-        .from('students')
-        .update({
-          device_calibration: {
-            device_hash: deviceHash,
-            device_name: deviceName,
-            latency_ms: offsetVal,
-            calibrated_at: new Date().toISOString()
-          }
-        })
-        .eq('id', studentId);
+      const platform = audioLatencyService.detectPlatform();
+      const profileKey = `${platform}_speaker_${deviceHash || 'default'}`;
+      await (supabase.rpc as any)('save_user_audio_calibration', {
+        p_user_id: studentId,
+        p_profile_key: profileKey,
+        p_calibration: {
+          profile_key: profileKey,
+          device_hash: deviceHash,
+          device_name: deviceName,
+          latency_ms: offsetVal,
+          calibrated_at: new Date().toISOString()
+        }
+      });
     } catch (err) {
       console.warn('[AudioDeviceCalibration] Supabase device calibration sync error:', err);
     }

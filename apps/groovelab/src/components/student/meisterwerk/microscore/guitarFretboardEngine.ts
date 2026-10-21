@@ -41,11 +41,19 @@ export const VIOLIN_STRINGS: GuitarStringInfo[] = [
   { index: 3, name: 'g', openPitch: 'G3', openMidi: 55 }
 ];
 
+export const UKE_STRINGS: GuitarStringInfo[] = [
+  { index: 0, name: 'a', openPitch: 'A4', openMidi: 69 },
+  { index: 1, name: 'e', openPitch: 'E4', openMidi: 64 },
+  { index: 2, name: 'c', openPitch: 'C4', openMidi: 60 },
+  { index: 3, name: 'g', openPitch: 'G4', openMidi: 67 }
+];
+
 export function isStringOrPluckedInstrument(instrument: MicroScoreInstrument): boolean {
-  return instrument === 'guitar' || instrument === 'bass' || instrument === 'strings';
+  return instrument === 'guitar' || instrument === 'bass' || instrument === 'strings' || instrument === 'ukulele';
 }
 
 export function getInstrumentStrings(instrument: MicroScoreInstrument | boolean): GuitarStringInfo[] {
+  if (instrument === 'ukulele') return UKE_STRINGS;
   if (instrument === 'strings') return VIOLIN_STRINGS;
   if (instrument === 'bass' || instrument === true) return BASS_STRINGS;
   return GUITAR_STRINGS;
@@ -93,13 +101,14 @@ export function midiToPitch(midi: number): string {
  * Berücksichtigt Standard-Gitarren/Bass-Notation (Treble 8vb / Bass 8vb: 1 Oktave höher notiert als klingend)
  */
 export function fretAndStringToPitch(stringIndex: number, fret: number, isBassOrInst: boolean | MicroScoreInstrument = false): string {
+  const isUke = isBassOrInst === 'ukulele';
   const isStrings = isBassOrInst === 'strings';
   const isBass = isBassOrInst === 'bass' || isBassOrInst === true;
-  const strings = isStrings ? VIOLIN_STRINGS : isBass ? BASS_STRINGS : GUITAR_STRINGS;
+  const strings = isUke ? UKE_STRINGS : isStrings ? VIOLIN_STRINGS : isBass ? BASS_STRINGS : GUITAR_STRINGS;
   const str = strings[stringIndex] || strings[0];
   const soundingMidi = str.openMidi + Math.max(0, Math.min(24, fret));
-  // Streicher spielen nicht-transponierend im Violinschlüssel (C-Notation)
-  const writtenMidi = isStrings ? soundingMidi : soundingMidi + 12;
+  // Streicher & Ukulele spielen nicht-transponierend im Violinschlüssel (C-Notation)
+  const writtenMidi = (isStrings || isUke) ? soundingMidi : soundingMidi + 12;
   return midiToPitch(writtenMidi);
 }
 
@@ -117,13 +126,14 @@ export function pitchToBestFretAndString(
   const rawMidi = pitchToMidi(pitch);
   if (rawMidi === null) return null;
 
+  const isUke = isBassOrInst === 'ukulele';
   const isStrings = isBassOrInst === 'strings';
   const isBass = isBassOrInst === 'bass' || isBassOrInst === true;
-  const strings = isStrings ? VIOLIN_STRINGS : isBass ? BASS_STRINGS : GUITAR_STRINGS;
+  const strings = isUke ? UKE_STRINGS : isStrings ? VIOLIN_STRINGS : isBass ? BASS_STRINGS : GUITAR_STRINGS;
 
-  // Transposition: Standard-Notation für Gitarre (Treble 8vb) & Bass (Bass 8vb)
+  // Transposition: Gitarre (Treble 8vb) & Bass (Bass 8vb), Streicher & Ukulele sind C-klingend
   let soundingMidi = rawMidi;
-  if (!isStrings) {
+  if (!isStrings && !isUke) {
     soundingMidi = rawMidi - 12; // Unconditional 8vb transposition for 100% parity
   }
 

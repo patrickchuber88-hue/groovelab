@@ -94,7 +94,7 @@ export const SecretarySponsorDeleteConfirmModal: React.FC<SecretarySponsorDelete
                 height: '42px',
                 borderRadius: '12px',
                 background: '#fffbeb',
-                border: '1px solid #fef3c7',
+                border: 'none',
                 color: '#d97706',
                 display: 'flex',
                 alignItems: 'center',
@@ -206,7 +206,7 @@ export const SecretarySponsorDeleteConfirmModal: React.FC<SecretarySponsorDelete
                 height: '42px',
                 borderRadius: '12px',
                 background: '#fef2f2',
-                border: '1px solid #fee2e2',
+                border: 'none',
                 color: '#ef4444',
                 display: 'flex',
                 alignItems: 'center',
@@ -239,7 +239,7 @@ export const SecretarySponsorDeleteConfirmModal: React.FC<SecretarySponsorDelete
             <div id="delete-dialog-desc" style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.82rem', color: '#334155' }}>
               <div style={{
                 background: '#fef2f2',
-                border: '1.5px solid #fecaca',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '14px',
                 color: '#991b1b',

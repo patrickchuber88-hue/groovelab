@@ -43,7 +43,7 @@ export const WochenFahrplanDidaktikChips: React.FC<WochenFahrplanDidaktikChipsPr
               padding: '2px 8px',
               borderRadius: '8px',
               background: '#ecfdf5',
-              border: '1px solid #a7f3d0',
+              border: 'none',
               color: '#065f46',
               fontSize: '0.72rem',
               fontWeight: 800,

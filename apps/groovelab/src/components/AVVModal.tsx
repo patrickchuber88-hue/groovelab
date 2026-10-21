@@ -620,7 +620,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           {signedSuccess || school?.avv_signed_at ? (
             <div style={{
               background: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              border: 'none',
               padding: '14px 18px',
               borderRadius: '16px',
               display: 'flex',

@@ -19,6 +19,7 @@ export interface TagesKompassScoreSnippetPillProps {
   snippet: MicroScoreSnippet;
   studentId?: string;
   studentName?: string;
+  studentInstrument?: string;
   isJunior?: boolean;
 }
 
@@ -26,6 +27,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
   snippet,
   studentId,
   studentName,
+  studentInstrument,
   isJunior = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -228,7 +230,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
           initialSnippet={snippet}
           studentId={studentId}
           taskTitle={snippet.title}
-          defaultInstrument={snippet.instrument}
+          defaultInstrument={studentInstrument || snippet.instrument}
           readOnly={false}
         />
       )}

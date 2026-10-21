@@ -20,7 +20,7 @@ export const Badge: React.FC<BadgeProps> = React.memo(({
     if (appearance === 'filled') {
       if (moduleTheme === 'admin') return 'bg-[#ea4335] text-white border-0';
       if (moduleTheme === 'campus') return 'bg-[#34a853] text-white border-0';
-      if (moduleTheme === 'groovelab') return 'bg-[#eab308] text-slate-900 font-bold border-0';
+      if (moduleTheme === 'groovelab') return 'bg-[#facc15] text-slate-900 font-bold border-0';
 
       switch (variant) {
         case 'success':
@@ -40,7 +40,7 @@ export const Badge: React.FC<BadgeProps> = React.memo(({
     if (appearance === 'outline') {
       if (moduleTheme === 'admin') return 'bg-transparent text-red-600 border border-red-500';
       if (moduleTheme === 'campus') return 'bg-transparent text-[#34a853] border border-[#34a853]';
-      if (moduleTheme === 'groovelab') return 'bg-transparent text-amber-700 border border-[#eab308]';
+      if (moduleTheme === 'groovelab') return 'bg-transparent text-amber-700 border border-[#facc15]';
 
       switch (variant) {
         case 'success':

@@ -63,21 +63,34 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const modalStates = useMasterAdminModalStates();
   const [globalFetchError, setGlobalFetchError] = useState<string | null>(null);
   const [dbLatency, setDbLatency] = useState<LatencyMetric>({ rttMs: 18, quality: 'EXCELLENT', timestamp: Date.now() });
-  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
-  );
+  const resolveMasterMobile = () => {
+    if (typeof window === 'undefined') return false;
+    if (typeof document !== 'undefined') {
+      const simCat = document.documentElement.getAttribute('data-sim-category');
+      if (simCat === 'mobile' || document.querySelector('.sim-viewport-mobile')) return true;
+      if (simCat === 'tablet' || document.querySelector('.sim-viewport-tablet')) return false;
+      const simW = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simW > 0) return simW <= 768;
+    }
+    return window.innerWidth <= 768;
+  };
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(resolveMasterMobile);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
+      const mobile = resolveMasterMobile();
       setIsMobileViewport(mobile);
       if (!mobile) {
         setMobileSidebarOpen(false);
       }
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
 
   // 1. Telemetry Domain Hook
@@ -218,85 +231,25 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   ), [schools.schools]);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'radial-gradient(circle at 50% 0%, #fcfdfe 0%, #f3f6fa 50%, #e9edf5 100%)',
-      color: '#1e293b',
-      fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
-      padding: '0',
-      transition: 'all 0.3s ease',
-      position: 'relative',
-      overflowX: 'hidden'
-    }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', color: '#1e293b', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif", padding: '0', transition: 'all 0.3s ease', position: 'relative', overflowX: 'hidden' }}>
       {/* Background Decorative Blobs */}
-      <div style={{
-        position: 'fixed',
-        top: '-10%',
-        right: '-10%',
-        width: '50vw',
-        height: '50vw',
-        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%)',
-        pointerEvents: 'none',
-        zIndex: 0
-      }} />
-      <div style={{
-        position: 'fixed',
-        bottom: '-10%',
-        left: '-10%',
-        width: '50vw',
-        height: '50vw',
-        background: 'radial-gradient(circle, rgba(234, 179, 8, 0.04) 0%, transparent 70%)',
-        pointerEvents: 'none',
-        zIndex: 0
-      }} />
+      <div style={{ position: 'fixed', top: '-10%', right: '-10%', width: '50vw', height: '50vw', background: 'transparent', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: '-10%', left: '-10%', width: '50vw', height: '50vw', background: 'transparent', pointerEvents: 'none', zIndex: 0 }} />
 
       {/* Mobile Header Bar (<= 768px only, Desktop untouched) */}
       {isMobileViewport && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 18px',
-          background: 'rgba(255, 255, 255, 0.92)',
-          backdropFilter: 'blur(20px)',
-          borderBottom: '1px solid #e2e8f0',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'rgba(255, 255, 255, 0.92)', backdropFilter: 'blur(20px)', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 50 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+            <div style={{ background: '#10b981', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield size={16} color="#ffffff" />
             </div>
-            <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
-              Admin Leitstand
-            </strong>
+            <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Admin Leitstand</strong>
           </div>
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(prev => !prev)}
             aria-label={mobileSidebarOpen ? 'Navigation schließen' : 'Navigation öffnen'}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '10px',
-              background: '#f1f5f9',
-              border: 'none',
-              color: '#0f172a',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 800,
-              fontSize: '0.82rem'
-            }}
+            style={{ padding: '8px 12px', borderRadius: '10px', background: '#f1f5f9', border: 'none', color: '#0f172a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.82rem' }}
           >
             {mobileSidebarOpen ? <X size={18} /> : <Menu size={18} />}
             <span>Menü</span>
@@ -305,22 +258,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       )}
 
       {/* Main Container Layout (Desktop 290px 1fr strictly preserved) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobileViewport ? '1fr' : '290px 1fr',
-        minHeight: '100vh',
-        position: 'relative',
-        zIndex: 1
-      }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobileViewport ? '1fr' : '290px 1fr', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
         {/* Left Premium Sidebar (Desktop sticky column or Mobile Drawer) */}
         {(!isMobileViewport || mobileSidebarOpen) && (
-          <div style={isMobileViewport ? {
-            position: 'fixed',
-            inset: 0,
-            zIndex: 45,
-            background: 'rgba(15, 23, 42, 0.45)',
-            display: 'flex'
-          } : undefined}>
+          <div style={isMobileViewport ? { position: 'fixed', inset: 0, zIndex: 45, background: 'rgba(15, 23, 42, 0.45)', display: 'flex' } : undefined}>
             <div style={isMobileViewport ? { width: '290px', maxWidth: '85vw', height: '100vh', overflowY: 'auto', background: '#ffffff' } : undefined}>
               <MasterAdminSidebar
                 activePortalTab={activePortalTab}
@@ -338,28 +279,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         )}
 
         {/* Right Workspace Area */}
-        <div style={{
-          padding: isMobileViewport ? '20px 16px' : '44px 54px',
-          overflowY: 'auto',
-          height: '100vh',
-          boxSizing: 'border-box',
-          position: 'relative'
-        }}>
+        <div style={{ padding: isMobileViewport ? '20px 16px' : '44px 54px', overflowY: 'auto', height: '100vh', boxSizing: 'border-box', position: 'relative' }}>
           {/* Security Shield Tamper Banner */}
           {securityShield.integrityCompromised && (
-            <div style={{
-              background: '#fef2f2',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '16px 20px',
-              color: '#b91c1c',
-              marginBottom: '24px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              boxShadow: 'none'
-            }}>
+            <div style={{ background: '#fef2f2', border: 'none', borderRadius: '16px', padding: '16px 20px', color: '#b91c1c', marginBottom: '24px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: 'none' }}>
               <Shield size={24} color="#dc2626" />
               <div>
                 <div style={{ fontSize: '0.90rem' }}>SICHERHEITS-INTEGRITÄTSWARNUNG</div>
@@ -370,91 +293,32 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {/* DOM Zeroing: Arbeitsspeicher- und DOM-Bereinigung im gesperrten Zustand */}
           {idleLock.isIdleLocked ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '75vh',
-              textAlign: 'center',
-              color: '#94a3b8'
-            }}>
-              <div style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '20px',
-                background: '#f1f5f9',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: '16px'
-              }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '75vh', textAlign: 'center', color: '#94a3b8' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                 <Shield size={30} color="#64748b" />
               </div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#475569', margin: '0 0 6px 0' }}>
-                Leitstand geschützt &amp; im Ruhezustand
-              </h3>
-              <p style={{ fontSize: '0.85rem', maxWidth: '360px', margin: 0, lineHeight: 1.5 }}>
-                Vertrauliche Arbeitsdaten wurden aus dem DOM und Arbeitsspeicher entfernt. Entsperren Sie über Touch ID oder Google Authenticator.
-              </p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#475569', margin: '0 0 6px 0' }}>Leitstand geschützt &amp; im Ruhezustand</h3>
+              <p style={{ fontSize: '0.85rem', maxWidth: '360px', margin: 0, lineHeight: 1.5 }}>Vertrauliche Arbeitsdaten wurden aus dem DOM und Arbeitsspeicher entfernt. Entsperren Sie über Touch ID oder Google Authenticator.</p>
             </div>
           ) : (
             <>
               {/* Offline / Server Error Banner */}
               {globalFetchError && (
-                <div style={{
-                  background: '#fffbeb',
-                  border: 'none',
-                  borderRadius: '20px',
-                  padding: '16px 22px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '14px',
-                  marginBottom: '24px',
-                  boxShadow: 'none'
-                }}>
+                <div style={{ background: '#fffbeb', border: 'none', borderRadius: '20px', padding: '16px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '24px', boxShadow: 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '13px',
-                  background: '#f1f5f9',
-                  border: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '13px', background: '#f1f5f9', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <WifiOff size={20} color="#0f172a" />
                 </div>
                 <div>
-                  <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
-                    Server-Verbindung eingeschränkt ({globalFetchError})
-                  </strong>
-                  <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                    Die Verbindung zum IONOS / Hetzner EU Cluster ist temporär unterbrochen.
-                  </span>
+                  <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Server-Verbindung eingeschränkt ({globalFetchError})</strong>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Die Verbindung zum IONOS / Hetzner EU Cluster ist temporär unterbrochen.</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setGlobalFetchError(null); schools.fetchSchoolsAndStats(); }}
                 disabled={schools.loading}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  color: '#0f172a',
-                  padding: '9px 18px',
-                  borderRadius: '12px',
-                  fontSize: '0.82rem',
-                  fontWeight: 850,
-                  cursor: schools.loading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px'
-                }}
+                style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', padding: '9px 18px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 850, cursor: schools.loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '7px' }}
               >
                 <RotateCcw size={14} className={schools.loading ? 'animate-spin' : ''} color="#0f172a" />
                 <span>{schools.loading ? 'Verbinde...' : 'Erneut verbinden'}</span>
@@ -468,114 +332,43 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               <button
                 type="button"
                 onClick={() => setActivePortalTab('maintenance')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: isGlobalMaintenanceActive ? '#fee2e2' : '#ecfdf5',
-                  border: 'none',
-                  color: isGlobalMaintenanceActive ? '#dc2626' : '#059669',
-                  padding: '6px 14px',
-                  borderRadius: '100px',
-                  fontSize: '0.78rem',
-                  fontWeight: 850,
-                  cursor: 'pointer'
-                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: isGlobalMaintenanceActive ? '#fee2e2' : '#ecfdf5', border: 'none', color: isGlobalMaintenanceActive ? '#dc2626' : '#059669', padding: '6px 14px', borderRadius: '100px', fontSize: '0.78rem', fontWeight: 850, cursor: 'pointer' }}
               >
-                <span style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: isGlobalMaintenanceActive ? '#dc2626' : '#10b981'
-                }} />
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isGlobalMaintenanceActive ? '#dc2626' : '#10b981' }} />
                 <span>{isGlobalMaintenanceActive ? 'Wartungsmodus Aktiv' : 'System-Status: Normal & Online'}</span>
               </button>
 
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '5px 12px',
-                borderRadius: '100px',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                color: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#15803d')
-              }}>
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#16a34a')
-                }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderRadius: '100px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.74rem', fontWeight: 800, color: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#15803d') }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dbLatency.quality === 'POOR' ? '#dc2626' : (dbLatency.quality === 'FAIR' ? '#d97706' : '#16a34a') }} />
                 <span>DB-Ping: {dbLatency.rttMs} ms (IONOS / Hetzner EU)</span>
               </div>
 
-              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
-                Campus-Groovelab Enterprise Leitstand
-              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>Campus-Groovelab Enterprise Leitstand</div>
             </div>
           )}
 
           {/* Active Ghost Mode Support Session Banner */}
           {schools.activeGhostSession && (
-            <div style={{
-              background: '#0f172a',
-              color: '#ffffff',
-              padding: '14px 22px',
-              borderRadius: '16px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)'
-            }}>
+            <div style={{ background: '#0f172a', color: '#ffffff', padding: '14px 22px', borderRadius: '16px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <Shield size={20} color="#ffffff" />
                 <div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 800 }}>Support-Sitzung aktiv (Ghost-Mode)</div>
-                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                    Autorisierter Master-Zugriff auf: <strong style={{ color: '#ffffff' }}>{schools.activeGhostSession.schoolName}</strong>
-                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Autorisierter Master-Zugriff auf: <strong style={{ color: '#ffffff' }}>{schools.activeGhostSession.schoolName}</strong></div>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    const url = `${window.location.origin}/?school_id=${schools.activeGhostSession.schoolId}&support_ghost=true`;
-                    window.location.href = url;
-                  }}
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.12)',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '8px 14px',
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    fontSize: '0.80rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
+                  onClick={() => { window.location.href = `${window.location.origin}/?school_id=${schools.activeGhostSession.schoolId}&support_ghost=true`; }}
+                  style={{ background: 'rgba(255, 255, 255, 0.12)', color: '#ffffff', border: 'none', padding: '8px 14px', borderRadius: '10px', fontWeight: 700, fontSize: '0.80rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Eye size={13} /> Schulumgebung öffnen
                 </button>
                 <button
                   type="button"
                   onClick={schools.handleStopGhostMode}
-                  style={{
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    fontWeight: 800,
-                    fontSize: '0.80rem',
-                    cursor: 'pointer'
-                  }}
+                  style={{ background: '#ffffff', color: '#0f172a', border: 'none', padding: '8px 16px', borderRadius: '10px', fontWeight: 800, fontSize: '0.80rem', cursor: 'pointer' }}
                 >
                   Sitzung beenden
                 </button>
@@ -585,22 +378,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {/* Success Toast */}
           {modalStates.saveSuccessToast && (
-            <div style={{
-              position: 'fixed',
-              top: '24px',
-              right: '28px',
-              zIndex: 99999,
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              padding: '14px 22px',
-              borderRadius: '16px',
-              boxShadow: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              fontSize: '0.90rem',
-              fontWeight: 800
-            }}>
+            <div style={{ position: 'fixed', top: '24px', right: '28px', zIndex: 99999, background: '#10b981', color: '#ffffff', padding: '14px 22px', borderRadius: '16px', boxShadow: 'none', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.90rem', fontWeight: 800 }}>
               <CheckCircle size={20} color="#ffffff" />
               <span>{modalStates.saveSuccessToast}</span>
             </div>
@@ -608,18 +386,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
           {/* Pending Storage Provisioning Banner */}
           {pendingStorageSchools.length > 0 && activePortalTab !== 'executive' && (
-            <div style={{
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '14px 20px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px'
-            }}>
+            <div style={{ background: '#fef9c3', border: 'none', borderRadius: '16px', padding: '14px 20px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <HardDrive size={18} color="#0f172a" />
                 <div>
@@ -634,19 +401,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               <button
                 type="button"
                 onClick={() => window.open('https://console.hetzner.cloud/projects', '_blank')}
-                style={{
-                  background: '#ffffff',
-                  border: '1px solid #d97706',
-                  color: '#92400e',
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
+                style={{ background: '#ffffff', border: '1px solid #d97706', color: '#92400e', padding: '6px 12px', borderRadius: '8px', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <ExternalLink size={12} /> console.hetzner.cloud ↗
               </button>

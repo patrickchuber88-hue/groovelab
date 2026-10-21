@@ -173,7 +173,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             <defs>
               <linearGradient id="celebrationProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor={studentUiLevel === 'pro' ? "#10b981" : studentUiLevel === 'teen' ? "#0d9488" : "#34a853"} />
-                <stop offset="100%" stopColor={studentUiLevel === 'pro' ? "#059669" : studentUiLevel === 'teen' ? "#f59e0b" : "#22c55e"} />
+                <stop offset="100%" stopColor={studentUiLevel === 'pro' ? "#059669" : studentUiLevel === 'teen' ? "#f59e0b" : "#34a853"} />
               </linearGradient>
             </defs>
           </svg>
@@ -345,7 +345,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
             fontSize: '0.82rem',
             color: '#5b21b6',
             background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-            border: '1.5px solid #c4b5fd',
+            border: 'none',
             padding: '12px 14px',
             borderRadius: '16px',
             width: '100%',
@@ -373,7 +373,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
                 <span style={{ fontWeight: 900, color: '#6d28d9', fontSize: '0.86rem' }}>
                   Schutzschild aktiv! 🔥
                 </span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 900, background: '#f5f3ff', color: '#6d28d9', padding: '2px 8px', borderRadius: '100px', border: '1px solid #ddd6fe' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 900, background: '#f5f3ff', color: '#6d28d9', padding: '2px 8px', borderRadius: '100px', border: 'none' }}>
                   Glut-Schutz
                 </span>
               </div>
@@ -418,7 +418,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
               ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
               : studentUiLevel === 'teen'
               ? 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)'
-              : 'linear-gradient(135deg, #34a853 0%, #22c55e 100%)',
+              : '#34a853',
             color: '#ffffff',
             border: 'none',
             padding: '16px 20px',

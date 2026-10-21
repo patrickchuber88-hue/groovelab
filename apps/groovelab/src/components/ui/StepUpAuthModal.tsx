@@ -154,7 +154,7 @@ export const StepUpAuthModal: React.FC<StepUpAuthModalProps> = ({
               padding: '10px 14px',
               borderRadius: '10px',
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               color: '#b91c1c',
               fontSize: '0.84rem',
               fontWeight: 600,

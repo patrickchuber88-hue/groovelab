@@ -167,7 +167,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
                   letterSpacing: '0.06em',
                   color: '#92400e',
                   background: '#fef3c7',
-                  border: '1px solid #fde68a',
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: '100px'
                 }}>
@@ -178,7 +178,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
                   fontWeight: 800,
                   color: '#047857',
                   background: '#ecfdf5',
-                  border: '1px solid #a7f3d0',
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: '100px',
                   display: 'flex',
@@ -222,7 +222,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
           {/* Reassuring Educational Guarantee Box */}
           <div style={{
             background: '#ecfdf5',
-            border: '1.5px solid #a7f3d0',
+            border: 'none',
             borderRadius: '14px',
             padding: '12px 14px',
             display: 'flex',
@@ -267,7 +267,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
                 fontWeight: 800,
                 color: '#10b981',
                 background: '#ecfdf5',
-                border: '1px solid #a7f3d0',
+                border: 'none',
                 padding: '3px 10px',
                 borderRadius: '100px'
               }}>
@@ -379,7 +379,7 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
           {showAlreadyPaidNotice && (
             <div style={{
               background: '#eff6ff',
-              border: '1.5px solid #93c5fd',
+              border: 'none',
               borderRadius: '14px',
               padding: '12px 14px',
               fontSize: '0.78rem',

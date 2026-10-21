@@ -178,7 +178,7 @@ export const TrialInfoModal: React.FC<TrialInfoModalProps> = ({
 
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <CheckCircle2 size={15} color="#eab308" />
+                <CheckCircle2 size={15} color="#facc15" />
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Modul GrooveLab</strong>
               </div>
               <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>
@@ -204,7 +204,7 @@ export const TrialInfoModal: React.FC<TrialInfoModalProps> = ({
             </div>
           </div>
         ) : isTeacher ? (
-          <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px 16px', border: '1px solid #bbf7d0' }}>
+          <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '14px 16px', border: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <Sparkles size={18} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div>

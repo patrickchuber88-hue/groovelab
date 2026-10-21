@@ -1397,7 +1397,7 @@ export const TeacherNotesBoardView: React.FC<TeacherNotesBoardViewProps> = ({
                             onClick={() => onResolveRoomIssue(def.id, 'teacher')}
                             title="Als behoben markieren"
                             style={{
-                              border: '1px solid #bbf7d0',
+                              border: 'none',
                               background: '#f0fdf4',
                               color: '#15803d',
                               fontSize: '0.72rem',

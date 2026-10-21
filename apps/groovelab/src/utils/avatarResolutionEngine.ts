@@ -347,6 +347,18 @@ export const resolveGrooveLabTeacherAvatar = (user?: any, src?: string | null): 
 export const isInstrumentAvatar = (url: string | null | undefined): boolean => {
   if (!url) return false;
   const u = String(url).toLowerCase();
+  if (
+    u.includes('student_') ||
+    u.includes('teen_') ||
+    u.includes('bandstyle_') ||
+    u.includes('teacher_') ||
+    u.includes('avatar_teacher') ||
+    u.includes('avatar_boy') ||
+    u.includes('avatar_girl') ||
+    u.includes('avatar_ghost')
+  ) {
+    return false;
+  }
   return (
     u.includes('gitarre_avatar') ||
     u.includes('guitar_avatar') ||
@@ -379,6 +391,52 @@ export const isInstrumentAvatar = (url: string | null | undefined): boolean => {
     u.includes('oboe_avatar') ||
     u.includes('neutral_instrument_avatar')
   );
+};
+
+/**
+ * Returns true if the URL is a musician/human avatar or ghost avatar that is strictly forbidden in Campus.
+ */
+export const isForbiddenCampusAvatarUrl = (url: string | null | undefined): boolean => {
+  if (!url) return true;
+  const u = String(url).toLowerCase();
+  if (u.includes('campus_login_hero')) return false;
+  if (
+    u.includes('student_') ||
+    u.includes('teen_') ||
+    u.includes('bandstyle_') ||
+    u.includes('teacher_') ||
+    u.includes('avatar_teacher') ||
+    u.includes('avatar_boy') ||
+    u.includes('avatar_girl') ||
+    u.includes('avatar_ghost')
+  ) {
+    return true;
+  }
+  return !isInstrumentAvatar(u);
+};
+
+/**
+ * Sanitizes any candidate avatar URL for the Campus module:
+ * Guarantees that musician avatars (human characters) and ghost avatars are NEVER returned in Campus,
+ * not even as a fallback.
+ */
+export const sanitizeCampusAvatarUrl = (
+  url: string | null | undefined,
+  user?: any,
+  fallbackTeacherOrTeachersList?: any,
+  schedules?: any[]
+): string => {
+  if (url && isInstrumentAvatar(url)) {
+    return url;
+  }
+  const role = (user?.role || '').toLowerCase();
+  const roles = Array.isArray(user?.roles) ? user.roles.map((r: any) => String(r).toLowerCase()) : [];
+  const isExplicitTeacher = role === 'teacher' || user?.isTeacherContext === true || user?.isTeacher === true || user?.activeWorkspace === 'teacher';
+  const isExplicitStudent = role === 'student';
+  if (!isExplicitTeacher && !isExplicitStudent && (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary'))) {
+    return '/campus_login_hero.png';
+  }
+  return resolveCampusStudentAvatar(user, fallbackTeacherOrTeachersList, schedules);
 };
 
 /**

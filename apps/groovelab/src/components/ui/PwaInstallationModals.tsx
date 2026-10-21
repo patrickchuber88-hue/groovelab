@@ -263,7 +263,7 @@ export const PwaInstallationModals: React.FC<PwaInstallationModalsProps> = ({
                 borderRadius: '11px',
                 background: isCampus 
                   ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)'
-                  : 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                  : '#facc15',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

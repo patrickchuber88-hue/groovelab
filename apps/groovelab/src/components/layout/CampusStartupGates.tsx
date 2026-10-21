@@ -160,7 +160,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
           {/* Small non-clickable brand indicator for public visitors */}
           <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10, display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
             <div style={{ width: '32px', height: '32px', background: '#fefce8', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Music size={18} color="#eab308" />
+              <Music size={18} color="#facc15" />
             </div>
             <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>GROOVELAB</div>
           </div>
@@ -193,7 +193,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
     // Show a minimalist loading state for public visitors
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#facc15', borderRadius: '50%' }}></div>
       </div>
     );
   }
@@ -258,7 +258,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
   if (loadingKiosk) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#facc15', borderRadius: '50%' }}></div>
         <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Lade Kiosk-Konfiguration…</div>
       </div>
     );
@@ -277,7 +277,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
   if (kioskBootstrapping) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
+        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#facc15', borderRadius: '50%' }}></div>
         <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Kiosk wird gestartet…</div>
       </div>
     );
@@ -475,7 +475,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
       <Suspense fallback={<DashboardLoader />}>
         <Startseite 
           onLogin={() => navigate(loggedInUserId ? '/dashboard' : '/login')} 
-          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+          onRegister={(_email) => setShowSchoolOnboardingModal(true)} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
           onShowImpressum={() => setShowImpressum(true)}
@@ -519,7 +519,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
       <Suspense fallback={<DashboardLoader />}>
         <Startseite2 
           onLogin={() => navigate('/login')} 
-          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
+          onRegister={(_email) => setShowSchoolOnboardingModal(true)} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
           onShowImpressum={() => setShowImpressum(true)}
@@ -655,7 +655,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
             maxWidth: '100%', 
             wordBreak: 'break-all',
             background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
+            border: 'none',
             padding: '12px',
             borderRadius: '8px'
           }}>
@@ -731,7 +731,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
               outline: 'none'
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.background = '#eab308';
+              e.currentTarget.style.background = '#facc15';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
@@ -783,7 +783,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
 
   // 2.5c INACTIVE STUDENT MODULE ACCESS SECURITY GUARD
   if (user.role?.toLowerCase() === 'student') {
-    const isCampusActive = user.is_campus_active === true;
+    const isCampusActive = user.is_campus_active !== false;
     const isGroovelabActive = user.is_groovelab_active === true;
 
     // Case 1: Student has NO active modules -> Strictly block entry to GrooveLab & Campus dashboards, force QRLandingPage!
@@ -836,7 +836,7 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '24px',
-            border: '1px solid rgba(239, 68, 68, 0.2)'
+            border: 'none'
           }}>
             <Clock size={40} color="#ef4444" className="animate-pulse" />
           </div>

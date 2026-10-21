@@ -136,7 +136,7 @@ export const MasterStepUpChallengeModal: React.FC<MasterStepUpChallengeModalProp
               padding: '6px 12px',
               borderRadius: '8px',
               background: '#fef3c7',
-              border: '1px solid #fde68a',
+              border: 'none',
               color: '#92400e',
               fontSize: '0.74rem',
               fontWeight: 800,

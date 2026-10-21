@@ -64,6 +64,66 @@ if (isoGuardRes.status !== 0) {
   console.log('  ✅ ISO 27001:2022 & ISO 27701 Compliance Pre-Flight verifiziert.\n');
 }
 
+// Pre-Flight 2: BSI 360° Cybersecurity Evaluation Matrix (6 Domains / 24 Checks)
+interface BsiDomainCheck {
+  id: string;
+  title: string;
+  passed: boolean;
+  evidence: string;
+}
+
+interface BsiDomainSummary {
+  id: string;
+  name: string;
+  standard: string;
+  weightPercent: number;
+  passedChecks: number;
+  totalChecks: number;
+  domainScore100: number;
+  weightedContribution: number;
+  rating: string;
+  checks: BsiDomainCheck[];
+}
+
+interface BsiMatrixPayload {
+  standard: string;
+  timestamp: string;
+  durationMs: number;
+  passed: boolean;
+  weightedScore: number;
+  maxScore: number;
+  thresholdScore: number;
+  totalChecks: number;
+  totalPassed: number;
+  failedCount: number;
+  verdict: string;
+  domains: BsiDomainSummary[];
+}
+
+console.log('  🛡️  Berechne BSI 360° Cybersecurity-Bewertungsmatrix (6 Domänen / 24 Invarianten)...');
+const bsiMatrixRes = spawnSync('node', ['scripts/bsi_360_cybersecurity_matrix_guard.mjs', '--json'], {
+  cwd: ROOT_DIR,
+  env: process.env,
+  encoding: 'utf-8'
+});
+
+let bsiMatrix: BsiMatrixPayload | null = null;
+try {
+  bsiMatrix = JSON.parse((bsiMatrixRes.stdout || '').trim()) as BsiMatrixPayload;
+} catch {
+  bsiMatrix = null;
+}
+
+if (bsiMatrixRes.status !== 0 || !bsiMatrix || !bsiMatrix.passed) {
+  console.error('  ❌ BSI 360° Cybersecurity-Bewertungsmatrix fehlgeschlagen!');
+  if (bsiMatrixRes.stderr) console.error(bsiMatrixRes.stderr);
+  process.exit(1);
+} else {
+  console.log(
+    `  ✅ BSI 360° Bewertungsmatrix verifiziert: ${bsiMatrix.weightedScore.toFixed(1)} / 100.0 Punkte (${bsiMatrix.totalPassed}/${bsiMatrix.totalChecks} Checks, ${bsiMatrix.durationMs}ms).\n`
+  );
+}
+
 const tGlobalStart = Date.now();
 const runnerResults: RunnerResult[] = [];
 let allPassed = true;
@@ -117,12 +177,31 @@ const dossierBaseName = `WEEKLY_RESILIENCE_DOSSIER_${year}_W${paddedWeek}`;
 // -----------------------------------------------------------------------------
 const rawEvidencePayload = JSON.stringify({
   organization: 'Campus-Groovelab Enterprise Systems',
-  jurisdiction: 'EU / DSGVO / DIN EN ISO/IEC 27001',
+  jurisdiction: 'EU / DSGVO / DIN EN ISO/IEC 27001 / BSI IT-Grundschutz',
   timestamp: now.toISOString(),
   year,
   week: weekNumber,
   totalDurationMs,
-  overallVerdict: allPassed ? 'PASSED_100_PERCENT' : 'FAILED',
+  overallVerdict: allPassed && bsiMatrix.passed ? 'PASSED_100_PERCENT' : 'FAILED',
+  bsiCybersecurityScorecard: {
+    weightedScore: bsiMatrix.weightedScore,
+    maxScore: bsiMatrix.maxScore,
+    thresholdScore: bsiMatrix.thresholdScore,
+    totalChecks: bsiMatrix.totalChecks,
+    totalPassed: bsiMatrix.totalPassed,
+    verdict: bsiMatrix.verdict,
+    domains: bsiMatrix.domains.map(d => ({
+      id: d.id,
+      name: d.name,
+      standard: d.standard,
+      weightPercent: d.weightPercent,
+      passedChecks: d.passedChecks,
+      totalChecks: d.totalChecks,
+      domainScore100: d.domainScore100,
+      weightedContribution: d.weightedContribution,
+      rating: d.rating
+    }))
+  },
   masterRunners: runnerResults.map(r => ({
     id: r.id,
     name: r.name,
@@ -145,30 +224,49 @@ const fullJsonPayload = {
     'DIN EN ISO/IEC 27701:2019 (PIMS Bildungsdatenschutz Minderjähriger)',
     'ISO/IEC 27018:2019 (Schutz von PII in Public Clouds)',
     'ISO/IEC 27037:2016 (Digitale Beweissicherung & Forensik)',
-    'BSI IT-Grundschutz APP.3.1',
+    'BSI IT-Grundschutz APP.3.1, CON.1, ORP.4, OPS.1.2.2',
+    'BSI TR-02102-1/2 (Kryptographische Verfahren & Schlüssellängen)',
+    'OWASP ASVS Level 3 (v4.0.3)',
+    'NIS-2-Richtlinie (EU 2022/2555 Art. 21)',
     'BFSG 2025 / WCAG 2.2 Stufe AA'
   ]
 };
 fs.writeFileSync(jsonFilePath, JSON.stringify(fullJsonPayload, null, 2), 'utf-8');
 
+const bsiDomainTableRows = bsiMatrix.domains
+  .map(
+    (d) =>
+      `| **${d.name}** | *${d.standard}* | ${d.weightPercent} % | **${d.domainScore100.toFixed(1)} / 100** (${d.passedChecks}/${d.totalChecks}) | **${d.weightedContribution.toFixed(1)}** | \`${d.rating}\` |`
+  )
+  .join('\n');
+
 // Write Markdown Summary Dossier
 const mdFilePath = path.join(REPORTS_DIR, `${dossierBaseName}.md`);
 const mdContent = `# 🏛️ Campus-Groovelab B2B Resilience Dossier (${year}-W${paddedWeek})
-**Offizieller Nachweis nach Art. 32 DSGVO & BSI IT-Grundschutz**
+**Offizieller Nachweis nach Art. 32 DSGVO, OWASP ASVS Level 3 & BSI IT-Grundschutz**
 
 ---
 
 ### 📋 Dossier-Metadaten
 - **Ausstellungszeitpunkt:** ${now.toISOString()}
 - **Kalenderwoche:** KW ${weekNumber} / ${year}
-- **Prüfumfang:** 3 Master-Runner (25+ Forensic Test-Suites)
-- **Gesamtergebnis:** ${allPassed ? '✅ 100% BESTANDEN (Enterprise Grade A+)' : '❌ ABWEICHUNG DETEKTIERT'}
+- **Prüfumfang:** BSI 360° Bewertungsmatrix (6 Domänen / 24 Checks) + 3 Master-Runner (25+ Forensic Test-Suites)
+- **BSI 0,1% Goldstandard-Gesamtscore:** **${bsiMatrix.weightedScore.toFixed(1)} / 100.0 Punkte** (${bsiMatrix.totalPassed}/${bsiMatrix.totalChecks} Invarianten erfüllt)
+- **Gesamtergebnis:** ${allPassed ? '✅ 100% BESTANDEN (Enterprise Grade A+ / BSI 0,1% Goldstandard)' : '❌ ABWEICHUNG DETEKTIERT'}
 - **Laufzeit:** ${(totalDurationMs / 1000).toFixed(1)} Sekunden
 - **Kryptografisches SHA-256 Siegel:** \`${sha256Seal}\`
 
 ---
 
-### 🛡️ Master-Runner Prüfergebnisse
+### 🛡️ BSI 0,1% Goldstandard 6-Domänen-Bewertungsmatrix (OWASP ASVS L3 / BSI IT-Grundschutz)
+| Prüfdomäne | Normative Referenz | Gewicht | Domänen-Score (Checks) | Gewichteter Beitrag | Einstufung |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+${bsiDomainTableRows}
+| **Gesamtbewertung (Gewichtet)** | **BSI / OWASP ASVS L3 / NIS-2 / DSGVO** | **100 %** | **${bsiMatrix.totalPassed} / ${bsiMatrix.totalChecks} Checks** | **${bsiMatrix.weightedScore.toFixed(1)} / 100.0** | **\`${bsiMatrix.verdict}\`** |
+
+---
+
+### 🧪 Master-Runner Prüfergebnisse
 | ID | Prüffeld & Master-Runner | Status | Dauer |
 | :--- | :--- | :---: | :---: |
 ${runnerResults.map(r => `| **${r.id}** | ${r.name} | ${r.passed ? '`PASS`' : '`FAIL`'} | ${(r.durationMs / 1000).toFixed(1)}s |`).join('\n')}
@@ -176,7 +274,7 @@ ${runnerResults.map(r => `| **${r.id}** | ${r.name} | ${r.passed ? '`PASS`' : '`
 ---
 
 ### ⚖️ Revisionssicherheit & B2B-Gültigkeit
-Dieses Dossier wurde automatisiert nach dem Zero-Sampling-Standard von Campus-Groovelab erzeugt. Es beweist die lückenlose Integrität von Mandantentrennung, WORM-Archiven, kryptografischer Nachrichtenverschlüsselung und Barrierefreiheit.
+Dieses Dossier wurde automatisiert nach dem Zero-Sampling-Standard von Campus-Groovelab erzeugt. Es beweist die lückenlose Integrität von EU-Souveränität, Kryptografie (BSI TR-02102-1), zweistufigem Session-Lease-Minting, Mandantentrennung (RLS), WORM-Archiven und Barrierefreiheit.
 `;
 
 fs.writeFileSync(mdFilePath, mdContent, 'utf-8');

@@ -88,7 +88,7 @@ export const UpdateAnnouncementHero: React.FC<UpdateAnnouncementHeroProps> = ({
             fontWeight: 800,
             background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
             color: '#1d4ed8',
-            border: '1px solid #bfdbfe'
+            border: 'none'
           }}>
             <Sparkles size={12} />
             {announcement.badge_tag || 'NEU IN CAMPUS-GROOVELAB'}
@@ -143,7 +143,7 @@ export const UpdateAnnouncementHero: React.FC<UpdateAnnouncementHeroProps> = ({
       {announcement.hero_credit && (
         <div style={{
           background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-          border: '1px solid #fef08a',
+          border: 'none',
           borderRadius: '12px',
           padding: '10px 14px',
           display: 'flex',

@@ -124,7 +124,7 @@ export const TeacherAnnouncementReaderModal: React.FC<TeacherAnnouncementReaderM
               gap: '8px',
               background: '#eff6ff',
               color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
+              border: 'none',
               padding: '10px 14px',
               borderRadius: '12px',
               fontSize: '0.78rem',

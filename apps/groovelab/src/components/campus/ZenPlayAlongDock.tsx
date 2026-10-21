@@ -377,18 +377,10 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
         background: isLight ? 'rgba(255, 255, 255, 0.88)' : 'rgba(15, 23, 42, 0.92)',
         backdropFilter: isLight ? 'blur(24px)' : 'blur(24px) saturate(1.8)',
         WebkitBackdropFilter: isLight ? 'blur(24px)' : 'blur(24px) saturate(1.8)',
-        border: isLight
-          ? '1.5px solid rgba(0, 113, 227, 0.16)'
-          : isAmber
-          ? '1.5px solid rgba(245, 158, 11, 0.35)'
-          : '1.5px solid rgba(165, 180, 252, 0.35)',
+        border: isLight ? '1.5px solid #e2e8f0' : 'none',
         borderRadius: '28px',
         padding: isMusicStandMode ? '12px 18px' : '10px 16px',
-        boxShadow: isLight
-          ? '0 20px 45px rgba(0, 113, 227, 0.08), 0 4px 15px rgba(0, 0, 0, 0.04)'
-          : isAmber
-          ? '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(245, 158, 11, 0.20)'
-          : '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(99, 102, 241, 0.22)',
+        boxShadow: 'none',
         display: 'flex',
         flexDirection: 'column',
         gap: '9px',
@@ -483,41 +475,23 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   height: '38px',
                   background: isLight
                     ? isSel
-                      ? 'linear-gradient(135deg, #0071e3 0%, #0284c7 100%)'
+                      ? '#0ea5e9'
                       : hasListened
                       ? '#dcfce7'
                       : '#f1f5f9'
                     : isAmber
                     ? isSel
-                      ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.75) 0%, rgba(217, 119, 6, 0.9) 100%)'
+                      ? '#f97316'
                       : hasListened
-                      ? 'rgba(34, 197, 94, 0.18)'
-                      : 'rgba(255, 255, 255, 0.08)'
+                      ? '#dcfce7'
+                      : '#1e293b'
                     : isSel
-                      ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.45) 0%, rgba(79, 70, 229, 0.65) 100%)'
+                      ? '#6366f1'
                       : hasListened
-                      ? 'rgba(34, 197, 94, 0.16)'
-                      : 'rgba(255, 255, 255, 0.08)',
-                  border: isLight
-                    ? isSel
-                      ? '1.5px solid #93c5fd'
-                      : hasListened
-                      ? '1px solid #10b981'
-                      : '1px solid #e2e8f0'
-                    : isAmber
-                    ? isSel
-                      ? '1.5px solid #fde047'
-                      : hasListened
-                      ? '1px solid rgba(16, 185, 129, 0.5)'
-                      : '1px solid rgba(255, 255, 255, 0.14)'
-                    : isSel
-                      ? '1.5px solid rgba(165, 180, 252, 0.85)'
-                      : hasListened
-                      ? '1px solid rgba(16, 185, 129, 0.45)'
-                      : '1px solid rgba(255, 255, 255, 0.14)',
+                      ? '#dcfce7'
+                      : '#1e293b',
+                  border: 'none',
                   borderRadius: '100px',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
                   padding: '2px',
                   display: 'flex',
                   alignItems: 'center',
@@ -527,17 +501,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                   userSelect: 'none',
-                  boxShadow: isLight
-                    ? isSel
-                      ? '0 4px 14px rgba(0, 113, 227, 0.35)'
-                      : '0 2px 6px rgba(0, 0, 0, 0.04)'
-                    : isAmber
-                    ? isSel
-                      ? '0 0 16px rgba(245, 158, 11, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3)'
-                      : '0 2px 8px rgba(0, 0, 0, 0.2)'
-                    : isSel
-                      ? '0 0 16px rgba(99, 102, 241, 0.45), 0 4px 12px rgba(0, 0, 0, 0.3)'
-                      : '0 2px 8px rgba(0, 0, 0, 0.2)',
+                  boxShadow: 'none',
                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                   position: 'relative'
                 }}
@@ -548,7 +512,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                 {ped.icon === '🎧' ? (
                   <Headphones
                     size={12}
-                    color={isSel ? '#ffffff' : isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc'}
+                    color={isSel ? '#ffffff' : hasListened ? '#15803d' : isLight ? '#64748b' : '#cbd5e1'}
                     style={{ flexShrink: 0 }}
                   />
                 ) : (
@@ -558,11 +522,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   style={{
                     fontSize: '0.82rem',
                     fontWeight: 950,
-                    color: isLight
-                      ? isSel ? '#ffffff' : hasListened ? '#059669' : '#475569'
-                      : isAmber
-                      ? isSel ? '#ffffff' : hasListened ? '#a7f3d0' : '#f1f5f9'
-                      : isSel ? '#ffffff' : hasListened ? '#a7f3d0' : '#cbd5e1',
+                    color: isSel ? '#ffffff' : hasListened ? '#15803d' : isLight ? '#475569' : '#cbd5e1',
                     fontVariantNumeric: 'tabular-nums'
                   }}
                 >
@@ -577,15 +537,15 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                       width: '15px',
                       height: '15px',
                       borderRadius: '50%',
-                      background: '#22c55e',
+                      background: '#34a853',
                       color: '#ffffff',
                       fontSize: '0.62rem',
                       fontWeight: 950,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                      border: isLight ? '1.5px solid #ffffff' : '1.5px solid #0f172a'
+                      boxShadow: 'none',
+                      border: 'none'
                     }}
                     title="Diese Spur hast du bereits geübt!"
                   >
@@ -602,7 +562,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '5px', paddingTop: '2px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <Headphones size={13} color={isPlaying ? (isLight ? '#0071e3' : '#4ade80') : (isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc')} style={{ flexShrink: 0 }} />
+            <Headphones size={13} color={isPlaying ? (isLight ? '#0ea5e9' : '#34a853') : (isLight ? '#64748b' : '#cbd5e1')} style={{ flexShrink: 0 }} />
             <span style={{
               fontSize: '0.84rem',
               fontWeight: 850,
@@ -652,7 +612,6 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           {waveformBars.map((val, i) => {
             const barRatio = i / waveformBars.length;
             const isFilled = barRatio <= trackProgress;
-            const isHead = Math.abs(barRatio - trackProgress) < (1 / waveformBars.length);
             const heightPct = Math.max(18, Math.round(val * 100));
 
             return (
@@ -664,15 +623,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   height: `${heightPct}%`,
                   borderRadius: '9999px',
                   background: isFilled
-                    ? (isLight
-                        ? (isPlaying ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' : '#059669')
-                        : isAmber
-                        ? (isPlaying ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' : '#f59e0b')
-                        : (isPlaying ? 'linear-gradient(180deg, #818cf8 0%, #6366f1 100%)' : '#6366f1'))
+                    ? (isLight ? '#10b981' : isAmber ? '#f97316' : '#6366f1')
                     : (isLight ? 'rgba(5, 150, 105, 0.14)' : 'rgba(255, 255, 255, 0.18)'),
-                  boxShadow: isHead && isPlaying
-                    ? (isAmber ? '0 0 8px rgba(245, 158, 11, 0.8)' : '0 0 8px rgba(99, 102, 241, 0.8)')
-                    : 'none',
+                  boxShadow: 'none',
                   transition: 'background 0.1s ease, height 0.15s ease'
                 }}
               />
@@ -700,38 +653,22 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           style={{
             flex: '1 1 0',
             height: '38px',
-            background: isLight
-              ? isCountInActive
-                ? 'rgba(245, 158, 11, 0.14)'
-                : '#f8fafc'
-              : isCountInActive
-                ? 'rgba(245, 158, 11, 0.22)'
-                : 'rgba(255, 255, 255, 0.09)',
-            border: isLight
-              ? isCountInActive ? '1.5px solid #f59e0b' : '1.5px solid #e2e8f0'
-              : isCountInActive ? '1.5px solid rgba(253, 224, 71, 0.75)' : '1px solid rgba(255, 255, 255, 0.16)',
+            background: isCountInActive ? '#fef9c3' : (isLight ? '#f8fafc' : '#1e293b'),
+            border: 'none',
             borderRadius: '100px',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
             padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            color: isLight
-              ? isCountInActive ? '#b45309' : '#334155'
-              : isCountInActive ? '#fef08a' : '#f1f5f9',
+            color: isCountInActive ? '#854d0e' : (isLight ? '#334155' : '#f1f5f9'),
             fontSize: '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
-            boxShadow: isLight
-              ? isCountInActive ? '0 0 16px rgba(245, 158, 11, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
-              : isCountInActive
-                ? '0 0 16px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25)'
-                : '0 4px 12px rgba(0, 0, 0, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
           className="hover-scale"
@@ -747,41 +684,17 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           type="button"
           onClick={togglePlay}
           style={{
-            background: isLight
-              ? countInStep !== null
-                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                : isPlaying
-                ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
-                : 'linear-gradient(135deg, #0071e3 0%, #0284c7 100%)'
+            background: countInStep !== null
+              ? '#f97316'
+              : isPlaying
+              ? '#34a853'
+              : isLight
+              ? '#0ea5e9'
               : isAmber
-              ? countInStep !== null
-                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                : isPlaying
-                ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-              : countInStep !== null
-                ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                : isPlaying
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              ? '#f97316'
+              : '#6366f1',
             color: '#ffffff',
-            border: isLight
-              ? countInStep !== null
-                ? '2px solid #fde047'
-                : isPlaying
-                ? 'none'
-                : '2px solid #bfdbfe'
-              : isAmber
-              ? countInStep !== null
-                ? '2px solid rgba(253, 224, 71, 0.95)'
-                : isPlaying
-                ? 'none'
-                : '2px solid rgba(253, 224, 71, 0.95)'
-              : countInStep !== null
-                ? '2px solid rgba(253, 224, 71, 0.85)'
-                : isPlaying
-                ? 'none'
-                : '2px solid rgba(165, 180, 252, 0.85)',
+            border: 'none',
             borderRadius: '50%',
             width: isMusicStandMode ? '54px' : '50px',
             height: isMusicStandMode ? '54px' : '50px',
@@ -793,23 +706,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
-            boxShadow: isLight
-              ? countInStep !== null
-                ? '0 0 24px rgba(245, 158, 11, 0.4)'
-                : isPlaying
-                ? '0 0 24px rgba(22, 163, 74, 0.35)'
-                : '0 0 24px rgba(0, 113, 227, 0.35)'
-              : isAmber
-              ? countInStep !== null
-                ? '0 0 24px rgba(245, 158, 11, 0.65), 0 6px 18px rgba(0, 0, 0, 0.4)'
-                : isPlaying
-                ? '0 0 24px rgba(34, 197, 94, 0.55), 0 6px 18px rgba(0, 0, 0, 0.4)'
-                : '0 0 24px rgba(245, 158, 11, 0.5), 0 6px 18px rgba(0, 0, 0, 0.4)'
-              : countInStep !== null
-                ? '0 0 24px rgba(245, 158, 11, 0.65), 0 6px 18px rgba(0, 0, 0, 0.4)'
-                : isPlaying
-                ? '0 0 24px rgba(34, 197, 94, 0.55), 0 6px 18px rgba(0, 0, 0, 0.4)'
-                : '0 0 24px rgba(99, 102, 241, 0.5), 0 6px 18px rgba(0, 0, 0, 0.4)',
+            boxShadow: 'none',
             transition: 'transform 0.15s ease, background 0.25s ease'
           }}
           className="hover-scale"
@@ -845,38 +742,22 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           style={{
             flex: '1 1 0',
             height: '38px',
-            background: isLight
-              ? isLooping
-                ? 'rgba(34, 197, 94, 0.14)'
-                : '#f8fafc'
-              : isLooping
-                ? 'rgba(34, 197, 94, 0.22)'
-                : 'rgba(255, 255, 255, 0.09)',
-            border: isLight
-              ? isLooping ? '1.5px solid #22c55e' : '1.5px solid #e2e8f0'
-              : isLooping ? '1.5px solid rgba(134, 239, 172, 0.75)' : '1px solid rgba(255, 255, 255, 0.16)',
+            background: isLooping ? '#dcfce7' : (isLight ? '#f8fafc' : '#1e293b'),
+            border: 'none',
             borderRadius: '100px',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
             padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            color: isLight
-              ? isLooping ? '#15803d' : '#334155'
-              : isLooping ? '#bbf7d0' : '#f1f5f9',
+            color: isLooping ? '#15803d' : (isLight ? '#334155' : '#f1f5f9'),
             fontSize: '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             userSelect: 'none',
-            boxShadow: isLight
-              ? isLooping ? '0 0 16px rgba(34, 197, 94, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
-              : isLooping
-                ? '0 0 16px rgba(34, 197, 94, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25)'
-                : '0 4px 12px rgba(0, 0, 0, 0.25)',
+            boxShadow: 'none',
             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
           className="hover-scale"
@@ -966,9 +847,9 @@ export const PreFlightAudioPreviewButton: React.FC<{
       type="button"
       onClick={toggle}
       style={{
-        background: isPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : isCompact ? '#ecfdf5' : '#ffffff',
-        color: isPlaying ? '#ffffff' : '#059669',
-        border: isPlaying ? 'none' : '1.5px solid #10b981',
+        background: isPlaying ? '#10b981' : isCompact ? '#d1fae5' : '#ffffff',
+        color: isPlaying ? '#ffffff' : '#047857',
+        border: (isPlaying || isCompact) ? 'none' : '1.5px solid #cbd5e1',
         borderRadius: isCompact ? '50%' : '100px',
         width: isCompact ? '24px' : 'auto',
         height: isCompact ? '24px' : 'auto',
@@ -980,7 +861,7 @@ export const PreFlightAudioPreviewButton: React.FC<{
         justifyContent: 'center',
         gap: '4px',
         cursor: 'pointer',
-        boxShadow: isPlaying ? '0 2px 8px rgba(22, 163, 74, 0.3)' : '0 1px 3px rgba(0,0,0,0.05)',
+        boxShadow: 'none',
         flexShrink: 0
       }}
       className="hover-scale"
@@ -1150,8 +1031,8 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                   flex: '1 1 0',
                   minWidth: '48px',
                   maxWidth: '68px',
-                  background: isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.70)',
-                  border: isSelected ? '2px solid #16a34a' : '1.5px solid #bbf7d0',
+                  background: isSelected ? '#ffffff' : '#f8fafc',
+                  border: isSelected ? '2px solid #34a853' : '1.5px solid #e2e8f0',
                   borderRadius: '16px',
                   padding: '7px 4px 6px 4px',
                   display: 'flex',
@@ -1159,7 +1040,7 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '5px',
-                  boxShadow: isSelected ? '0 3px 0 #15803d, 0 4px 10px rgba(22, 163, 74, 0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+                  boxShadow: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -1168,11 +1049,11 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
               >
                 {/* Oben: Kopfhörer & Ziffer */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                  <Headphones size={13} color={isSelected ? '#16a34a' : '#475569'} strokeWidth={2.4} />
+                  <Headphones size={13} color={isSelected ? '#15803d' : '#475569'} strokeWidth={2.4} />
                   <span style={{
                     fontSize: '0.86rem',
                     fontWeight: 950,
-                    color: isSelected ? '#14532d' : '#334155',
+                    color: isSelected ? '#15803d' : '#334155',
                     fontVariantNumeric: 'tabular-nums',
                     lineHeight: 1
                   }}>
@@ -1185,9 +1066,9 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                   type="button"
                   onClick={(e) => toggleTrack(trIdx, e)}
                   style={{
-                    background: isCurrentPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : isSelected ? '#ecfdf5' : '#ffffff',
-                    color: isCurrentPlaying ? '#ffffff' : '#059669',
-                    border: isCurrentPlaying ? 'none' : '1.5px solid #10b981',
+                    background: isCurrentPlaying ? '#10b981' : isSelected ? '#d1fae5' : '#ffffff',
+                    color: isCurrentPlaying ? '#ffffff' : '#047857',
+                    border: (isCurrentPlaying || isSelected) ? 'none' : '1.5px solid #cbd5e1',
                     borderRadius: '50%',
                     width: '24px',
                     height: '24px',
@@ -1196,7 +1077,7 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: isCurrentPlaying ? '0 2px 8px rgba(16, 185, 129, 0.35)' : 'none',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale"
@@ -1229,9 +1110,9 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
               type="button"
               onClick={() => toggleTrack(0)}
               style={{
-                background: isPlaying ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ecfdf5',
-                color: isPlaying ? '#ffffff' : '#059669',
-                border: isPlaying ? 'none' : '1.5px solid #10b981',
+                background: isPlaying ? '#10b981' : '#d1fae5',
+                color: isPlaying ? '#ffffff' : '#047857',
+                border: 'none',
                 borderRadius: '50%',
                 width: '32px',
                 height: '32px',
@@ -1244,11 +1125,11 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
             >
               {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" style={{ marginLeft: '1px' }} />}
             </button>
-            <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#14532d' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#15803d' }}>
               {currentTrack?.label || 'Unterrichtsaufnahme'}
             </span>
           </div>
-          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#166534', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', fontVariantNumeric: 'tabular-nums' }}>
             {formatTrackTime(currentTime)} / {formatTrackTime(duration || currentTrack?.duration || 0)}
           </span>
         </div>
@@ -1258,8 +1139,8 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
       <div style={{
         marginTop: '2px',
         padding: '6px 10px',
-        background: 'rgba(255, 255, 255, 0.85)',
-        border: '1px solid #bbf7d0',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
         borderRadius: '14px',
         display: 'flex',
         flexDirection: 'column',
@@ -1280,7 +1161,7 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
           <span style={{
             fontSize: '0.74rem',
             fontWeight: 850,
-            color: '#166534',
+            color: '#15803d',
             fontVariantNumeric: 'tabular-nums',
             flexShrink: 0
           }}>
@@ -1306,7 +1187,6 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
           {waveformBars.map((val, i) => {
             const barRatio = i / waveformBars.length;
             const isFilled = barRatio <= trackProgress;
-            const isHead = Math.abs(barRatio - trackProgress) < (1 / waveformBars.length);
             const heightPct = Math.max(18, Math.round(val * 100));
 
             return (
@@ -1317,8 +1197,8 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
                   minWidth: '2px',
                   height: `${heightPct}%`,
                   borderRadius: '9999px',
-                  background: isFilled ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' : 'rgba(22, 163, 74, 0.14)',
-                  boxShadow: isHead && isPlaying ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
+                  background: isFilled ? '#34a853' : 'rgba(52, 168, 83, 0.14)',
+                  boxShadow: 'none',
                   transition: 'background 0.1s ease, height 0.15s ease'
                 }}
               />

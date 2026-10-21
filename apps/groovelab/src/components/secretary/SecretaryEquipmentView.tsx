@@ -55,6 +55,7 @@ export interface SecretaryEquipmentViewProps {
   equipmentNameInputRef?: React.RefObject<HTMLInputElement>;
   equipmentQtyInputRef?: React.RefObject<HTMLInputElement>;
   parseRoomName: (name: string) => { prefix: string; number: number | null };
+  windowWidth?: number;
 }
 
 export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
@@ -95,7 +96,10 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
   equipmentNameInputRef,
   equipmentQtyInputRef,
   parseRoomName,
+  windowWidth = 1280,
 }) => {
+  const effectiveWidth = windowWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+  const isTabletOrMobile = effectiveWidth <= 1180;
   const [localRefreshTick, setLocalRefreshTick] = useState(0);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickFilter, setQuickFilter] = useState<'all' | 'free' | 'assigned'>('all');
@@ -304,10 +308,11 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
   return (
     <div style={{ 
       display: 'grid', 
-      gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 340px', 
+      gridTemplateColumns: isTabletOrMobile ? '1fr' : 'minmax(0, 1fr) 340px', 
       gap: '24px', 
       fontFamily: "'Plus Jakarta Sans', sans-serif", 
-      alignItems: 'start' 
+      alignItems: 'start',
+      minWidth: 0
     }}>
       
       {/* LEFT COLUMN: MAIN COCKPIT & INSTRUMENTS */}
@@ -328,11 +333,11 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   width: '38px',
                   height: '38px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #ea4335 0%, #b71904 100%)',
+                  background: '#ef4444',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(216, 30, 5, 0.25)'
+                  boxShadow: 'none'
                 }}>
                   <Layers size={20} color="#ffffff" />
                 </div>
@@ -497,10 +502,10 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                 <div style={{ fontSize: '1.30rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Urbanist', sans-serif", lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {kpis.free}
                   {kpis.free > 0 && (
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
                   )}
                 </div>
-                <span style={{ fontSize: '0.68rem', color: kpis.free > 0 ? '#15803d' : '#94a3b8', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.68rem', color: kpis.free > 0 ? '#137333' : '#94a3b8', fontWeight: 600 }}>
                   {kpis.free > 0 ? 'Bereit zur Zuweisung' : 'Alle Einheiten belegt'}
                 </span>
               </div>
@@ -719,7 +724,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              boxShadow: isQuickAddOpen ? 'none' : '0 4px 14px rgba(216, 30, 5, 0.22)',
+              boxShadow: 'none',
               transition: 'all 0.15s',
               whiteSpace: 'nowrap'
             }}
@@ -810,7 +815,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   fontSize: '0.80rem',
                   cursor: 'pointer',
                   opacity: equipmentSaving || !equipmentFormName.trim() ? 0.6 : 1,
-                  boxShadow: '0 2px 8px rgba(216,30,5,0.2)'
+                  boxShadow: 'none'
                 }}
               >
                 {equipmentSaving ? 'Wird registriert...' : 'Im Pool anlegen'}
@@ -870,7 +875,7 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                     fontSize: '0.78rem', 
                     fontWeight: 800, 
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(216,30,5,0.2)'
+                    boxShadow: 'none'
                   }}
                 >
                   + Erstes Instrument anlegen

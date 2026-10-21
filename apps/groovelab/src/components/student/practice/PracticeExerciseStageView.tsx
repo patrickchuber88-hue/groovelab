@@ -191,6 +191,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
   // Sekundäre Aufgaben für das Context Shelf
   const secondaryBooks = books.slice(primaryBook ? 1 : 0);
   const secondarySongs = safeSongs.slice(primarySong ? 1 : 0);
+  const secondaryMicroScores = (microScores || []).slice(primaryMicroScore && !primaryBook && !primarySong ? 1 : 0);
 
   const isJunior = studentUiLevel === 'junior';
   const isTeen = studentUiLevel === 'teen';
@@ -257,9 +258,9 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
             style={{
               background: '#ffffff',
               borderRadius: '24px',
-              border: effectiveHasActiveHomework ? '2px solid #bbf7d0' : '2px solid #e2e8f0',
+              border: '2px solid #e2e8f0',
               padding: isMusicStandMode ? '24px 24px' : '20px 22px',
-              boxShadow: effectiveHasActiveHomework ? '0 12px 32px -4px rgba(16, 185, 129, 0.10)' : '0 8px 24px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               gap: '16px',
@@ -276,9 +277,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
               left: 0,
               right: 0,
               height: '4px',
-              background: effectiveHasActiveHomework
-                ? 'linear-gradient(90deg, #10b981 0%, #34d399 100%)'
-                : 'linear-gradient(90deg, #64748b 0%, #94a3b8 100%)'
+              background: effectiveHasActiveHomework ? '#10b981' : '#64748b'
             }} />
 
             {/* Header-Zeile mit Eyebrow & Status-Pill */}
@@ -288,9 +287,9 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: effectiveHasActiveHomework ? '#ecfdf5' : '#f1f5f9',
-                  color: effectiveHasActiveHomework ? '#065f46' : '#475569',
-                  border: effectiveHasActiveHomework ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
+                  background: effectiveHasActiveHomework ? '#d1fae5' : '#f1f5f9',
+                  color: effectiveHasActiveHomework ? '#047857' : '#475569',
+                  border: 'none',
                   fontSize: '0.76rem',
                   fontWeight: 900,
                   padding: '4px 10px',
@@ -317,7 +316,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                     fontWeight: 900,
                     color: '#15803d',
                     background: '#dcfce7',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     padding: '3px 10px',
                     borderRadius: '100px'
                   }}>
@@ -343,13 +342,13 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                 width: isMusicStandMode ? '54px' : '48px',
                 height: isMusicStandMode ? '54px' : '48px',
                 borderRadius: '16px',
-                background: effectiveHasActiveHomework ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
+                background: effectiveHasActiveHomework ? '#10b981' : '#475569',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
-                boxShadow: effectiveHasActiveHomework ? '0 4px 12px rgba(16, 185, 129, 0.28)' : '0 2px 8px rgba(0,0,0,0.1)',
+                boxShadow: 'none',
                 flexShrink: 0
               }}>
                 {primaryBook ? <BookOpen size={24} /> : <Music size={24} />}
@@ -389,7 +388,8 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                   studentId={studentId || studentUser?.id}
                   taskId={primaryTaskId}
                   taskTitle={primaryTitle}
-                  defaultInstrument={studentUser?.instrument}
+                  defaultInstrument={primaryMicroScore?.instrument || studentUser?.instrument}
+                  initialSnippet={primaryMicroScore || undefined}
                   isJunior={isJunior}
                 />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -402,7 +402,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                 </div>
               </div>
 
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 800, color: '#047857', background: '#ecfdf5', padding: '4px 10px', borderRadius: '8px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 800, color: '#047857', background: '#d1fae5', padding: '4px 10px', borderRadius: '8px', border: 'none' }}>
                 <Target size={13} color="#059669" />
                 <span>Sub-Tempo empfohlen</span>
               </div>
@@ -411,8 +411,8 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
             {/* 🎧 AUDIO-REFERENZ DES LEHRERS (SOUND BEFORE SIGHT) */}
             {audioTracks && audioTracks.length > 0 && (
               <div style={{
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                border: '1.5px solid #a7f3d0',
+                background: '#d1fae5',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '12px 16px',
                 display: 'flex',
@@ -429,7 +429,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                       width: '44px',
                       height: '44px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: '#10b981',
                       border: 'none',
                       color: '#ffffff',
                       display: 'flex',
@@ -509,7 +509,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                         alignItems: 'center',
                         gap: '6px',
                         transition: 'all 0.15s ease',
-                        background: isDone ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                        background: isDone ? '#10b981' : '#ffffff',
                         color: isDone ? '#ffffff' : '#64748b',
                         border: isDone ? 'none' : '1.5px solid #cbd5e1',
                         boxShadow: 'none'
@@ -546,7 +546,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                 style={{
                   flex: 1,
                   minHeight: isMusicStandMode ? '54px' : '48px',
-                  background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                  background: '#34a853',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '16px',
@@ -634,9 +634,9 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
               <span style={{
                 fontSize: '0.72rem',
                 fontWeight: 850,
-                color: '#4f46e5',
-                background: '#eef2ff',
-                border: '1px solid #c7d2fe',
+                color: '#4338ca',
+                background: '#e0e7ff',
+                border: 'none',
                 padding: '2px 8px',
                 borderRadius: '100px',
                 display: 'inline-flex',
@@ -661,17 +661,17 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                   let color = '#64748b';
 
                   if (isMastered) {
-                    bg = '#ecfdf5';
-                    border = '1.5px solid #10b981';
-                    color = '#065f46';
+                    bg = '#d1fae5';
+                    border = 'none';
+                    color = '#047857';
                   } else if (isToday) {
-                    bg = '#fefce8';
-                    border = '1.5px solid #fde047';
-                    color = '#b45309';
+                    bg = '#fef9c3';
+                    border = 'none';
+                    color = '#854d0e';
                   } else if (isShielded) {
-                    bg = '#f5f3ff';
-                    border = '1.5px solid #c4b5fd';
-                    color = '#6d28d9';
+                    bg = '#f3e8ff';
+                    border = 'none';
+                    color = '#7e22ce';
                   }
 
                   return (
@@ -704,7 +704,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
           </div>
 
           {/* 📚 2. BEGLEITENDE AUFGABEN IM WOCHEN-FAHRPLAN */}
-          {(secondaryBooks.length > 0 || secondarySongs.length > 0 || generalNotes.length > 0) && (
+          {(secondaryBooks.length > 0 || secondarySongs.length > 0 || secondaryMicroScores.length > 0 || generalNotes.length > 0) && (
             <div style={{
               background: '#ffffff',
               borderRadius: '22px',
@@ -748,13 +748,13 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                           width: '24px',
                           height: '24px',
                           borderRadius: '7px',
-                          background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
-                          border: '1px solid rgba(255, 255, 255, 0.85)',
+                          background: '#fee2e2',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#e11d48',
-                          boxShadow: '0 2px 6px rgba(225, 29, 72, 0.12)',
+                          color: '#b91c1c',
+                          boxShadow: 'none',
                           flexShrink: 0
                         }}>
                           <BookOpen size={12} strokeWidth={2.4} />
@@ -768,7 +768,7 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                             fontWeight: 850,
                             color: '#15803d',
                             background: '#dcfce7',
-                            border: '1px solid #bbf7d0',
+                            border: 'none',
                             padding: '2px 8px',
                             borderRadius: '99px',
                             whiteSpace: 'nowrap',
@@ -810,13 +810,13 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                           width: '24px',
                           height: '24px',
                           borderRadius: '7px',
-                          background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
-                          border: '1px solid rgba(255, 255, 255, 0.85)',
+                          background: songColor.from || '#e0f2fe',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: songColor.text || '#0f172a',
-                          boxShadow: `0 2px 6px ${songColor.shadowFrom || 'rgba(0, 0, 0, 0.06)'}`,
+                          boxShadow: 'none',
                           flexShrink: 0
                         }}>
                           <Music size={12} strokeWidth={2.4} />
@@ -835,6 +835,52 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
                         studentId={studentId || studentUser?.id}
                         taskId={`song-${s.id || s.cleanTitle}`}
                         label={s.cleanTitle}
+                        variant="compact_hud"
+                      />
+                    </div>
+                  );
+                })}
+
+                {secondaryMicroScores.map((ms: any, idx: number) => {
+                  const msId = ms.id || `ms-${idx}`;
+                  const msTitle = ms.title || 'Notenschnipsel';
+                  return (
+                    <div
+                      key={`sec-ms-${msId}-${idx}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <MicroScoreSnippetButton
+                          studentId={studentId || studentUser?.id}
+                          taskId={msId}
+                          taskTitle={msTitle}
+                          defaultInstrument={ms.instrument || studentUser?.instrument}
+                          initialSnippet={ms}
+                          isJunior={isJunior}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {msTitle}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 650, color: '#64748b' }}>
+                            {ms.tempoBpm || 80} BPM · {ms.barsCount || 2} Takte Notenschnipsel
+                          </span>
+                        </div>
+                      </div>
+
+                      <StudentHomeworkStatusButton
+                        studentId={studentId || studentUser?.id}
+                        taskId={msId}
+                        label={msTitle}
                         variant="compact_hud"
                       />
                     </div>
@@ -871,14 +917,14 @@ export const PracticeExerciseStageView: React.FC<PracticeExerciseStageViewProps>
               gap: '8px',
               padding: '10px 14px',
               borderRadius: '16px',
-              background: '#fffdf0',
-              border: '1.5px solid #fde047',
+              background: '#fef9c3',
+              border: 'none',
               boxShadow: 'none'
             }}>
-              <HelpCircle size={15} color="#ca8a04" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <HelpCircle size={15} color="#854d0e" style={{ flexShrink: 0, marginTop: '2px' }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <strong style={{ fontSize: '0.78rem', color: '#854d0e', textTransform: 'uppercase' }}>Deine Frage aktiv:</strong>
-                <span style={{ fontSize: '0.84rem', color: '#713f12', fontWeight: 700 }}>„{studentQuestion}“</span>
+                <span style={{ fontSize: '0.84rem', color: '#854d0e', fontWeight: 700 }}>„{studentQuestion}“</span>
               </div>
             </div>
           )}

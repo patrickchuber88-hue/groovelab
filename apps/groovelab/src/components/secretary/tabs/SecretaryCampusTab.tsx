@@ -12,9 +12,11 @@ import {
   BookOpen, DoorOpen, Calendar, Sliders, LayoutDashboard, AlertCircle, Clock,
   ShieldCheck, ShieldAlert, Cpu, HardDrive, Zap, Trash2, Download, Eye, EyeOff,
   Music, Lock, Key, QrCode, GraduationCap, ClipboardList, FileText, CheckCircle,
-  BarChart2, LayoutGrid, Info, Activity, Lightbulb, GripVertical
+  BarChart2, LayoutGrid, Info, Activity, Lightbulb, GripVertical, Scale
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { normalizeCampusIdToNumeric } from '../../../utils/campusIdHelper';
+import { HerrenbergComplianceModal } from '../modals/HerrenbergComplianceModal';
 const SecretaryStudentsView = React.lazy(() => import('../SecretaryStudentsView').then(m => ({ default: m.SecretaryStudentsView })));
 const SecretarySubjectsView = React.lazy(() => import('../SecretarySubjectsView').then(m => ({ default: m.SecretarySubjectsView })));
 import { AppleStyleTokenField } from '../../common/AppleStyleTokenField';
@@ -28,12 +30,12 @@ const getAlphabeticalColor = (name: string) => {
   const trimmed = (name || '').trim();
   if (trimmed.toLowerCase() === 'ohne zuweisung') {
     return {
-      avatarBg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+      avatarBg: '#f1f5f9',
       avatarColor: '#475569'
     };
   }
   const hue = getAlphabeticalHue(trimmed);
-  const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  const avatarBg = `hsl(${hue}, 85%, 94%)`;
   const avatarColor = `hsl(${hue}, 90%, 25%)`;
   return { avatarBg, avatarColor };
 };
@@ -42,6 +44,8 @@ export interface SecretaryCampusTabProps {
   campusSubTab: 'briefing' | 'onboarding' | 'subjects' | 'students' | 'rooms' | 'events' | 'schedules' | 'status';
   setCampusSubTab: React.Dispatch<React.SetStateAction<any>> | ((tab: any) => void);
   setSecretarySubTab: React.Dispatch<React.SetStateAction<any>> | ((subTab: any) => void);
+  setActiveTab?: (tab: 'groovelab' | 'campus' | 'secretary') => void;
+  setShowDunningPayModal?: React.Dispatch<React.SetStateAction<boolean>> | ((show: boolean) => void);
   activePlatform?: string;
   schoolId: string;
   userId?: string;
@@ -290,6 +294,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
   campusSubTab,
   setCampusSubTab,
   setSecretarySubTab,
+  setActiveTab,
+  setShowDunningPayModal,
   activePlatform,
   schoolId,
   userId,
@@ -520,6 +526,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
   handleToggleSetting,
 }) => {
   const { toggleVisibility: toggleRealNames } = useRealNamesVisibility();
+  const [showHerrenbergModal, setShowHerrenbergModal] = useState<boolean>(false);
+  const [showMatrixWeekend, setShowMatrixWeekend] = useState<boolean>(false);
+  const [hoveredMatrixRoomId, setHoveredMatrixRoomId] = useState<string | null>(null);
+  const [showResetMatrixConfirm, setShowResetMatrixConfirm] = useState<boolean>(false);
   const teacherStudentCountsMap = useMemo(() => {
     const map: Record<string, number> = {};
     (students || []).forEach((s: any) => { if (s?.teacher_id) map[s.teacher_id] = (map[s.teacher_id] || 0) + 1; });
@@ -550,8 +560,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                   {/* Backup Warning Banner (Campus Green Theme) */}
                   {showBackupAlert && (
                     <div style={{
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      border: '1px solid #bbf7d0',
+                      background: '#dcfce7',
+                      border: 'none',
                       borderRadius: '16px',
                       padding: '12px 16px',
                       display: 'flex',
@@ -568,7 +578,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          border: '1px solid #10b981'
+                          border: 'none'
                         }}>
                           <ShieldAlert size={20} style={{ color: '#10b981' }} />
                         </div>
@@ -613,7 +623,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                   {frozenStudents.length > 0 && (
                     <div style={{
                       background: '#fef2f2',
-                      border: '1.5px solid #dc2626',
+                      border: 'none',
                       borderRadius: '20px',
                       padding: '20px',
                       display: 'flex',
@@ -639,7 +649,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             background: '#ffffff',
-                            border: '1px solid #fee2e2',
+                            border: 'none',
                             padding: '10px 14px',
                             borderRadius: '12px'
                           }}>
@@ -685,7 +695,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       return (
                         <div style={{
                           background: '#fffbeb',
-                          border: '1.5px solid #f59e0b',
+                          border: 'none',
                           borderRadius: '20px',
                           padding: '16px 20px',
                           display: 'flex',
@@ -703,7 +713,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             </span>
                           </div>
                           <button
-                            onClick={() => setSecretarySubTab('licenses')}
+                            onClick={() => {
+                              if (setShowDunningPayModal) {
+                                setShowDunningPayModal(true);
+                              } else {
+                                if (setActiveTab) setActiveTab('secretary');
+                                setSecretarySubTab('licenses');
+                              }
+                            }}
                             style={{
                               background: '#f59e0b',
                               color: 'white',
@@ -727,7 +744,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       return (
                         <div style={{
                           background: '#fef2f2',
-                          border: '1.5px solid #ef4444',
+                          border: 'none',
                           borderRadius: '20px',
                           padding: '16px 20px',
                           display: 'flex',
@@ -745,7 +762,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             </span>
                           </div>
                           <button
-                            onClick={() => setSecretarySubTab('licenses')}
+                            onClick={() => {
+                              if (setShowDunningPayModal) {
+                                setShowDunningPayModal(true);
+                              } else {
+                                if (setActiveTab) setActiveTab('secretary');
+                                setSecretarySubTab('licenses');
+                              }
+                            }}
                             style={{
                               background: '#ef4444',
                               color: 'white',
@@ -853,7 +877,15 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     return (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         {/* KPI Cards Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: windowWidth <= 768
+                            ? 'repeat(2, minmax(0, 1fr))'
+                            : windowWidth <= 1180
+                              ? 'repeat(3, minmax(0, 1fr))'
+                              : 'repeat(4, minmax(0, 1fr))',
+                          gap: windowWidth <= 768 ? '12px' : '20px'
+                        }}>
                           {kpis.map(kpi => {
                             const Icon = kpi.icon;
                             const isScheduleWarning = kpi.id === 'schedules' && pendingSchedules.length > 0;
@@ -868,8 +900,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                   display: 'flex',
                                   flexDirection: 'column',
                                   gap: '12px',
-                                  border: isScheduleWarning ? '1px solid rgba(220, 38, 38, 0.2) !important' : '1px solid rgba(255, 255, 255, 0.5) !important',
-                                  background: isScheduleWarning ? 'linear-gradient(135deg, rgba(254, 242, 242, 0.8) 0%, rgba(254, 242, 242, 0.4) 100%) !important' : undefined
+                                  border: isScheduleWarning ? 'none' : '1px solid rgba(255, 255, 255, 0.5) !important',
+                                  background: isScheduleWarning ? '#fee2e2' : undefined
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -1011,7 +1043,12 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         </h3>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button type="button" aria-label="Herrenberg-Cockpit für Honorarkräfte öffnen" onClick={() => setShowHerrenbergModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: '12px', padding: '8px 16px', fontSize: '0.8rem', fontWeight: 800, background: '#ecfdf5', color: '#065f46', border: 'none', cursor: 'pointer', fontFamily: 'Urbanist', boxShadow: 'none', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
+                          <Scale size={15} style={{ color: '#059669', flexShrink: 0 }} />
+                          <span style={{ whiteSpace: 'nowrap' }}>Herrenberg-Cockpit</span>
+                        </button>
+
                         <button
                           onClick={() => setIsCsvExpanded(!isCsvExpanded)}
                           style={{ 
@@ -1076,7 +1113,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           return (
                             <div style={{
                               background: 'rgba(52, 168, 83, 0.03)',
-                              border: '1.5px solid rgba(52, 168, 83, 0.12)',
+                              border: 'none',
                               borderRadius: '16px',
                               padding: '12px 16px',
                               display: 'flex',
@@ -1339,7 +1376,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                     {teacherName}
                                   </span>
                                   <span style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                    🛡️ Ausweis: {t.ausweisNummer || t.ausweis_nummer || 'Aktiv'}
+                                    🛡️ Ausweis: {normalizeCampusIdToNumeric(t.ausweisNummer || t.ausweis_nummer) || 'Aktiv'}
                                   </span>
                                 </div>
                               </div>
@@ -1463,7 +1500,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           {/* Modal Body */}
                           <form onSubmit={handleCreateTeacher}>
                             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                                   <input
@@ -1562,6 +1599,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                 coaches={coaches}
                 currentSchoolProfile={currentSchoolProfile}
                 schoolId={schoolId}
+                userId={userId}
                 schoolName={schoolName}
                 windowWidth={windowWidth}
                 hasCampusSub={hasCampusSub}
@@ -1696,7 +1734,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         <div>
                           <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span>{pendingSchedules.length} ausstehende Stundenplan-Freigaben zur Review</span>
-                            <span style={{ fontSize: '0.66rem', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.66rem', background: '#fef3c7', color: '#b45309', border: 'none', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
                               Prüfung erforderlich
                             </span>
                           </div>
@@ -1723,7 +1761,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           style={{
                             background: showOnlyPendingReviews ? '#d97706' : '#fef3c7',
                             color: showOnlyPendingReviews ? '#ffffff' : '#b45309',
-                            border: '1px solid #fde68a',
+                            border: 'none',
                             padding: '8px 16px',
                             borderRadius: '10px',
                             fontSize: '0.78rem',
@@ -1745,7 +1783,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           onClick={handleApproveAllPendingSchedules}
                           disabled={isApprovingAllSchedules}
                           style={{
-                            background: 'linear-gradient(135deg, #d97706, #b45309)',
+                            background: '#f97316',
                             color: '#ffffff',
                             border: 'none',
                             padding: '8px 18px',
@@ -1791,8 +1829,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px', width: '100%' }}>
-                      {/* Segmented Switch for Modes */}
-                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', width: '300px', flexShrink: 0 }}>
+                      {/* Segmented Switch for Modes (isTabletOrMobile elastic width) */}
+                      <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '9px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '300px', flexShrink: 0 }}>
                         <button
                           type="button"
                           onClick={() => setSchedulesRoomsViewMode('designer')}
@@ -1839,21 +1877,60 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
                       {schedulesRoomsViewMode === 'designer' && (
                         <>
+                          {(() => {
+                            const weekendCount = matrixAllocations.filter(p => p.dayOfWeek === 6 || p.dayOfWeek === 7).length;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setShowMatrixWeekend(prev => !prev)}
+                                title={showMatrixWeekend ? 'Samstag & Sonntag ausblenden (Mo–Fr Fokus)' : 'Samstag & Sonntag in der Matrix einblenden'}
+                                style={{
+                                  flex: 0.9,
+                                  background: showMatrixWeekend ? 'rgba(52, 168, 83, 0.1)' : 'white',
+                                  border: showMatrixWeekend ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
+                                  color: showMatrixWeekend ? '#15803d' : '#475569',
+                                  fontWeight: 800,
+                                  padding: '7px 10px',
+                                  borderRadius: '10px',
+                                  fontSize: '0.73rem',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '5px',
+                                  transition: 'all 0.2s',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                <Calendar size={13} />
+                                <span>{showMatrixWeekend ? 'Sa/So aktiv' : '+ Sa/So'}</span>
+                                {weekendCount > 0 && (
+                                  <span style={{
+                                    background: showMatrixWeekend ? '#34a853' : '#e2e8f0',
+                                    color: showMatrixWeekend ? 'white' : '#334155',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 900,
+                                    padding: '1px 5px',
+                                    borderRadius: '6px'
+                                  }}>
+                                    {weekendCount}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })()}
                           <button
                             type="button"
                             onClick={runAutoRoomAllocation}
                             disabled={matrixAllocations.filter(p => !p.roomId).length === 0}
-                            style={{ flex: 1, background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
+                            style={{ flex: 1, background: 'white', border: '1.5px solid #cbd5e1', color: '#475569', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', opacity: matrixAllocations.filter(p => !p.roomId).length === 0 ? 0.5 : 1, transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
-                            ⚡ Auto
+                            <Zap size={13} />
+                            <span>Auto</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (window.confirm('Möchtest du wirklich alle Zuteilungen zurücksetzen? Alle Termine werden wieder in die Liste der offenen Zuteilungen verschoben.')) {
-                                setMatrixAllocations(prev => prev.map(p => ({ ...p, roomId: null })));
-                              }
-                            }}
+                            onClick={() => setShowResetMatrixConfirm(true)}
                             style={{ flex: 1, background: 'white', border: '1.5px solid #fca5a5', color: '#b91c1c', fontWeight: 800, padding: '7px 12px', borderRadius: '10px', fontSize: '0.74rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', transition: 'all 0.2s', whiteSpace: 'nowrap' }}
                           >
                             Zurücksetzen
@@ -1862,7 +1939,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             type="button"
                             onClick={() => handleSaveAndApproveAll(false)}
                             disabled={isSavingApproval}
-                            style={{ flex: 1.5, background: isSavingApproval ? '#6b9e7a' : 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: isSavingApproval ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 2px 6px rgba(52,168,83,0.15)', whiteSpace: 'nowrap', opacity: isSavingApproval ? 0.8 : 1, transition: 'all 0.2s' }}
+                            style={{ flex: 1.5, background: isSavingApproval ? '#94a3b8' : '#34a853', color: 'white', border: 'none', fontWeight: 800, padding: '7.5px 14px', borderRadius: '10px', fontSize: '0.74rem', cursor: isSavingApproval ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: 'none', whiteSpace: 'nowrap', opacity: isSavingApproval ? 0.8 : 1, transition: 'all 0.2s' }}
                           >
                             {isSavingApproval ? (
                               <>
@@ -1875,19 +1952,134 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         </>
                       )}
                     </div>
+
+                    {showResetMatrixConfirm && schedulesRoomsViewMode === 'designer' && (
+                      <div
+                        role="alertdialog"
+                        aria-labelledby="reset-matrix-confirm-title"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          padding: '12px 16px',
+                          borderRadius: '12px',
+                          background: '#fef2f2',
+                          border: 'none',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <strong id="reset-matrix-confirm-title" style={{ fontSize: '0.78rem', fontWeight: 800, color: '#991b1b' }}>
+                            Alle Lehrer-Raumzuteilungen zurücksetzen?
+                          </strong>
+                          <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
+                            Die eingereichten Lehrer-Tage werden wieder in „Kein Raum“ verschoben. Gekoppelte GrooveLab-Räume bleiben geschützt.
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowResetMatrixConfirm(false)}
+                            style={{
+                              background: 'white',
+                              border: '1px solid #cbd5e1',
+                              color: '#475569',
+                              fontWeight: 700,
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMatrixAllocations(prev => prev.map(p => p.teacherId === 'groovelab' ? p : { ...p, roomId: null }));
+                              setShowResetMatrixConfirm(false);
+                              if (setApprovalToast) {
+                                setApprovalToast({
+                                  message: '↩ Alle Lehrer-Raumzuteilungen wurden zurückgesetzt.',
+                                  type: 'success'
+                                });
+                                setTimeout(() => setApprovalToast(null), 3500);
+                              }
+                            }}
+                            style={{
+                              background: '#dc2626',
+                              border: 'none',
+                              color: 'white',
+                              fontWeight: 800,
+                              padding: '6px 12px',
+                              borderRadius: '8px',
+                              fontSize: '0.72rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Ja, zurücksetzen
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* ──────────────────────────────────────────────────────── */}
                   {/* VIEW MODE 1: DYNAMISCHER LIVE-RAUMPLAN (TIMELINE VIEW) */}
                   {/* ──────────────────────────────────────────────────────── */}
-                  {schedulesRoomsViewMode === 'live' && (
+                  {schedulesRoomsViewMode === 'live' && (() => {
+                    const nowRef = simulatedToday ? new Date(simulatedToday) : new Date();
+                    const todayDayNum = nowRef.getDay() || 7;
+                    const nowMins = nowRef.getHours() * 60 + nowRef.getMinutes();
+                    const isLiveDayToday = liveViewDay === todayDayNum;
+                    const showLiveNowLine = isLiveDayToday && nowMins >= 780 && nowMins <= 1260;
+                    const liveNowPercent = showLiveNowLine ? ((nowMins - 780) / 480) * 100 : 0;
+                    const liveNowStr = `${String(nowRef.getHours()).padStart(2, '0')}:${String(nowRef.getMinutes()).padStart(2, '0')}`;
+
+                    const isLiveTeacherMatch = (planTeacherId?: string) => {
+                      if (!selectedFilterTeacherId) return false;
+                      if (planTeacherId === selectedFilterTeacherId) return true;
+                      const cleanA = (planTeacherId || '').replace(/^teacher-/i, '');
+                      const cleanB = selectedFilterTeacherId.replace(/^teacher-/i, '');
+                      return !!cleanA && cleanA === cleanB;
+                    };
+
+                    return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       
                       {/* Weekday Switcher (Apple-style Segmented Control) */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>Tag auswählen</span>
-                          <span style={{ fontSize: '0.7rem', color: '#8e8e93', fontWeight: 600 }}>Semester-Belegungen</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8e8e93', letterSpacing: '-0.01em', textTransform: 'uppercase' }}>Tag auswählen</span>
+                            {liveViewDay !== todayDayNum && (
+                              <button
+                                type="button"
+                                onClick={() => setLiveViewDay(todayDayNum)}
+                                style={{
+                                  background: 'rgba(52, 168, 83, 0.1)',
+                                  border: 'none',
+                                  color: '#15803d',
+                                  borderRadius: '6px',
+                                  padding: '2px 7px',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Direkt zum heutigen Wochentag springen"
+                              >
+                                <Clock size={10} />
+                                <span>Heute</span>
+                              </button>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.7rem', color: '#8e8e93', fontWeight: 600 }}>
+                            {selectedFilterTeacherId ? 'Gefilterte Lehrer-Belegung' : 'Semester-Belegungen'}
+                          </span>
                         </div>
                         <div style={{ 
                           display: 'grid', 
@@ -1901,8 +2093,12 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         }}>
                           {[1,2,3,4,5,6,7].map(d => {
                             const isSelected = liveViewDay === d;
+                            const isTodayTab = d === todayDayNum;
                             const dayName = ['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][d];
-                            const allocationCount = matrixAllocations.filter(p => p.dayOfWeek === d && p.roomId).length;
+                            const dayPlans = matrixAllocations.filter(p => p.dayOfWeek === d && p.roomId);
+                            const allocationCount = selectedFilterTeacherId
+                              ? dayPlans.filter(p => isLiveTeacherMatch(p.teacherId)).length
+                              : dayPlans.length;
                             return (
                               <button
                                 key={d}
@@ -1921,14 +2117,30 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   gap: '6px',
+                                  position: 'relative',
                                   boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)' : 'none',
                                   transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                 }}
                               >
                                 <span>{dayName}</span>
+                                {isTodayTab && (
+                                  <span
+                                    title="Heutiger Wochentag"
+                                    style={{
+                                      width: '5px',
+                                      height: '5px',
+                                      borderRadius: '50%',
+                                      background: '#34a853',
+                                      position: 'absolute',
+                                      bottom: '4px',
+                                      left: '50%',
+                                      transform: 'translateX(-50%)'
+                                    }}
+                                  />
+                                )}
                                 <span style={{ 
-                                  background: isSelected ? '#34a853' : 'rgba(0, 0, 0, 0.05)', 
-                                  color: isSelected ? 'white' : '#636366', 
+                                  background: isSelected ? '#34a853' : (allocationCount > 0 && selectedFilterTeacherId ? 'rgba(52, 168, 83, 0.16)' : 'rgba(0, 0, 0, 0.05)'), 
+                                  color: isSelected ? 'white' : (allocationCount > 0 && selectedFilterTeacherId ? '#15803d' : '#636366'), 
                                   fontSize: '0.65rem', 
                                   fontWeight: 700, 
                                   width: '18px',
@@ -1950,27 +2162,60 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       {/* Timeline Board */}
                       <div style={{ background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)', overflowX: 'auto' }}>
                         {rooms.length === 0 ? (
-                          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
-                            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+                          <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <DoorOpen size={28} style={{ color: '#94a3b8' }} />
                             <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
                           </div>
                         ) : (
                           <div style={{ minWidth: '800px', position: 'relative' }}>
                             
-                            {/* Hour Header Bar */}
-                            <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>
-                              <div style={{ width: '180px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raum</div>
-                              <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', paddingLeft: '20px', position: 'relative' }}>
+                            {/* Hour Header Bar (Exact 0%..100% alignment over 8 hours = 480 mins) */}
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '12px' }}>
+                              <div style={{ width: '190px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raum</div>
+                              <div style={{ flex: 1, position: 'relative', height: '18px', marginLeft: '14px', marginRight: '14px' }}>
                                 {['13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'].map((hr, idx) => (
-                                  <div key={idx} style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textAlign: 'center', width: '40px', flexShrink: 0, position: 'relative' }}>
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${(idx / 8) * 100}%`,
+                                      transform: 'translateX(-50%)',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      color: '#64748b',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
                                     {hr}
                                   </div>
                                 ))}
+                                {showLiveNowLine && (
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      left: `${liveNowPercent}%`,
+                                      top: '-2px',
+                                      transform: 'translateX(-50%)',
+                                      background: '#0f172a',
+                                      color: '#ffffff',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 800,
+                                      padding: '1px 6px',
+                                      borderRadius: '6px',
+                                      zIndex: 15,
+                                      whiteSpace: 'nowrap',
+                                      boxShadow: '0 2px 6px rgba(15,23,42,0.18)'
+                                    }}
+                                    title="Aktuelle Uhrzeit"
+                                  >
+                                    {liveNowStr}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
                             {/* Room Timeline Rows */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                               {rooms.filter(room => room.is_campus_active !== false).map((room, rIdx) => {
                                 const roomAllocations = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === liveViewDay);
                                 
@@ -1983,25 +2228,86 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                 const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
                                 const liveHours = openingHours?.[dayKeys[liveViewDay]];
                                 const isGroovelabActiveToday = isGroovelabRoom && liveHours?.active === true && !!liveHours?.start && !!liveHours?.end;
+                                const hasGroovelabAllocationInRoom = roomAllocations.some(p => p.teacherId === 'groovelab');
+
+                                const roomEquipment: string[] = Array.isArray(room.equipment) ? room.equipment.filter(Boolean) : [];
+                                const roomUnsuitable: string[] = room.unsuitable_instruments || (() => {
+                                  try {
+                                    const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                    return map[room.id] || [];
+                                  } catch { return []; }
+                                })();
+                                const isRoomHovered = hoveredMatrixRoomId === `live_${room.id}`;
 
                                 return (
-                                  <div key={room.id} style={{ display: 'flex', alignItems: 'center', minHeight: '64px', paddingBottom: '8px', borderBottom: '1px solid #f8fafc' }}>
+                                  <div key={room.id} style={{ display: 'flex', alignItems: 'center', minHeight: '60px', paddingBottom: '8px', borderBottom: '1px solid #f8fafc' }}>
                                     
-                                    {/* Left info box: 1% Goldstandard Dual-Layer Room Identity */}
-                                    <div style={{ width: '180px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                        <strong style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>
-                                          {room.name}
-                                          {rooms.filter((r: any) => r.name === room.name).length > 1 && (
-                                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, marginLeft: '5px' }}>
-                                              ({room.building_name || room.location || `Raum-Nr. ${room.room_number || (rIdx + 1)}`})
+                                    {/* Left info box: 0.1% Goldstandard Dual-Layer Room Identity + Equipment Hover Popover */}
+                                    <div
+                                      tabIndex={0}
+                                      onMouseEnter={() => setHoveredMatrixRoomId(`live_${room.id}`)}
+                                      onMouseLeave={() => setHoveredMatrixRoomId(null)}
+                                      onFocus={() => setHoveredMatrixRoomId(`live_${room.id}`)}
+                                      onBlur={() => setHoveredMatrixRoomId(null)}
+                                      style={{
+                                        width: '190px',
+                                        flexShrink: 0,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '3px',
+                                        position: 'relative',
+                                        padding: '4px 8px 4px 4px',
+                                        borderRadius: '10px',
+                                        background: isRoomHovered ? '#f8fafc' : 'transparent',
+                                        transition: 'background 0.2s',
+                                        outline: 'none'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', minWidth: 0 }}>
+                                          <strong style={{ fontSize: '0.84rem', color: '#1e293b', fontWeight: 800 }}>
+                                            {room.name}
+                                            {rooms.filter((r: any) => r.name === room.name).length > 1 && (
+                                              <span style={{ fontSize: '0.67rem', color: '#64748b', fontWeight: 600, marginLeft: '4px' }}>
+                                                ({room.building_name || room.location || `Raum-Nr. ${room.room_number || (rIdx + 1)}`})
+                                              </span>
+                                            )}
+                                          </strong>
+                                          {hasConflicts && (
+                                            <span style={{ background: '#fef2f2', border: 'none', color: '#ef4444', fontSize: '0.58rem', fontWeight: 900, padding: '1px 5px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }} title="Zeitliche Überschneidung!">
+                                              <AlertCircle size={10} />
+                                              <span>KOLLISION</span>
                                             </span>
                                           )}
-                                        </strong>
-                                        {hasConflicts && (
-                                          <span style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', fontSize: '0.58rem', fontWeight: 900, padding: '1px 5px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Zeitliche Überschneidung!">
-                                            ⚠️ KOLLISION
-                                          </span>
+                                        </div>
+                                        {roomAllocations.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setAdHocRoomId(room.id);
+                                              setAdHocStartTime('14:00');
+                                              setShowAdHocBooking(true);
+                                            }}
+                                            title={`Freies Zeitfenster in ${room.name} buchen`}
+                                            aria-label={`Freies Zeitfenster in ${room.name} buchen`}
+                                            style={{
+                                              width: '22px',
+                                              height: '22px',
+                                              borderRadius: '6px',
+                                              border: '1px solid #e2e8f0',
+                                              background: 'white',
+                                              color: '#475569',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              cursor: 'pointer',
+                                              flexShrink: 0,
+                                              padding: 0
+                                            }}
+                                          >
+                                            <Plus size={12} />
+                                          </button>
                                         )}
                                       </div>
 
@@ -2013,16 +2319,16 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                               fontSize: '0.61rem',
                                               fontWeight: 800,
                                               background: '#fef9c3',
-                                              color: '#0f172a',
+                                              color: '#713f12',
                                               border: '1px solid #fde047',
                                               borderRadius: '6px',
                                               padding: '1px 6px',
                                               display: 'inline-flex',
                                               alignItems: 'center',
                                               gap: '4px'
-                                            }} title={`GrooveLab Bandbetrieb (${liveHours.start}–${liveHours.end}). Außerhalb dieser Zeiten voll für Campus-Unterricht nutzbar.`}>
-                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
-                                              GrooveLab {liveHours.start}–{liveHours.end}
+                                            }} title={`Gekoppelter GrooveLab-Bandunterricht (${liveHours.start}–${liveHours.end}). Vor und nach dieser Zeit frei für Campus-Unterricht nutzbar.`}>
+                                              <Lock size={10} style={{ color: '#a16207' }} />
+                                              <span>GrooveLab {liveHours.start}–{liveHours.end}</span>
                                             </span>
                                           </div>
                                         ) : (
@@ -2032,19 +2338,16 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                               fontWeight: 800,
                                               background: '#e6f4ea',
                                               color: '#137333',
-                                              border: '1px solid #b7e1cd',
+                                              border: 'none',
                                               borderRadius: '6px',
                                               padding: '1px 6px',
                                               display: 'inline-flex',
                                               alignItems: 'center',
                                               gap: '4px',
                                               width: 'fit-content'
-                                            }} title="GrooveLab-Betrieb ruht: Der Raum ist zu 100% frei für regulären Campus-Unterricht, Ensembles, Schlagzeug und Spontanbuchungen.">
-                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
-                                              Frei für Campus-Unterricht
-                                            </span>
-                                            <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                                              Akustik- & Bandraum
+                                            }} title="GrooveLab-Betrieb ruht heute: Der Raum ist zu 100% frei für regulären Campus-Unterricht und Spontanbuchungen.">
+                                              <CheckCircle size={10} style={{ color: '#15803d' }} />
+                                              <span>Frei für Campus-Unterricht</span>
                                             </span>
                                           </div>
                                         )
@@ -2053,6 +2356,83 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           {room.building_name || room.location || 'Unterrichtsraum'}
                                         </span>
                                       )}
+
+                                      {/* Sleek Compact Hover Popover for Room Equipment & Acoustics */}
+                                      {isRoomHovered && (
+                                        <div
+                                          role="tooltip"
+                                          style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            left: '4px',
+                                            marginTop: '4px',
+                                            width: '235px',
+                                            background: 'rgba(15, 23, 42, 0.96)',
+                                            backdropFilter: 'blur(14px)',
+                                            WebkitBackdropFilter: 'blur(14px)',
+                                            color: '#f8fafc',
+                                            borderRadius: '12px',
+                                            padding: '10px 12px',
+                                            boxShadow: '0 10px 28px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                                            zIndex: 80,
+                                            pointerEvents: 'none',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '7px'
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff' }}>{room.name}</span>
+                                            {isGroovelabRoom && (
+                                              <span style={{ fontSize: '0.56rem', fontWeight: 800, background: 'rgba(250, 204, 21, 0.2)', color: '#fde047', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <Lock size={9} />
+                                                <span>GrooveLab-Kopplung</span>
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <span style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+                                              Ausstattung
+                                            </span>
+                                            {roomEquipment.length > 0 ? (
+                                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                {roomEquipment.map((eq, eqIdx) => (
+                                                  <span key={eqIdx} style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(255, 255, 255, 0.12)', color: '#f1f5f9', padding: '2px 6px', borderRadius: '5px' }}>
+                                                    {eq}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <span style={{ fontSize: '0.63rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                                Standard-Unterrichtsraum (keine Spezialausstattung hinterlegt)
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          {roomUnsuitable.length > 0 && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                              <span style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fca5a5' }}>
+                                                Akustisch ausgeschlossen
+                                              </span>
+                                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                                {roomUnsuitable.map((un, unIdx) => (
+                                                  <span key={unIdx} style={{ fontSize: '0.61rem', fontWeight: 700, background: 'rgba(239, 68, 68, 0.22)', color: '#fecaca', padding: '2px 6px', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <X size={9} />
+                                                    <span>{un}</span>
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {isGroovelabRoom && (
+                                            <span style={{ fontSize: '0.6rem', color: '#fde047', fontWeight: 600, lineHeight: 1.35 }}>
+                                              Vor & nach dem GrooveLab-Block frei für anderen Unterricht nutzbar.
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* Right timeline grid area with click-to-book */}
@@ -2060,8 +2440,9 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                       onClick={(e) => {
                                         if (e.target === e.currentTarget) {
                                           const rect = e.currentTarget.getBoundingClientRect();
-                                          const clickX = e.clientX - rect.left;
-                                          const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                                          const innerWidth = Math.max(1, rect.width - 28);
+                                          const clickX = Math.max(0, Math.min(innerWidth, e.clientX - rect.left - 14));
+                                          const ratio = clickX / innerWidth;
                                           const clickedMins = 13 * 60 + Math.round(ratio * 480);
                                           const h = Math.floor(clickedMins / 60);
                                           const m = Math.floor((clickedMins % 60) / 15) * 15;
@@ -2071,174 +2452,241 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           setShowAdHocBooking(true);
                                         }
                                       }}
-                                      style={{ flex: 1, height: '52px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer' }}
+                                      style={{ flex: 1, height: '52px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer', paddingLeft: '14px', paddingRight: '14px' }}
                                       title="Klicke auf eine freie Stelle, um eine Spontanbelegung für diesen Raum zu buchen"
                                     >
-                                      
-                                      {/* Visual Hour Grid lines */}
-                                      <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none', paddingLeft: '20px', paddingRight: '20px' }}>
-                                        {[1,2,3,4,5,6,7,8,9].map(i => (
-                                          <div key={i} style={{ borderLeft: '1.5px dashed rgba(226, 232, 240, 0.7)', height: '100%' }} />
-                                        ))}
-                                      </div>
-
-                                      {/* Subtle GrooveLab Operating Window Indicator (Only during active band hours) */}
-                                      {(() => {
-                                        if (!isGroovelabRoom || !isGroovelabActiveToday || !liveHours?.start || !liveHours?.end) return null;
-
-                                        const tToM = (t: string) => {
-                                          const [h, m] = t.split(':').map(Number);
-                                          return h * 60 + m;
-                                        };
-
-                                        const startMin = tToM(liveHours.start);
-                                        const endMin = tToM(liveHours.end);
-
-                                        // Timeline is 13:00 (780 mins) to 21:00 (1260 mins). Duration 480 mins.
-                                        const glLeft = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
-                                        const glWidth = Math.max(0, Math.min(100 - glLeft, ((endMin - startMin) / 480) * 100));
-
-                                        if (glWidth <= 0) return null;
-
-                                        return (
-                                          <div
-                                            style={{
-                                              position: 'absolute',
-                                              left: `${glLeft}%`,
-                                              width: `${glWidth}%`,
-                                              top: '2px',
-                                              bottom: '2px',
-                                              background: 'rgba(254, 240, 138, 0.15)',
-                                              border: '1.5px dashed rgba(234, 179, 8, 0.4)',
-                                              borderRadius: '10px',
-                                              pointerEvents: 'none',
-                                              zIndex: 0,
-                                              display: 'flex',
-                                              alignItems: 'flex-start',
-                                              justifyContent: 'flex-end',
-                                              padding: '2px 6px'
-                                            }}
-                                            title={`GrooveLab Bandbetriebsfenster: ${liveHours.start}–${liveHours.end} Uhr`}
-                                          >
-                                            <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                              GrooveLab Kernzeit
-                                            </span>
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {/* Absolute Positioned Allocations */}
-                                      {roomAllocations.map(plan => {
-                                        // Conversion helper
-                                        const timeToMins = (t: string) => {
-                                          if (!t || !t.includes(':')) return 840; // Default 14:00
-                                          const [h, m] = t.split(':').map(Number);
-                                          return h * 60 + m;
-                                        };
-
-                                        const startMin = timeToMins(plan.startTime);
-                                        const endMin = timeToMins(plan.endTime);
+                                      {/* Inner Coordinate Track (0% = 13:00, 100% = 21:00) */}
+                                      <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                                         
-                                        // Timeline starts 13:00 (780 mins), ends 21:00 (1260 mins). Duration 480 mins.
-                                        const leftPercent = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
-                                        const widthPercent = Math.max(8, Math.min(100 - leftPercent, ((endMin - startMin) / 480) * 100));
-
-                                        const isConflict = roomAllocations.some(p => 
-                                          p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime
-                                        );
-
-                                        // Beautiful pastel coloring replaced with uniform green
-                                        const themeBg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                                        const themeBorder = '#34a853';
-                                        const themeText = '#34a853';
-
-                                        return (
+                                        {/* Visual Hour Grid lines (Exact 0%..100% alignment) */}
+                                        {[0,1,2,3,4,5,6,7,8].map(i => (
                                           <div
-                                            key={plan.id}
-                                            onClick={() => setSelectedDayPlan(plan)}
+                                            key={i}
                                             style={{
                                               position: 'absolute',
-                                              left: `${leftPercent}%`,
-                                              width: `${widthPercent}%`,
-                                              height: '38px',
-                                              background: themeBg,
-                                              border: `1.5px solid ${themeBorder}`,
-                                              borderLeft: `4.5px solid ${themeBorder}`,
-                                              borderRadius: '10px',
-                                              padding: '2px 8px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              flexDirection: 'column',
-                                              justifyContent: 'center',
-                                              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)',
-                                              zIndex: isConflict ? 10 : 2,
-                                              transition: 'all 0.2s',
-                                              overflow: 'hidden'
+                                              left: `${(i / 8) * 100}%`,
+                                              top: 0,
+                                              bottom: 0,
+                                              borderLeft: '1.5px dashed rgba(203, 213, 225, 0.65)',
+                                              pointerEvents: 'none'
                                             }}
-                                            className="hover-scale-mini"
-                                            title={`${getPlanDisplayName(plan)} (${plan.instrument}) : ${plan.startTime} - ${plan.endTime}`}
-                                          >
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                              <span style={{ fontSize: '0.67rem', fontWeight: 900, color: themeText, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                                {getPlanDisplayName(plan)}
-                                              </span>
-                                              <span style={{ fontSize: '0.58rem', fontWeight: 900, fontFamily: 'monospace', color: themeText, opacity: 0.85 }}>
-                                                {plan.startTime} - {plan.endTime}
+                                          />
+                                        ))}
+
+                                        {/* Live Current Time Vertical Hairline */}
+                                        {showLiveNowLine && (
+                                          <div
+                                            style={{
+                                              position: 'absolute',
+                                              left: `${liveNowPercent}%`,
+                                              top: 0,
+                                              bottom: 0,
+                                              width: '1.5px',
+                                              background: '#0f172a',
+                                              opacity: 0.45,
+                                              zIndex: 12,
+                                              pointerEvents: 'none'
+                                            }}
+                                          />
+                                        )}
+
+                                        {/* Subtle GrooveLab Operating Window Indicator (Only when no explicit GrooveLab block is already rendered) */}
+                                        {(() => {
+                                          if (!isGroovelabRoom || !isGroovelabActiveToday || hasGroovelabAllocationInRoom || !liveHours?.start || !liveHours?.end) return null;
+
+                                          const tToM = (t: string) => {
+                                            const [h, m] = t.split(':').map(Number);
+                                            return h * 60 + m;
+                                          };
+
+                                          const startMin = tToM(liveHours.start);
+                                          const endMin = tToM(liveHours.end);
+
+                                          // Timeline is 13:00 (780 mins) to 21:00 (1260 mins). Duration 480 mins.
+                                          const glLeft = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
+                                          const glWidth = Math.max(0, Math.min(100 - glLeft, ((endMin - startMin) / 480) * 100));
+
+                                          if (glWidth <= 0) return null;
+
+                                          return (
+                                            <div
+                                              style={{
+                                                position: 'absolute',
+                                                left: `${glLeft}%`,
+                                                width: `${glWidth}%`,
+                                                top: '4px',
+                                                bottom: '4px',
+                                                background: 'rgba(254, 240, 138, 0.22)',
+                                                border: '1.5px dashed #facc15',
+                                                borderRadius: '10px',
+                                                pointerEvents: 'none',
+                                                zIndex: 0,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'flex-end',
+                                                padding: '2px 8px'
+                                              }}
+                                              title={`GrooveLab Bandbetriebsfenster: ${liveHours.start}–${liveHours.end} Uhr`}
+                                            >
+                                              <span style={{ fontSize: '0.56rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                                GrooveLab {liveHours.start}–{liveHours.end}
                                               </span>
                                             </div>
-                                            <span style={{ fontSize: '0.55rem', fontWeight: 700, color: themeText, opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                              {plan.id.startsWith('adhoc_') ? '⚡ Spontan' : plan.instrument}
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
+                                          );
+                                        })()}
 
-                                      {/* Interactive 1% Goldstandard Free Slot Trigger */}
-                                      {roomAllocations.length === 0 && (
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setAdHocRoomId(room.id);
-                                            setAdHocStartTime('14:00');
-                                            setShowAdHocBooking(true);
-                                          }}
-                                          style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            background: 'transparent',
-                                            border: 'none',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px',
-                                            cursor: 'pointer',
-                                            borderRadius: '12px',
-                                            transition: 'all 0.15s ease',
-                                            padding: '0 12px',
-                                            outline: 'none'
-                                          }}
-                                          className="hover-scale-mini"
-                                          title={`${room.name} ist frei. Klicke hier, um eine Spontanbelegung oder Unterrichtsstunde einzubuchen.`}
-                                          aria-label={`${room.name} ist frei. Klicke für Spontanbelegung.`}
-                                        >
-                                          <span style={{
-                                            fontSize: '0.72rem',
-                                            fontWeight: 700,
-                                            color: isGroovelabRoom ? '#15803d' : '#64748b',
-                                            background: isGroovelabRoom ? '#dcfce7' : 'rgba(0,0,0,0.03)',
-                                            border: isGroovelabRoom ? '1px solid #bbf7d0' : '1px solid rgba(0,0,0,0.05)',
-                                            padding: '4px 12px',
-                                            borderRadius: '20px',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '6px'
-                                          }}>
-                                            <span>☕ Frei · {isGroovelabRoom ? 'Für Campus-Unterricht verfügbar' : 'Keine Zuweisungen'}</span>
-                                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: isGroovelabRoom ? '#166534' : '#34a853', opacity: 0.9 }}>+ Belegung buchen</span>
-                                          </span>
-                                        </button>
-                                      )}
+                                        {/* Absolute Positioned Allocations */}
+                                        {roomAllocations.map(plan => {
+                                          const timeToMins = (t: string) => {
+                                            if (!t || !t.includes(':')) return 840;
+                                            const [h, m] = t.split(':').map(Number);
+                                            return h * 60 + m;
+                                          };
+
+                                          const startMin = timeToMins(plan.startTime);
+                                          const endMin = timeToMins(plan.endTime);
+                                          
+                                          // Timeline starts 13:00 (780 mins), ends 21:00 (1260 mins). Duration 480 mins.
+                                          const leftPercent = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
+                                          const widthPercent = Math.max(6, Math.min(100 - leftPercent, ((endMin - startMin) / 480) * 100));
+
+                                          const isConflict = roomAllocations.some(p => 
+                                            p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime
+                                          );
+                                          const isGlPlan = plan.teacherId === 'groovelab';
+                                          const matchesSelectedTeacher = isLiveTeacherMatch(plan.teacherId);
+                                          const isTeacherDimmed = !!selectedFilterTeacherId && !matchesSelectedTeacher;
+
+                                          // GrooveLab = Canonical Yellow (#fef9c3 / #facc15 / #854d0e), Regular Campus = Green (#e6f4ea / #34a853 / #137333)
+                                          const themeBg = isGlPlan
+                                            ? '#fef9c3'
+                                            : '#e6f4ea';
+                                          const themeBorder = isGlPlan ? '#facc15' : '#34a853';
+                                          const themeBorderLeft = isGlPlan ? '#facc15' : '#34a853';
+                                          const themeText = isGlPlan ? '#854d0e' : '#137333';
+                                          const displayInstrument = isGlPlan && (!plan.instrument || plan.instrument.toLowerCase() === 'plattform')
+                                            ? 'Bandunterricht'
+                                            : plan.instrument;
+
+                                          let blockShadow = 'none';
+                                          if (matchesSelectedTeacher) {
+                                            blockShadow = 'none';
+                                          }
+
+                                          return (
+                                            <div
+                                              key={plan.id}
+                                              role="button"
+                                              tabIndex={0}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedDayPlan(plan);
+                                              }}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  setSelectedDayPlan(plan);
+                                                }
+                                              }}
+                                              style={{
+                                                position: 'absolute',
+                                                left: `${leftPercent}%`,
+                                                width: `${widthPercent}%`,
+                                                height: '40px',
+                                                background: themeBg,
+                                                border: 'none',
+                                                borderLeft: `4.5px solid ${themeBorderLeft}`,
+                                                borderRadius: '10px',
+                                                padding: '2px 9px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'center',
+                                                boxShadow: blockShadow,
+                                                opacity: isTeacherDimmed ? 0.22 : 1,
+                                                zIndex: isConflict ? 10 : 2,
+                                                transition: 'all 0.2s',
+                                                overflow: 'hidden',
+                                                pointerEvents: 'auto',
+                                                boxSizing: 'border-box'
+                                              }}
+                                              className="hover-scale-mini"
+                                              title={`${getPlanDisplayName(plan)} (${displayInstrument}) : ${plan.startTime}–${plan.endTime} Uhr`}
+                                            >
+                                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
+                                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: themeText, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                  {isGlPlan && <Lock size={10} style={{ color: '#a16207', flexShrink: 0 }} />}
+                                                  <span>{getPlanDisplayName(plan)}</span>
+                                                </span>
+                                                <span style={{ fontSize: '0.6rem', fontWeight: 900, fontFamily: 'monospace', color: themeText, opacity: 0.9, flexShrink: 0 }}>
+                                                  {plan.startTime}–{plan.endTime}
+                                                </span>
+                                              </div>
+                                              <span style={{ fontSize: '0.56rem', fontWeight: 700, color: themeText, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                {plan.id.startsWith('adhoc_') ? (
+                                                  <>
+                                                    <Zap size={9} />
+                                                    <span>Spontanbuchung</span>
+                                                  </>
+                                                ) : displayInstrument}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+
+                                        {/* Interactive 0.1% Goldstandard Free Slot Trigger (Monochrome Icons) */}
+                                        {roomAllocations.length === 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setAdHocRoomId(room.id);
+                                              setAdHocStartTime('14:00');
+                                              setShowAdHocBooking(true);
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              height: '100%',
+                                              background: 'transparent',
+                                              border: 'none',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '8px',
+                                              cursor: 'pointer',
+                                              borderRadius: '12px',
+                                              transition: 'all 0.15s ease',
+                                              padding: '0 12px',
+                                              outline: 'none',
+                                              pointerEvents: 'auto'
+                                            }}
+                                            className="hover-scale-mini"
+                                            title={`${room.name} ist frei. Klicke hier, um eine Spontanbelegung oder Unterrichtsstunde einzubuchen.`}
+                                            aria-label={`${room.name} ist frei. Klicke für Spontanbelegung.`}
+                                          >
+                                            <span style={{
+                                              fontSize: '0.72rem',
+                                              fontWeight: 700,
+                                              color: isGroovelabRoom ? '#15803d' : '#64748b',
+                                              background: isGroovelabRoom ? '#dcfce7' : 'rgba(15, 23, 42, 0.03)',
+                                              border: isGroovelabRoom ? 'none' : '1px solid rgba(15, 23, 42, 0.06)',
+                                              padding: '4px 12px',
+                                              borderRadius: '20px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '6px'
+                                            }}>
+                                              <CheckCircle size={12} style={{ color: isGroovelabRoom ? '#15803d' : '#94a3b8' }} />
+                                              <span>Frei · {isGroovelabRoom ? 'Für Campus-Unterricht verfügbar' : 'Keine Zuweisungen'}</span>
+                                              <span style={{ fontSize: '0.64rem', fontWeight: 800, color: isGroovelabRoom ? '#166534' : '#34a853', display: 'inline-flex', alignItems: 'center', gap: '2px', marginLeft: '2px' }}>
+                                                <Plus size={11} />
+                                                <span>Belegung buchen</span>
+                                              </span>
+                                            </span>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
 
                                   </div>
@@ -2251,7 +2699,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       </div>
 
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ──────────────────────────────────────────────────────── */}
                   {/* VIEW MODE 2: UPGRADED RAUMPLAN-DESIGNER (MATRIX GRID)    */}
@@ -2259,21 +2708,31 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                   {schedulesRoomsViewMode === 'designer' && (
                     <div style={{ overflowX: 'auto', background: 'white', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', padding: '24px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)' }}>
                       {rooms.length === 0 ? (
-                        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8' }}>
-                          <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>🏫</span>
+                        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                          <DoorOpen size={28} style={{ color: '#94a3b8' }} />
                           <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>Keine Räume gefunden. Bitte zuerst Räume im System anlegen.</span>
                         </div>
-                      ) : (
-                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '8px 6px', tableLayout: 'fixed', minWidth: '700px' }}>
+                      ) : (() => {
+                        const visibleMatrixDays = showMatrixWeekend ? [1, 2, 3, 4, 5, 6, 7] : [1, 2, 3, 4, 5];
+                        const isTeacherMatch = (planTeacherId?: string) => {
+                          if (!selectedFilterTeacherId) return false;
+                          if (planTeacherId === selectedFilterTeacherId) return true;
+                          const cleanA = (planTeacherId || '').replace(/^teacher-/i, '');
+                          const cleanB = selectedFilterTeacherId.replace(/^teacher-/i, '');
+                          return !!cleanA && cleanA === cleanB;
+                        };
+
+                        return (
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '8px 6px', tableLayout: 'fixed', minWidth: showMatrixWeekend ? '700px' : '560px' }}>
                           <colgroup>
                             <col style={{ width: '130px' }} />
-                            {[1,2,3,4,5,6,7].map(d => <col key={d} />)}
+                            {visibleMatrixDays.map(d => <col key={d} />)}
                           </colgroup>
 
                           <thead>
                             <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
                               <th style={{ padding: '10px 12px', fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Raum</th>
-                              {[1,2,3,4,5,6,7].map(d => (
+                              {visibleMatrixDays.map(d => (
                                 <th key={d} style={{ padding: '10px 10px', fontSize: '0.75rem', fontWeight: 900, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
                                   {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][d]}
                                   {matrixAllocations.filter(p => !p.roomId && p.dayOfWeek === d).length > 0 && (
@@ -2291,13 +2750,13 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             <tr style={{ borderBottom: '2px solid #fef3c7', background: '#fffbeb' }}>
                               <td style={{ padding: '10px 12px', verticalAlign: 'top' }}>
                                 <strong style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>Kein Raum</strong>
-                                <span style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 700 }}>↓ in Raum ziehen</span>
+                                <span style={{ fontSize: '0.6rem', color: '#b45309', fontWeight: 700 }}>↓ in Raum ziehen</span>
                               </td>
-                              {[1,2,3,4,5,6,7].map(dayNum => {
+                              {visibleMatrixDays.map(dayNum => {
                                 const unassigned = matrixAllocations.filter(p => {
                                   if (p.roomId) return false;
                                   if (p.dayOfWeek !== dayNum) return false;
-                                  if (selectedFilterTeacherId && p.teacherId !== selectedFilterTeacherId) return false;
+                                  if (selectedFilterTeacherId && !isTeacherMatch(p.teacherId)) return false;
                                   return true;
                                 });
                                 return (
@@ -2311,14 +2770,15 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                       <div style={{
                                         height: '56px',
                                         borderRadius: '10px',
-                                        border: '2px dashed rgba(245, 158, 11, 0.15)',
+                                        border: '2px dashed rgba(180, 83, 9, 0.25)',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: 'rgba(245, 158, 11, 0.35)',
+                                        color: '#b45309',
+                                        opacity: 0.72,
                                         fontSize: '0.68rem',
                                         fontWeight: 800,
-                                        background: 'rgba(254, 243, 199, 0.05)'
+                                        background: 'rgba(254, 243, 199, 0.12)'
                                       }}>
                                         Leer
                                       </div>
@@ -2334,25 +2794,30 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           });
                                           const isPendingBlock = isExplicitPending || isTeacherPending;
 
-                                          let cardBg = isGL ? '#fffbeb' : '#e6f4ea';
-                                          let cardBorder = isGL ? '1px solid #fde68a' : '1px solid #a7f3d0';
-                                          let cardBorderLeft = isGL ? '4px solid #f59e0b' : '4px solid #34a853';
-                                          const titleColor = isGL ? '#92400e' : '#0f172a';
-                                          const instColor = isGL ? '#b45309' : '#64748b';
-                                          const timeColor = isGL ? '#d97706' : '#34a853';
+                                          let cardBg = isGL ? '#fef9c3' : '#e6f4ea';
+                                          let cardBorder = 'none';
+                                          let cardBorderLeft = isGL ? '4px solid #facc15' : '4px solid #34a853';
+                                          const titleColor = isGL ? '#854d0e' : '#0f172a';
+                                          const instColor = isGL ? '#854d0e' : '#475569';
+                                          const timeColor = isGL ? '#854d0e' : '#137333';
+                                          const displayInst = isGL && (!plan.instrument || plan.instrument.toLowerCase() === 'plattform')
+                                            ? 'Bandunterricht'
+                                            : plan.instrument;
 
                                           if (showOnlyPendingReviews && isPendingBlock) {
-                                            cardBorder = '1.5px dashed #f59e0b';
-                                            cardBorderLeft = '4px solid #f59e0b';
-                                            cardBg = '#fffbeb';
+                                            cardBorder = 'none';
+                                            cardBorderLeft = '4px solid #f97316';
+                                            cardBg = '#ffedd5';
                                           }
 
                                           const blockOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
-                                          const blockShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(245, 158, 11, 0.22)' : (isGL ? '0 4px 8px rgba(245, 158, 11, 0.06)' : '0 4px 8px rgba(52, 168, 83, 0.06)');
+                                          const blockShadow = 'none';
 
                                           return (
                                             <div
                                               key={plan.id}
+                                              role="button"
+                                              tabIndex={0}
                                               draggable
                                               onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
                                               onDragEnd={() => {
@@ -2373,7 +2838,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                 setSelectedDayPlan(plan);
                                                 e.stopPropagation();
                                               }}
-                                              title={`${getPlanDisplayName(plan)} (${plan.instrument})`}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  setSelectedDayPlan(plan);
+                                                }
+                                              }}
+                                              title={`${getPlanDisplayName(plan)} (${displayInst}) — Klicken für Stundenplan-Details`}
                                               style={{
                                                 position: 'relative',
                                                 background: cardBg,
@@ -2393,8 +2865,11 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                               }}
                                             >
                                               <span style={{ fontSize: '0.73rem', fontWeight: 800, color: titleColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getPlanDisplayName(plan)}</span>
-                                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: instColor }}>{plan.instrument}</span>
-                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: timeColor }}>⏱ {plan.startTime}–{plan.endTime}</span>
+                                              <span style={{ fontSize: '0.6rem', fontWeight: 700, color: instColor }}>{displayInst}</span>
+                                              <span style={{ fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: timeColor, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                {isGL ? <Lock size={10} /> : <Clock size={10} />}
+                                                <span>{plan.startTime}–{plan.endTime}</span>
+                                              </span>
                                               {(() => {
                                                 // Only validate for GrooveLab slots
                                                 const isGroovelabPlan = plan.teacherId === 'groovelab';
@@ -2405,12 +2880,17 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                 if (!dayHours) return null;
                                                 
                                                 if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
-                                                  return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+                                                  return (
+                                                    <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: 'none', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '3px' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>
+                                                      <AlertCircle size={9} />
+                                                      <span>Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>
+                                                    </span>
+                                                  );
                                                 }
                                                 return null;
                                               })()}
                                               {isPendingBlock && (
-                                                <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: 'none', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
                                                   <Activity size={10} style={{ color: '#b45309' }} />
                                                   <span>Review</span>
                                                 </span>
@@ -2431,38 +2911,136 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               .map((room, rIdx) => {
                               // Smart instrument compatibility check for visual highlighting
                               const draggedPlan = draggedPlanId ? matrixAllocations.find(p => p.id === draggedPlanId) : null;
+                              const roomEquipment: string[] = Array.isArray(room.equipment) ? room.equipment.filter(Boolean) : [];
+                              const roomUnsuitable: string[] = room.unsuitable_instruments || (() => {
+                                try {
+                                  const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
+                                  return map[room.id] || [];
+                                } catch { return []; }
+                              })();
+                              const isGlRoom = room.is_groovelab_active === true;
                               
                               let isCompatible = true;
                               if (draggedPlan && draggedPlan.instrument) {
-                                const unsuitable = room.unsuitable_instruments || (() => {
-                                  try {
-                                    const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-                                    return map[room.id] || [];
-                                  } catch { return []; }
-                                })();
-                                isCompatible = !unsuitable.some((inst: string) => inst.toLowerCase() === draggedPlan.instrument.toLowerCase());
+                                isCompatible = !roomUnsuitable.some((inst: string) => inst.toLowerCase() === draggedPlan.instrument.toLowerCase());
                               }
+
+                              const isRoomHovered = hoveredMatrixRoomId === room.id;
 
                               return (
                                 <tr id={`room-row-${room.id}`} key={room.id} style={{ borderBottom: rIdx < rooms.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                                  <td style={{ padding: '8px', verticalAlign: 'top', background: draggedPlanId && !isCompatible ? '#fef2f2' : 'transparent', transition: 'background 0.25s' }}>
+                                  <td
+                                    tabIndex={0}
+                                    onMouseEnter={() => setHoveredMatrixRoomId(room.id)}
+                                    onMouseLeave={() => setHoveredMatrixRoomId(null)}
+                                    onFocus={() => setHoveredMatrixRoomId(room.id)}
+                                    onBlur={() => setHoveredMatrixRoomId(null)}
+                                    style={{
+                                      padding: '8px',
+                                      verticalAlign: 'top',
+                                      position: 'relative',
+                                      background: draggedPlanId && !isCompatible ? '#fef2f2' : (isRoomHovered ? '#f8fafc' : 'transparent'),
+                                      borderRadius: '10px',
+                                      transition: 'background 0.2s',
+                                      cursor: 'default',
+                                      outline: 'none'
+                                    }}
+                                  >
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                      <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
-                                        {room.name}
+                                      <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                                        <span>{room.name}</span>
                                         {rooms.filter((r: any) => r.name === room.name).length > 1 && (
-                                          <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600, marginLeft: '4px' }}>
+                                          <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>
                                             ({room.building_name || room.location || `Raum-Nr. ${room.room_number || (rIdx + 1)}`})
                                           </span>
                                         )}
                                       </strong>
                                       {draggedPlanId && !isCompatible && (
-                                        <span style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: 600 }}>
-                                          ⚠️ Nicht geeignet
+                                        <span style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                          <AlertCircle size={10} />
+                                          <span>Nicht geeignet</span>
                                         </span>
                                       )}
                                     </div>
+
+                                    {/* Sleek Compact Hover Popover for Room Equipment & Acoustics */}
+                                    {isRoomHovered && (
+                                      <div
+                                        role="tooltip"
+                                        style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: '8px',
+                                          marginTop: '4px',
+                                          width: '235px',
+                                          background: 'rgba(15, 23, 42, 0.96)',
+                                          backdropFilter: 'blur(14px)',
+                                          WebkitBackdropFilter: 'blur(14px)',
+                                          color: '#f8fafc',
+                                          borderRadius: '12px',
+                                          padding: '10px 12px',
+                                          boxShadow: '0 10px 28px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                                          zIndex: 80,
+                                          pointerEvents: 'none',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '7px'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px' }}>
+                                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff' }}>{room.name}</span>
+                                          {isGlRoom && (
+                                            <span style={{ fontSize: '0.56rem', fontWeight: 800, background: 'rgba(250, 204, 21, 0.2)', color: '#fde047', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                              <Lock size={9} />
+                                              <span>GrooveLab-Kopplung</span>
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          <span style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>
+                                            Ausstattung
+                                          </span>
+                                          {roomEquipment.length > 0 ? (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                              {roomEquipment.map((eq, eqIdx) => (
+                                                <span key={eqIdx} style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(255, 255, 255, 0.12)', color: '#f1f5f9', padding: '2px 6px', borderRadius: '5px' }}>
+                                                  {eq}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span style={{ fontSize: '0.63rem', color: '#cbd5e1', fontWeight: 500 }}>
+                                              Standard-Unterrichtsraum (keine Spezialausstattung hinterlegt)
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {roomUnsuitable.length > 0 && (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <span style={{ fontSize: '0.58rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#fca5a5' }}>
+                                              Akustisch ausgeschlossen
+                                            </span>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                              {roomUnsuitable.map((un, unIdx) => (
+                                                <span key={unIdx} style={{ fontSize: '0.61rem', fontWeight: 700, background: 'rgba(239, 68, 68, 0.22)', color: '#fecaca', padding: '2px 6px', borderRadius: '5px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                  <X size={9} />
+                                                  <span>{un}</span>
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {isGlRoom && (
+                                          <span style={{ fontSize: '0.6rem', color: '#fde047', fontWeight: 600, lineHeight: 1.35 }}>
+                                            Vor & nach dem GrooveLab-Block frei für anderen Unterricht nutzbar.
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
-                                  {[1,2,3,4,5,6,7].map(dayNum => {
+                                  {visibleMatrixDays.map(dayNum => {
                                     const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
                                     
                                     // Visual highlight styling based on compatibility & real-time dragover hover
@@ -2532,6 +3110,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           {cellPlans.map(plan => {
                                             const hasOverlap = cellPlans.some(p => p.id !== plan.id && p.startTime < plan.endTime && plan.startTime < p.endTime);
                                             const isGroovelabPlan = plan.teacherId === 'groovelab';
+                                            const matchesSelectedTeacher = isTeacherMatch(plan.teacherId);
+                                            const isTeacherDimmed = !!selectedFilterTeacherId && !matchesSelectedTeacher;
 
                                             const isExplicitPending = plan.status === 'ready_for_admin_review' || plan.status === 'pending';
                                             const isTeacherPending = !isGroovelabPlan && pendingSchedules.some(s => {
@@ -2541,28 +3121,41 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                             });
                                             const isPendingBlock = isExplicitPending || isTeacherPending;
 
-                                            let themeBg = isGroovelabPlan ? '#fefce8' : 'rgba(230, 244, 234, 0.45)';
-                                            let themeBorder = isGroovelabPlan ? '1px solid #fef08a' : '1px solid #e2e8f0';
+                                            let themeBg = isGroovelabPlan ? '#fef9c3' : '#e6f4ea';
+                                            let themeBorder = 'none';
                                             let themeBorderLeft = isGroovelabPlan ? '4px solid #facc15' : '4px solid #34a853';
-                                            const themeText = '#0f172a';
-                                            const timeText = isGroovelabPlan ? '#eab308' : '#34a853';
+                                            const themeText = isGroovelabPlan ? '#854d0e' : '#0f172a';
+                                            const instText = isGroovelabPlan ? '#854d0e' : '#64748b';
+                                            const timeText = isGroovelabPlan ? '#854d0e' : '#137333';
+                                            const displayInst = isGroovelabPlan && (!plan.instrument || plan.instrument.toLowerCase() === 'plattform')
+                                              ? 'Bandunterricht'
+                                              : plan.instrument;
 
                                             if (hasOverlap) {
-                                              themeBorder = isGroovelabPlan ? '2px dashed #facc15' : '2px dashed #34a853';
+                                              themeBorder = 'none';
                                             }
 
                                             if (showOnlyPendingReviews && isPendingBlock) {
-                                              themeBorder = '1.5px dashed #f59e0b';
-                                              themeBorderLeft = '4px solid #f59e0b';
-                                              themeBg = '#fffbeb';
+                                              themeBorder = 'none';
+                                              themeBorderLeft = '4px solid #f97316';
+                                              themeBg = '#ffedd5';
                                             }
 
-                                            const planOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
-                                            const planShadow = showOnlyPendingReviews && isPendingBlock ? '0 4px 16px rgba(245, 158, 11, 0.22)' : '0 1px 3px rgba(0,0,0,0.02)';
+                                            let planOpacity = showOnlyPendingReviews ? (isPendingBlock ? 1 : 0.25) : 1;
+                                            if (isTeacherDimmed) {
+                                              planOpacity = 0.22;
+                                            }
+
+                                            let planShadow = 'none';
+                                            if (matchesSelectedTeacher) {
+                                              planShadow = 'none';
+                                            }
 
                                             return (
                                               <div
                                                 key={plan.id}
+                                                role="button"
+                                                tabIndex={0}
                                                 draggable
                                                 onDragStart={(e) => handleDragStartMatrix(e, plan.id)}
                                                 onDragEnd={() => {
@@ -2570,16 +3163,25 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                   setDraggedPlanDay(null);
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                  if (showOnlyPendingReviews && !isPendingBlock) {
+                                                  if ((showOnlyPendingReviews && !isPendingBlock) || isTeacherDimmed) {
                                                     e.currentTarget.style.opacity = '1';
                                                   }
                                                 }}
                                                 onMouseLeave={(e) => {
-                                                  if (showOnlyPendingReviews && !isPendingBlock) {
+                                                  if (isTeacherDimmed) {
+                                                    e.currentTarget.style.opacity = '0.22';
+                                                  } else if (showOnlyPendingReviews && !isPendingBlock) {
                                                     e.currentTarget.style.opacity = '0.25';
                                                   }
                                                 }}
                                                 onClick={() => setSelectedDayPlan(plan)}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    setSelectedDayPlan(plan);
+                                                  }
+                                                }}
+                                                title={`${getPlanDisplayName(plan)} (${displayInst}) — Klicken für Stundenplan-Details`}
                                                 style={{
                                                   background: themeBg,
                                                   border: themeBorder,
@@ -2601,11 +3203,16 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                   <span style={{ fontSize: '0.73rem', fontWeight: 800, color: themeText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {getPlanDisplayName(plan)}
                                                   </span>
-                                                  {hasOverlap && <span style={{ fontSize: '0.6rem', flexShrink: 0 }} title="Zeitkonflikt!">⚠️</span>}
+                                                  {hasOverlap && (
+                                                    <span style={{ fontSize: '0.6rem', color: '#ef4444', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title="Zeitkonflikt!">
+                                                      <AlertCircle size={11} />
+                                                    </span>
+                                                  )}
                                                 </div>
-                                                <span style={{ pointerEvents: 'none', fontSize: '0.6rem', fontWeight: 700, color: '#94a3b8' }}>{plan.instrument}</span>
-                                                <span style={{ pointerEvents: 'none', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : timeText }}>
-                                                  ⏱ {plan.startTime}–{plan.endTime}
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.6rem', fontWeight: 700, color: instText }}>{displayInst}</span>
+                                                <span style={{ pointerEvents: 'none', fontSize: '0.62rem', fontWeight: 900, fontFamily: 'monospace', color: hasOverlap ? '#ef4444' : timeText, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                  {isGroovelabPlan ? <Lock size={10} /> : <Clock size={10} />}
+                                                  <span>{plan.startTime}–{plan.endTime}</span>
                                                 </span>
                                                 {(() => {
                                                   if (!isGroovelabPlan) return null;
@@ -2614,12 +3221,17 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                   const dayHours = openingHours?.[dayKeys[dayNum]];
                                                   if (!dayHours) return null;
                                                   if (dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
-                                                    return <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>⚠️ Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>;
+                                                    return (
+                                                      <span style={{ pointerEvents: 'none', fontSize: '0.55rem', fontWeight: 900, color: '#ef4444', background: '#fef2f2', border: 'none', padding: '2px 4px', borderRadius: '4px', marginTop: '2px', alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '3px' }} title={`Öffnungszeiten: ${dayHours.start} - ${dayHours.end}`}>
+                                                        <AlertCircle size={9} />
+                                                        <span>Außerhalb Betriebszeit (${dayHours.start}–${dayHours.end})</span>
+                                                      </span>
+                                                    );
                                                   }
                                                   return null;
                                                 })()}
                                                 {isPendingBlock && (
-                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0f172a', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0f172a', background: '#fef3c7', border: 'none', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
                                                     <Activity size={10} style={{ color: '#b45309' }} />
                                                     <span>Review</span>
                                                   </span>
@@ -2637,7 +3249,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             })}
                           </tbody>
                         </table>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -2661,7 +3274,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         onSubmit={(e) => {
                           e.preventDefault();
                           if (!adHocTeacherId) {
-                            alert('Bitte wähle eine Lehrkraft.');
+                            if (setApprovalToast) {
+                              setApprovalToast({ message: 'Bitte wähle eine Lehrkraft.', type: 'error' });
+                              setTimeout(() => setApprovalToast(null), 3500);
+                            }
                             return;
                           }
                           const chosenTeacher = campusTeachers.find(t => t.id === adHocTeacherId);
@@ -2698,12 +3314,18 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           setMatrixAllocations(prev => [...prev, newPlanEntry]);
                           setShowAdHocBooking(false);
                           setAdHocStudentName('');
-                          alert('Spontanbelegung erfolgreich eingebucht! ⚡');
+                          if (setApprovalToast) {
+                            setApprovalToast({ message: 'Spontanbelegung erfolgreich eingebucht.', type: 'success' });
+                            setTimeout(() => setApprovalToast(null), 3500);
+                          }
                         }}
                         style={{ background: 'white', borderRadius: '28px', border: '1px solid rgba(255,255,255,0.5)', width: '100%', maxWidth: '440px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '0 24px 64px rgba(15,23,42,0.18)', animation: 'modalFadeIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
                       >
                         <div>
-                          <h3 id="adhoc-booking-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>⚡ Spontanbelegung buchen</h3>
+                          <h3 id="adhoc-booking-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Zap size={18} style={{ color: '#34a853' }} />
+                            <span>Spontanbelegung buchen</span>
+                          </h3>
                           <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 550 }}>
                             Buche ad-hoc freie Zeitkapazitäten für {rooms.find(r => r.id === adHocRoomId)?.name || 'diesen Raum'}.
                           </p>
@@ -2742,7 +3364,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         </div>
 
                         {/* Start Time & Duration Picker */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label htmlFor="adhoc-start-time" style={{ fontSize: '0.67rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Startzeit</label>
                             <input
@@ -2776,9 +3398,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                           <button
                             type="submit"
-                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: 'none', transition: 'all 0.15s' }}
+                            style={{ flex: 1.5, background: '#34a853', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: 'none', transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                           >
-                            Einbuchen ⚡
+                            <Check size={16} />
+                            <span>Einbuchen</span>
                           </button>
                           <button
                             type="button"
@@ -2807,11 +3430,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px', marginBottom: '16px' }}>
                         <div>
-                          <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#f59e0b', background: '#fffbeb', border: '1px solid rgba(245,158,11,0.2)', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
+                          <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#854d0e', background: '#fef9c3', border: 'none', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-block', marginBottom: '6px' }}>
                             {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} Plan
                           </span>
                           <h3 id="dayplan-inspect-title" style={{ margin: '0 0 2px 0', fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <Music size={12} style={{ color: '#64748b' }} />
+                            <span>{selectedDayPlan.teacherId === 'groovelab' && (!selectedDayPlan.instrument || selectedDayPlan.instrument.toLowerCase() === 'plattform') ? 'Bandunterricht' : selectedDayPlan.instrument}</span>
+                          </span>
                         </div>
                         <button 
                           type="button"
@@ -2846,7 +3472,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
                             if (setApprovalToast) {
                               setApprovalToast({
-                                message: `📍 ${dayName} (${selectedDayPlan.teacherName || 'Lehrkraft'}) zugeteilt an: ${targetRoomName}`,
+                                message: `${dayName} (${getPlanDisplayName(selectedDayPlan) || 'Lehrkraft'}) zugeteilt an: ${targetRoomName}`,
                                 type: 'success'
                               });
                               setTimeout(() => setApprovalToast(null), 3500);
@@ -2914,7 +3540,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         {!selectedDayPlan.id.startsWith('adhoc_') && (
                           <button
                             onClick={() => handleRejectTeacherDayPlan(selectedDayPlan)}
-                            style={{ background: 'rgba(239,68,68,0.05)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
+                            style={{ background: 'rgba(239,68,68,0.05)', color: '#ef4444', border: 'none', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
                           >
                             ↩ Zur Überarbeitung zurückweisen
                           </button>
@@ -2930,9 +3556,9 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               {isAlreadySplit && (
                                 <button
                                   onClick={() => handleMergePlans(selectedDayPlan)}
-                                  style={{ background: 'rgba(52,168,83,0.05)', color: '#34a853', border: '1px solid rgba(52,168,83,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                  style={{ background: 'rgba(52,168,83,0.05)', color: '#34a853', border: 'none', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                 >
-                                  🔗 Aufteilung aufheben (Zusammenfügen)
+                                  <span>Aufteilung aufheben (Zusammenfügen)</span>
                                 </button>
                               )}
                               
@@ -2943,9 +3569,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                     <button
                                       key={pIdx}
                                       onClick={() => handleSplitPlan(selectedDayPlan, pt.index)}
-                                      style={{ background: 'rgba(245,158,11,0.05)', color: '#d97706', border: '1px solid rgba(245,158,11,0.2)', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%' }}
+                                      style={{ background: 'rgba(245,158,11,0.05)', color: '#d97706', border: 'none', padding: '9px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                                     >
-                                      ✂️ Block teilen an Pause um {pt.time} ({pt.duration} Min.)
+                                      <Clock size={12} />
+                                      <span>Block teilen an Pause um {pt.time} ({pt.duration} Min.)</span>
                                     </button>
                                   ))}
                                 </div>
@@ -2957,34 +3584,62 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
                       {/* Slot list */}
                       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>Stundenliste</h4>
-                        {selectedDayPlan.teacherId === 'groovelab' ? (
-                          <div style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: '#f8fafc', borderLeft: '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
-                                GrooveLab Betriebszeit
-                              </span>
-                              <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
-                                Virtueller Termin für Raumzuteilung
-                              </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.06em' }}>
+                            {selectedDayPlan.teacherId === 'groovelab' ? 'Gekoppelte Raumsperrung' : 'Stundenplan-Zusammensetzung'}
+                          </h4>
+                          {selectedDayPlan.teacherId !== 'groovelab' && Array.isArray(selectedDayPlan.slots) && (
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', padding: '2px 7px', borderRadius: '6px' }}>
+                              {selectedDayPlan.slots.filter((s: any) => s.student_id || selectedDayPlan.id.startsWith('adhoc_')).length} Schüler · {selectedDayPlan.startTime}–{selectedDayPlan.endTime}
+                            </span>
+                          )}
+                        </div>
+                        {selectedDayPlan.teacherId === 'groovelab' ? (() => {
+                          const coupledGlRooms = rooms.filter((r: any) => r.is_groovelab_active === true && r.is_campus_active !== false);
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <div style={{ padding: '12px 14px', borderRadius: '12px', border: 'none', background: '#fef9c3', borderLeft: '4px solid #facc15', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#713f12', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <Lock size={13} style={{ color: '#854d0e' }} />
+                                    <span>GrooveLab Bandunterricht</span>
+                                  </span>
+                                  <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: '#713f12', background: '#fef08a', padding: '2px 6px', borderRadius: '6px' }}>
+                                    {selectedDayPlan.startTime}–{selectedDayPlan.endTime}
+                                  </span>
+                                </div>
+                                <span style={{ fontSize: '0.68rem', color: '#713f12', fontWeight: 600, lineHeight: 1.45 }}>
+                                  Der GrooveLab-Unterricht findet zeitgleich parallel in den gekoppelten GrooveLab-Räumen statt. Während dieses Zeitfensters sind die Räume gemeinsam gesperrt.
+                                </span>
+                                {coupledGlRooms.length > 0 && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '2px' }}>
+                                    {coupledGlRooms.map((glR: any) => (
+                                      <span key={glR.id} style={{ fontSize: '0.64rem', fontWeight: 800, background: '#ffffff', border: '1px solid #facc15', color: '#713f12', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <DoorOpen size={11} />
+                                        <span>{glR.name}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#dcfce7', border: 'none', color: '#166534', fontSize: '0.68rem', fontWeight: 650, lineHeight: 1.4, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                                <CheckCircle size={14} style={{ color: '#15803d', flexShrink: 0, marginTop: '1px' }} />
+                                <span><strong>Vor {selectedDayPlan.startTime} Uhr</strong> und <strong>nach {selectedDayPlan.endTime} Uhr</strong> stehen diese Räume uneingeschränkt für regulären Einzel- und Gruppenunterricht zur Verfügung.</span>
+                              </div>
                             </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a' }}>
-                                {selectedDayPlan.startTime}–{selectedDayPlan.endTime}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
+                          );
+                        })() : (
                           selectedDayPlan.slots.map((slot: any, idx: number) => {
                             const isBreak = !slot.student_id && !selectedDayPlan.id.startsWith('adhoc_');
                             return (
-                              <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #34a853', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
-                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f' }}>
-                                    {isBreak ? '☕ Pause' : slot.student_name}
+                                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                    {isBreak && <Clock size={12} style={{ color: '#b45309' }} />}
+                                    <span>{isBreak ? 'Pause' : slot.student_name}</span>
                                   </span>
                                   <span style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 650, display: 'block', marginTop: '1px' }}>
-                                    {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
+                                    {isBreak ? 'Unterrichtspause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
                                   </span>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
@@ -3027,8 +3682,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Menü- & Board-Struktur',
                         subtitle: 'Fächer, Räume, Termine, Pläne',
                         badge: `${[enabledCampusSubjects, enabledCampusRooms, enabledCampusEvents, enabledCampusSchedules].filter(Boolean).length} Boards Aktiv`,
-                        gradient: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
-                        shadowColor: 'rgba(52, 168, 83, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: LayoutGrid
                       },
                       {
@@ -3036,8 +3691,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Hausaufgaben & Protokoll',
                         subtitle: 'Hausaufgabenheft & Meisterwerk',
                         badge: campusHomeworkNotesSync ? 'Auto-Sync An' : 'Manuell',
-                        gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: BookOpen
                       },
                       {
@@ -3045,8 +3700,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Übe-Timer & Audio-Loopstation',
                         subtitle: `${campusFocusTimerDefaultMin} Min Focus • ${campusLoopstationBarsPause}-Takte Loop-Puffer`,
                         badge: `${campusFocusTimerDefaultMin} Min • Loopstation`,
-                        gradient: 'linear-gradient(135deg, #059669 0%, #065f46 100%)',
-                        shadowColor: 'rgba(5, 150, 105, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: Clock
                       },
                       {
@@ -3054,8 +3709,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Stundenplan & Zeitraster',
                         subtitle: `${campusScheduleSlotMinutes} Min Takt • Konflikt-Check`,
                         badge: `${campusScheduleSlotMinutes} Min Raster`,
-                        gradient: 'linear-gradient(135deg, #0d9488 0%, #115e59 100%)',
-                        shadowColor: 'rgba(13, 148, 136, 0.40)',
+                        gradient: '#06b6d4',
+                        shadowColor: 'none',
                         icon: Calendar
                       },
                       {
@@ -3063,8 +3718,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Eltern-Portal & Freigaben',
                         subtitle: 'Abwesenheiten, Chat & DSGVO',
                         badge: campusParentChatEnabled ? 'Chat Aktiv' : 'Nur Abwesenheit',
-                        gradient: 'linear-gradient(135deg, #16a34a 0%, #166534 100%)',
-                        shadowColor: 'rgba(22, 163, 74, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: Users
                       },
                       {
@@ -3072,8 +3727,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Campus-Kiosk & QR-Login',
                         subtitle: `${campusKioskPinLength}-stellig • ${enabledQrLogin ? 'QR-Login An' : 'Passwort'}`,
                         badge: enabledQrLogin ? 'QR-Login Aktiv' : 'PIN & Passwort',
-                        gradient: 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)',
-                        shadowColor: 'rgba(34, 197, 94, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: QrCode
                       },
                       {
@@ -3081,8 +3736,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Lehrkräfte-Rechte',
                         subtitle: 'Schüler- & Lehrer-Rollen im Campus',
                         badge: campusTeachersManageStudents ? 'Erweitert' : 'Standard',
-                        gradient: 'linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)',
-                        shadowColor: 'rgba(46, 125, 50, 0.40)',
+                        gradient: '#34a853',
+                        shadowColor: 'none',
                         icon: ShieldCheck
                       },
                       {
@@ -3090,8 +3745,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         title: 'Ideenschmiede Campus',
                         subtitle: 'Wünsche & Fehler melden',
                         badge: 'Mitgestalten',
-                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                        shadowColor: 'rgba(5, 150, 105, 0.40)',
+                        gradient: '#10b981',
+                        shadowColor: 'none',
                         icon: Lightbulb
                       }
                     ].map((module) => {
@@ -3152,7 +3807,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#ffffff',
-                            boxShadow: `0 8px 18px -4px ${module.shadowColor}`,
+                            boxShadow: 'none',
                             marginBottom: '14px',
                             flexShrink: 0
                           }}>
@@ -3189,7 +3844,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                             fontWeight: 800,
                             color: '#15803d',
                             background: '#e6f4ea',
-                            border: '1px solid #bbf7d0',
+                            border: 'none',
                             padding: '4px 10px',
                             borderRadius: '100px',
                             letterSpacing: '0.02em',
@@ -3260,7 +3915,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               width: '42px',
                               height: '42px',
                               borderRadius: '12px',
-                              background: 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                              background: '#34a853',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -3899,7 +4554,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               border: isHovered 
                                 ? '2px dashed #34a853' 
                                 : isActive 
-                                  ? '1.5px solid #34a853' 
+                                  ? '1.5px solid transparent' 
                                   : '1.5px solid #cbd5e1',
                               background: isHovered 
                                 ? '#e6f4ea' 
@@ -3909,7 +4564,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               cursor: 'pointer',
                               transform: isHovered ? 'scale(1.02)' : 'scale(1)',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
+                              boxShadow: 'none'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -3987,7 +4642,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               border: isHovered 
                                 ? '2px dashed #34a853' 
                                 : isActive 
-                                  ? '1.5px solid #34a853' 
+                                  ? '1.5px solid transparent' 
                                   : '1.5px solid #f1f5f9',
                               background: isHovered 
                                 ? '#e6f4ea' 
@@ -4057,7 +4712,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                 const getAvatarTextColor = (name: string) => getAlphabeticalColor(name).avatarColor;
 
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '340px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: (typeof window !== 'undefined' && window.innerWidth <= 1024) ? '100%' : '340px', flexShrink: 0 }}>
                     <div className="google-card" style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -4096,14 +4751,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               padding: '12px 16px',
                               borderRadius: '16px',
                               border: isActive 
-                                ? '1.5px solid #34a853' 
+                                ? '1.5px solid transparent' 
                                 : '1.5px solid #f1f5f9',
                               background: isActive 
                                 ? '#e6f4ea' 
                                 : '#ffffff',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px rgba(52,168,83,0.06)' : 'none'
+                              boxShadow: 'none'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
@@ -4364,7 +5019,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         fontWeight: 800,
                         color: '#15803d',
                         background: '#ecfdf5',
-                        border: '1px solid #a7f3d0',
+                        border: 'none',
                         padding: '3px 8px',
                         borderRadius: '20px',
                         display: 'inline-flex',
@@ -4452,7 +5107,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                 fontWeight: 800,
                                 color: '#15803d',
                                 background: '#ecfdf5',
-                                border: '1px solid #d1fae5',
+                                border: 'none',
                                 padding: '2px 7px',
                                 borderRadius: '12px',
                                 display: 'inline-flex',
@@ -4638,9 +5293,9 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         // Inject virtual GrooveLab teacher
                         allTeachersList.push({
                           id: 'groovelab',
-                          firstName: 'Groove',
-                          lastName: 'Lab',
-                          instrument: 'Plattform',
+                          firstName: 'GrooveLab',
+                          lastName: '',
+                          instrument: 'Bandunterricht',
                           role: 'teacher'
                         });
 
@@ -4664,7 +5319,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           const hasPending = teacherPendingBlocks.length > 0;
 
                           grouped[t.id] = {
-                            teacherName: `${t.firstName} ${t.lastName}`,
+                            teacherName: `${t.firstName || ''} ${t.lastName || ''}`.trim(),
                             instrument: t.instrument || 'Lehrkraft',
                             blocks: [],
                             isUnsubmitted,
@@ -4863,7 +5518,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           fontSize: '0.62rem',
                                           background: '#fef3c7',
                                           color: '#b45309',
-                                          border: '1px solid #fde68a',
+                                          border: 'none',
                                           fontWeight: 800,
                                           padding: '2px 6px',
                                           borderRadius: '6px',
@@ -4877,22 +5532,24 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                       )}
                                       <button
                                         type="button"
+                                        aria-label={`Stundenplan von ${data.teacherName} herunterladen`}
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           handleDownloadTeacherSchedule(tId, data.teacherName, data.instrument);
                                         }}
                                         style={{
-                                          padding: '3px 7px',
-                                          borderRadius: '6px',
+                                          width: '26px',
+                                          height: '26px',
+                                          padding: 0,
+                                          borderRadius: '7px',
                                           border: 'none',
                                           background: 'rgba(52, 168, 83, 0.08)',
                                           color: '#34a853',
                                           cursor: 'pointer',
-                                          display: 'flex',
+                                          display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '4px',
-                                          fontSize: '0.64rem',
-                                          fontWeight: 700,
+                                          justifyContent: 'center',
+                                          flexShrink: 0,
                                           transition: 'all 0.15s ease'
                                         }}
                                         title={`Unterrichtszeiten für ${data.teacherName} (alle Wochentage) herunterladen`}
@@ -4905,8 +5562,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           e.currentTarget.style.color = '#34a853';
                                         }}
                                       >
-                                        <Download size={12} />
-                                        <span>Download</span>
+                                        <Download size={13} />
                                       </button>
                                       {data.hasPending && (
                                         <button
@@ -4920,7 +5576,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                             padding: '3px 8px',
                                             borderRadius: '6px',
                                             border: 'none',
-                                            background: 'linear-gradient(135deg, #34a853, #2e7d32)',
+                                            background: '#34a853',
                                             color: '#ffffff',
                                             cursor: isSavingApproval ? 'not-allowed' : 'pointer',
                                             display: 'inline-flex',
@@ -4952,7 +5608,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                          <span style={{ 
                                            fontSize: '0.66rem', 
                                            background: '#fffbeb', 
-                                           border: '1px solid #fde68a',
+                                           border: 'none',
                                            color: '#92400e', 
                                            fontWeight: 750, 
                                            padding: '2px 6px', 
@@ -5005,8 +5661,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                             <div style={{
                                               padding: '12px 14px',
                                               borderRadius: '12px',
-                                              border: '1.5px solid #fde68a',
-                                              background: 'linear-gradient(180deg, #fffbeb 0%, #fefce8 100%)',
+                                              border: 'none',
+                                              background: '#fef9c3',
                                               color: '#92400e',
                                               fontSize: '0.74rem',
                                               display: 'flex',
@@ -5026,7 +5682,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                   fontWeight: 800,
                                                   padding: '2px 7px',
                                                   borderRadius: '6px',
-                                                  border: '1px solid #fde68a'
+                                                  border: 'none'
                                                 }}>
                                                   Review
                                                 </span>
@@ -5168,12 +5824,28 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                           } catch { return []; }
                                                         })();
                                                         if (unsuitable.some((inst: string) => inst.toLowerCase() === block.instrument?.toLowerCase())) {
-                                                          alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${block.instrument}".`);
+                                                          if (setApprovalToast) {
+                                                            setApprovalToast({
+                                                              message: `⚠️ Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für "${block.instrument}".`,
+                                                              type: 'error'
+                                                            });
+                                                            setTimeout(() => setApprovalToast(null), 4000);
+                                                          }
                                                           e.target.value = "";
                                                           return;
                                                         }
                                                       }
-                                                      setMatrixAllocations(prev => prev.map(p => p.id === block.id ? { ...p, roomId: rId } : p));
+                                                      const glActiveRooms = rooms.filter((r: any) => r.is_groovelab_active === true && r.is_campus_active !== false);
+                                                      const isTargetGlRoom = glActiveRooms.some((r: any) => r.id === rId);
+                                                      setMatrixAllocations(prev => prev.map(p => {
+                                                        if (block.teacherId === 'groovelab' && p.teacherId === 'groovelab' && p.dayOfWeek === block.dayOfWeek && isTargetGlRoom && glActiveRooms.length > 1 && p.id.startsWith(`groovelab_${block.dayOfWeek}_`)) {
+                                                          const embeddedRoomId = p.id.replace(`groovelab_${block.dayOfWeek}_`, '');
+                                                          if (glActiveRooms.some((r: any) => r.id === embeddedRoomId)) {
+                                                            return { ...p, roomId: embeddedRoomId };
+                                                          }
+                                                        }
+                                                        return p.id === block.id ? { ...p, roomId: rId } : p;
+                                                      }));
                                                     }
                                                   }}
                                                   style={{
@@ -5215,7 +5887,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.82rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                         
                         {/* REVIEW CARD */}
                         <div style={{
@@ -5611,8 +6283,8 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       width: '64px',
                       height: '64px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.16) 0%, rgba(46, 125, 50, 0.22) 100%)',
-                      border: '2px solid rgba(52, 168, 83, 0.3)',
+                      background: '#dcfce7',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -5717,7 +6389,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                   {/* Status checklist */}
                   <div style={{
                     background: 'rgba(52, 168, 83, 0.06)',
-                    border: '1px solid rgba(52, 168, 83, 0.2)',
+                    border: 'none',
                     borderRadius: '14px',
                     padding: '14px 16px',
                     display: 'flex',
@@ -5745,7 +6417,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                     type="button"
                     onClick={() => setApprovalSummaryModal?.(null)}
                     style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      background: '#34a853',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '14px',
@@ -5766,6 +6438,9 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Herrenberg Compliance Modal für Honorarkräfte */}
+            <HerrenbergComplianceModal isOpen={showHerrenbergModal} onClose={() => setShowHerrenbergModal(false)} schoolName={schoolName} />
 
           </div>
 

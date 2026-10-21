@@ -182,7 +182,7 @@ return (
                     <div style={{
                       width: `${Math.min(100, Math.max(progressPercent, isMastered ? 100 : 5))}%`,
                       height: '100%',
-                      background: isMastered ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+                      background: '#34a853',
                       borderRadius: '4px',
                       transition: 'width 0.3s ease'
                     }} />
@@ -201,7 +201,7 @@ return (
                 {cleanNotes && (
                   <div style={{
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     borderRadius: '18px',
                     padding: '16px 18px',
                     display: 'flex',
@@ -262,7 +262,7 @@ return (
                   }}
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    background: '#34a853',
                     color: '#ffffff',
                     border: 'none',
                     padding: '16px 20px',

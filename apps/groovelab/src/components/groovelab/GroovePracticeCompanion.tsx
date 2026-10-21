@@ -2524,7 +2524,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       flexDirection: 'column',
       flex: 1,
       height: '100%',
-      background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+      background: '#f8fafc',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
       minHeight: 0,
@@ -2647,14 +2647,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       height: '68px',
                       borderRadius: '50%',
                       background: isActive
-                        ? (isAccent ? '#eab308' : '#38bdf8')
+                        ? (isAccent ? '#facc15' : '#38bdf8')
                         : 'rgba(255,255,255,0.08)',
-                      border: isActive
-                        ? '4px solid #ffffff'
-                        : '2px solid rgba(255,255,255,0.2)',
-                      boxShadow: isActive
-                        ? `0 0 35px ${isAccent ? 'rgba(234, 179, 8, 0.8)' : 'rgba(56, 189, 248, 0.8)'}`
-                        : 'none',
+                      border: isActive ? 'none' : '2px solid rgba(255,255,255,0.2)',
+                      boxShadow: 'none',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -2690,7 +2686,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 padding: '16px',
                 borderRadius: '16px',
                 border: 'none',
-                background: isPlaying ? '#ef4444' : '#eab308',
+                background: isPlaying ? '#ef4444' : '#facc15',
                 color: isPlaying ? '#ffffff' : '#0f172a',
                 fontSize: '1.2rem',
                 fontWeight: 950,
@@ -2831,13 +2827,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '40px',
                   height: '40px',
                   borderRadius: '12px',
-                  background: '#fef3c7',
-                  border: '1.5px solid #fde047',
+                  background: '#fef9c3',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}>
-                  <Flame size={22} color="#d97706" />
+                  <Flame size={22} color="#854d0e" />
                 </div>
                 <div>
                   <h3 id="tools-modal-title" style={{ margin: 0, fontSize: '1.12rem', fontWeight: 900, color: '#0f172a' }}>
@@ -2890,7 +2886,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     height: '34px',
                     borderRadius: '10px',
                     background: volMaster === 0 ? '#f1f5f9' : '#fef9c3',
-                    border: volMaster === 0 ? '1px solid #cbd5e1' : '1px solid #fde047',
+                    border: volMaster === 0 ? '1px solid #cbd5e1' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2899,7 +2895,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     {volMaster === 0 ? (
                       <VolumeX size={18} color="#64748b" />
                     ) : (
-                      <Volume2 size={18} color="#a16207" />
+                      <Volume2 size={18} color="#854d0e" />
                     )}
                   </div>
                   <div>
@@ -2913,7 +2909,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           fontWeight: 900,
                           padding: '1.5px 6px',
                           borderRadius: '6px',
-                          background: '#eab308',
+                          background: '#facc15',
                           color: '#0f172a',
                           letterSpacing: '0.04em'
                         }}>
@@ -2932,7 +2928,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     fontSize: '0.88rem',
                     fontWeight: 900,
                     fontVariantNumeric: 'tabular-nums',
-                    color: volMaster === 0 ? '#94a3b8' : (volMaster > 100 ? '#b45309' : '#0f172a'),
+                    color: volMaster === 0 ? '#94a3b8' : (volMaster > 100 ? '#854d0e' : '#0f172a'),
                     minWidth: '40px',
                     textAlign: 'right'
                   }}>
@@ -2953,9 +2949,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     style={{
                       padding: '6px 10px',
                       borderRadius: '10px',
-                      border: volMaster === 0 ? '1.5px solid #ef4444' : '1px solid #e2e8f0',
-                      background: volMaster === 0 ? '#fef2f2' : '#f8fafc',
-                      color: volMaster === 0 ? '#dc2626' : '#475569',
+                      border: volMaster === 0 ? 'none' : '1px solid #e2e8f0',
+                      background: volMaster === 0 ? '#fee2e2' : '#f8fafc',
+                      color: volMaster === 0 ? '#b91c1c' : '#475569',
                       fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -2993,7 +2989,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   aria-label="Master-Lautstärke Regler"
                   style={{
                     flex: 1,
-                    accentColor: '#eab308',
+                    accentColor: '#facc15',
                     cursor: 'pointer',
                     height: '6px',
                     borderRadius: '3px'
@@ -3053,8 +3049,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         style={{
                           padding: '8px 6px',
                           borderRadius: '10px',
-                          border: isSel ? '1.5px solid #eab308' : '1px solid #e2e8f0',
-                          background: isSel ? '#fefce8' : '#f8fafc',
+                          border: isSel ? 'none' : '1px solid #e2e8f0',
+                          background: isSel ? '#fef9c3' : '#f8fafc',
                           color: isSel ? '#854d0e' : '#475569',
                           cursor: 'pointer',
                           display: 'flex',
@@ -3069,7 +3065,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>
                           {p.label}
                         </span>
-                        <span style={{ fontSize: '0.60rem', color: isSel ? '#a16207' : '#94a3b8', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.60rem', color: isSel ? '#854d0e' : '#94a3b8', fontWeight: 600 }}>
                           {p.hint}
                         </span>
                       </button>
@@ -3083,8 +3079,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               padding: '16px',
               borderRadius: '16px',
-              background: speedTrainerActive ? '#fff7ed' : '#f8fafc',
-              border: speedTrainerActive ? '1.5px solid #fdba74' : '1px solid #e2e8f0',
+              background: speedTrainerActive ? '#ffedd5' : '#f8fafc',
+              border: speedTrainerActive ? 'none' : '1px solid #e2e8f0',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
@@ -3092,12 +3088,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Flame size={18} style={{ color: '#ea580c' }} />
+                  <Flame size={18} style={{ color: '#c2410c' }} />
                   <div>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#9a3412', display: 'block' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#c2410c', display: 'block' }}>
                       Tempo-Trainer (Speed-Up)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: '#7c2d12', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.68rem', color: '#c2410c', fontWeight: 600 }}>
                       Steigert das Tempo automatisch alle X Takte
                     </span>
                   </div>
@@ -3111,10 +3107,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     padding: '6px 14px',
                     borderRadius: '10px',
                     border: 'none',
-                    background: speedTrainerActive ? '#ea580c' : '#cbd5e1',
+                    background: speedTrainerActive ? '#f97316' : '#cbd5e1',
                     color: '#ffffff',
                     cursor: 'pointer',
-                    boxShadow: speedTrainerActive ? '0 2px 8px rgba(234, 88, 12, 0.35)' : 'none',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -3124,9 +3120,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
               {speedTrainerActive && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#7c2d12', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#c2410c', fontWeight: 700 }}>
                     <span>Ziel-Tempo:</span>
-                    <strong style={{ fontSize: '1rem', color: '#9a3412', fontFamily: 'SF Mono, monospace' }}>
+                    <strong style={{ fontSize: '1rem', color: '#c2410c', fontFamily: 'SF Mono, monospace' }}>
                       {speedTrainerTargetBpm} BPM
                     </strong>
                   </div>
@@ -3136,7 +3132,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     max="220"
                     value={speedTrainerTargetBpm}
                     onChange={(e) => setSpeedTrainerTargetBpm(Number(e.target.value))}
-                    style={{ width: '100%', height: '6px', accentColor: '#ea580c', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '6px', accentColor: '#f97316', cursor: 'pointer' }}
                   />
                   <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                     {[
@@ -3159,9 +3155,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                             fontSize: '0.66rem',
                             fontWeight: isSel ? 900 : 700,
                             borderRadius: '8px',
-                            border: isSel ? '1.5px solid #ea580c' : '1px solid #fed7aa',
+                            border: isSel ? 'none' : '1px solid #e2e8f0',
                             background: isSel ? '#ffedd5' : '#ffffff',
-                            color: isSel ? '#9a3412' : '#7c2d12',
+                            color: isSel ? '#c2410c' : '#475569',
                             cursor: 'pointer'
                           }}
                         >
@@ -3178,8 +3174,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               padding: '16px',
               borderRadius: '16px',
-              background: muteBarActive ? '#ecfdf5' : '#f8fafc',
-              border: muteBarActive ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+              background: muteBarActive ? '#d1fae5' : '#f8fafc',
+              border: muteBarActive ? 'none' : '1px solid #e2e8f0',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
@@ -3189,10 +3185,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '1.2rem' }}>🧠</span>
                   <div>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: muteBarActive ? '#065f46' : '#1e293b', display: 'block' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: muteBarActive ? '#047857' : '#1e293b', display: 'block' }}>
                       Stummtakt-Training (Innere Uhr)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: muteBarActive ? '#059669' : '#64748b', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.68rem', color: muteBarActive ? '#047857' : '#64748b', fontWeight: 600 }}>
                       Mutet Takte für Timing-Training im Kopf
                     </span>
                   </div>
@@ -3209,10 +3205,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     padding: '6px 14px',
                     borderRadius: '10px',
                     border: 'none',
-                    background: muteBarActive ? '#16a34a' : '#cbd5e1',
+                    background: muteBarActive ? '#34a853' : '#cbd5e1',
                     color: '#ffffff',
                     cursor: 'pointer',
-                    boxShadow: muteBarActive ? '0 2px 8px rgba(22, 163, 74, 0.35)' : 'none',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -3236,7 +3232,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           padding: '10px 8px',
                           borderRadius: '10px',
                           border: isSel ? 'none' : '1px solid #cbd5e1',
-                          background: isSel ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                          background: isSel ? '#10b981' : '#ffffff',
                           color: isSel ? '#ffffff' : '#475569',
                           cursor: 'pointer',
                           display: 'flex',
@@ -3244,7 +3240,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           alignItems: 'center',
                           gap: '2px',
                           transition: 'all 0.15s ease',
-                          boxShadow: isSel ? '0 2px 8px rgba(16, 185, 129, 0.28)' : 'none'
+                          boxShadow: 'none'
                         }}
                       >
                         <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>{item.label}</span>
@@ -3260,17 +3256,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               padding: '16px',
               borderRadius: '16px',
-              background: chamberPitch > 0 ? '#fefce8' : '#f8fafc',
-              border: chamberPitch > 0 ? '1.5px solid #fcd34d' : '1px solid #e2e8f0',
+              background: chamberPitch > 0 ? '#fef9c3' : '#f8fafc',
+              border: chamberPitch > 0 ? 'none' : '1px solid #e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               transition: 'all 0.2s ease'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Bell size={18} style={{ color: chamberPitch > 0 ? '#d97706' : '#64748b' }} />
+                <Bell size={18} style={{ color: chamberPitch > 0 ? '#854d0e' : '#64748b' }} />
                 <div>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: chamberPitch > 0 ? '#92400e' : '#1e293b', display: 'block' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: chamberPitch > 0 ? '#854d0e' : '#1e293b', display: 'block' }}>
                     Kammerton-Stimmgabel
                   </span>
                   <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
@@ -3288,9 +3284,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     fontWeight: 850,
                     borderRadius: '10px',
                     border: 'none',
-                    background: chamberPitch === 440 ? '#d97706' : '#ffffff',
-                    color: chamberPitch === 440 ? '#ffffff' : '#0f172a',
-                    boxShadow: chamberPitch === 440 ? '0 2px 8px rgba(217, 119, 6, 0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
+                    background: chamberPitch === 440 ? '#facc15' : '#ffffff',
+                    color: '#0f172a',
+                    boxShadow: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -3306,9 +3302,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     fontWeight: 850,
                     borderRadius: '10px',
                     border: 'none',
-                    background: chamberPitch === 442 ? '#d97706' : '#ffffff',
-                    color: chamberPitch === 442 ? '#ffffff' : '#0f172a',
-                    boxShadow: chamberPitch === 442 ? '0 2px 8px rgba(217, 119, 6, 0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
+                    background: chamberPitch === 442 ? '#facc15' : '#ffffff',
+                    color: '#0f172a',
+                    boxShadow: 'none',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -3383,491 +3379,304 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           overflowY: 'auto',
           boxSizing: 'border-box'
         }}>
-          <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          <div style={{ width: '100%', maxWidth: '460px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
                 ÜBE-METRONOM
               </span>
               <span style={{
                 fontSize: '0.62rem',
                 fontWeight: 800,
                 color: '#854d0e',
-                background: '#fefce8',
-                border: '1px solid #fef08a',
+                background: '#fef9c3',
+                border: 'none',
                 padding: '2px 8px',
-                borderRadius: '100px'
+                borderRadius: '100px',
+                whiteSpace: 'nowrap'
               }}>
                 {effectiveUiLevel === 'junior' ? 'JUNIOR' : effectiveUiLevel === 'teen' ? 'TEEN BEAT' : 'PRO STUDIO'}
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={() => setShowToolsModal(true)}
                 style={{
-                  background: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#fff7ed' : '#f8fafc',
-                  border: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '1.5px solid #ea580c' : '1px solid #cbd5e1',
+                  background: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#ffedd5' : '#f8fafc',
+                  border: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? 'none' : '1px solid #e2e8f0',
                   borderRadius: '10px',
                   padding: '6px 11px',
                   fontSize: '0.72rem',
-                  fontWeight: 850,
-                  color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#9a3412' : '#334155',
+                  fontWeight: 800,
+                  color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#c2410c' : '#475569',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
-                  boxShadow: (speedTrainerActive || muteBarActive) ? '0 2px 6px rgba(234, 88, 12, 0.2)' : '0 1px 2px rgba(0,0,0,0.02)',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
                 title="Übe-Werkzeuge öffnen (Tempo-Trainer, Stummtakt, Kammerton)"
               >
-                <Flame size={13} style={{ color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#ea580c' : '#64748b' }} />
+                <Flame size={13} style={{ color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#c2410c' : '#64748b' }} />
                 <span>Werkzeuge</span>
                 {(speedTrainerActive || muteBarActive || chamberPitch !== 0) && (
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ea580c' }} />
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f97316' }} />
                 )}
               </button>
               <button
                 type="button"
                 onClick={() => setIsStageView(true)}
                 style={{
-                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                  border: '1.5px solid #ca8a04',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
                   borderRadius: '10px',
-                  padding: '6px 13px',
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  color: '#0f172a',
+                  padding: '6px 12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#475569',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '5px',
                   boxShadow: 'none',
                   transition: 'all 0.15s ease',
                   touchAction: 'manipulation'
                 }}
                 title="Notenständer-Großansicht öffnen"
               >
-                <Maximize2 size={13} strokeWidth={2.8} color="#0f172a" />
+                <Maximize2 size={13} strokeWidth={2.2} color="#64748b" />
                 <span>Notenständer</span>
               </button>
             </div>
           </div>
 
-          {/* 🎙️ Side-by-Side Studio-Bühne: Metronom-Visualizer (links) & Apple-Style Tempo-Cockpit (rechts) */}
+          {/* 🎙️ Symmetrisches Studio-Tempo-Cockpit (0,1% Apple Goldstandard) */}
           <div style={{
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: '460px',
             background: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            border: '1px solid #f1f5f9',
             borderRadius: '20px',
-            padding: '10px 12px',
+            padding: '20px 24px',
             boxSizing: 'border-box',
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             gap: '12px',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
             position: 'relative'
           }}>
-            {/* Linke Zelle: Visualizer (Teen Wave-Ring oder Nussbaum-Metronom) */}
+            {/* Musikalische Tempobezeichnung & Subtiler Live-Puls-Punkt */}
             <div style={{
-              width: '124px',
-              height: '144px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              position: 'relative'
+              gap: '6px',
+              fontSize: '0.70rem',
+              fontWeight: 850,
+              letterSpacing: '0.08em',
+              color: '#64748b',
+              textTransform: 'uppercase'
             }}>
-              {effectiveUiLevel === 'teen' ? (
-                <div style={{
-                  position: 'relative',
-                  width: '116px',
-                  height: '136px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <div style={{
-                    position: 'absolute',
-                    width: isPlaying ? '112px' : '78px',
-                    height: isPlaying ? '112px' : '78px',
-                    borderRadius: '50%',
-                    border: '2px solid rgba(234, 179, 8, 0.45)',
-                    transform: isPlaying ? 'scale(1.12)' : 'scale(1)',
-                    opacity: isPlaying ? 0.85 : 0.25,
-                    transition: 'all 0.12s ease-out'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    width: isPlaying ? '90px' : '66px',
-                    height: isPlaying ? '90px' : '66px',
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(250, 204, 21, 0.3) 0%, transparent 70%)',
-                    border: '1.5px solid rgba(234, 179, 8, 0.7)',
-                    transform: isPlaying ? 'scale(1.06)' : 'scale(1)',
-                    transition: 'all 0.1s ease-out'
-                  }} />
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                    border: 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: isPlaying ? '0 0 18px rgba(234, 179, 8, 0.55)' : '0 4px 10px rgba(0,0,0,0.15)',
-                    zIndex: 2
-                  }}>
-                    <Activity size={20} color="#facc15" style={{ transform: isPlaying ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.08s' }} />
-                    <span style={{ fontSize: '0.52rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em', marginTop: '2px' }}>
-                      {isPlaying ? 'IM TAKT' : 'BEREIT'}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                /* Freestanding Acoustic Precision Pendulum (Natural, Earthy, Organic Handcraft) */
-                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <style>{`
-                    @keyframes swing-anim {
-                      0% { transform: rotate(-13deg); }
-                      100% { transform: rotate(13deg); }
-                    }
-                  `}</style>
-
-                  <svg width="124" height="142" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
-                    <defs>
-                      {/* Natural Linen / Ivory Gauge Plate */}
-                      <linearGradient id="naturalGauge" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#faf7f2" />
-                        <stop offset="100%" stopColor="#f3eee3" />
-                      </linearGradient>
-                      {/* Brushed Brass Rod */}
-                      <linearGradient id="brushedBrass" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#fef08a" />
-                        <stop offset="45%" stopColor="#eab308" />
-                        <stop offset="85%" stopColor="#ca8a04" />
-                        <stop offset="100%" stopColor="#a16207" />
-                      </linearGradient>
-                      {/* Warm Amber Pivot Glow */}
-                      <radialGradient id="pivotGlow" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#facc15" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="#ca8a04" stopOpacity="0" />
-                      </radialGradient>
-                      {/* Soft Organic Shadow */}
-                      <filter id="organicShadow" x="-20%" y="-10%" width="140%" height="130%">
-                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#451a03" floodOpacity="0.08" />
-                      </filter>
-                    </defs>
-
-                    {/* Warm Natural Scale Plate (Organic Rounded Arch) */}
-                    <rect 
-                      x="48" 
-                      y="18" 
-                      width="84" 
-                      height="176" 
-                      rx="24" 
-                      fill="url(#naturalGauge)" 
-                      stroke="#e7e0d2" 
-                      strokeWidth="1.2"
-                      filter="url(#organicShadow)"
-                    />
-
-                    {/* Laser-Engraved Tempo Scale Markings */}
-                    <g fill="#78716c" opacity="0.75" fontFamily="SF Mono, Menlo, monospace" fontSize="5.5" fontWeight="600">
-                      <line x1="90" y1="36" x2="90" y2="168" stroke="#d6cebe" strokeWidth="0.8" strokeDasharray="1 3" />
-                      
-                      <line x1="82" y1="52" x2="98" y2="52" stroke="#a8a29e" strokeWidth="0.8" />
-                      <text x="76" y="54" textAnchor="end">40</text>
-                      <text x="104" y="54" textAnchor="start">Largo</text>
-
-                      <line x1="84" y1="75" x2="96" y2="75" stroke="#a8a29e" strokeWidth="0.8" />
-                      <text x="78" y="77" textAnchor="end">80</text>
-                      <text x="102" y="77" textAnchor="start">Adagio</text>
-
-                      <line x1="82" y1="98" x2="98" y2="98" stroke="#a8a29e" strokeWidth="0.8" />
-                      <text x="76" y="100" textAnchor="end">120</text>
-                      <text x="104" y="100" textAnchor="start">Andante</text>
-
-                      <line x1="84" y1="121" x2="96" y2="121" stroke="#a8a29e" strokeWidth="0.8" />
-                      <text x="78" y="123" textAnchor="end">160</text>
-                      <text x="102" y="123" textAnchor="start">Allegro</text>
-
-                      <line x1="82" y1="144" x2="98" y2="144" stroke="#a8a29e" strokeWidth="0.8" />
-                      <text x="76" y="146" textAnchor="end">200</text>
-                      <text x="104" y="146" textAnchor="start">Presto</text>
-                    </g>
-
-                    {/* Subtle Organic Pendulum Shadow */}
-                    <g style={{
-                      transformOrigin: '88px 178px',
-                      transform: isPlaying ? 'none' : 'rotate(0deg)',
-                      animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
-                      transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
-                      opacity: 0.12
-                    }}>
-                      <line x1="88" y1="178" x2="88" y2="34" stroke="#451a03" strokeWidth="3" strokeLinecap="round" />
-                      <rect 
-                        x="77" 
-                        y={36 + ((240 - bpm) / (240 - 40)) * 105} 
-                        width="22" 
-                        height="16" 
-                        rx="3" 
-                        fill="#451a03" 
-                      />
-                    </g>
-
-                    {/* Handcrafted Brushed Brass Pendulum Rod & Slider Weight */}
-                    <g style={{
-                      transformOrigin: '90px 178px',
-                      transform: isPlaying ? 'none' : 'rotate(0deg)',
-                      animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
-                      transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
-                    }}>
-                      <line x1="90" y1="178" x2="90" y2="32" stroke="url(#brushedBrass)" strokeWidth="2.8" strokeLinecap="round" />
-                      
-                      {/* Sliding Brass Weight */}
-                      <rect 
-                        x="78" 
-                        y={36 + ((240 - bpm) / (240 - 40)) * 105} 
-                        width="24" 
-                        height="16" 
-                        rx="3" 
-                        fill="url(#brushedBrass)" 
-                        stroke="#92400e" 
-                        strokeWidth="1" 
-                        style={{ transition: 'y 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
-                      />
-                      {/* Center Indicator Line on Weight */}
-                      <line 
-                        x1="81" 
-                        y1={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
-                        x2="99" 
-                        y2={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
-                        stroke="#78350f" 
-                        strokeWidth="0.9" 
-                        style={{ transition: 'y 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
-                      />
-                      <circle 
-                        cx="90" 
-                        cy={36 + ((240 - bpm) / (240 - 40)) * 105 + 8} 
-                        r="2.2" 
-                        fill="#fef08a" 
-                        stroke="#92400e" 
-                        strokeWidth="0.8" 
-                        style={{ transition: 'cy 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
-                      />
-                    </g>
-
-                    {/* Acoustic Pivot Cap (Brushed Brass) with Beat 1 Glow */}
-                    {isPlaying && (
-                      <circle cx="90" cy="178" r="14" fill="url(#pivotGlow)" opacity="0.8" />
-                    )}
-                    <circle cx="90" cy="178" r="7" fill="url(#brushedBrass)" stroke="#78350f" strokeWidth="1.2" />
-                    <circle cx="90" cy="178" r="2.2" fill="#451a03" />
-                  </svg>
-                </div>
-              )}
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: isPlaying ? '#facc15' : '#cbd5e1',
+                boxShadow: 'none',
+                transition: 'all 0.12s ease'
+              }} />
+              <span>
+                {bpm < 60 ? 'Largo' :
+                 bpm < 76 ? 'Adagio' :
+                 bpm < 108 ? 'Andante' :
+                 bpm < 120 ? 'Moderato' :
+                 bpm < 156 ? 'Allegro' :
+                 bpm < 176 ? 'Vivace' : 'Presto'}
+              </span>
             </div>
 
-            {/* Rechte Zelle: Apple-Style Tempo-Cockpit */}
-            <div style={{
-              flex: 1,
-              minWidth: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {/* Apple Hero: (-) 120 BPM (+) Flank & All-in-One Tempo-Kapsel */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
-                {/* 120 BPM Hero Number geflankt von schnellen tactile Steppern (-) und (+) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBpm(prev => Math.max(40, prev - 1));
-                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                        try { navigator.vibrate(10); } catch (_) {}
-                      }
+            {/* Hero Number geflankt von schnellen tactile Steppern (-) und (+) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setBpm(prev => Math.max(40, prev - 1));
+                  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                    try { navigator.vibrate(10); } catch (_) {}
+                  }
+                }}
+                aria-label="1 BPM langsamer"
+                title="1 BPM langsamer"
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.12s ease',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <Minus size={16} strokeWidth={2.6} />
+              </button>
+
+              {isEditingBpm ? (
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', minWidth: '120px' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoFocus
+                    value={tempBpmInput}
+                    onChange={(e) => setTempBpmInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                    onFocus={(e) => e.target.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCommitBpmInput();
+                      if (e.key === 'Escape') setIsEditingBpm(false);
                     }}
-                    aria-label="1 BPM langsamer"
-                    title="1 BPM langsamer"
+                    onBlur={handleCommitBpmInput}
+                    aria-label="Tempo in BPM direkt eingeben"
                     style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '50%',
-                      border: '1.5px solid #cbd5e1',
-                      background: '#ffffff',
+                      width: '100px',
+                      fontSize: '2.8rem',
+                      fontWeight: 950,
+                      textAlign: 'center',
+                      fontFamily: 'SF Mono, monospace',
                       color: '#0f172a',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      transition: 'all 0.12s ease',
-                      touchAction: 'manipulation'
+                      background: '#fef9c3',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '2px 4px',
+                      lineHeight: 1,
+                      outline: 'none',
+                      boxShadow: 'none'
                     }}
-                  >
-                    <Minus size={15} strokeWidth={2.8} />
-                  </button>
-
-                  {isEditingBpm ? (
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', minWidth: '105px' }}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        autoFocus
-                        value={tempBpmInput}
-                        onChange={(e) => setTempBpmInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
-                        onFocus={(e) => e.target.select()}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCommitBpmInput();
-                          if (e.key === 'Escape') setIsEditingBpm(false);
-                        }}
-                        onBlur={handleCommitBpmInput}
-                        aria-label="Tempo in BPM direkt eingeben"
-                        style={{
-                          width: '90px',
-                          fontSize: '2.5rem',
-                          fontWeight: 950,
-                          textAlign: 'center',
-                          fontFamily: 'SF Mono, monospace',
-                          color: '#0f172a',
-                          background: '#fefce8',
-                          border: '2px solid #eab308',
-                          borderRadius: '12px',
-                          padding: '2px 4px',
-                          lineHeight: 1,
-                          outline: 'none',
-                          boxShadow: 'none'
-                        }}
-                      />
-                      <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 900 }}>
-                        BPM
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTempoDeck(prev => !prev);
-                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                          try { navigator.vibrate(15); } catch (_) {}
-                        }
-                      }}
-                      title="Klicken für Tempo-Feineinstellung (Schieberegler, Direkteingabe & Tasten)"
-                      aria-label={`Tempo: ${bpm} BPM. Klicken für Feineinstellung`}
-                      aria-expanded={showTempoDeck}
-                      aria-haspopup="dialog"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        minWidth: '105px',
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '2px 4px',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        transition: 'background 0.12s ease',
-                        touchAction: 'manipulation'
-                      }}
-                      className="hover-scale-mini"
-                    >
-                      <span style={{
-                        fontSize: '2.9rem',
-                        fontWeight: 950,
-                        color: '#0f172a',
-                        lineHeight: 1,
-                        fontFamily: 'SF Mono, monospace',
-                        letterSpacing: '-0.03em'
-                      }}>
-                        {bpm}
-                      </span>
-                      <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 900 }}>
-                        BPM
-                      </span>
-                    </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBpm(prev => Math.min(240, prev + 1));
-                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                        try { navigator.vibrate(10); } catch (_) {}
-                      }
-                    }}
-                    aria-label="1 BPM schneller"
-                    title="1 BPM schneller"
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '50%',
-                      border: '1.5px solid #cbd5e1',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      transition: 'all 0.12s ease',
-                      touchAction: 'manipulation'
-                    }}
-                  >
-                    <Plus size={15} strokeWidth={2.8} />
-                  </button>
+                  />
+                  <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 900 }}>
+                    BPM
+                  </span>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTempoDeck(prev => !prev);
+                    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                      try { navigator.vibrate(15); } catch (_) {}
+                    }
+                  }}
+                  title="Klicken für Tempo-Feineinstellung (Schieberegler, Direkteingabe & Tasten)"
+                  aria-label={`Tempo: ${bpm} BPM. Klicken für Feineinstellung`}
+                  aria-expanded={showTempoDeck}
+                  aria-haspopup="dialog"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    minWidth: '120px',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px 6px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    transition: 'background 0.12s ease',
+                    touchAction: 'manipulation'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <span style={{
+                    fontSize: '3.4rem',
+                    fontWeight: 950,
+                    color: '#0f172a',
+                    lineHeight: 1,
+                    fontFamily: 'SF Mono, monospace',
+                    letterSpacing: '-0.04em'
+                  }}>
+                    {bpm}
+                  </span>
+                  <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 900 }}>
+                    BPM
+                  </span>
+                </button>
+              )}
 
-                {/* ⚡ DIRECT TAP-TEMPO BUTTON (Organisch, Taktil & Zentriert) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTapTempo();
-                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                        try { navigator.vibrate(20); } catch (_) {}
-                      }
-                    }}
-                    aria-label="Tempo einklopfen (Tap oder Taste T)"
-                    title="Tempo im Takt antippen oder Taste 'T' drücken"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      background: '#ffffff',
-                      border: '1.5px solid #cbd5e1',
-                      padding: '5px 14px',
-                      borderRadius: '100px',
-                      cursor: 'pointer',
-                      fontSize: '0.76rem',
-                      fontWeight: 900,
-                      color: '#475569',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      transition: 'all 0.12s ease',
-                      touchAction: 'manipulation'
-                    }}
-                    className="hover-scale-mini"
-                  >
-                    <Zap size={13} style={{ color: '#d97706' }} />
-                    <span style={{ letterSpacing: '0.04em' }}>TAP</span>
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBpm(prev => Math.min(240, prev + 1));
+                  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                    try { navigator.vibrate(10); } catch (_) {}
+                  }
+                }}
+                aria-label="1 BPM schneller"
+                title="1 BPM schneller"
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.12s ease',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <Plus size={16} strokeWidth={2.6} />
+              </button>
+            </div>
+
+            {/* ⚡ DIRECT TAP-TEMPO BUTTON (Organisch, Taktil & Zentriert) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTapTempo();
+                  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                    try { navigator.vibrate(20); } catch (_) {}
+                  }
+                }}
+                aria-label="Tempo einklopfen (Tap oder Taste T)"
+                title="Tempo im Takt antippen oder Taste 'T' drücken"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  padding: '6px 18px',
+                  borderRadius: '100px',
+                  cursor: 'pointer',
+                  fontSize: '0.76rem',
+                  fontWeight: 900,
+                  color: '#475569',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  transition: 'all 0.12s ease',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale-mini"
+              >
+                <Zap size={13} style={{ color: '#d97706' }} />
+                <span style={{ letterSpacing: '0.04em' }}>TAP</span>
+              </button>
+            </div>
 
               {/* Apple-Grade Floating Tempo-Popover Deck */}
               {showTempoDeck && (
@@ -3939,8 +3748,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                               fontFamily: 'SF Mono, monospace',
                               padding: '2px 4px',
                               borderRadius: '6px',
-                              background: '#fefce8',
-                              border: '1.5px solid #eab308',
+                              background: '#fef9c3',
+                              border: 'none',
                               color: '#854d0e',
                               textAlign: 'center',
                               outline: 'none'
@@ -3960,8 +3769,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                               fontFamily: 'SF Mono, monospace',
                               padding: '2px 7px',
                               borderRadius: '6px',
-                              background: '#fef3c7',
-                              border: '1px solid #fde047',
+                              background: '#fef9c3',
+                              border: 'none',
                               color: '#854d0e',
                               cursor: 'pointer'
                             }}
@@ -4086,7 +3895,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         value={bpm}
                         onChange={(e) => setBpm(Number(e.target.value))}
                         aria-label="BPM Schieberegler"
-                        style={{ flex: 1, height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
+                        style={{ flex: 1, height: '6px', accentColor: '#facc15', cursor: 'pointer' }}
                       />
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>240</span>
                     </div>
@@ -4099,8 +3908,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         width: '100%',
                         height: '34px',
                         borderRadius: '10px',
-                        border: '1.5px solid #facc15',
-                        background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+                        border: 'none',
+                        background: '#fef9c3',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4109,18 +3918,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         fontWeight: 850,
                         color: '#854d0e',
                         cursor: 'pointer',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        boxShadow: 'none',
                         touchAction: 'manipulation'
                       }}
                       title="Takt tippen um Tempo zu ermitteln"
                     >
-                      <Zap size={14} color="#a16207" />
+                      <Zap size={14} color="#854d0e" />
                       <span>Tempo einklopfen (Tap)</span>
                     </button>
                   </div>
                 </>
               )}
-            </div>
           </div>
 
           {/* Mute-Bar Challenge Alert Banner */}
@@ -4128,8 +3936,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               width: '100%',
               maxWidth: '280px',
-              background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
-              color: '#e0e7ff',
+              background: '#6366f1',
+              color: '#ffffff',
               padding: '6px 10px',
               borderRadius: '10px',
               display: 'flex',
@@ -4145,13 +3953,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           )}
 
-          {/* Zählzeiten Header mit Taktart-Pille */}
+          {/* Zählzeiten Header */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: '460px',
             margin: '2px 0 4px 0',
             padding: '0 4px'
           }}>
@@ -4168,33 +3976,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               <Clock size={13} />
               Zählzeiten & Akzente
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {effectiveUiLevel === 'pro' && (
-                <span style={{
-                  fontSize: '0.66rem',
-                  fontWeight: 800,
-                  color: '#64748b',
-                  background: '#f1f5f9',
-                  padding: '2px 7px',
-                  borderRadius: '6px',
-                  fontFamily: 'SF Mono, monospace'
-                }}>
-                  {Math.round((60000 / bpm))}ms
-                </span>
-              )}
-              <span style={{
-                fontSize: '0.74rem',
-                fontWeight: 950,
-                color: '#854d0e',
-                background: '#fefce8',
-                border: '1px solid #fde047',
-                padding: '2px 10px',
-                borderRadius: '100px',
-                fontFamily: 'SF Mono, monospace'
-              }}>
-                {activeMeterInfo.meter} Takt
-              </span>
-            </div>
           </div>
 
           {/* Dynamische Interaktive Beat-Pads je Taktart (4-Stufen-Zyklus: Akzent, Normal, Ghost, Mute) */}
@@ -4203,7 +3984,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gridTemplateColumns: `repeat(${activeMeterInfo.beats}, 1fr)`,
             gap: activeMeterInfo.beats > 4 ? '6px' : '10px',
             width: '100%',
-            maxWidth: '400px',
+            maxWidth: '460px',
             margin: '2px 0 6px 0'
           }}>
             {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
@@ -4223,23 +4004,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     height: activeMeterInfo.beats > 4 ? '50px' : '62px',
                     borderRadius: '16px',
                     background: isActive 
-                      ? (isAccent ? '#eab308' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
-                      : (isAccent ? '#fefce8' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#ffffff'))),
+                      ? (isAccent ? '#facc15' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
+                      : (isAccent ? '#fef9c3' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#f8fafc'))),
                     border: isActive 
-                      ? '2.5px solid #facc15' 
-                      : (isAccent ? '2px solid #eab308' : (isMute ? '1.5px dashed #cbd5e1' : '1.5px solid #cbd5e1')),
-                    boxShadow: isActive 
-                      ? '0 0 20px rgba(234, 179, 8, 0.55)' 
-                      : (isAccent ? '0 2px 8px rgba(234, 179, 8, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'),
+                      ? 'none' 
+                      : (isAccent ? 'none' : '1px solid #e2e8f0'),
+                    boxShadow: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: isActive ? '#ffffff' : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
+                    color: isActive ? (isAccent ? '#0f172a' : '#ffffff') : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
                     fontSize: activeMeterInfo.beats > 4 ? '0.92rem' : '1.1rem',
                     fontWeight: 950,
                     cursor: 'pointer',
-                    transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                    transform: isActive ? 'scale(1.06)' : 'scale(1)',
                     transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     position: 'relative'
                   }}
@@ -4256,13 +4035,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
           {/* Rhythmus-Zentrale Kapseln: Taktart & Unterteilung */}
           {selectedStyle === 'metronome' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '400px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '460px' }}>
               {/* Taktart-Wahl (4/4, 3/4, 2/4, 6/8) */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 width: '100%',
                 background: '#f1f5f9',
                 padding: '4px',
@@ -4280,14 +4059,14 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       }}
                       style={{
                         flex: 1,
-                        padding: '9px 0',
-                        fontSize: '0.82rem',
+                        padding: '8px 0',
+                        fontSize: '0.80rem',
                         fontWeight: isSelected ? 900 : 750,
                         borderRadius: '10px',
                         border: 'none',
                         background: isSelected ? '#ffffff' : 'transparent',
-                        color: isSelected ? '#854d0e' : '#64748b',
-                        boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                        color: isSelected ? '#0f172a' : '#64748b',
+                        boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                         cursor: 'pointer',
                         transition: 'all 0.12s ease'
                       }}
@@ -4303,54 +4082,59 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 width: '100%',
-                background: '#f8fafc',
+                background: '#f1f5f9',
                 padding: '4px',
                 borderRadius: '14px',
-                border: '1px solid #e2e8f0'
+                border: 'none'
               }}>
                 {[
                   { id: '1', label: '1/4 Viertel' },
                   { id: '2', label: '1/8 Achtel' },
                   { id: '3', label: 'Triolen' },
                   { id: '4', label: '1/16 16tel' }
-                ].map(subOpt => (
-                  <button
-                    key={subOpt.id}
-                    type="button"
-                    onClick={() => setSubdivision(subOpt.id as any)}
-                    style={{
-                      flex: 1,
-                      padding: '8px 0',
-                      fontSize: '0.76rem',
-                      fontWeight: subdivision === subOpt.id ? 900 : 700,
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: subdivision === subOpt.id ? '#fefce8' : 'transparent',
-                      color: subdivision === subOpt.id ? '#854d0e' : '#64748b',
-                      boxShadow: subdivision === subOpt.id ? '0 2px 6px rgba(234, 179, 8, 0.25)' : 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.1s ease'
-                    }}
-                  >
-                    {subOpt.label}
-                  </button>
-                ))}
+                ].map(subOpt => {
+                  const isSubSelected = subdivision === subOpt.id;
+                  return (
+                    <button
+                      key={subOpt.id}
+                      type="button"
+                      onClick={() => setSubdivision(subOpt.id as any)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 0',
+                        fontSize: '0.76rem',
+                        fontWeight: isSubSelected ? 900 : 700,
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isSubSelected ? '#ffffff' : 'transparent',
+                        color: isSubSelected ? '#0f172a' : '#64748b',
+                        boxShadow: isSubSelected ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.1s ease'
+                      }}
+                    >
+                      {subOpt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Takt-Fortschritts-Sweep-Bar */}
+          {/* Takt-Fortschritts-Sweep-Bar (im Ruhezustand unsichtbar, um visuelles Linien-Rauschen zu vermeiden) */}
           <div style={{
             width: '100%',
-            maxWidth: '400px',
-            height: '6px',
-            background: '#e2e8f0',
+            maxWidth: '460px',
+            height: '4px',
+            background: '#f1f5f9',
             borderRadius: '10px',
             overflow: 'hidden',
             position: 'relative',
-            margin: '4px 0'
+            margin: '2px 0',
+            opacity: isPlaying ? 1 : 0,
+            transition: 'opacity 0.2s ease'
           }}>
             <div style={{
               position: 'absolute',
@@ -4358,7 +4142,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               left: 0,
               height: '100%',
               width: `${barProgress}%`,
-              background: 'linear-gradient(90deg, #facc15 0%, #eab308 100%)',
+              background: '#facc15',
               boxShadow: 'none',
               borderRadius: '10px',
               transition: isPlaying ? 'none' : 'width 0.1s ease-out'
@@ -4370,9 +4154,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           {activeSongContext?.songTitle && (
             <div style={{
               width: '100%',
-              maxWidth: '400px',
-              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-              border: '1.5px solid #fde047',
+              maxWidth: '460px',
+              background: '#fef9c3',
+              border: 'none',
               borderRadius: '14px',
               padding: '8px 12px',
               display: 'flex',
@@ -4381,12 +4165,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               boxShadow: 'none'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Music size={15} style={{ color: '#ca8a04' }} />
+                <Music size={15} style={{ color: '#854d0e' }} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#854d0e' }}>
                   Song: <strong>{activeSongContext.songTitle}</strong>
                 </span>
               </div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: 'none' }}>
                 {activeSongContext.targetBpm} BPM
               </span>
             </div>
@@ -4412,8 +4196,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             display: 'flex',
             gap: '10px',
             width: '100%',
-            maxWidth: '400px',
-            marginTop: '8px',
+            maxWidth: '460px',
+            marginTop: '4px',
             paddingTop: '4px'
           }}>
             <button
@@ -4423,7 +4207,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               style={{
                 flex: 1.3,
                 minHeight: '52px',
-                background: (isPlaying && !isRecording) ? '#0f172a' : (isRecording || isCountingIn ? '#cbd5e1' : 'linear-gradient(135deg, #facc15 0%, #eab308 100%)'),
+                background: (isPlaying && !isRecording) ? '#0f172a' : (isRecording || isCountingIn ? '#cbd5e1' : '#facc15'),
                 color: (isPlaying && !isRecording) ? '#ffffff' : (isRecording || isCountingIn ? '#ffffff' : '#0f172a'),
                 border: 'none',
                 borderRadius: '16px',
@@ -4435,7 +4219,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: (isPlaying && !isRecording) ? '0 4px 16px rgba(15, 23, 42, 0.25)' : '0 6px 20px rgba(234, 179, 8, 0.35)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -4458,9 +4242,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               style={{
                 flex: 1,
                 minHeight: '52px',
-                background: isRecording ? '#dc2626' : (isCountingIn ? '#f59e0b' : '#1e293b'),
+                background: isRecording ? '#ef4444' : (isCountingIn ? '#f97316' : '#0f172a'),
                 color: '#ffffff',
-                border: isRecording ? '2px solid #ef4444' : (isCountingIn ? '2px solid #d97706' : '1.5px solid #334155'),
+                border: 'none',
                 borderRadius: '16px',
                 padding: '10px 12px',
                 fontSize: '0.92rem',
@@ -4470,7 +4254,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.55)' : '0 2px 8px rgba(0, 0, 0, 0.12)',
+                boxShadow: 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -4497,13 +4281,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           {pendingPreviewTake && (
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: '1.5px solid #fde68a',
+              background: '#fef9c3',
+              border: 'none',
               borderRadius: '16px',
               padding: '14px 16px',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+              boxShadow: 'none',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px',
@@ -4516,11 +4298,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     width: '32px',
                     height: '32px',
                     borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    background: '#facc15',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#ffffff',
+                    color: '#0f172a',
                     boxShadow: 'none',
                     flexShrink: 0
                   }}>
@@ -4528,7 +4310,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   </div>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         🎧 Deine Aufnahme anhören
                       </span>
                       <span style={{ fontSize: '0.56rem', color: '#94a3b8' }}>
@@ -4565,7 +4347,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 background: '#ffffff',
                 borderRadius: '10px',
                 padding: '8px 12px',
-                border: '1px solid #fde68a',
+                border: '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px'
@@ -4577,8 +4359,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     width: '30px',
                     height: '30px',
                     borderRadius: '50%',
-                    background: '#f59e0b',
-                    color: '#ffffff',
+                    background: '#facc15',
+                    color: '#0f172a',
                     border: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -4595,7 +4377,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div style={{
                     width: '100%',
                     height: '5px',
-                    background: '#fef3c7',
+                    background: '#fef9c3',
                     borderRadius: '999px',
                     overflow: 'hidden',
                     position: 'relative'
@@ -4606,12 +4388,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       top: 0,
                       bottom: 0,
                       width: `${previewProgress}%`,
-                      background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                      background: '#facc15',
                       borderRadius: '999px',
                       transition: 'width 0.1s linear'
                     }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: '#78350f', fontFamily: 'SF Mono, monospace' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.58rem', color: '#854d0e', fontFamily: 'SF Mono, monospace' }}>
                     <span>{formatTime(previewCurrentTime)}</span>
                     <span>{formatTime(pendingPreviewTake.duration)}</span>
                   </div>
@@ -4652,7 +4434,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   className="tactile-btn"
                   style={{
                     flex: 1.4,
-                    background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                    background: '#facc15',
                     color: '#0f172a',
                     border: 'none',
                     borderRadius: '10px',
@@ -4679,8 +4461,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           {savedTakeSuccessToast && (
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-              border: '1.5px solid #fde047',
+              background: '#fef9c3',
+              border: 'none',
               borderRadius: '14px',
               padding: '10px 14px',
               display: 'flex',
@@ -4691,7 +4473,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               boxSizing: 'border-box'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CheckCircle2 size={16} color="#ca8a04" />
+                <CheckCircle2 size={16} color="#854d0e" />
                 <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e' }}>
                   ✨ Im Aufnahmen-Modul gesichert!
                 </span>
@@ -4701,7 +4483,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   type="button"
                   onClick={onNavigateToRecordings}
                   style={{
-                    background: '#eab308',
+                    background: '#facc15',
                     color: '#0f172a',
                     border: 'none',
                     borderRadius: '6px',
@@ -4751,12 +4533,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '60px',
                   height: '60px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-                  border: '2px solid #facc15',
+                  background: '#fef9c3',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ca8a04'
+                  color: '#854d0e'
                 }}>
                   <Sparkles size={30} />
                 </div>
@@ -4784,7 +4566,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       >
                         <Star
                           size={38}
-                          fill={isLit ? '#eab308' : '#e2e8f0'}
+                          fill={isLit ? '#facc15' : '#e2e8f0'}
                           color={isLit ? '#ca8a04' : '#cbd5e1'}
                         />
                       </div>
@@ -4853,8 +4635,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         top: 0,
                         bottom: 0,
                         background: 'rgba(234, 179, 8, 0.25)',
-                        borderLeft: '1.5px dashed #eab308',
-                        borderRight: '1.5px dashed #eab308'
+                        borderLeft: '1.5px dashed #facc15',
+                        borderRight: '1.5px dashed #facc15'
                       }} />
 
                       {/* Center 0ms Line */}
@@ -4864,7 +4646,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         top: 0,
                         bottom: 0,
                         width: '2px',
-                        background: '#eab308'
+                        background: '#facc15'
                       }} />
 
                       {/* Plot Student Hit Markers */}
@@ -4873,7 +4655,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         const pct = ((clampedDelta + 100) / 200) * 100;
                         const isPerfect = Math.abs(clampedDelta) <= 35;
                         const isRushing = clampedDelta < -35;
-                        const color = isPerfect ? '#eab308' : (isRushing ? '#f59e0b' : '#3b82f6');
+                        const color = isPerfect ? '#facc15' : (isRushing ? '#f59e0b' : '#3b82f6');
 
                         return (
                           <div
@@ -4887,7 +4669,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                               height: '7px',
                               borderRadius: '50%',
                               background: color,
-                              boxShadow: `0 0 6px ${color}`,
+                              boxShadow: 'none',
                               zIndex: 3
                             }}
                           />
@@ -4903,8 +4685,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     fontSize: '0.72rem',
                     fontWeight: 800,
                     color: '#854d0e',
-                    background: '#fefce8',
-                    border: '1px solid #fde047',
+                    background: '#fef9c3',
+                    border: 'none',
                     borderRadius: '10px',
                     padding: '6px 12px',
                     width: '100%',
@@ -4915,7 +4697,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 )}
 
                 {/* Didactic AI Advice Text */}
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, background: '#fefce8', padding: '12px 14px', borderRadius: '12px', borderLeft: '4px solid #eab308' }}>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, background: '#fef9c3', padding: '12px 14px', borderRadius: '12px', border: 'none' }}>
                   {summaryCardData.advice}
                 </p>
 
@@ -4955,7 +4737,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     }}
                     style={{
                       flex: 1.6,
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                      background: '#facc15',
                       color: '#0f172a',
                       border: 'none',
                       borderRadius: '12px',
@@ -5010,15 +4792,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 fontSize: '0.70rem',
                 fontWeight: 850,
                 color: '#854d0e',
-                background: '#fefce8',
-                border: '1px solid #fef08a',
+                background: '#fef9c3',
+                border: 'none',
                 padding: '4px 10px',
                 borderRadius: '100px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308' }} />
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#facc15' }} />
                 Beat läuft
               </span>
             )}
@@ -5031,10 +4813,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gap: '12px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick', icon: <Timer size={22} strokeWidth={2.3} /> },
-              { id: 'rock', label: 'Rock & Pop', icon: <Drum size={22} strokeWidth={2.3} /> },
-              { id: 'hiphop', label: 'Hip-Hop Pocket', icon: <Headphones size={22} strokeWidth={2.3} /> },
-              { id: 'singersongwriter', label: 'Liedermacher', icon: <Guitar size={22} strokeWidth={2.3} /> }
+              { id: 'metronome', label: 'Metronom Klick', icon: <Timer size={22} strokeWidth={2.2} /> },
+              { id: 'rock', label: 'Rock & Pop', icon: <Drum size={22} strokeWidth={2.2} /> },
+              { id: 'hiphop', label: 'Hip-Hop Pocket', icon: <Headphones size={22} strokeWidth={2.2} /> },
+              { id: 'singersongwriter', label: 'Liedermacher', icon: <Guitar size={22} strokeWidth={2.2} /> }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -5050,9 +4832,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                   className="tactile-btn"
                   style={{
-                    background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#ffffff',
+                    background: isSelected ? '#facc15' : '#ffffff',
                     color: isSelected ? '#0f172a' : '#1e293b',
-                    border: isSelected ? '2px solid #ca8a04' : '1.5px solid #e2e8f0',
+                    border: isSelected ? 'none' : '1px solid #e2e8f0',
                     borderRadius: '16px',
                     padding: '16px 18px',
                     cursor: 'pointer',
@@ -5062,35 +4844,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     justifyContent: 'center',
                     minHeight: '68px',
                     transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                    boxShadow: isSelected ? '0 6px 20px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.03)',
+                    boxShadow: 'none',
                     textAlign: 'left',
                     position: 'relative'
                   }}
                 >
                   <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#b45309' }}>{styleOpt.icon}</span>
-                      <span style={{ fontSize: '1.12rem', fontWeight: 950, letterSpacing: '-0.02em', color: isSelected ? '#0f172a' : '#0f172a' }}>{styleOpt.label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#64748b' }}>{styleOpt.icon}</span>
+                      <span style={{ fontSize: '1.08rem', fontWeight: 950, letterSpacing: '-0.02em', color: '#0f172a' }}>{styleOpt.label}</span>
                     </div>
-                    {isSelected && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {isPlaying && (
-                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', marginRight: '2px' }}>
-                            <span className="eq-bar-1" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
-                            <span className="eq-bar-2" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
-                            <span className="eq-bar-3" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
-                          </div>
-                        )}
-                        <span style={{
-                          fontSize: '0.66rem',
-                          fontWeight: 900,
-                          background: 'rgba(15, 23, 42, 0.14)',
-                          color: '#0f172a',
-                          padding: '2px 8px',
-                          borderRadius: '100px'
-                        }}>
-                          Aktiv
-                        </span>
+                    {isSelected && isPlaying && (
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', marginRight: '2px' }}>
+                        <span className="eq-bar-1" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
+                        <span className="eq-bar-2" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
+                        <span className="eq-bar-3" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
                       </div>
                     )}
                   </div>
@@ -5107,11 +4875,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               width: '100%',
               padding: '10px 14px',
               borderRadius: '12px',
-              border: '1.5px dashed #cbd5e1',
+              border: 'none',
               background: showAllStyles ? '#f1f5f9' : '#f8fafc',
-              color: '#334155',
-              fontSize: '0.78rem',
-              fontWeight: 850,
+              color: '#64748b',
+              fontSize: '0.76rem',
+              fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -5132,7 +4900,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               padding: '12px',
               background: '#f8fafc',
               borderRadius: '16px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid #f1f5f9',
               animation: 'fadeIn 0.15s ease'
             }}>
               {[
@@ -5158,9 +4926,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     }}
                     style={{
                       gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
-                      background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#ffffff',
+                      background: isSelected ? '#facc15' : '#ffffff',
                       color: isSelected ? '#0f172a' : '#1e293b',
-                      border: isSelected ? '2px solid #ca8a04' : '1px solid #cbd5e1',
+                      border: isSelected ? 'none' : '1px solid #e2e8f0',
                       borderRadius: '12px',
                       padding: '10px 12px',
                       fontSize: '0.80rem',
@@ -5170,7 +4938,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       minHeight: '44px',
-                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.25)' : 'none',
+                      boxShadow: 'none',
                       transition: 'all 0.12s ease'
                     }}
                   >
@@ -5178,31 +4946,30 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? '#0f172a' : '#64748b' }}>{styleOpt.icon}</span>
                       <span>{styleOpt.label}</span>
                     </div>
-                    {isSelected && (
-                      <span style={{ fontSize: '0.62rem', fontWeight: 900, background: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', padding: '2px 6px', borderRadius: '100px' }}>
-                        Aktiv
-                      </span>
-                    )}
                   </button>
                 );
               })}
             </div>
           )}
 
-          {/* ANKER 4: GROOVE-STUFE (Standard / Mehr Pep) */}
+          {/* ANKER 4: GROOVE-STUFE (Ruhiges Apple Segmented Control) */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 16px'
+            paddingTop: '4px'
           }}>
-            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', paddingLeft: '2px' }}>
               Rhythmus-Variante
             </span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '4px',
+              background: '#f1f5f9',
+              padding: '4px',
+              borderRadius: '14px'
+            }}>
               {[
                 { id: 'A', label: 'Grund-Rhythmus', desc: 'Standard Groove' },
                 { id: 'B', label: 'Mehr Schwung', desc: 'Variante mit Kick & Snare' }
@@ -5214,21 +4981,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     type="button"
                     onClick={() => setSelectedVariation(varOpt.id as any)}
                     style={{
-                      background: isSelected ? '#fefce8' : '#ffffff',
-                      color: isSelected ? '#854d0e' : '#475569',
-                      border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
-                      borderRadius: '12px',
+                      background: isSelected ? '#ffffff' : 'transparent',
+                      color: isSelected ? '#0f172a' : '#64748b',
+                      border: 'none',
+                      borderRadius: '10px',
                       padding: '10px 12px',
                       fontSize: '0.80rem',
-                      fontWeight: 900,
+                      fontWeight: isSelected ? 900 : 750,
                       cursor: 'pointer',
                       textAlign: 'center',
-                      boxShadow: isSelected ? '0 2px 6px rgba(234, 179, 8, 0.15)' : 'none',
+                      boxShadow: isSelected ? '0 1px 3px rgba(0, 0, 0, 0.08)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
                     <div>{varOpt.label}</div>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 650, color: isSelected ? '#a16207' : '#94a3b8' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 650, color: isSelected ? '#64748b' : '#94a3b8' }}>
                       {varOpt.desc}
                     </span>
                   </button>
@@ -5266,10 +5033,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={16} color={showStudioMixer ? '#eab308' : '#64748b'} />
+                <Sliders size={16} color={showStudioMixer ? '#facc15' : '#64748b'} />
                 <span>Mischpult & Klangeinstellungen</span>
                 {selectedVariation === 'C' && (
-                  <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef9c3', color: '#854d0e', padding: '2px 8px', borderRadius: '100px' }}>
                     Wirbel aktiv
                   </span>
                 )}
@@ -5293,7 +5060,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       <Volume2 size={14} color="#0f172a" />
                       <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>Master-Lautstärke</span>
                       {volMaster > 100 && (
-                        <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#eab308', color: '#0f172a' }}>
+                        <span style={{ fontSize: '0.56rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: '#facc15', color: '#0f172a' }}>
                           BOOST
                         </span>
                       )}
@@ -5307,7 +5074,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     value={volMaster}
                     onChange={(e) => setVolMaster(Number(e.target.value))}
                     aria-label="Master-Lautstärke Regler Mischpult"
-                    style={{ width: '100%', accentColor: '#eab308', cursor: 'pointer' }}
+                    style={{ width: '100%', accentColor: '#facc15', cursor: 'pointer' }}
                   />
                 </div>
 
@@ -5323,8 +5090,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     style={{
                       padding: '4px 10px',
                       borderRadius: '8px',
-                      border: selectedVariation === 'C' ? '1.5px solid #eab308' : '1px solid #cbd5e1',
-                      background: selectedVariation === 'C' ? '#fefce8' : '#ffffff',
+                      border: selectedVariation === 'C' ? 'none' : '1px solid #cbd5e1',
+                      background: selectedVariation === 'C' ? '#fef9c3' : '#ffffff',
                       color: selectedVariation === 'C' ? '#854d0e' : '#64748b',
                       fontSize: '0.72rem',
                       fontWeight: 800,
@@ -5362,7 +5129,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         max="200"
                         value={volMetronome}
                         onChange={(e) => setVolMetronome(Number(e.target.value))}
-                        style={{ flex: 1, accentColor: '#eab308' }}
+                        style={{ flex: 1, accentColor: '#facc15' }}
                       />
                       <button
                         type="button"
@@ -5397,7 +5164,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           max="200"
                           value={volKick}
                           onChange={(e) => setVolKick(Number(e.target.value))}
-                          style={{ accentColor: '#eab308' }}
+                          style={{ accentColor: '#facc15' }}
                         />
                       </div>
                       {/* Snare */}
@@ -5412,7 +5179,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                           max="200"
                           value={volSnare}
                           onChange={(e) => setVolSnare(Number(e.target.value))}
-                          style={{ accentColor: '#eab308' }}
+                          style={{ accentColor: '#facc15' }}
                         />
                       </div>
                     </div>
@@ -5458,12 +5225,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
-                  background: '#fefce8',
-                  border: '1.5px solid #fde047',
+                  background: '#fef9c3',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ca8a04'
+                  color: '#854d0e'
                 }}>
                   <CheckCircle2 size={36} />
                 </div>
@@ -5478,16 +5245,16 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   width: '64px',
                   height: '64px',
                   borderRadius: '50%',
-                  background: '#fefce8',
-                  border: '1.5px solid #fde047',
+                  background: '#fef9c3',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#ca8a04'
+                  color: '#854d0e'
                 }}>
                   <Mic size={32} />
                 </div>
-                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   SCHRITT 3/3: INSTRUMENT EINPEGELN (3 TÖNE)
                 </span>
                 <h3 style={{ margin: '2px 0 0 0', fontSize: '1.15rem', fontWeight: 900, color: '#1e293b' }}>
@@ -5504,7 +5271,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         width: '54px',
                         height: '54px',
                         borderRadius: '16px',
-                        background: num <= instrumentToneCount ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#f1f5f9',
+                        background: num <= instrumentToneCount ? '#facc15' : '#f1f5f9',
                         color: num <= instrumentToneCount ? '#0f172a' : '#94a3b8',
                         display: 'flex',
                         alignItems: 'center',
@@ -5512,7 +5279,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                         fontWeight: 900,
                         fontSize: '1rem',
                         transition: 'all 0.2s ease-out',
-                        boxShadow: num <= instrumentToneCount ? '0 6px 14px rgba(234, 179, 8, 0.35)' : 'none'
+                        boxShadow: 'none'
                       }}
                     >
                       {num <= instrumentToneCount ? '✓' : `Ton ${num}`}
@@ -5550,7 +5317,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             alignItems: 'center',
             gap: '16px',
             boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
-            border: '2px solid rgba(239, 68, 68, 0.2)',
+            border: '1.5px solid #e2e8f0',
             maxWidth: '340px',
             width: '90%',
             animation: 'scaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
@@ -5560,7 +5327,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               alignItems: 'center',
               gap: '6px',
               background: '#fee2e2',
-              color: '#dc2626',
+              color: '#b91c1c',
               padding: '5px 14px',
               borderRadius: '999px',
               fontSize: '0.72rem',
@@ -5568,7 +5335,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               letterSpacing: '0.04em',
               textTransform: 'uppercase'
             }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#dc2626', animation: 'pulse 1s infinite' }} />
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
               <span>Aufnahme startet...</span>
             </div>
 
@@ -5578,7 +5345,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               style={{
                 fontSize: '5rem',
                 fontWeight: 900,
-                color: '#dc2626',
+                color: '#ef4444',
                 lineHeight: 1,
                 fontFamily: 'SF Pro Display, -apple-system, sans-serif',
                 animation: 'countdownPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
@@ -5599,10 +5366,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     width: '14px',
                     height: '14px',
                     borderRadius: '50%',
-                    background: b <= countInBeat ? '#dc2626' : '#e2e8f0',
+                    background: b <= countInBeat ? '#ef4444' : '#e2e8f0',
                     transition: 'all 0.15s ease',
                     transform: b === countInBeat ? 'scale(1.3)' : 'scale(1)',
-                    boxShadow: b === countInBeat ? '0 0 10px rgba(220, 38, 38, 0.5)' : 'none'
+                    boxShadow: 'none'
                   }}
                 />
               ))}
@@ -5660,7 +5427,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             width: '32px',
             height: '32px',
             borderRadius: '50%',
-            background: '#eab308',
+            background: '#facc15',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

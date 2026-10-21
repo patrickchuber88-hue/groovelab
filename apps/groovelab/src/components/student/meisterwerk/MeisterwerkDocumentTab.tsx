@@ -11,72 +11,27 @@ import { CampusPinUnlockModal } from '../../CampusPinUnlockModal';
 import { SpeechDictationButton } from '../SpeechDictationButton';
 import { MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
 import { AudioSettingsSheet } from './AudioSettingsSheet';
+import { audioLatencyService } from '../../../services/audioLatencyService';
 import { Student } from '../meisterwerk.types';
-import {
-  StudioModuleKey,
-  ALL_STUDIO_MODULE_KEYS,
-  isStudioModuleActive,
-  DEFAULT_ACTIVE_STUDIO_MODULES
-} from '../studentAgeStandards';
-import {
-  cleanSongOrBookTitle,
-  formatHarmonizedAudioTitle,
-  formatAudioDate
-} from '../../../utils/audioNamingHelper';
-import {
-  formatTeacherFullName,
-  capitalizeFirstLetter,
-  formatSongTitleCase,
-  copyTextToClipboard,
-  maskLastName
-} from '../../../utils/nameHelper';
+import { StudioModuleKey, ALL_STUDIO_MODULE_KEYS, isStudioModuleActive, DEFAULT_ACTIVE_STUDIO_MODULES } from '../studentAgeStandards';
+import { cleanSongOrBookTitle, formatHarmonizedAudioTitle, formatAudioDate } from '../../../utils/audioNamingHelper';
+import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 import { cleanHomeworkTitle } from '../../../utils/homeworkSnapshotHelper';
 import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
-import {
-  formatPageNumbers,
-  getCleanPageNotes,
-  getCleanTeacherHomeworkText,
-  formatStudentNoteDisplay,
-  parseStudentQuestionFromNotes,
-  parseStudentAnnotation,
-  parseSongArtistAndTitle,
-  SKILL_TAGS,
-  parseWorldTourMasteries,
-  ParsedWorldTourMastery
-} from '../meisterwerk.types';
+import { formatPageNumbers, getCleanPageNotes, getCleanTeacherHomeworkText, formatStudentNoteDisplay, parseStudentQuestionFromNotes, parseStudentAnnotation, parseSongArtistAndTitle, SKILL_TAGS, parseWorldTourMasteries, ParsedWorldTourMastery } from '../meisterwerk.types';
 import { WorldTourMasteryNoteCard } from './worldtour/WorldTourMasteryNoteCard';
 import { StudentHomeworkStatusButton } from '../homework/StudentHomeworkStatusButton';
+import { TeacherPastHomeworkDock } from './components/TeacherPastHomeworkDock';
+import { MeisterwerkBrushToolbar } from './components/MeisterwerkBrushToolbar';
+import { extractPastWeekSnapshot, hasCommittedCurrentWeekEntry, PastWeekHomeworkItem, PastWeekSnapshotInfo } from '../../../utils/homeworkLifecycleHelper';
 import { useAuthoritativeHomeworkOptional } from '../context/AuthoritativeHomeworkContext';
 import { useMeisterwerkTestScrubber } from './hooks/useMeisterwerkTestScrubber';
 import { MicroScoreSnippetButton } from './microscore';
-import {
-  parseRawNotesArray,
-  parseSnapshotLehrwerke,
-  parseSnapshotSongs,
-  parseAudioEntries,
-  parseDidacticTextNotes
-} from './utils/meisterwerkSnapshotUnpacker';
-import {
-  ALL_STICKERS,
-  getUnifiedStickerStatus,
-  getUnifiedStickersMap,
-  cleanNotesText,
-  filterNotesForStudent,
-  isInternalMetadataNote
-} from '../../../domain/stickersAndTresor';
+import { parseRawNotesArray, parseSnapshotLehrwerke, parseSnapshotSongs, parseAudioEntries, parseMicroScoreEntries, parseDidacticTextNotes } from './utils/meisterwerkSnapshotUnpacker';
+import { ALL_STICKERS, getUnifiedStickerStatus, getUnifiedStickersMap, cleanNotesText, filterNotesForStudent, isInternalMetadataNote } from '../../../domain/stickersAndTresor';
 import { formatPageNumbersGerman, formatSingleBookForSpeech, formatSingleSongForSpeech } from '../../../services/neuralTtsService';
-import {
-  levenshteinDistance,
-  normalizeSongStr,
-  extractSongArtistAndTitle,
-  areSongsIdentical,
-  formatDisplayTitle,
-  stripInstrumentFromTitle,
-  isDummyOrTestSong,
-  isWeeklySnapshotContainer,
-  collectHomeworkSongsFromSources
-} from './utils/meisterwerkSongHelpers';
+import { levenshteinDistance, normalizeSongStr, extractSongArtistAndTitle, areSongsIdentical, formatDisplayTitle, stripInstrumentFromTitle, isDummyOrTestSong, isWeeklySnapshotContainer, collectHomeworkSongsFromSources } from './utils/meisterwerkSongHelpers';
 import type { SongSection, SongMeasure } from './components/SongStructureBar';
 import { playAlongAudioEngine, DEFAULT_MIXER_STATE, type AudioMixerState } from './utils/songPlayAlongAudioEngine';
 import { getInstrumentAvatarUrl } from '../studentAvatars.constants';
@@ -91,495 +46,150 @@ export type MeisterwerkBrushType = 'NONE' | 'LOCKED' | 'HOMEWORK' | 'MASTERED' |
 export type MeisterwerkFeedbackStatus = 'beherrscht' | 'in_entwicklung' | 'wiederholen' | null;
 
 export interface LehrwerkExercise {
-  id: string;
-  label: string;
-  status: 'locked' | 'homework' | 'mastered';
-  targetBpm?: number;
-  notes?: string;
-  createdBy?: 'teacher' | 'student';
+  id: string; label: string; status: 'locked' | 'homework' | 'mastered'; targetBpm?: number; notes?: string; createdBy?: 'teacher' | 'student';
 }
 
 export interface MeisterwerkDocumentTabProps {
-  DIDACTIC_QUICK_TAGS: any[];
-  PRESET_CHIPS: any[];
-  activeBrush: MeisterwerkBrushType;
-  activeLehrwerkId: any;
-  activeNoteTarget: any;
-  activePageNumber: any;
-  activeSongSkills: any[];
-  activeSubView: any;
-  activeTagPickerRowIndex: number | null;
-  activeTtsKey: any;
-  adjustTextareaHeight: (...args: any[]) => any;
-  assignedLehrwerke: any[];
-  setAssignedLehrwerke?: (val: any) => void;
-  audioDuration: number;
-  audioLabel: any;
-  awardSticker: (...args: any[]) => any;
-  buildCompleteWeeklyHomeworkSpeechPhrases: (...args: any[]) => any;
-  cancelPlayAlongCountIn: (...args: any[]) => any;
-  clickTimeoutRef: React.MutableRefObject<any>;
-  collectedStickers: Record<string, any>;
-  customTags: any[];
-  effectiveGroupStudents: any[];
-  effectiveTeacherFullName: any;
-  expressionVal: number;
-  fingerVal: number;
-  formatRecordTime: (...args: any[]) => any;
-  generalHomeworkNotes: string;
-  getCanonicalSongKey: (...args: any[]) => any;
-  getFeedbackForWeek: (...args: any[]) => any;
-  getHomeworkNoteItems: (...args: any[]) => any;
-  getISOWeek: (...args: any[]) => any;
-  getItemWeek: (...args: any[]) => any;
-  getLehrwerkColor: (...args: any[]) => any;
-  getNormalizedSongTitle: (...args: any[]) => any;
-  getSongColor: (...args: any[]) => any;
-  getTargetWeekIso: (...args: any[]) => any;
-  getWeekDateRange: (...args: any[]) => any;
-  getWeeksBetween: (...args: any[]) => any;
-  globalLehrwerke: any[];
-  handleAddCustomTag: (...args: any[]) => any;
-  handleAssignLehrwerk: (...args: any[]) => any;
-  handleAssignSongFromCatalog: (...args: any[]) => any;
-  handleBackToHub: (...args: any[]) => any;
-  handleCheckMatch: (...args: any[]) => any;
-  handleCommitStudentRating: (...args: any[]) => any;
-  handleCopyShareLink: (...args: any[]) => any;
-  handlePrintHomeworkSheet?: (...args: any[]) => any;
-  handleCreateAndAssignLehrwerk: (...args: any[]) => any;
-  handleCreateAndAssignSong: (...args: any[]) => any;
-  handleDeleteNote: (...args: any[]) => any;
-  handleDeletePageNote: (...args: any[]) => any;
-  handleDeleteSingleNoteItem: (...args: any[]) => any;
-  handlePageDoubleClick: (...args: any[]) => any;
-  handleRemoveLehrwerk: (...args: any[]) => any;
-  handleRemoveSong: (...args: any[]) => any;
-  handleResetAllCurrentHomework: (...args: any[]) => any;
-  handleResolveStudentQuestion: (...args: any[]) => any;
-  handleAcknowledgeWorldTourMastery?: (countryCode: string) => any;
-  handleOpenWorldTourStation?: (countryCode: string) => any;
-  handleSave: (...args: any[]) => any;
-  handleSaveStudentQuestion: (...args: any[]) => any;
-  handleSetRowTag: (...args: any[]) => any;
-  handleShareEmail: (...args: any[]) => any;
-  handleSpeakText: (...args: any[]) => any;
-  handleStartPlayAlongRecording: (...args: any[]) => any;
-  handleStopSpeaking: (...args: any[]) => any;
-  handleStudentRatingChange: (...args: any[]) => any;
-  handleToggleMatchMode: (...args: any[]) => any;
-  handleTogglePresetChip: (...args: any[]) => any;
-  hasTresorStorage: boolean;
-  hasTransferableHomework?: boolean;
-  homeworkNotes: any;
-  homeworkNotesList: any[];
-  hubTab: any;
-  insertOrToggleTagInText: (...args: any[]) => any;
-  isCampusActive?: boolean;
-  isCountInEnabled: boolean;
-  isCurrentHomework: boolean;
-  isFullscreen: boolean;
-  isInsideSim: boolean;
-  isLinkCopied: boolean;
-  isMatchModeEnabled: boolean;
-  isMatchRevealed: boolean;
-  isMobileOrSim: boolean;
-  isMobileView: boolean;
-  isQuestionEditorOpen: boolean;
-  isRecordingAudio: boolean;
-  isRecordingMetronomeActive: boolean;
-  isSavingFeedback: boolean;
-  isSavingQuestion: boolean;
-  isShareMenuOpen: boolean;
-  isSongMatch: (item: any, skill: any) => boolean;
-  isStudentNotePrivate: boolean;
-  isStudentRatingCommitted: boolean;
-  isSubSlidersExpanded: boolean;
-  isTeacherMode: boolean;
-  isTeacherTools: boolean;
-  isTeacherSelf?: boolean;
-  isTtsSpeaking: boolean;
-  isUploadingAudio: boolean;
-  lastClickRef: React.MutableRefObject<any>;
-  lastMatchedAt: any;
-  lastMatchedStudentPercent: any;
-  lastMatchedTeacherPercent: any;
-  latestGeneralHomeworkNotesRef: React.MutableRefObject<any>;
-  latestTeacherNotesRef: React.MutableRefObject<any>;
-  matchHistory: any[];
-  mobileProtokollTab: any;
-  newCustomTagInput: any;
-  newLehrwerkLoading: boolean;
-  newLehrwerkPages: string;
-  newLehrwerkTitle: any;
-  newSongArtist: any;
-  newSongTitle: any;
-  onClose?: () => void;
-  onOpenAssignModal?: () => void;
-  pageHomeworkNotes: string;
-  pageNotesSelectionRef: React.MutableRefObject<any>;
-  pageNotesTextareaRef: React.MutableRefObject<any>;
-  parsedStudentQuestion: any;
-  pendingFeedbackStatus: MeisterwerkFeedbackStatus;
-  pendingFeedbackTags: any[];
-  playAlongCountInRemaining: number | null;
-  playMetronomeTick: (...args: any[]) => any;
-  progressItems: any[];
-  questionDraftText: any;
-  readOnly: boolean;
-  recordingBpm: number;
-  renderSongVinylCover: (...args: any[]) => any;
-  renderTextWithDidacticBadges: (...args: any[]) => any;
-  rhythmVal: number;
-  saveFeedback: (...args: any[]) => any;
-  schoolId: any;
-  selectActiveSong: (...args: any[]) => any;
-  selectTextbookPage: (...args: any[]) => any;
-  selectedActiveSongId: string | null;
-  selectedCategoryFilter: string | null;
-  selectedHistoryWeek: string | null;
-  setActiveBrush: React.Dispatch<React.SetStateAction<MeisterwerkBrushType>>;
-  setActiveInputTab: React.Dispatch<React.SetStateAction<any>>;
-  setActiveLehrwerkId: React.Dispatch<React.SetStateAction<any>>;
-  setActiveModalTab: React.Dispatch<React.SetStateAction<any>>;
-  setActiveNoteTarget: React.Dispatch<React.SetStateAction<any>>;
-  setActivePageNumber: React.Dispatch<React.SetStateAction<any>>;
-  setActiveSongSkills: React.Dispatch<React.SetStateAction<any[]>>;
-  setActiveSubView: React.Dispatch<React.SetStateAction<any>>;
-  setActiveTagPickerRowIndex: React.Dispatch<React.SetStateAction<any>>;
-  setActiveViewMode: React.Dispatch<React.SetStateAction<any>>;
-  setAudioLabel: React.Dispatch<React.SetStateAction<any>>;
-  setExpressionVal: React.Dispatch<React.SetStateAction<any>>;
-  setFingerVal: React.Dispatch<React.SetStateAction<any>>;
-  setGeneralHomeworkNotes: React.Dispatch<React.SetStateAction<string>>;
-  setHasChanges: React.Dispatch<React.SetStateAction<any>>;
-  setHomeworkNotesList: React.Dispatch<React.SetStateAction<any[]>>;
-  setHubTab: React.Dispatch<React.SetStateAction<any>>;
-  setIsCountInEnabled: React.Dispatch<React.SetStateAction<any>>;
-  setIsCurrentHomework: React.Dispatch<React.SetStateAction<any>>;
-  setIsNotesFocused: React.Dispatch<React.SetStateAction<any>>;
-  setIsQuestionEditorOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsRecordingMetronomeActive: React.Dispatch<React.SetStateAction<any>>;
-  setIsSavingFeedback: React.Dispatch<React.SetStateAction<any>>;
-  setIsShareMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsStudentNotePrivate: React.Dispatch<React.SetStateAction<any>>;
-  setIsSubSlidersExpanded: React.Dispatch<React.SetStateAction<any>>;
-  setIsTransferModalOpen: React.Dispatch<React.SetStateAction<any>>;
-  setMobileProtokollTab: React.Dispatch<React.SetStateAction<any>>;
-  setNewCustomTagInput: React.Dispatch<React.SetStateAction<any>>;
-  setNewLehrwerkPages: React.Dispatch<React.SetStateAction<any>>;
-  setNewLehrwerkTitle: React.Dispatch<React.SetStateAction<any>>;
-  setNewSongArtist: React.Dispatch<React.SetStateAction<any>>;
-  setNewSongTitle: React.Dispatch<React.SetStateAction<any>>;
-  setPageChunk: React.Dispatch<React.SetStateAction<any>>;
+  DIDACTIC_QUICK_TAGS: any[]; PRESET_CHIPS: any[]; activeBrush: MeisterwerkBrushType; activeLehrwerkId: any; activeNoteTarget: any;
+  activePageNumber: any; activeSongSkills: any[]; activeSubView: any; activeTagPickerRowIndex: number | null; activeTtsKey: any;
+  adjustTextareaHeight: (...args: any[]) => any; assignedLehrwerke: any[]; setAssignedLehrwerke?: (val: any) => void;
+  audioDuration: number; audioLabel: any; awardSticker: (...args: any[]) => any;
+  buildCompleteWeeklyHomeworkSpeechPhrases: (...args: any[]) => any; cancelPlayAlongCountIn: (...args: any[]) => any;
+  clickTimeoutRef: React.MutableRefObject<any>; collectedStickers: Record<string, any>; customTags: any[];
+  effectiveGroupStudents: any[]; effectiveTeacherFullName: any; expressionVal: number; fingerVal: number;
+  formatRecordTime: (...args: any[]) => any; generalHomeworkNotes: string; getCanonicalSongKey: (...args: any[]) => any;
+  getFeedbackForWeek: (...args: any[]) => any; getHomeworkNoteItems: (...args: any[]) => any; getISOWeek: (...args: any[]) => any;
+  getItemWeek: (...args: any[]) => any; getLehrwerkColor: (...args: any[]) => any; getNormalizedSongTitle: (...args: any[]) => any;
+  getSongColor: (...args: any[]) => any; getTargetWeekIso: (...args: any[]) => any; getWeekDateRange: (...args: any[]) => any;
+  getWeeksBetween: (...args: any[]) => any; globalLehrwerke: any[]; handleAddCustomTag: (...args: any[]) => any;
+  handleAssignLehrwerk: (...args: any[]) => any; handleAssignSongFromCatalog: (...args: any[]) => any;
+  handleBackToHub: (...args: any[]) => any; handleCheckMatch: (...args: any[]) => any;
+  handleCommitStudentRating: (...args: any[]) => any; handleCopyShareLink: (...args: any[]) => any;
+  handlePrintHomeworkSheet?: (...args: any[]) => any; handleCreateAndAssignLehrwerk: (...args: any[]) => any;
+  handleCreateAndAssignSong: (...args: any[]) => any; handleDeleteNote: (...args: any[]) => any;
+  handleDeletePageNote: (...args: any[]) => any; handleDeleteSingleNoteItem: (...args: any[]) => any;
+  handlePageDoubleClick: (...args: any[]) => any; handleRemoveLehrwerk: (...args: any[]) => any;
+  handleRemoveSong: (...args: any[]) => any; handleResetAllCurrentHomework: (...args: any[]) => any;
+  handleResolveStudentQuestion: (...args: any[]) => any; handleAcknowledgeWorldTourMastery?: (countryCode: string) => any;
+  handleOpenWorldTourStation?: (countryCode: string) => any; handleSave: (...args: any[]) => any;
+  handleSaveStudentQuestion: (...args: any[]) => any; handleSetRowTag: (...args: any[]) => any;
+  handleShareEmail: (...args: any[]) => any; handleSpeakText: (...args: any[]) => any;
+  handleStartPlayAlongRecording: (...args: any[]) => any; handleStopSpeaking: (...args: any[]) => any;
+  handleStudentRatingChange: (...args: any[]) => any; handleToggleMatchMode: (...args: any[]) => any;
+  handleTogglePresetChip: (...args: any[]) => any; hasTresorStorage: boolean; hasTransferableHomework?: boolean;
+  homeworkNotes: any; homeworkNotesList: any[]; hubTab: any; insertOrToggleTagInText: (...args: any[]) => any;
+  isCampusActive?: boolean; isCountInEnabled: boolean; isCurrentHomework: boolean; isFullscreen: boolean; isInsideSim: boolean;
+  isLinkCopied: boolean; isMatchModeEnabled: boolean; isMatchRevealed: boolean; isMobileOrSim: boolean; isMobileView: boolean;
+  isQuestionEditorOpen: boolean; isRecordingAudio: boolean; isRecordingMetronomeActive: boolean; isSavingFeedback: boolean;
+  isSavingQuestion: boolean; isShareMenuOpen: boolean; isSongMatch: (item: any, skill: any) => boolean;
+  isStudentNotePrivate: boolean; isStudentRatingCommitted: boolean; isSubSlidersExpanded: boolean; isTeacherMode: boolean;
+  isTeacherTools: boolean; isTeacherSelf?: boolean; isTtsSpeaking: boolean; isUploadingAudio: boolean;
+  lastClickRef: React.MutableRefObject<any>; lastMatchedAt: any; lastMatchedStudentPercent: any; lastMatchedTeacherPercent: any;
+  latestGeneralHomeworkNotesRef: React.MutableRefObject<any>; latestTeacherNotesRef: React.MutableRefObject<any>;
+  matchHistory: any[]; mobileProtokollTab: any; newCustomTagInput: any; newLehrwerkLoading: boolean; newLehrwerkPages: string;
+  newLehrwerkTitle: any; newSongArtist: any; newSongTitle: any; onClose?: () => void; onOpenAssignModal?: () => void;
+  pageHomeworkNotes: string; pageNotesSelectionRef: React.MutableRefObject<any>; pageNotesTextareaRef: React.MutableRefObject<any>;
+  parsedStudentQuestion: any; pendingFeedbackStatus: MeisterwerkFeedbackStatus; pendingFeedbackTags: any[];
+  playAlongCountInRemaining: number | null; playMetronomeTick: (...args: any[]) => any; progressItems: any[];
+  questionDraftText: any; readOnly: boolean; recordingBpm: number; renderSongVinylCover: (...args: any[]) => any;
+  renderTextWithDidacticBadges: (...args: any[]) => any; rhythmVal: number; saveFeedback: (...args: any[]) => any;
+  schoolId: any; selectActiveSong: (...args: any[]) => any; selectTextbookPage: (...args: any[]) => any;
+  selectedActiveSongId: string | null; selectedCategoryFilter: string | null; selectedHistoryWeek: string | null;
+  setActiveBrush: React.Dispatch<React.SetStateAction<MeisterwerkBrushType>>; setActiveInputTab: React.Dispatch<React.SetStateAction<any>>;
+  setActiveLehrwerkId: React.Dispatch<React.SetStateAction<any>>; setActiveModalTab: React.Dispatch<React.SetStateAction<any>>;
+  setActiveNoteTarget: React.Dispatch<React.SetStateAction<any>>; setActivePageNumber: React.Dispatch<React.SetStateAction<any>>;
+  setActiveSongSkills: React.Dispatch<React.SetStateAction<any[]>>; setActiveSubView: React.Dispatch<React.SetStateAction<any>>;
+  setActiveTagPickerRowIndex: React.Dispatch<React.SetStateAction<any>>; setActiveViewMode: React.Dispatch<React.SetStateAction<any>>;
+  setAudioLabel: React.Dispatch<React.SetStateAction<any>>; setExpressionVal: React.Dispatch<React.SetStateAction<any>>;
+  setFingerVal: React.Dispatch<React.SetStateAction<any>>; setGeneralHomeworkNotes: React.Dispatch<React.SetStateAction<string>>;
+  setHasChanges: React.Dispatch<React.SetStateAction<any>>; setHomeworkNotesList: React.Dispatch<React.SetStateAction<any[]>>;
+  setHubTab: React.Dispatch<React.SetStateAction<any>>; setIsCountInEnabled: React.Dispatch<React.SetStateAction<any>>;
+  setIsCurrentHomework: React.Dispatch<React.SetStateAction<any>>; setIsNotesFocused: React.Dispatch<React.SetStateAction<any>>;
+  setIsQuestionEditorOpen: React.Dispatch<React.SetStateAction<boolean>>; setIsRecordingMetronomeActive: React.Dispatch<React.SetStateAction<any>>;
+  setIsSavingFeedback: React.Dispatch<React.SetStateAction<any>>; setIsShareMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsStudentNotePrivate: React.Dispatch<React.SetStateAction<any>>; setIsSubSlidersExpanded: React.Dispatch<React.SetStateAction<any>>;
+  setIsTransferModalOpen: React.Dispatch<React.SetStateAction<any>>; setMobileProtokollTab: React.Dispatch<React.SetStateAction<any>>;
+  setNewCustomTagInput: React.Dispatch<React.SetStateAction<any>>; setNewLehrwerkPages: React.Dispatch<React.SetStateAction<any>>;
+  setNewLehrwerkTitle: React.Dispatch<React.SetStateAction<any>>; setNewSongArtist: React.Dispatch<React.SetStateAction<any>>;
+  setNewSongTitle: React.Dispatch<React.SetStateAction<any>>; setPageChunk: React.Dispatch<React.SetStateAction<any>>;
   setPageHomeworkNotes: React.Dispatch<React.SetStateAction<string>>;
   setPendingFeedbackStatus: React.Dispatch<React.SetStateAction<MeisterwerkFeedbackStatus>>;
   setPendingFeedbackTags: React.Dispatch<React.SetStateAction<string[]>>;
-  setQuestionDraftText: React.Dispatch<React.SetStateAction<string>>;
-  setRecordingBpm: React.Dispatch<React.SetStateAction<number>>;
-  setRhythmVal: React.Dispatch<React.SetStateAction<any>>;
-  setSelectedHistoryWeek: React.Dispatch<React.SetStateAction<any>>;
-  setShowAllPagesGrid: React.Dispatch<React.SetStateAction<any>>;
-  setShowAssignDropdown: React.Dispatch<React.SetStateAction<any>>;
-  setShowCreateLehrwerkModal: React.Dispatch<React.SetStateAction<any>>;
-  setShowCreateSongModal: React.Dispatch<React.SetStateAction<any>>;
-  setShowPlayAlongMetronomePopup: React.Dispatch<React.SetStateAction<any>>;
-  setSongHomeworkNotes: React.Dispatch<React.SetStateAction<string>>;
-  setSongModalTab: React.Dispatch<React.SetStateAction<any>>;
-  setSongProgressPercent: React.Dispatch<React.SetStateAction<any>>;
-  setSongSearch: React.Dispatch<React.SetStateAction<any>>;
-  setStatus: React.Dispatch<React.SetStateAction<any>>;
-  setStudentNotes: React.Dispatch<React.SetStateAction<string>>;
-  setTeacherNotes: React.Dispatch<React.SetStateAction<string>>;
-  setViewingWeekOffset: React.Dispatch<React.SetStateAction<number>>;
-  shareMenuRef: React.MutableRefObject<any>;
-  showAssignDropdown: boolean;
-  showCreateLehrwerkModal: boolean;
-  showCreateSongModal: boolean;
-  showMatchConfetti: boolean;
-  showPlayAlongMetronomePopup: boolean;
-  showdownState: any;
-  songHomeworkNotes: string;
-  songModalTab: any;
-  songNotesSelectionRef: React.MutableRefObject<any>;
-  songNotesTextareaRef: React.MutableRefObject<any>;
-  songProgressPercent: any;
-  songSearch: any;
-  songs: any[];
-  assignedCampusSongs?: any[];
-  sortedAssignedLehrwerke: any[];
-  status: string;
-  stopRecordingAudio: (...args: any[]) => any;
-  student: Student;
-  studentFirstName: any;
-  studentNotes: string;
-  studentNotesSelectionRef: React.MutableRefObject<any>;
-  studentNotesTextareaRef: React.MutableRefObject<any>;
-  studentRating: any;
-  studentRatingUpdatedAt: any;
-  teacherId: any;
-  teacherNotes: string;
-  teacherNotesTextareaRef: React.MutableRefObject<any>;
-  textbookPageChunkIndex: number;
-  toggleStudentFocusPage: (...args: any[]) => any;
-  topicName: any;
-  triggerDebouncedAutoSave: (...args: any[]) => any;
-  triggerDebouncedSongSave: (...args: any[]) => any;
-  triggerDebouncedTeacherNoteSave: (...args: any[]) => any;
-  triggerDirectSave: (...args: any[]) => any;
-  triggerDirectSongSave: (...args: any[]) => any;
-  triggerImmediateAutoSave: (...args: any[]) => any;
-  uiLevel: any;
-  parentPermissions?: any;
-  onSaveParentOverrides?: (overrides: Record<string, boolean>) => void;
-  updateLehrwerkVisibility: (...args: any[]) => any;
-  useNotebookLayout: boolean;
-  viewingWeekOffset: number;
+  setQuestionDraftText: React.Dispatch<React.SetStateAction<string>>; setRecordingBpm: React.Dispatch<React.SetStateAction<number>>;
+  setRhythmVal: React.Dispatch<React.SetStateAction<any>>; setSelectedHistoryWeek: React.Dispatch<React.SetStateAction<any>>;
+  setShowAllPagesGrid: React.Dispatch<React.SetStateAction<any>>; setShowAssignDropdown: React.Dispatch<React.SetStateAction<any>>;
+  setShowCreateLehrwerkModal: React.Dispatch<React.SetStateAction<any>>; setShowCreateSongModal: React.Dispatch<React.SetStateAction<any>>;
+  setShowPlayAlongMetronomePopup: React.Dispatch<React.SetStateAction<any>>; setSongHomeworkNotes: React.Dispatch<React.SetStateAction<string>>;
+  setSongModalTab: React.Dispatch<React.SetStateAction<any>>; setSongProgressPercent: React.Dispatch<React.SetStateAction<any>>;
+  setSongSearch: React.Dispatch<React.SetStateAction<any>>; setStatus: React.Dispatch<React.SetStateAction<any>>;
+  setStudentNotes: React.Dispatch<React.SetStateAction<string>>; setTeacherNotes: React.Dispatch<React.SetStateAction<string>>;
+  setViewingWeekOffset: React.Dispatch<React.SetStateAction<number>>; shareMenuRef: React.MutableRefObject<any>;
+  showAssignDropdown: boolean; showCreateLehrwerkModal: boolean; showCreateSongModal: boolean; showMatchConfetti: boolean;
+  showPlayAlongMetronomePopup: boolean; showdownState: any; songHomeworkNotes: string; songModalTab: any;
+  songNotesSelectionRef: React.MutableRefObject<any>; songNotesTextareaRef: React.MutableRefObject<any>;
+  songProgressPercent: any; songSearch: any; songs: any[]; assignedCampusSongs?: any[]; sortedAssignedLehrwerke: any[];
+  status: string; stopRecordingAudio: (...args: any[]) => any; student: Student; studentFirstName: any; studentNotes: string;
+  studentNotesSelectionRef: React.MutableRefObject<any>; studentNotesTextareaRef: React.MutableRefObject<any>;
+  studentRating: any; studentRatingUpdatedAt: any; teacherId: any; teacherNotes: string;
+  teacherNotesTextareaRef: React.MutableRefObject<any>; textbookPageChunkIndex: number;
+  toggleStudentFocusPage: (...args: any[]) => any; topicName: any; triggerDebouncedAutoSave: (...args: any[]) => any;
+  triggerDebouncedSongSave: (...args: any[]) => any; triggerDebouncedTeacherNoteSave: (...args: any[]) => any;
+  triggerDirectSave: (...args: any[]) => any; triggerDirectSongSave: (...args: any[]) => any;
+  triggerImmediateAutoSave: (...args: any[]) => any; uiLevel: any; parentPermissions?: any;
+  onSaveParentOverrides?: (overrides: Record<string, boolean>) => void; updateLehrwerkVisibility: (...args: any[]) => any;
+  useNotebookLayout: boolean; viewingWeekOffset: number;
 }
 
 export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const {
-    DIDACTIC_QUICK_TAGS,
-    PRESET_CHIPS,
-    activeBrush: propActiveBrush,
-    activeLehrwerkId,
-    activeNoteTarget,
-    activePageNumber,
-    activeSongSkills,
-    activeSubView,
-    activeTagPickerRowIndex: propActiveTagPickerRowIndex,
-    activeTtsKey,
-    adjustTextareaHeight,
-    assignedLehrwerke,
-    setAssignedLehrwerke,
-    audioDuration,
-    audioLabel,
-    awardSticker,
-    buildCompleteWeeklyHomeworkSpeechPhrases,
-    cancelPlayAlongCountIn,
-    clickTimeoutRef,
-    collectedStickers,
-    customTags,
-    effectiveGroupStudents,
-    effectiveTeacherFullName,
-    expressionVal,
-    fingerVal,
-    formatRecordTime,
-    generalHomeworkNotes = '',
-    getCanonicalSongKey,
-    getFeedbackForWeek,
-    getHomeworkNoteItems,
-    getISOWeek,
-    getItemWeek,
-    getLehrwerkColor,
-    getNormalizedSongTitle,
-    getSongColor,
-    getTargetWeekIso,
-    getWeekDateRange,
-    getWeeksBetween,
-    globalLehrwerke,
-    handleAddCustomTag,
-    handleAssignLehrwerk,
-    handleAssignSongFromCatalog,
-    handleBackToHub,
-    handleCheckMatch,
-    handleCommitStudentRating,
-    handleCopyShareLink,
-    handlePrintHomeworkSheet,
-    handleCreateAndAssignLehrwerk,
-    handleCreateAndAssignSong,
-    handleDeleteNote,
-    handleDeletePageNote,
-    handleDeleteSingleNoteItem,
-    handlePageDoubleClick,
-    handleRemoveLehrwerk,
-    handleRemoveSong,
-    handleResetAllCurrentHomework,
-    handleResolveStudentQuestion,
-    handleAcknowledgeWorldTourMastery,
-    handleOpenWorldTourStation,
-    handleSave,
-    handleSaveStudentQuestion,
-    handleSetRowTag,
-    handleShareEmail,
-    handleSpeakText,
-    handleStartPlayAlongRecording,
-    handleStopSpeaking,
-    handleStudentRatingChange,
-    handleToggleMatchMode,
-    handleTogglePresetChip,
-    hasTresorStorage,
-    hasTransferableHomework = false,
-    homeworkNotes,
-    homeworkNotesList,
-    hubTab,
-    insertOrToggleTagInText,
-    isCampusActive = true,
-    isCountInEnabled,
-    isCurrentHomework,
-    isFullscreen,
-    isInsideSim,
-    isLinkCopied,
-    isMatchModeEnabled,
-    isMatchRevealed,
-    isMobileOrSim,
-    isMobileView,
-    isQuestionEditorOpen: propIsQuestionEditorOpen,
-    isRecordingAudio,
-    isRecordingMetronomeActive,
-    isSavingFeedback,
-    isSavingQuestion: propIsSavingQuestion,
-    isShareMenuOpen,
-    isSongMatch,
-    isStudentNotePrivate,
-    isStudentRatingCommitted,
-    isSubSlidersExpanded: propIsSubSlidersExpanded,
-    isTeacherMode,
-    isTeacherTools,
-    isTeacherSelf = false,
-    isTtsSpeaking,
-    isUploadingAudio,
-    lastClickRef,
-    lastMatchedAt,
-    lastMatchedStudentPercent,
-    lastMatchedTeacherPercent,
-    latestGeneralHomeworkNotesRef,
-    latestTeacherNotesRef,
-    matchHistory,
-    mobileProtokollTab,
-    newCustomTagInput,
-    newLehrwerkLoading,
-    newLehrwerkPages,
-    newLehrwerkTitle,
-    newSongArtist,
-    newSongTitle,
-    onClose,
-    onOpenAssignModal,
-    pageHomeworkNotes = '',
-    pageNotesSelectionRef,
-    pageNotesTextareaRef,
-    parsedStudentQuestion,
-    pendingFeedbackStatus,
-    pendingFeedbackTags,
-    playAlongCountInRemaining,
-    playMetronomeTick,
-    progressItems,
-    questionDraftText: propQuestionDraftText,
-    readOnly,
-    recordingBpm,
-    renderSongVinylCover,
-    renderTextWithDidacticBadges,
-    rhythmVal,
-    saveFeedback,
-    schoolId,
-    selectActiveSong,
-    selectTextbookPage,
-    selectedActiveSongId,
-    selectedCategoryFilter,
-    selectedHistoryWeek: propSelectedHistoryWeek,
-    setActiveBrush: propSetActiveBrush,
-    setActiveInputTab,
-    setActiveLehrwerkId,
-    setActiveModalTab,
-    setActiveNoteTarget,
-    setActivePageNumber,
-    setActiveSongSkills,
-    setActiveSubView,
-    setActiveTagPickerRowIndex: propSetActiveTagPickerRowIndex,
-    setActiveViewMode,
-    setAudioLabel,
-    setExpressionVal,
-    setFingerVal,
-    setGeneralHomeworkNotes,
-    setHasChanges,
-    setHomeworkNotesList,
-    setHubTab,
-    setIsCountInEnabled,
-    setIsCurrentHomework,
-    setIsNotesFocused,
-    setIsQuestionEditorOpen: propSetIsQuestionEditorOpen,
-    setIsRecordingMetronomeActive,
-    setIsSavingFeedback,
-    setIsShareMenuOpen,
-    setIsStudentNotePrivate,
-    setIsSubSlidersExpanded: propSetIsSubSlidersExpanded,
-    setIsTransferModalOpen,
-    setMobileProtokollTab,
-    setNewCustomTagInput,
-    setNewLehrwerkPages,
-    setNewLehrwerkTitle,
-    setNewSongArtist,
-    setNewSongTitle,
-    setPageChunk,
-    setPageHomeworkNotes,
-    setPendingFeedbackStatus,
-    setPendingFeedbackTags,
-    setQuestionDraftText: propSetQuestionDraftText,
-    setRecordingBpm,
-    setRhythmVal,
-    setSelectedHistoryWeek: propSetSelectedHistoryWeek,
-    setShowAllPagesGrid,
-    setShowAssignDropdown,
-    setShowCreateLehrwerkModal,
-    setShowCreateSongModal,
-    setShowPlayAlongMetronomePopup: propSetShowPlayAlongMetronomePopup,
-    setSongHomeworkNotes,
-    setSongModalTab,
-    setSongProgressPercent,
-    setSongSearch,
-    setStatus,
-    setStudentNotes,
-    setTeacherNotes,
-    setViewingWeekOffset,
-    shareMenuRef,
-    showAssignDropdown,
-    showCreateLehrwerkModal,
-    showCreateSongModal,
-    showMatchConfetti,
-    showPlayAlongMetronomePopup: propShowPlayAlongMetronomePopup,
-    showdownState,
-    songHomeworkNotes = '',
-    songModalTab,
-    songNotesSelectionRef,
-    songNotesTextareaRef,
-    songProgressPercent,
-    songSearch,
-    songs,
-    assignedCampusSongs = [],
-    sortedAssignedLehrwerke,
-    status,
-    stopRecordingAudio,
-    student,
-    studentFirstName,
-    studentNotes = '',
-    studentNotesSelectionRef,
-    studentNotesTextareaRef,
-    studentRating,
-    studentRatingUpdatedAt,
-    teacherId,
-    teacherNotes = '',
-    teacherNotesTextareaRef,
-    textbookPageChunkIndex,
-    toggleStudentFocusPage,
-    topicName,
-    triggerDebouncedAutoSave,
-    triggerDebouncedSongSave,
-    triggerDebouncedTeacherNoteSave,
-    triggerDirectSave,
-    triggerDirectSongSave,
-    triggerImmediateAutoSave,
-    uiLevel,
-    parentPermissions,
-    onSaveParentOverrides,
-    updateLehrwerkVisibility,
-    useNotebookLayout,
-    viewingWeekOffset
+    DIDACTIC_QUICK_TAGS, PRESET_CHIPS, activeBrush: propActiveBrush, activeLehrwerkId, activeNoteTarget, activePageNumber,
+    activeSongSkills, activeSubView, activeTagPickerRowIndex: propActiveTagPickerRowIndex, activeTtsKey, adjustTextareaHeight,
+    assignedLehrwerke, setAssignedLehrwerke, audioDuration, audioLabel, awardSticker, buildCompleteWeeklyHomeworkSpeechPhrases,
+    cancelPlayAlongCountIn, clickTimeoutRef, collectedStickers, customTags, effectiveGroupStudents, effectiveTeacherFullName,
+    expressionVal, fingerVal, formatRecordTime, generalHomeworkNotes = '', getCanonicalSongKey, getFeedbackForWeek,
+    getHomeworkNoteItems, getISOWeek, getItemWeek, getLehrwerkColor, getNormalizedSongTitle, getSongColor, getTargetWeekIso,
+    getWeekDateRange, getWeeksBetween, globalLehrwerke, handleAddCustomTag, handleAssignLehrwerk, handleAssignSongFromCatalog,
+    handleBackToHub, handleCheckMatch, handleCommitStudentRating, handleCopyShareLink, handlePrintHomeworkSheet,
+    handleCreateAndAssignLehrwerk, handleCreateAndAssignSong, handleDeleteNote, handleDeletePageNote, handleDeleteSingleNoteItem,
+    handlePageDoubleClick, handleRemoveLehrwerk, handleRemoveSong, handleResetAllCurrentHomework, handleResolveStudentQuestion,
+    handleAcknowledgeWorldTourMastery, handleOpenWorldTourStation, handleSave, handleSaveStudentQuestion, handleSetRowTag,
+    handleShareEmail, handleSpeakText, handleStartPlayAlongRecording, handleStopSpeaking, handleStudentRatingChange,
+    handleToggleMatchMode, handleTogglePresetChip, hasTresorStorage, hasTransferableHomework = false, homeworkNotes,
+    homeworkNotesList, hubTab, insertOrToggleTagInText, isCampusActive = true, isCountInEnabled, isCurrentHomework, isFullscreen,
+    isInsideSim, isLinkCopied, isMatchModeEnabled, isMatchRevealed, isMobileOrSim, isMobileView,
+    isQuestionEditorOpen: propIsQuestionEditorOpen, isRecordingAudio, isRecordingMetronomeActive, isSavingFeedback,
+    isSavingQuestion: propIsSavingQuestion, isShareMenuOpen, isSongMatch, isStudentNotePrivate, isStudentRatingCommitted,
+    isSubSlidersExpanded: propIsSubSlidersExpanded, isTeacherMode, isTeacherTools, isTeacherSelf = false, isTtsSpeaking,
+    isUploadingAudio, lastClickRef, lastMatchedAt, lastMatchedStudentPercent, lastMatchedTeacherPercent,
+    latestGeneralHomeworkNotesRef, latestTeacherNotesRef, matchHistory, mobileProtokollTab, newCustomTagInput, newLehrwerkLoading,
+    newLehrwerkPages, newLehrwerkTitle, newSongArtist, newSongTitle, onClose, onOpenAssignModal, pageHomeworkNotes = '',
+    pageNotesSelectionRef, pageNotesTextareaRef, parsedStudentQuestion, pendingFeedbackStatus, pendingFeedbackTags,
+    playAlongCountInRemaining, playMetronomeTick, progressItems, questionDraftText: propQuestionDraftText, readOnly, recordingBpm,
+    renderSongVinylCover, renderTextWithDidacticBadges, rhythmVal, saveFeedback, schoolId, selectActiveSong, selectTextbookPage,
+    selectedActiveSongId, selectedCategoryFilter, selectedHistoryWeek: propSelectedHistoryWeek, setActiveBrush: propSetActiveBrush,
+    setActiveInputTab, setActiveLehrwerkId, setActiveModalTab, setActiveNoteTarget, setActivePageNumber, setActiveSongSkills,
+    setActiveSubView, setActiveTagPickerRowIndex: propSetActiveTagPickerRowIndex, setActiveViewMode, setAudioLabel,
+    setExpressionVal, setFingerVal, setGeneralHomeworkNotes, setHasChanges, setHomeworkNotesList, setHubTab, setIsCountInEnabled,
+    setIsCurrentHomework, setIsNotesFocused, setIsQuestionEditorOpen: propSetIsQuestionEditorOpen, setIsRecordingMetronomeActive,
+    setIsSavingFeedback, setIsShareMenuOpen, setIsStudentNotePrivate, setIsSubSlidersExpanded: propSetIsSubSlidersExpanded,
+    setIsTransferModalOpen, setMobileProtokollTab, setNewCustomTagInput, setNewLehrwerkPages, setNewLehrwerkTitle,
+    setNewSongArtist, setNewSongTitle, setPageChunk, setPageHomeworkNotes, setPendingFeedbackStatus, setPendingFeedbackTags,
+    setQuestionDraftText: propSetQuestionDraftText, setRecordingBpm, setRhythmVal,
+    setSelectedHistoryWeek: propSetSelectedHistoryWeek, setShowAllPagesGrid, setShowAssignDropdown, setShowCreateLehrwerkModal,
+    setShowCreateSongModal, setShowPlayAlongMetronomePopup: propSetShowPlayAlongMetronomePopup, setSongHomeworkNotes,
+    setSongModalTab, setSongProgressPercent, setSongSearch, setStatus, setStudentNotes, setTeacherNotes, setViewingWeekOffset,
+    shareMenuRef, showAssignDropdown, showCreateLehrwerkModal, showCreateSongModal, showMatchConfetti,
+    showPlayAlongMetronomePopup: propShowPlayAlongMetronomePopup, showdownState, songHomeworkNotes = '', songModalTab,
+    songNotesSelectionRef, songNotesTextareaRef, songProgressPercent, songSearch, songs, assignedCampusSongs = [],
+    sortedAssignedLehrwerke, status, stopRecordingAudio, student, studentFirstName, studentNotes = '', studentNotesSelectionRef,
+    studentNotesTextareaRef, studentRating, studentRatingUpdatedAt, teacherId, teacherNotes = '', teacherNotesTextareaRef,
+    textbookPageChunkIndex, toggleStudentFocusPage, topicName, triggerDebouncedAutoSave, triggerDebouncedSongSave,
+    triggerDebouncedTeacherNoteSave, triggerDirectSave, triggerDirectSongSave, triggerImmediateAutoSave, uiLevel,
+    parentPermissions, onSaveParentOverrides, updateLehrwerkVisibility, useNotebookLayout, viewingWeekOffset
   } = props;
 
   const isJunior = uiLevel === 'junior';
   const authHw = useAuthoritativeHomeworkOptional();
-
-  // 🛡️ Datenschutz- & Minderjährigenschutz-Schranke (§ 201 StGB / Art. 8 DSGVO)
   const isStudentAudioForbiddenForTeacher = useMemo(() => {
     const studentIdVal = (student as any)?.id;
     const localTeacherAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentIdVal}`) : null;
@@ -591,17 +201,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const moduleUnlockModalRef = useModalA11y(showModuleUnlockModal, () => closeAndLockModuleModal());
   const [showParentPinModalForModules, setShowParentPinModalForModules] = useState(false);
   const [isConfirmingResolveQuestion, setIsConfirmingResolveQuestion] = useState(false);
-
   const studentIdVal = (student as any)?.id;
 
   const [localModuleOverrides, setLocalModuleOverrides] = useState<Record<string, boolean>>(() => {
     if (props.parentPermissions?.module_overrides) return props.parentPermissions.module_overrides;
     if ((student as any)?.parent_permissions?.module_overrides) return (student as any).parent_permissions.module_overrides;
     if (studentIdVal && typeof window !== 'undefined') {
-      try {
-        const cached = localStorage.getItem(`campus_studio_module_overrides_${studentIdVal}`);
-        if (cached) return JSON.parse(cached);
-      } catch (e) {}
+      try { const cached = localStorage.getItem(`campus_studio_module_overrides_${studentIdVal}`); if (cached) return JSON.parse(cached); } catch (e) {}
     }
     return {};
   });
@@ -611,14 +217,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     if (nextOverrides && typeof nextOverrides === 'object') {
       setLocalModuleOverrides(nextOverrides);
       if (studentIdVal && typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`campus_studio_module_overrides_${studentIdVal}`, JSON.stringify(nextOverrides));
-        } catch (e) {}
+        try { localStorage.setItem(`campus_studio_module_overrides_${studentIdVal}`, JSON.stringify(nextOverrides)); } catch (e) {}
       }
     }
   }, [props.parentPermissions?.module_overrides, (student as any)?.parent_permissions?.module_overrides, studentIdVal]);
 
-  // 🎵 Song Selection & Creation Modal State (Self-Contained 1% Goldstandard)
   const [localShowCreateSongModal, setLocalShowCreateSongModal] = useState(false);
   const createSongModalRef = useModalA11y(localShowCreateSongModal, () => setLocalShowCreateSongModal(false));
   const [localSongModalTab, setLocalSongModalTab] = useState<'catalog' | 'create'>('catalog');
@@ -626,7 +229,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [localNewSongTitle, setLocalNewSongTitle] = useState('');
   const [localNewSongArtist, setLocalNewSongArtist] = useState('');
 
-  // 🎙️ 0.1% Goldstandard: Revisionssichere Dismissal-Liste für übertragene Aufnahmen (ohne Mutation historischer Snapshots)
   const currentWeekDismissKey = useMemo(() => student?.id ? `campus_dismissed_audios_${student.id}_${viewingWeekOffset}` : null, [student?.id, viewingWeekOffset]);
   const [dismissedAudioUrls, setDismissedAudioUrls] = useState<string[]>(() => {
     try { return (typeof window !== 'undefined' && student?.id) ? JSON.parse(localStorage.getItem(`campus_dismissed_audios_${student.id}_${viewingWeekOffset}`) || '[]') : []; } catch { return []; }
@@ -643,13 +245,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     return () => window.removeEventListener('campus-audio-dismissed', handleAudioDismissed);
   }, [currentWeekDismissKey]);
 
-  // 🎵 0.1% Goldstandard 2027 Song Sections Architecture (Zero-Dummy-Data Doktrin)
   const [songSections, setSongSections] = useState<SongSection[]>(() => []);
   const [activeSectionId, setActiveSectionId] = useState<string>('');
   const [hasPracticedSectionToday, setHasPracticedSectionToday] = useState<boolean>(false);
   const [textbookPageFilter, setTextbookPageFilter] = useState<'all' | 'homework' | 'focus'>('all');
 
-  // Load song sections whenever selectedActiveSongId changes
   useEffect(() => {
     if (!selectedActiveSongId || !student?.id) return;
     try {
@@ -664,119 +264,51 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         }
       }
     } catch {}
-
-    // Zero-Dummy-Data: Starts completely empty until created by student or teacher
     setSongSections([]);
     setActiveSectionId('');
   }, [selectedActiveSongId, student?.id]);
 
-  // Sync practiced state for active section
   useEffect(() => {
     if (!selectedActiveSongId || !student?.id || !activeSectionId) return;
     const todayStr = new Date().toISOString().split('T')[0];
-    const isDone = localStorage.getItem(`song_practiced_${student.id}_${selectedActiveSongId}_${activeSectionId}_${todayStr}`) === 'true';
-    setHasPracticedSectionToday(isDone);
+    setHasPracticedSectionToday(localStorage.getItem(`song_practiced_${student.id}_${selectedActiveSongId}_${activeSectionId}_${todayStr}`) === 'true');
   }, [selectedActiveSongId, student?.id, activeSectionId]);
 
-  // 🎵 Song Sections Handlers (Universal Architecture Builder)
+  const persistSongSections = (updated: SongSection[]) => {
+    setSongSections(updated);
+    if (selectedActiveSongId && student?.id) {
+      try { localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated)); } catch {}
+    }
+    setHasChanges(true);
+  };
+
   const handleAddSongSection = (name: string) => {
-    const newSec: SongSection = {
-      id: `sec-${Date.now()}`,
-      name,
-      bars: '8 Takte',
-      barsCount: 8,
-      repetitions: 1,
-      chords: ['Em', 'C', 'G', 'D'],
-      drumFeel: '8tel Beat',
-      drumSurface: 'Geschlossene Hi-Hat'
-    };
-    const updated = [...songSections, newSec];
-    setSongSections(updated);
+    const newSec: SongSection = { id: `sec-${Date.now()}`, name, bars: '8 Takte', barsCount: 8, repetitions: 1, chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Beat', drumSurface: 'Geschlossene Hi-Hat' };
+    persistSongSections([...songSections, newSec]);
     setActiveSectionId(newSec.id);
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
   };
-
-  const handleUpdateSongSection = (updatedSec: SongSection) => {
-    const updated = songSections.map(s => s.id === updatedSec.id ? updatedSec : s);
-    setSongSections(updated);
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
-  };
-
-  const handleToggleSectionFocus = (id: string) => {
-    const updated = songSections.map(s => ({
-      ...s,
-      isHomeworkFocus: s.id === id ? !s.isHomeworkFocus : false
-    }));
-    setSongSections(updated);
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
-  };
-
+  const handleUpdateSongSection = (updatedSec: SongSection) => persistSongSections(songSections.map(s => s.id === updatedSec.id ? updatedSec : s));
+  const handleToggleSectionFocus = (id: string) => persistSongSections(songSections.map(s => ({ ...s, isHomeworkFocus: s.id === id ? !s.isHomeworkFocus : false })));
   const handleDeleteSongSection = (id: string) => {
     if (songSections.length <= 1) return;
     const updated = songSections.filter(s => s.id !== id);
-    setSongSections(updated);
-    if (activeSectionId === id) {
-      setActiveSectionId(updated[0]?.id || '');
-    }
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
+    if (activeSectionId === id) setActiveSectionId(updated[0]?.id || '');
+    persistSongSections(updated);
   };
-
   const handleDuplicateSongSection = (id: string) => {
     const idx = songSections.findIndex(s => s.id === id);
     if (idx === -1) return;
-    const target = songSections[idx];
-    const dupl: SongSection = {
-      ...target,
-      id: `sec-${Date.now()}`,
-      name: `${target.name} (Kopie)`
-    };
     const updated = [...songSections];
-    updated.splice(idx + 1, 0, dupl);
-    setSongSections(updated);
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
+    updated.splice(idx + 1, 0, { ...songSections[idx], id: `sec-${Date.now()}`, name: `${songSections[idx].name} (Kopie)` });
+    persistSongSections(updated);
   };
-
   const handleMoveSongSection = (id: string, direction: 'left' | 'right') => {
     const idx = songSections.findIndex(s => s.id === id);
-    if (idx === -1) return;
-    if ((direction === 'left' && idx === 0) || (direction === 'right' && idx === songSections.length - 1)) return;
+    if (idx === -1 || (direction === 'left' && idx === 0) || (direction === 'right' && idx === songSections.length - 1)) return;
     const updated = [...songSections];
     const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
-    const temp = updated[idx];
-    updated[idx] = updated[targetIdx];
-    updated[targetIdx] = temp;
-    setSongSections(updated);
-    if (selectedActiveSongId && student?.id) {
-      try {
-        localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated));
-      } catch {}
-    }
-    setHasChanges(true);
+    [updated[idx], updated[targetIdx]] = [updated[targetIdx], updated[idx]];
+    persistSongSections(updated);
   };
 
   // 🎵 Song Architecture & Play-Along State (2027 Goldstandard)
@@ -818,9 +350,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     tapTimesRef.current = taps;
     if (taps.length >= 2) {
       const intervals: number[] = [];
-      for (let i = 1; i < taps.length; i++) {
-        intervals.push(taps[i] - taps[i - 1]);
-      }
+      for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
       const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
       const calculatedBpm = Math.min(240, Math.max(40, Math.round(60000 / avgInterval)));
       setSongBpm(calculatedBpm);
@@ -831,11 +361,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   };
 
   const handleUpdateMixer = (patch: Partial<AudioMixerState>) => {
-    setMixerState(prev => {
-      const updated = { ...prev, ...patch };
-      playAlongAudioEngine.updateMixer(updated);
-      return updated;
-    });
+    setMixerState(prev => { const updated = { ...prev, ...patch }; playAlongAudioEngine.updateMixer(updated); return updated; });
   };
 
   // Play-Along Timer Effect using Web Audio Engine
@@ -848,10 +374,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
     const beatsPerBar = songTimeSignature === '3/4' ? 3 : (songTimeSignature === '6/8' ? 6 : (songTimeSignature === '12/8' ? 12 : 4));
     const msPerBeat = Math.round(60000 / songBpm);
-
-    let curBeat = 1;
-    let curBar = 1;
-    let curRep = 1;
+    let curBeat = 1, curBar = 1, curRep = 1;
     let secIdx = songSections.findIndex(s => s.id === activeSectionId);
     if (secIdx === -1) secIdx = 0;
 
@@ -859,24 +382,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     const initialMeasure = initialSec?.measures?.[0];
     const initialChord = initialMeasure?.chords?.[0] || initialSec?.chords?.[0] || 'C';
 
-    playAlongAudioEngine.triggerBeat({
-      beat: 1,
-      totalBeats: beatsPerBar,
-      chord: initialChord,
-      drumFeel: initialSec?.drumFeel,
-      isFirstBeatOfMeasure: true,
-      shouldPlayChord: true
-    });
-
-    setPlayAlongBeat(1);
-    setPlayAlongBar(1);
-    setPlayAlongRepetition(1);
+    playAlongAudioEngine.triggerBeat({ beat: 1, totalBeats: beatsPerBar, chord: initialChord, drumFeel: initialSec?.drumFeel, isFirstBeatOfMeasure: true, shouldPlayChord: true });
+    setPlayAlongBeat(1); setPlayAlongBar(1); setPlayAlongRepetition(1);
 
     playAlongTimerRef.current = setInterval(() => {
       curBeat++;
       if (curBeat > beatsPerBar) {
-        curBeat = 1;
-        curBar++;
+        curBeat = 1; curBar++;
         const currentSec = songSections[secIdx];
         const maxBars = currentSec?.barsCount || (currentSec?.bars ? parseInt(currentSec.bars, 10) || 4 : 4);
         const maxReps = Math.max(1, currentSec?.repetitions || 1);
@@ -884,41 +396,28 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         if (curBar > maxBars) {
           curBar = 1;
           if (isLoopingActiveSection) {
-            // Stay on current section in loop mode
-            curRep++;
-            setPlayAlongRepetition(curRep);
+            curRep++; setPlayAlongRepetition(curRep);
             if (isSpeedTrainerActive) {
               setSongBpm(prev => {
                 const nextBpm = Math.min(240, prev + 5);
-                if (selectedActiveSongId && student?.id) {
-                  try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
-                }
+                if (selectedActiveSongId && student?.id) try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
                 return nextBpm;
               });
             }
+          } else if (curRep < maxReps) {
+            curRep++; setPlayAlongRepetition(curRep);
           } else {
-            if (curRep < maxReps) {
-              curRep++;
-              setPlayAlongRepetition(curRep);
-            } else {
-              curRep = 1;
-              setPlayAlongRepetition(1);
-              const nextIdx = (secIdx + 1) % (songSections.length || 1);
-              if (nextIdx === 0 && isSpeedTrainerActive) {
-                // Full song completed, speed up +5 BPM!
-                setSongBpm(prev => {
-                  const nextBpm = Math.min(240, prev + 5);
-                  if (selectedActiveSongId && student?.id) {
-                    try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
-                  }
-                  return nextBpm;
-                });
-              }
-              secIdx = nextIdx;
-              if (songSections[secIdx]) {
-                setActiveSectionId(songSections[secIdx].id);
-              }
+            curRep = 1; setPlayAlongRepetition(1);
+            const nextIdx = (secIdx + 1) % (songSections.length || 1);
+            if (nextIdx === 0 && isSpeedTrainerActive) {
+              setSongBpm(prev => {
+                const nextBpm = Math.min(240, prev + 5);
+                if (selectedActiveSongId && student?.id) try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(nextBpm)); } catch {}
+                return nextBpm;
+              });
             }
+            secIdx = nextIdx;
+            if (songSections[secIdx]) setActiveSectionId(songSections[secIdx].id);
           }
         }
       }
@@ -929,43 +428,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
         ? activeMeasure.chords
         : (activeSec?.chords && activeSec.chords.length > 0 ? [activeSec.chords[(curBar - 1) % activeSec.chords.length]] : ['C']);
 
-      let activeChord = measureChords[0] || 'C';
-      let shouldPlayChord = false;
-
+      let activeChord = measureChords[0] || 'C', shouldPlayChord = false;
       if (measureChords.length === 1) {
-        shouldPlayChord = curBeat === 1;
-        activeChord = measureChords[0];
+        shouldPlayChord = curBeat === 1; activeChord = measureChords[0];
       } else if (measureChords.length === 2) {
-        if (curBeat === 1) {
-          shouldPlayChord = true;
-          activeChord = measureChords[0];
-        } else if (beatsPerBar === 4 && curBeat === 3) {
-          shouldPlayChord = true;
-          activeChord = measureChords[1];
-        } else if (beatsPerBar === 6 && curBeat === 4) {
-          shouldPlayChord = true;
-          activeChord = measureChords[1];
-        } else if (beatsPerBar === 12 && curBeat === 7) {
-          shouldPlayChord = true;
-          activeChord = measureChords[1];
-        } else if (beatsPerBar === 3 && curBeat === 2) {
-          shouldPlayChord = true;
-          activeChord = measureChords[1];
+        if (curBeat === 1) { shouldPlayChord = true; activeChord = measureChords[0]; }
+        else if ((beatsPerBar === 4 && curBeat === 3) || (beatsPerBar === 6 && curBeat === 4) || (beatsPerBar === 12 && curBeat === 7) || (beatsPerBar === 3 && curBeat === 2)) {
+          shouldPlayChord = true; activeChord = measureChords[1];
         }
       } else {
         const chordSpacing = Math.max(1, Math.floor(beatsPerBar / measureChords.length));
         const chordIdx = Math.floor((curBeat - 1) / chordSpacing);
         if (chordIdx < measureChords.length) {
-          activeChord = measureChords[chordIdx];
-          shouldPlayChord = (curBeat - 1) % chordSpacing === 0;
+          activeChord = measureChords[chordIdx]; shouldPlayChord = (curBeat - 1) % chordSpacing === 0;
         }
       }
 
-      playAlongAudioEngine.triggerBeat({
-        beat: curBeat,
-        totalBeats: beatsPerBar,
-        chord: activeChord,
-        drumFeel: activeSec?.drumFeel,
+      playAlongAudioEngine.triggerBeat({ beat: curBeat, totalBeats: beatsPerBar, chord: activeChord, drumFeel: activeSec?.drumFeel,
         isFirstBeatOfMeasure: curBeat === 1,
         shouldPlayChord
       });
@@ -1345,6 +824,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const canCustomizeLayout = true;
   const [isModuleEditMode, setIsModuleEditMode] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  useEffect(() => {
+    audioLatencyService.hydrateFromUserLogin(student as any).catch(() => {});
+  }, [student?.id]);
   useEffect(() => {
     const handleOpenAudioSettings = () => setShowAudioSettings(true);
     window.addEventListener('campus_open_audio_settings', handleOpenAudioSettings);
@@ -1883,10 +1365,251 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [teacherConsentRequested, setTeacherConsentRequested] = useState(false);
   const [isCarriedOverDismissed, setIsCarriedOverDismissed] = useState(false);
   const [forceImmediateDelivery, setForceImmediateDelivery] = useState(false);
+  const [adoptedPastItemIds, setAdoptedPastItemIds] = useState<string[]>([]);
+  const [removedHomeworkBookTitles, setRemovedHomeworkBookTitles] = useState<string[]>([]);
+  const [removedHomeworkSongIds, setRemovedHomeworkSongIds] = useState<string[]>([]);
 
   useEffect(() => {
     setIsCarriedOverDismissed(false);
+    setAdoptedPastItemIds([]);
+    setRemovedHomeworkBookTitles([]);
+    setRemovedHomeworkSongIds([]);
   }, [viewingWeekOffset, student?.id]);
+
+  const handleRemoveBookFromCurrentHomework = useCallback((bookTitle: string, pages: number[]) => {
+    const rawTitle = (bookTitle || '').trim().toLowerCase();
+    const cleanTitle = cleanHomeworkTitle(rawTitle).trim().toLowerCase();
+
+    // 1. Sofort in lokale Ausschlussliste für den aktuellen Entwurf aufnehmen
+    setRemovedHomeworkBookTitles(prev => {
+      const next = [...prev];
+      if (!next.includes(rawTitle)) next.push(rawTitle);
+      if (!next.includes(cleanTitle)) next.push(cleanTitle);
+      if (bookTitle && !next.includes(bookTitle)) next.push(bookTitle);
+      return next;
+    });
+
+    // 2. Chip-Status im Vorwochen-Dock synchronisieren (Tombstone-Entfernung)
+    setAdoptedPastItemIds(prev => prev.filter(id => {
+      const idLower = id.toLowerCase();
+      return idLower !== `book-${cleanTitle}` && idLower !== `book-${rawTitle}` && !idLower.includes(cleanTitle);
+    }));
+
+    // 3. assignedLehrwerke aktualisieren (Sowohl direkte ID, Titel als auch globalLehrwerke Match)
+    const updateFn = setAssignedLehrwerke || props.setAssignedLehrwerke;
+    if (typeof updateFn === 'function') {
+      updateFn((prev: any[]) => {
+        const list = Array.isArray(prev) ? prev : [];
+        const updated = list.map((assignment: any) => {
+          const aTitle = (assignment.bookTitle || assignment.title || assignment.lehrwerkTitle || '').trim().toLowerCase();
+          const aClean = cleanHomeworkTitle(aTitle).trim().toLowerCase();
+          const globalMatch = (globalLehrwerke || []).find(g => String(g.id) === String(assignment.lehrwerkId));
+          const gTitle = (globalMatch?.title || '').trim().toLowerCase();
+          const gClean = cleanHomeworkTitle(gTitle).trim().toLowerCase();
+
+          const isMatch = aTitle === rawTitle || aClean === cleanTitle || gTitle === rawTitle || gClean === cleanTitle;
+          if (!isMatch) return assignment;
+
+          const pageStates = { ...(assignment.pageStates || {}) };
+          Object.keys(pageStates).forEach((pKey: string) => {
+            const pNum = parseInt(pKey, 10);
+            const shouldReset = pages.length === 0 || pages.includes(pNum) || pageStates[pKey]?.isCurrentHomework || pageStates[pKey]?.status === 'homework';
+            if (shouldReset && pageStates[pKey]) {
+              const prevStatus = pageStates[pKey].status === 'homework' ? 'IN_PROGRESS' : pageStates[pKey].status;
+              pageStates[pKey] = {
+                ...pageStates[pKey],
+                status: prevStatus,
+                isCurrentHomework: false,
+                updatedAt: new Date().toISOString()
+              };
+            }
+          });
+          return { ...assignment, pageStates };
+        });
+        try {
+          localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+
+    // 4. In-Memory Mutation von progressItems
+    (progressItems || []).forEach((pi: any) => {
+      if (pi.topic_name) {
+        const tLower = pi.topic_name.toLowerCase();
+        if (tLower.startsWith(`${rawTitle} - seite `) || cleanHomeworkTitle(tLower).startsWith(`${cleanTitle} - seite `)) {
+          pi.is_current_homework = false;
+          if (pi.status === 'homework') pi.status = 'IN_PROGRESS';
+        }
+      }
+    });
+
+    // 5. Autoritatives DB-Update im Hintergrund
+    if (student?.id && typeof supabase !== 'undefined') {
+      try {
+        supabase
+          .from('progress_matrix')
+          .update({ is_current_homework: false, status: 'IN_PROGRESS' })
+          .eq('student_id', student.id)
+          .ilike('topic_name', `${bookTitle.trim()} - Seite %`)
+          .then(() => {});
+      } catch {}
+    }
+  }, [setAssignedLehrwerke, props.setAssignedLehrwerke, globalLehrwerke, progressItems, student?.id]);
+
+  const handleRemoveSongFromCurrentHomework = useCallback((songItem: any) => {
+    const sTitle = songItem.title || songItem.topic_name || '';
+    const sId = String(songItem.id || songItem.song_id || cleanHomeworkTitle(sTitle));
+    const normTitle = sTitle.trim().toLowerCase();
+    const cleanTitle = cleanHomeworkTitle(sTitle).trim().toLowerCase();
+
+    // 1. Sofort in lokale Ausschlussliste für Songs aufnehmen
+    setRemovedHomeworkSongIds(prev => {
+      const next = [...prev];
+      if (sId && !next.includes(sId)) next.push(sId);
+      if (normTitle && !next.includes(normTitle)) next.push(normTitle);
+      if (cleanTitle && !next.includes(cleanTitle)) next.push(cleanTitle);
+      return next;
+    });
+
+    // 2. Chip-Status im Vorwochen-Dock synchronisieren
+    setAdoptedPastItemIds(prev => prev.filter(id => {
+      const idLower = id.toLowerCase();
+      return idLower !== `song-${sId.toLowerCase()}` && idLower !== `song-${cleanTitle}` && !idLower.includes(cleanTitle);
+    }));
+
+    // 3. LocalStorage Bereinigung
+    if (student?.id && sId) {
+      try {
+        localStorage.removeItem(`song_hw_${student.id}_${sId}`);
+      } catch {}
+    }
+
+    // 4. In-Memory Mutation von progressItems
+    (progressItems || []).forEach((pi: any) => {
+      if (pi.id === songItem.id || (pi.topic_name && sTitle && pi.topic_name.toLowerCase().trim() === sTitle.toLowerCase().trim())) {
+        pi.is_current_homework = false;
+      }
+    });
+
+    // 5. Autoritatives DB-Update im Hintergrund
+    if (songItem.id && typeof supabase !== 'undefined') {
+      try {
+        supabase.from('progress_matrix').update({ is_current_homework: false }).eq('id', songItem.id).then(() => {});
+      } catch {}
+    }
+  }, [student?.id, progressItems]);
+
+  const handleAdoptPastHomeworkItem = useCallback((item: PastWeekHomeworkItem) => {
+    setAdoptedPastItemIds(prev => prev.includes(item.id) ? prev : [...prev, item.id]);
+
+    if (item.type === 'book' && item.bookData) {
+      const bookTitle = item.bookData.title;
+      const pages = item.bookData.pages || [];
+      const normTitle = (bookTitle || '').trim().toLowerCase();
+      const cleanTitle = cleanHomeworkTitle(normTitle).trim().toLowerCase();
+
+      // Aus Ausschlussliste entfernen (Re-Adopt)
+      setRemovedHomeworkBookTitles(prev => prev.filter(t => {
+        const tLower = t.trim().toLowerCase();
+        return tLower !== normTitle && tLower !== cleanTitle && cleanHomeworkTitle(tLower) !== cleanTitle;
+      }));
+
+      const updateFn = setAssignedLehrwerke || props.setAssignedLehrwerke;
+      if (typeof updateFn === 'function') {
+        updateFn((prev: any[]) => {
+          const list = Array.isArray(prev) ? prev : [];
+          const updated = list.map((assignment: any) => {
+            const aTitle = (assignment.bookTitle || assignment.title || assignment.lehrwerkTitle || '').trim().toLowerCase();
+            const aClean = cleanHomeworkTitle(aTitle).trim().toLowerCase();
+            const globalMatch = (globalLehrwerke || []).find(g => String(g.id) === String(assignment.lehrwerkId));
+            const gTitle = (globalMatch?.title || '').trim().toLowerCase();
+            const gClean = cleanHomeworkTitle(gTitle).trim().toLowerCase();
+
+            const isMatch = aTitle === normTitle || aClean === cleanTitle || gTitle === normTitle || gClean === cleanTitle;
+            if (!isMatch) return assignment;
+            const pageStates = { ...(assignment.pageStates || {}) };
+            pages.forEach((p: number) => {
+              pageStates[p] = {
+                ...(pageStates[p] || {}),
+                status: 'homework',
+                isCurrentHomework: true,
+                updatedAt: new Date().toISOString()
+              };
+            });
+            return { ...assignment, pageStates };
+          });
+          try {
+            localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    } else if (item.type === 'song' && item.songData) {
+      const songTitle = item.songData.title;
+      const songId = item.songData.id;
+      const normTitle = (songTitle || '').trim().toLowerCase();
+      const cleanTitle = cleanHomeworkTitle(normTitle).trim().toLowerCase();
+      const sId = String(songId || cleanTitle);
+
+      // Aus Ausschlussliste entfernen (Re-Adopt)
+      setRemovedHomeworkSongIds(prev => prev.filter(id => {
+        const idLower = String(id).trim().toLowerCase();
+        return idLower !== sId.toLowerCase() && idLower !== normTitle && idLower !== cleanTitle;
+      }));
+
+      if (typeof handleAssignSongFromCatalog === 'function') {
+        const matchingCatalogSong = (songs || []).find((s: any) => (s.id && s.id === songId) || (s.title && songTitle && s.title.toLowerCase().trim() === songTitle.toLowerCase().trim()));
+        if (matchingCatalogSong) {
+          handleAssignSongFromCatalog(matchingCatalogSong);
+        }
+      }
+      if (student?.id && songId) {
+        try {
+          localStorage.setItem(`song_hw_${student.id}_${songId}`, 'true');
+        } catch {}
+      }
+    } else if (item.type === 'note' && item.noteData) {
+      setGeneralHomeworkNotes((prev: string) => {
+        const trimmed = (prev || '').trim();
+        return trimmed ? `${trimmed}\n${item.noteData}` : (item.noteData || '');
+      });
+    } else if (item.type === 'audio' && item.audioData) {
+      const token = `AUDIO:${item.audioData.url}|${item.audioData.duration || 0}|${item.audioData.date || ''}|${item.audioData.label || 'Aufnahme'}|teacher`;
+      setHomeworkNotesList((prev: any[]) => [...(Array.isArray(prev) ? prev : []), token]);
+    }
+  }, [setAssignedLehrwerke, props.setAssignedLehrwerke, globalLehrwerke, handleAssignSongFromCatalog, songs, student?.id, setGeneralHomeworkNotes, setHomeworkNotesList]);
+
+  const handleAdoptAllPastHomework = useCallback((pastHw: PastWeekSnapshotInfo) => {
+    if (!pastHw || !pastHw.items) return;
+    pastHw.items.forEach(it => handleAdoptPastHomeworkItem(it));
+  }, [handleAdoptPastHomeworkItem]);
+
+  const handleUnadoptPastHomeworkItem = useCallback((item: PastWeekHomeworkItem) => {
+    setAdoptedPastItemIds(prev => prev.filter(id => id !== item.id));
+
+    if (item.type === 'book' && item.bookData) {
+      handleRemoveBookFromCurrentHomework(item.bookData.title || item.title, item.bookData.pages || []);
+    } else if (item.type === 'song') {
+      handleRemoveSongFromCurrentHomework(item.songData || { id: item.id.replace(/^song-/, ''), title: item.title });
+    } else if (item.type === 'note' && item.noteData) {
+      setGeneralHomeworkNotes((prev: string) => {
+        const text = prev || '';
+        const lines = text.split('\n').filter(line => line.trim() !== (item.noteData || '').trim());
+        return lines.join('\n').trim();
+      });
+    } else if (item.type === 'audio' && item.audioData) {
+      setHomeworkNotesList((prev: any[]) => {
+        const list = Array.isArray(prev) ? prev : [];
+        return list.filter((n: any) => typeof n !== 'string' || !n.includes(`AUDIO:${item.audioData?.url}`));
+      });
+    }
+  }, [handleRemoveBookFromCurrentHomework, handleRemoveSongFromCurrentHomework, setGeneralHomeworkNotes, setHomeworkNotesList]);
+
+  const handleUnadoptAllPastHomework = useCallback((pastHw: PastWeekSnapshotInfo) => {
+    if (!pastHw || !pastHw.items) return;
+    pastHw.items.forEach(it => handleUnadoptPastHomeworkItem(it));
+  }, [handleUnadoptPastHomeworkItem]);
 
   const handleRequestParentAudioConsent = useCallback(async () => {
     if (!student?.id) return;
@@ -2100,9 +1823,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <div style={{
                         width: '54px',
                         height: '70px',
-                        background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
+                        background: bookColor.from,
                         borderRadius: '10px',
-                        boxShadow: `0 6px 16px ${bookColor.from}40`,
+                        boxShadow: 'none',
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
@@ -2139,7 +1862,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <BookOpen size={11} strokeWidth={2} style={{ color: '#64748b' }} /> Eigenes Lehrwerk
                                   </span>
                                 ) : isStudentViewingTeacherBook ? (
-                                  <span style={{ color: '#166534', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: '1px solid #dcfce7', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ color: '#166534', fontSize: '0.72rem', fontWeight: 800, background: '#f0fdf4', border: 'none', padding: '2px 8px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                     <Users size={11} strokeWidth={2} style={{ color: '#16a34a' }} /> Von deiner Lehrkraft begleitet
                                   </span>
                                 ) : activeLehrwerkId.startsWith('custom-') || book.is_custom || assignedBook?.createdByRole === 'teacher' || book.created_by_teacher ? (
@@ -2273,7 +1996,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 </span>
                               </div>
                               <div style={{ width: '100%', height: '6px', background: '#e8e8ed', borderRadius: '3px', marginTop: '6px', overflow: 'hidden' }}>
-                                <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #34a853, #34a853)', transition: 'width 0.4s ease' }} />
+                                <div style={{ width: `${pct}%`, height: '100%', background: '#34a853', transition: 'width 0.4s ease' }} />
                               </div>
                             </>
                           );
@@ -2281,121 +2004,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </div>
                     </div>
 
-                    {/* 🖌️ Pinsel zum Einfärben (Lehrkraft: 4 Pinsel, Schüler: Mein Fokus Pinsel) */}
+                    {/* 🖌️ Werkzeug & Pinsel zum Einfärben (Apple Segmented Tool Control) */}
                     {(() => {
                       const isStudentCreated = Boolean(assignedBook?.isStudentCreated || assignedBook?.createdByRole === 'student' || book.created_by_role === 'student');
                       const isStudentViewingTeacherBook = Boolean(readOnly && !isStudentCreated);
-
                       const focusCount = pages.filter(p => assignedBook.pageStates?.[p]?.studentFocus).length;
 
-                      const brushes: Array<{ mode: string; color: string; activeBorder: string; border: string; label: string }> = isStudentViewingTeacherBook
-                        ? [
-                            {
-                              mode: 'STUDENT_FOCUS',
-                              color: '#c084fc',
-                              activeBorder: '#6b21a8',
-                              border: '#9333ea',
-                              label: `Zuhause geübt${focusCount > 0 ? ` (${focusCount})` : ''}`
-                            }
-                          ]
-                        : [
-                            { mode: 'LOCKED', color: '#e2e8f0', activeBorder: '#94a3b8', border: '#cbd5e1', label: 'grau = neutral / offen' },
-                            { mode: 'HOMEWORK', color: '#fde047', activeBorder: '#ca8a04', border: '#eab308', label: 'gelb = Hausaufgabe' },
-                            { mode: 'MASTERED', color: '#10b981', activeBorder: '#047857', border: '#059669', label: 'grün = gemeistert' }
-                          ];
-
                       return (
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px',
-                          background: 'white',
-                          borderRadius: '18px',
-                          padding: isStudentViewingTeacherBook ? '10px 16px' : '12px 16px',
-                          border: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS'
-                            ? '1.5px solid #a855f7'
-                            : '1px solid rgba(0, 0, 0, 0.08)',
-                          boxShadow: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS'
-                            ? '0 3px 12px rgba(168, 85, 247, 0.12)'
-                            : '0 4px 15px rgba(0,0,0,0.02)',
-                          transition: 'all 0.15s ease'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#4b5563', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <Edit3 size={13} strokeWidth={2.2} style={{ color: isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS' ? '#7e22ce' : '#4b5563' }} />
-                              <span>{isStudentViewingTeacherBook ? 'Pinsel für geübte Seiten:' : 'Pinsel zum Einfärben:'}</span>
-                            </span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {brushes.map(b => {
-                                const isActive = activeBrush === b.mode;
-                                return (
-                                  <button
-                                    key={b.mode}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveBrush(prev => prev === b.mode ? 'NONE' : b.mode as any);
-                                    }}
-                                    style={{
-                                      height: isStudentViewingTeacherBook ? '30px' : '28px',
-                                      borderRadius: isStudentViewingTeacherBook ? '12px' : '50%',
-                                      padding: isStudentViewingTeacherBook ? '0 12px' : '0',
-                                      minWidth: isStudentViewingTeacherBook ? 'auto' : '28px',
-                                      background: isActive
-                                        ? (b.mode === 'STUDENT_FOCUS' ? '#9333ea' : b.color)
-                                        : (isStudentViewingTeacherBook ? '#f3e8ff' : b.color),
-                                      border: isActive
-                                        ? `2.5px solid ${b.activeBorder}`
-                                        : (b.border ? `1.5px solid ${b.border}` : '1.5px solid #cbd5e1'),
-                                      color: isActive ? '#ffffff' : (isStudentViewingTeacherBook ? '#6b21a8' : '#334155'),
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s ease',
-                                      transform: isActive ? 'scale(1.08)' : 'none',
-                                      outline: 'none',
-                                      boxShadow: isActive
-                                        ? (b.mode === 'STUDENT_FOCUS' ? '0 2px 10px rgba(147, 51, 234, 0.35)' : `0 0 0 3px ${b.color}80, 0 2px 6px rgba(0,0,0,0.15)`)
-                                        : 'none',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '6px',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 850
-                                    }}
-                                    className="hover-scale-mini"
-                                    title={b.label}
-                                  >
-                                    {isStudentViewingTeacherBook ? (
-                                      <>
-                                        <span style={{
-                                          width: '7px',
-                                          height: '7px',
-                                          borderRadius: '50%',
-                                          background: isActive ? '#ffffff' : '#9333ea'
-                                        }} />
-                                        <span>{isActive ? '✓ Pinsel aktiv' : 'Zuhause geübt'}</span>
-                                        {focusCount > 0 && (
-                                          <span style={{
-                                            fontSize: '0.66rem',
-                                            fontWeight: 800,
-                                            opacity: 0.85
-                                          }}>
-                                            ({focusCount})
-                                          </span>
-                                        )}
-                                      </>
-                                    ) : null}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          {isStudentViewingTeacherBook && activeBrush === 'STUDENT_FOCUS' && (
-                            <div style={{ fontSize: '0.68rem', color: '#7e22ce', fontWeight: 700, paddingLeft: '18px' }}>
-                              Tippe auf Seiten in der Übersicht, um zu markieren, welche Seiten du zuhause geübt hast!
-                            </div>
-                          )}
-                        </div>
+                        <MeisterwerkBrushToolbar
+                          activeBrush={activeBrush}
+                          setActiveBrush={setActiveBrush}
+                          isStudentViewingTeacherBook={isStudentViewingTeacherBook}
+                          focusCount={focusCount}
+                        />
                       );
                     })()}
 
@@ -2461,7 +2082,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           gap: '4px'
                                         }}
                                       >
-                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308' }} />
+                                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#facc15' }} />
                                         <span>Hausaufgaben ({homeworkCount})</span>
                                       </button>
                                       <button
@@ -2623,7 +2244,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 borderColor = '#facc15';
                                 bg = '#fef9c3';
                                 textColor = '#854d0e';
-                                solidActiveBg = '#eab308';
+                                solidActiveBg = '#facc15';
                               } else if (isStudentFocus || status === 'purple') {
                                 borderColor = '#c084fc';
                                 bg = '#faf5ff';
@@ -2698,20 +2319,16 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     position: 'relative',
                                     height: '44px',
                                     borderRadius: '50%',
-                                    border: isPageActive 
-                                      ? `2.5px solid ${solidActiveBg}` 
-                                      : `2px solid ${borderColor}`,
+                                    border: (isPageActive || isMastered || isHomework || isStudentFocus || status === 'purple') ? 'none' : `2px solid ${borderColor}`,
                                     background: isPageActive ? solidActiveBg : bg,
-                                    color: isPageActive ? (isHomework ? '#713f12' : '#ffffff') : textColor,
+                                    color: isPageActive ? (isHomework ? '#0f172a' : '#ffffff') : textColor,
                                     fontWeight: 900,
                                     fontSize: '0.88rem',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    boxShadow: isStudentFocus 
-                                      ? '0 0 0 2.5px #a855f7, 0 2px 6px rgba(168, 85, 247, 0.25)' 
-                                      : (isPageActive ? '0 4px 8px rgba(0,0,0,0.1)' : 'none'),
+                                    boxShadow: 'none',
                                     transform: isPageActive ? 'scale(1.08)' : 'none',
                                     transition: 'all 0.15s ease'
                                   }}
@@ -2800,13 +2417,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px',
-                              background: status === 'MASTERED'
-                                ? '#dcfce7'
-                                : (isCurrentHomework ? '#fef3c7' : '#f1f5f9'),
-                              color: status === 'MASTERED'
-                                ? '#15803d'
-                                : (isCurrentHomework ? '#92400e' : '#475569'),
-                              border: `1.5px solid ${status === 'MASTERED' ? '#10b981' : (isCurrentHomework ? '#fde68a' : '#cbd5e1')}`,
+                              background: status === 'MASTERED' ? '#dcfce7' : (isCurrentHomework ? '#fef9c3' : '#f1f5f9'),
+                              color: status === 'MASTERED' ? '#15803d' : (isCurrentHomework ? '#854d0e' : '#475569'),
+                              border: 'none',
                               padding: '4px 12px',
                               borderRadius: '99px',
                               fontSize: '0.74rem',
@@ -2943,9 +2556,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 borderRadius: '99px',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                border: isMatchModeEnabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                background: isMatchModeEnabled ? '#f0fdf4' : '#f8fafc',
-                                color: isMatchModeEnabled ? '#166534' : '#64748b',
+                                border: isMatchModeEnabled ? 'none' : '1px solid #e2e8f0',
+                                background: isMatchModeEnabled ? '#dcfce7' : '#f8fafc',
+                                color: isMatchModeEnabled ? '#15803d' : '#64748b',
                                 cursor: 'pointer',
                                 transition: 'all 0.15s ease'
                               }}
@@ -2963,13 +2576,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            color: '#eab308',
+                            color: '#ca8a04',
                             fontSize: '0.84rem',
                             fontWeight: 900,
                             animation: 'fadeIn 0.3s ease'
                           }}>
                             <span>Song gemeistert</span>
-                            <Star size={16} fill="#eab308" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(234, 179, 8, 0.5))' }} />
+                            <Star size={16} fill="#facc15" color="#ca8a04" style={{ filter: 'drop-shadow(0 0 3px rgba(250, 204, 21, 0.5))' }} />
                           </div>
                         ) : (
                           !readOnly && (
@@ -3030,14 +2643,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               }}
                               style={{
                                 flex: 1,
-                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
+                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#facc15' : '#64748b'),
                                 height: '9px',
                                 borderRadius: '4.5px',
                                 cursor: 'pointer',
                                 background: songProgressPercent === 100
                                   ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
                                   : (songProgressPercent >= 50
-                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
+                                    ? `linear-gradient(to right, #facc15 0%, #facc15 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
                                     : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
                                 WebkitAppearance: 'none',
                                 outline: 'none',
@@ -3060,7 +2673,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               value={songProgressPercent}
                               style={{
                                 flex: 1,
-                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#eab308' : '#64748b'),
+                                accentColor: songProgressPercent === 100 ? '#34a853' : (songProgressPercent >= 50 ? '#facc15' : '#64748b'),
                                 height: '10px',
                                 borderRadius: '5px',
                                 cursor: 'default',
@@ -3068,7 +2681,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 background: songProgressPercent === 100
                                   ? `linear-gradient(to right, #34a853 0%, #34a853 100%)`
                                   : (songProgressPercent >= 50
-                                    ? `linear-gradient(to right, #eab308 0%, #eab308 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
+                                    ? `linear-gradient(to right, #facc15 0%, #facc15 ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`
                                     : `linear-gradient(to right, #64748b 0%, #64748b ${songProgressPercent}%, #e2e8f0 ${songProgressPercent}%, #e2e8f0 100%)`),
                                 WebkitAppearance: 'none',
                                 outline: 'none'
@@ -3098,7 +2711,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             background: '#f0fdf4',
                             padding: '14px 16px',
                             borderRadius: '16px',
-                            border: '1.5px solid #bbf7d0',
+                            border: 'none',
                             animation: 'fadeIn 0.2s ease'
                           }}>
                             {/* Top Header Row */}
@@ -3189,13 +2802,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '4px',
-                                        background: matchHistory.length > 0 ? '#f0fdf4' : '#fffbeb',
-                                        color: matchHistory.length > 0 ? '#15803d' : '#b45309',
+                                        background: matchHistory.length > 0 ? '#dcfce7' : '#fef9c3',
+                                        color: matchHistory.length > 0 ? '#15803d' : '#854d0e',
                                         padding: '4px 10px',
                                         borderRadius: '99px',
                                         fontSize: '0.72rem',
                                         fontWeight: 800,
-                                        border: `1px solid ${matchHistory.length > 0 ? '#bbf7d0' : '#fde68a'}`
+                                        border: 'none'
                                       }}>
                                         <span>{matchHistory.length > 0 ? `🌱 Tipp für Match ${targetMatchNum} einstellen (${currentPct}%)` : '⚠️ 1. Tipp noch nicht abgeschickt'}</span>
                                       </span>
@@ -3208,9 +2821,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     disabled={isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)}
                                     style={{
                                       border: 'none',
-                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted))
-                                        ? '#e2e8f0'
-                                        : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#e2e8f0' : '#34a853',
                                       color: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#475569' : '#ffffff',
                                       padding: '9px 20px',
                                       borderRadius: '99px',
@@ -3220,7 +2831,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '6px',
-                                      boxShadow: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'none' : '0 3px 10px rgba(22, 163, 74, 0.35)',
+                                      boxShadow: 'none',
                                       transition: 'all 0.15s ease'
                                     }}
                                     className={(isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '' : 'hover-scale'}
@@ -3255,7 +2866,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               }}>
                                 <div style={{
                                   background: '#fefce8',
-                                  border: '1.5px solid #fde047',
+                                  border: 'none',
                                   borderRadius: '12px',
                                   padding: '8px 10px',
                                   display: 'flex',
@@ -3271,7 +2882,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                 <div style={{
                                   background: '#f0f9ff',
-                                  border: '1.5px solid #bae6fd',
+                                  border: 'none',
                                   borderRadius: '12px',
                                   padding: '8px 10px',
                                   display: 'flex',
@@ -3287,7 +2898,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                 <div style={{
                                   background: '#faf5ff',
-                                  border: '1.5px solid #e9d5ff',
+                                  border: 'none',
                                   borderRadius: '12px',
                                   padding: '8px 10px',
                                   display: 'flex',
@@ -3309,13 +2920,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       {/* 1. DUAL-BALKEN SHOWDOWN RACE BOX (Animated 1.2s Comparison) */}
                       {showdownState && (
                         <div style={{
-                          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                          background: '#0f172a',
                           borderRadius: '20px',
                           padding: '16px 20px',
                           color: '#ffffff',
                           margin: '8px 0',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-                          border: '1.5px solid rgba(255,255,255,0.12)',
+                          boxShadow: 'none',
+                          border: 'none',
                           animation: 'fadeIn 0.25s ease'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -3327,7 +2938,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 ⚡ Showdown läuft...
                               </span>
                             ) : (
-                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#059669', background: '#ecfdf5', border: '1px solid #10b981', padding: '2px 8px', borderRadius: '99px' }}>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#059669', background: '#ecfdf5', border: 'none', padding: '2px 8px', borderRadius: '99px' }}>
                                 Δ {Math.abs(showdownState.teacherTarget - showdownState.studentTarget)}% Differenz
                               </span>
                             )}
@@ -3345,7 +2956,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <div style={{
                                 width: `${showdownState.currentTeacherVal}%`,
                                 height: '100%',
-                                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
+                                background: '#34a853',
                                 borderRadius: '99px',
                                 transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
                                 boxShadow: 'none'
@@ -3365,7 +2976,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <div style={{
                                 width: `${showdownState.currentStudentVal}%`,
                                 height: '100%',
-                                background: 'linear-gradient(90deg, #eab308, #fde047)',
+                                background: '#facc15',
                                 borderRadius: '99px',
                                 transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
                                 boxShadow: 'none'
@@ -3401,7 +3012,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             background: '#f8fafc',
                             padding: '10px 14px',
                             borderRadius: '14px',
-                            border: canExecuteMatch ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0',
+                            border: '1px solid #e2e8f0',
                             gap: '10px',
                             flexWrap: 'wrap',
                             marginTop: '2px'
@@ -3446,9 +3057,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '4px',
-                                      background: latestMatch.tier === 'tier1' ? '#fef3c7' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
-                                      color: latestMatch.tier === 'tier1' ? '#92400e' : (latestMatch.tier === 'tier2' ? '#075985' : '#6b21a8'),
-                                      border: `1px solid ${latestMatch.tier === 'tier1' ? '#fde68a' : (latestMatch.tier === 'tier2' ? '#bae6fd' : '#e9d5ff')}`,
+                                      background: latestMatch.tier === 'tier1' ? '#fef9c3' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
+                                      color: latestMatch.tier === 'tier1' ? '#854d0e' : (latestMatch.tier === 'tier2' ? '#0369a1' : '#7e22ce'),
+                                      border: 'none',
                                       padding: '4px 9px',
                                       borderRadius: '99px',
                                       fontWeight: 850,
@@ -3507,9 +3118,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               disabled={!canExecuteMatch}
                               style={{
                                 border: 'none',
-                                background: canExecuteMatch
-                                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
-                                  : '#cbd5e1',
+                                background: canExecuteMatch ? '#34a853' : '#cbd5e1',
                                 color: canExecuteMatch ? '#ffffff' : '#64748b',
                                 padding: '7px 16px',
                                 borderRadius: '99px',
@@ -3519,7 +3128,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '6px',
-                                boxShadow: canExecuteMatch ? '0 2px 8px rgba(22, 163, 74, 0.3)' : 'none',
+                                boxShadow: 'none',
                                 transition: 'all 0.15s ease'
                               }}
                               className={canExecuteMatch ? 'hover-scale' : ''}
@@ -3659,7 +3268,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             className="hover-scale"
                           >
                             <span>{songProgressPercent === 100 ? 'Song gemeistert' : 'Song als gemeistert markieren'}</span>
-                            <Star size={16} fill="#facc15" color="#eab308" style={{ filter: 'drop-shadow(0 0 3px rgba(250, 204, 21, 0.6))' }} />
+                            <Star size={16} fill="#facc15" color="#ca8a04" style={{ filter: 'drop-shadow(0 0 3px rgba(250, 204, 21, 0.6))' }} />
                           </button>
                         </div>
                       )}
@@ -3683,7 +3292,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               style={{
                                 marginTop: '12px',
                                 width: '100%',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                background: '#f97316',
                                 color: 'white',
                                 border: 'none',
                                 padding: '10px 16px',
@@ -3791,8 +3400,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       }> = {
                         practice: {
                           title: 'Üben',
-                          icon: <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                          icon: <Clock size={34} color="#0f172a" strokeWidth={2.3} />,
+                          gradient: '#facc15',
                           boxShadow: 'none',
                           isUnlocked: isModActive('practice'),
                           showInView: isModActive('practice') || !readOnly,
@@ -3804,8 +3413,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         recordings: {
                           title: 'Aufnahmen',
-                          icon: <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                          icon: <Mic size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#6366f1',
                           boxShadow: 'none',
                           isUnlocked: isModActive('recordings'),
                           showInView: isModActive('recordings') || !readOnly,
@@ -3817,8 +3426,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         groovetrainer: {
                           title: 'Groove-Trainer',
-                          icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                          icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#f97316',
                           boxShadow: 'none',
                           isUnlocked: isModActive('groovetrainer'),
                           showInView: isModActive('groovetrainer') || !readOnly,
@@ -3831,8 +3440,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         tuner: {
                           title: 'Stimmgerät',
-                          icon: <TuningForkIcon size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                          icon: <TuningForkIcon size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#06b6d4',
                           boxShadow: 'none',
                           isUnlocked: isModActive('tuner'),
                           showInView: isModActive('tuner') || !readOnly,
@@ -3845,14 +3454,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         loopstation: {
                           title: 'Loopstation',
-                          icon: <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: isModActive('loopstation') 
-                            ? 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)'
-                            : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-                          boxShadow: isModActive('loopstation') ? '0 6px 14px -2px rgba(244, 63, 94, 0.40)' : 'none',
+                          icon: <Sliders size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: isModActive('loopstation') ? '#ef4444' : '#94a3b8',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('loopstation'),
                           showInView: isModActive('loopstation') || !readOnly,
-                          borderOverride: isModActive('loopstation') ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          borderOverride: isModActive('loopstation') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveViewMode('loopstation');
@@ -3861,8 +3468,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         earlab: {
                           title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
-                          icon: <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                          icon: <Headphones size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#a855f7',
                           boxShadow: 'none',
                           isUnlocked: isModActive('earlab'),
                           showInView: isModActive('earlab') || !readOnly,
@@ -3876,16 +3483,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         skillradar: {
                           title: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten',
                           icon: uiLevel === 'junior' ? (
-                            <Star size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                            <Star size={34} color="#ffffff" strokeWidth={2.3} />
                           ) : (
-                            <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                            <Activity size={34} color="#ffffff" strokeWidth={2.3} />
                           ),
-                          gradient: uiLevel === 'junior'
-                            ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%)'
-                            : 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-                          boxShadow: uiLevel === 'junior'
-                            ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
-                            : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+                          gradient: '#ec4899',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('skillradar'),
                           showInView: isModActive('skillradar') || !readOnly,
                           borderOverride: isModActive('skillradar') ? undefined : '1.5px dashed #cbd5e1',
@@ -3899,8 +3502,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             : uiLevel === 'teen'
                               ? 'Songs & Noten'
                               : 'Repertoire & Noten',
-                          icon: <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                          icon: <BookOpen size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#10b981',
                           boxShadow: 'none',
                           isUnlocked: isModActive('protocol'),
                           showInView: isModActive('protocol') || !readOnly,
@@ -3910,14 +3513,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         archive: {
                           title: 'Verlauf',
-                          icon: <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: isModActive('archive')
-                            ? 'linear-gradient(135deg, #64748b 0%, #334155 100%)'
-                            : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
-                          boxShadow: isModActive('archive') ? '0 6px 14px -2px rgba(100, 116, 139, 0.40)' : 'none',
+                          icon: <History size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: isModActive('archive') ? '#475569' : '#94a3b8',
+                          boxShadow: 'none',
                           isUnlocked: isModActive('archive'),
                           showInView: isModActive('archive') || !readOnly,
-                          borderOverride: isModActive('archive') ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          borderOverride: isModActive('archive') ? undefined : '1.5px dashed #cbd5e1',
                           onClick: () => {
                             setActiveModalTab('document');
                             setActiveSubView('history');
@@ -3928,8 +3529,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         },
                         worldtour: {
                           title: 'Musik-Weltreise',
-                          icon: <Compass size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
-                          gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          icon: <Compass size={34} color="#ffffff" strokeWidth={2.3} />,
+                          gradient: '#007acc',
                           boxShadow: 'none',
                           isUnlocked: isModActive('worldtour'),
                           showInView: isModActive('worldtour') || !readOnly,
@@ -4431,7 +4032,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           alignItems: 'center',
                           gap: '5px',
                           background: '#f0fdf4',
-                          border: '1.5px solid #bbf7d0',
+                          border: 'none',
                           color: '#15803d',
                           padding: '4px 10px',
                           borderRadius: '100px',
@@ -4516,9 +4117,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         <div style={{
                                           width: '18px',
                                           height: '24px',
-                                          background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                                          background: bookColor.from,
                                           borderRadius: '3px',
-                                          boxShadow: '0 2px 4px rgba(0,0,0,0.12)',
+                                          boxShadow: 'none',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
@@ -4762,7 +4363,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             background: '#ffffff',
                             borderRadius: '20px',
                             border: isSelected ? '2px solid #34a853' : '1px solid #e8e8ed',
-                            boxShadow: isSelected ? '0 6px 18px rgba(52, 168, 83, 0.16)' : '0 2px 8px rgba(0,0,0,0.03)',
+                            boxShadow: 'none',
                             padding: '12px',
                             cursor: 'pointer',
                             display: 'flex',
@@ -4779,7 +4380,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           <div style={{
                             width: '100%',
                             height: '108px',
-                            background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                            background: '#f8fafc',
                             borderRadius: '14px',
                             position: 'relative',
                             display: 'flex',
@@ -4791,9 +4392,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             <div style={{
                               width: '64px',
                               height: '84px',
-                              background: `linear-gradient(135deg, ${bookColor.from} 0%, ${bookColor.to} 100%)`,
+                              background: bookColor.from,
                               borderRadius: '8px',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                              boxShadow: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -4814,7 +4415,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 fontWeight: 850,
                                 padding: '2px 7px',
                                 borderRadius: '100px',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                boxShadow: 'none',
                                 zIndex: 5
                               }}>
                                 {pct}%
@@ -4911,7 +4512,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         alignItems: 'center',
                         gap: '5px',
                         background: '#f0fdf4',
-                        border: '1.5px solid #bbf7d0',
+                        border: 'none',
                         color: '#15803d',
                         padding: '4px 10px',
                         borderRadius: '100px',
@@ -5035,10 +4636,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectActiveSong(skill); }
                                 }}
                                 style={{
-                                  background: isSelected ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : '#ffffff',
+                                  background: isSelected ? '#dcfce7' : '#ffffff',
                                   borderRadius: '16px',
-                                  border: isSelected ? '1.5px solid #34a853' : '1px solid #e8e8ed',
-                                  boxShadow: isSelected ? '0 4px 14px rgba(52, 168, 83, 0.15)' : '0 2px 6px rgba(0,0,0,0.02)',
+                                  border: isSelected ? 'none' : '1px solid #e8e8ed',
+                                  boxShadow: 'none',
                                   padding: '10px 14px',
                                   minHeight: '54px',
                                   cursor: 'pointer',
@@ -5057,13 +4658,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     width: '42px',
                                     height: '42px',
                                     borderRadius: '12px',
-                                    background: `linear-gradient(135deg, ${songColor.from}, ${songColor.to})`,
+                                    background: songColor.from,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     color: songColor.text || '#ffffff',
                                     flexShrink: 0,
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
+                                    boxShadow: 'none'
                                   }}>
                                     <Music size={18} strokeWidth={2.4} />
                                   </div>
@@ -5102,7 +4703,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       fontWeight: 850,
                                       color: '#9a3412',
                                       background: '#ffedd5',
-                                      border: '1px solid #fed7aa',
+                                      border: 'none',
                                       padding: '3px 9px',
                                       borderRadius: '8px',
                                       display: 'flex',
@@ -5124,7 +4725,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     borderRadius: '100px',
                                     fontSize: '0.74rem',
                                     fontWeight: 850,
-                                    border: progress >= 100 ? '1px solid #bbf7d0' : '1px solid #e2e8f0'
+                                    border: progress >= 100 ? 'none' : '1px solid #e2e8f0'
                                   }}>
                                     <span>{progress}%</span>
                                   </div>
@@ -5577,7 +5178,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       padding: isMobileOrSim ? '8px 6px' : '10px 12px',
                       borderRadius: '14px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                      background: '#6366f1',
                       color: 'white',
                       fontWeight: 800,
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
@@ -5610,7 +5211,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       padding: isMobileOrSim ? '8px 6px' : '10px 12px',
                       borderRadius: '14px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      background: '#f97316',
                       color: 'white',
                       fontWeight: 800,
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
@@ -5643,7 +5244,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       padding: isMobileOrSim ? '8px 6px' : '10px 12px',
                       borderRadius: '14px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: '#10b981',
                       color: 'white',
                       fontWeight: 800,
                       fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
@@ -5688,8 +5289,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   width: '40px',
                   height: '4px',
                   borderRadius: '2px',
-                  background: 'linear-gradient(180deg, #ffd54f 0%, #ff9100 100%)',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                  background: '#facc15',
+                  boxShadow: 'none',
                   zIndex: 35,
                   position: 'absolute',
                   left: '-17px'
@@ -5793,7 +5394,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             width: '18px',
                             height: '18px',
                             borderRadius: '50%',
-                            background: isPageMastered ? '#22c55e' : (isPageHomework ? '#facc15' : '#cbd5e1'),
+                            background: isPageMastered ? '#34a853' : (isPageHomework ? '#facc15' : '#cbd5e1'),
                             border: isCurrentPageStudentFocused ? '2px solid #9333ea' : '1.5px solid rgba(0,0,0,0.1)',
                             boxShadow: isCurrentPageStudentFocused ? '0 0 0 2px #c084fc, inset 0 1px 2px rgba(0,0,0,0.05)' : 'inset 0 1px 2px rgba(0,0,0,0.05)',
                             flexShrink: 0
@@ -5810,7 +5411,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               fontWeight: 800,
                               color: '#6d28d9',
                               background: '#f5f3ff',
-                              border: '1.5px solid #c4b5fd',
+                              border: 'none',
                               padding: '2px 8px',
                               borderRadius: '999px',
                               boxShadow: 'none'
@@ -5848,7 +5449,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                                     transform: isActive ? 'scale(1.2)' : 'scale(1)',
                                     outline: 'none',
-                                    boxShadow: isActive ? `0 0 0 3px ${b.color}80, 0 3px 8px rgba(0,0,0,0.15)` : '0 2px 4px rgba(0,0,0,0.06)'
+                                    boxShadow: 'none'
                                   }}
                                   title={b.label}
                                 />
@@ -5870,9 +5471,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 gap: '6px',
                                 padding: '6px 12px',
                                 borderRadius: '10px',
-                                background: isCurrentPageStudentFocused ? '#f5f3ff' : '#ffffff',
-                                border: isCurrentPageStudentFocused ? '1.5px solid #9333ea' : '1.5px solid #cbd5e1',
-                                color: isCurrentPageStudentFocused ? '#6b21a8' : '#475569',
+                                background: isCurrentPageStudentFocused ? '#f3e8ff' : '#ffffff',
+                                border: isCurrentPageStudentFocused ? 'none' : '1.5px solid #cbd5e1',
+                                color: isCurrentPageStudentFocused ? '#7e22ce' : '#475569',
                                 fontWeight: 800,
                                 fontSize: '0.76rem',
                                 cursor: 'pointer',
@@ -5898,8 +5499,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 14px',
-                    background: 'linear-gradient(90deg, #fef9c3 0%, #fef08a 100%)',
-                    border: '1.5px solid #eab308',
+                    background: '#fef9c3',
+                    border: 'none',
                     borderRadius: '14px',
                     boxShadow: 'none',
                     animation: 'pulse 2s infinite'
@@ -5942,13 +5543,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           <span>Hausaufgabe & Notiz für diese Seite:</span>
                         </label>
                         <SpeechDictationButton
-                          onTranscript={(text) => {
-                            setPageHomeworkNotes(prev => {
-                              const trimmed = prev.trim();
-                              return trimmed ? `${trimmed}\n${text}` : text;
-                            });
+                          value={pageHomeworkNotes || ''}
+                          onChange={(val) => {
+                            setPageHomeworkNotes(val);
+                            if (val.trim().length > 0 && !isCurrentHomework && status === 'IN_PROGRESS') {
+                              setIsCurrentHomework(true);
+                              setHasChanges(true);
+                              if (activeLehrwerkId && activePageNumber) {
+                                triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true);
+                              }
+                            }
                             triggerDebouncedAutoSave();
                           }}
+                          joinWithNewline
                           title="Diktieren"
                         />
                       </div>
@@ -5992,6 +5599,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             end: target.selectionEnd ?? val.length
                           };
                           setPageHomeworkNotes(val);
+                          if (val.trim().length > 0 && !isCurrentHomework && status === 'IN_PROGRESS') {
+                            setIsCurrentHomework(true);
+                            setHasChanges(true);
+                            if (activeLehrwerkId && activePageNumber) {
+                              triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true);
+                            }
+                          }
                           triggerDebouncedAutoSave();
                         }}
                         style={{
@@ -6051,6 +5665,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 const newCursorPos = typeof res === 'object' && typeof res?.newCursorPos === 'number' ? res.newCursorPos : nextText.length;
                                 setPageHomeworkNotes(nextText);
                                 pageNotesSelectionRef.current = { start: newCursorPos, end: newCursorPos };
+                                if (nextText.trim().length > 0 && !isCurrentHomework && status === 'IN_PROGRESS') {
+                                  setIsCurrentHomework(true);
+                                  setHasChanges(true);
+                                  if (activeLehrwerkId && activePageNumber) {
+                                    triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true);
+                                  }
+                                }
                                 triggerDebouncedAutoSave();
                                 setTimeout(() => {
                                   if (pageNotesTextareaRef.current) {
@@ -6062,7 +5683,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               style={{
                                 background: isActive ? t.color : t.bg,
                                 color: isActive ? '#ffffff' : t.color,
-                                border: `1px solid ${isActive ? t.color : t.border}`,
+                                border: 'none',
                                 padding: '3px 8px',
                                 borderRadius: '100px',
                                 fontSize: '0.68rem',
@@ -6096,6 +5717,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             onClick={() => {
                               const newNotes = pageHomeworkNotes ? `${pageHomeworkNotes}\n${tpl.text}` : tpl.text;
                               setPageHomeworkNotes(newNotes);
+                              if (!isCurrentHomework && status === 'IN_PROGRESS') {
+                                setIsCurrentHomework(true);
+                                setHasChanges(true);
+                                if (activeLehrwerkId && activePageNumber) {
+                                  triggerDirectSave(activeLehrwerkId, activePageNumber, 'IN_PROGRESS', true);
+                                }
+                              }
                               triggerDebouncedAutoSave();
                             }}
                             style={{
@@ -6125,7 +5753,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         <div style={{
                           marginTop: '12px',
                           background: '#f0fdf4',
-                          border: '1.5px solid #10b981',
+                          border: 'none',
                           borderRadius: '16px',
                           padding: '12px 16px',
                           display: 'flex',
@@ -6158,11 +5786,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           pageState?.status === 'HOMEWORK'
                         );
                         if (!cleanTeacherNotes && !isHomeworkActive) return null;
-                        const displayText = cleanTeacherNotes || `Ganze Seite ${activePageNumber || ''} im Unterricht durchgehen & üben.`;
+                        const displayText = cleanTeacherNotes || `Ganze Seite ${activePageNumber || ''} bis zur nächsten Stunde üben & festigen.`;
                         return (
                           <div style={{
-                            background: '#fefdf8',
-                            border: '1.5px solid #fde68a',
+                            background: '#fef9c3',
+                            border: 'none',
                             borderRadius: '16px',
                             padding: '14px 16px',
                             display: 'flex',
@@ -6196,12 +5824,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </label>
 
                           <SpeechDictationButton
-                            onTranscript={(text) => {
-                              setStudentNotes(prev => {
-                                const trimmed = prev.trim();
-                                return trimmed ? `${trimmed}\n${text}` : text;
-                              });
-                            }}
+                            value={studentNotes || ''}
+                            onChange={setStudentNotes}
+                            joinWithNewline
                             title="Diktieren"
                           />
                         </div>
@@ -6454,12 +6079,37 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           });
 
-                          // Include active page if marked as homework in current form state
-                          if (activePageNumber !== null && isCurrentHomework) homeworkPagesSet.add(activePageNumber);
-                          const homeworkPagesList = Array.from(homeworkPagesSet).sort((a, b) => a - b);
-                          const pagesToRender = homeworkPagesList.length > 0 ? homeworkPagesList : (activePageNumber !== null && isCurrentHomework ? [activePageNumber] : []);
-                          const formattedPagesStr = formatPageNumbers(pagesToRender);
-                          if (pagesToRender.length === 0) return <div style={{ fontSize: '0.80rem', color: '#64748b', fontStyle: 'italic' }}>Keine Hausaufgabe für dieses Lehrwerk eingetragen.</div>;
+                          // Include active page if marked as homework OR if text is currently being entered
+                          const isDraftingActivePage = Boolean(activePageNumber !== null && (isCurrentHomework || (pageHomeworkNotes || '').trim().length > 0));
+                          if (isDraftingActivePage && activePageNumber !== null) {
+                            homeworkPagesSet.add(activePageNumber);
+                          }
+                          const sortedPagesList = Array.from(homeworkPagesSet).sort((a, b) => a - b);
+                          const formattedPagesStr = formatPageNumbers(sortedPagesList);
+                          if (sortedPagesList.length === 0) return <div style={{ fontSize: '0.80rem', color: '#64748b', fontStyle: 'italic' }}>Keine Hausaufgabe für dieses Lehrwerk eingetragen.</div>;
+
+                          // Extract note info for each page
+                          const pagesWithData = sortedPagesList.map(pNum => {
+                            const isCurrent = pNum === activePageNumber;
+                            let text = '';
+                            if (isCurrent) {
+                              text = cleanNotesText(pageHomeworkNotes || '') || cleanNotesText(homeworkNotes || '');
+                            } else {
+                              const savedPageState = pageStates[pNum];
+                              const rawSavedNote = savedPageState?.homeworkNotes || savedPageState?.notes || '';
+                              text = cleanNotesText(rawSavedNote);
+                              if (!text) {
+                                const matchProgress = progressItems.find(pi => pi.topic_name === `${book?.title} - Seite ${pNum}`);
+                                if (matchProgress?.homework_notes) {
+                                  text = cleanNotesText(matchProgress.homework_notes);
+                                }
+                              }
+                            }
+                            return { pageNum: pNum, text: text.trim(), isCurrent };
+                          });
+
+                          const pagesWithCustomNotes = pagesWithData.filter(p => p.text.length > 0);
+                          const pagesWithoutCustomNotes = pagesWithData.filter(p => p.text.length === 0);
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -6482,65 +6132,99 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 )}
                               </div>
 
-                              <div style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                background: '#ffffff',
-                                color: '#475569',
-                                padding: '4px 12px',
-                                borderRadius: '999px',
-                                fontSize: '0.74rem',
-                                fontWeight: 900,
-                                border: '1px solid rgba(251, 191, 36, 0.3)',
-                                boxShadow: '0 3px 8px rgba(0,0,0,0.03)',
-                                alignSelf: 'flex-start'
-                              }}>
-                                <FileText size={11} strokeWidth={2} style={{ color: '#64748b' }} />
-                                <span>{formattedPagesStr ? formattedPagesStr : `S. ${activePageNumber}`}</span>
-                              </div>
-
-                              {/* Stacked notes for all homework pages in this book */}
+                              {/* Intelligent Didactic Aggregation */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
-                                {pagesToRender.map(pNum => {
-                                  let pageNoteText = '';
-                                  if (pNum === activePageNumber) {
-                                    pageNoteText = cleanNotesText(homeworkNotes);
-                                  } else {
-                                    const savedPageState = pageStates[pNum];
-                                    const rawSavedNote = savedPageState?.homeworkNotes || savedPageState?.notes || '';
-                                    pageNoteText = cleanNotesText(rawSavedNote);
-                                    
-                                    if (!pageNoteText) {
-                                      // Fallback search in progressItems
-                                      const matchProgress = progressItems.find(pi => pi.topic_name === `${book?.title} - Seite ${pNum}`);
-                                      if (matchProgress?.homework_notes) {
-                                        pageNoteText = cleanNotesText(matchProgress.homework_notes);
-                                      }
-                                    }
-                                  }
+                                {pagesWithCustomNotes.length === 0 ? (
+                                  /* Fall A: Reiner Seitenbereich ohne Sonder-Notizen -> 1 einzige ruhige Karte */
+                                  <div style={{
+                                    display: 'flex',
+                                    gap: '6px',
+                                    alignItems: 'center',
+                                    fontSize: '0.78rem',
+                                    color: '#334155',
+                                    lineHeight: '1.45',
+                                    background: '#ffffff',
+                                    border: '1px solid rgba(251, 191, 36, 0.35)',
+                                    borderRadius: '12px',
+                                    padding: '9px 12px',
+                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                  }}>
+                                    <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>
+                                      {formattedPagesStr}:
+                                    </span>
+                                    <span style={{ fontWeight: 650, color: '#475569' }}>
+                                      {sortedPagesList.length === 1
+                                        ? `Ganze Seite ${sortedPagesList[0]} bis zur nächsten Stunde üben & festigen.`
+                                        : `${formatPageNumbersGerman(sortedPagesList)} bis zur nächsten Stunde üben & festigen.`}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  /* Fall B / C: Seiten mit spezifischen Aufgaben + optional unkommentierte Rest-Seiten */
+                                  <>
+                                    {pagesWithCustomNotes.map(p => {
+                                      const isCurrent = p.pageNum === activePageNumber;
+                                      return (
+                                        <div key={p.pageNum} style={{
+                                          display: 'flex',
+                                          gap: '6px',
+                                          alignItems: 'flex-start',
+                                          fontSize: '0.75rem',
+                                          color: '#475569',
+                                          lineHeight: '1.4',
+                                          background: '#ffffff',
+                                          border: isCurrent ? '1.5px solid rgba(234, 179, 8, 0.45)' : '1px solid rgba(251, 191, 36, 0.18)',
+                                          borderRadius: '12px',
+                                          padding: '8px 12px',
+                                          boxShadow: isCurrent ? '0 2px 8px rgba(234, 179, 8, 0.08)' : 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                        }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                            <span style={{ fontWeight: 800, color: '#b45309' }}>S. {p.pageNum}:</span>
+                                            {isCurrent && (
+                                              <span style={{
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                background: '#fef08a',
+                                                color: '#854d0e',
+                                                padding: '1px 5px',
+                                                borderRadius: '999px',
+                                                border: 'none'
+                                              }}>
+                                                Aktuell
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span style={{ fontWeight: 650, color: '#1e293b', fontStyle: 'normal', whiteSpace: 'pre-wrap' }}>
+                                            {renderTextWithDidacticBadges(p.text)}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
 
-                                  return (
-                                    <div key={pNum} style={{ 
-                                      display: 'flex', 
-                                      gap: '6px', 
-                                      alignItems: 'flex-start', 
-                                      fontSize: '0.75rem', 
-                                      color: '#475569', 
-                                      lineHeight: '1.4',
-                                      background: '#ffffff',
-                                      border: pNum === activePageNumber ? '1.5px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(251, 191, 36, 0.18)',
-                                      borderRadius: '12px',
-                                      padding: '8px 12px',
-                                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                    }}>
-                                      <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>S. {pNum}:</span>
-                                      <span style={{ fontWeight: 650, color: pageNoteText ? '#1e293b' : '#94a3b8', fontStyle: pageNoteText ? 'normal' : 'italic', whiteSpace: 'pre-wrap' }}>
-                                        {pageNoteText ? renderTextWithDidacticBadges(pageNoteText) : 'Keine Hausaufgabe eingetragen'}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
+                                    {pagesWithoutCustomNotes.length > 0 && (
+                                      <div style={{
+                                        display: 'flex',
+                                        gap: '6px',
+                                        alignItems: 'center',
+                                        fontSize: '0.75rem',
+                                        color: '#475569',
+                                        lineHeight: '1.4',
+                                        background: '#fafaf9',
+                                        border: '1px dashed rgba(251, 191, 36, 0.25)',
+                                        borderRadius: '12px',
+                                        padding: '7px 12px'
+                                      }}>
+                                        <span style={{ fontWeight: 800, color: '#b45309', flexShrink: 0 }}>
+                                          {formatPageNumbers(pagesWithoutCustomNotes.map(p => p.pageNum))}:
+                                        </span>
+                                        <span style={{ fontWeight: 600, color: '#64748b' }}>
+                                          {pagesWithoutCustomNotes.length === 1
+                                            ? `Ganze Seite ${pagesWithoutCustomNotes[0].pageNum} bis zur nächsten Stunde üben & festigen.`
+                                            : `${formatPageNumbersGerman(pagesWithoutCustomNotes.map(p => p.pageNum))} bis zur nächsten Stunde üben & festigen.`}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                               </div>
                             </div>
                           );
@@ -6557,13 +6241,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                         </label>
                         <SpeechDictationButton
-                          onTranscript={(text) => {
-                            setTeacherNotes(prev => {
-                              const trimmed = prev.trim();
-                              return trimmed ? `${trimmed}\n${text}` : text;
-                            });
+                          value={teacherNotes || ''}
+                          onChange={(val) => {
+                            setTeacherNotes(val);
                             triggerDebouncedAutoSave();
                           }}
+                          joinWithNewline
                           title="Diktieren"
                         />
                       </div>
@@ -6613,7 +6296,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             fontWeight: 800,
                             color: '#10b981',
                             background: '#ecfdf5',
-                            border: '1px solid #d1fae5',
+                            border: 'none',
                             padding: '2px 8px',
                             borderRadius: '999px',
                             display: 'flex',
@@ -6638,8 +6321,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             📝 Übungs-Fahrplan & Hausaufgabe:
                           </label>
                           <SpeechDictationButton
-                            onTranscript={(text) => {
-                              const newNotes = songHomeworkNotes ? `${(songHomeworkNotes || '').trim()}\n${text}` : text;
+                            value={songHomeworkNotes || ''}
+                            onChange={(newNotes) => {
                               setSongHomeworkNotes(newNotes);
                               setHasChanges(true);
                               if (selectedActiveSongId) {
@@ -6649,6 +6332,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 triggerDebouncedSongSave(newNotes);
                               }
                             }}
+                            joinWithNewline
                             title="Diktieren"
                           />
                         </div>
@@ -6808,8 +6492,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>• Didaktischer Verlauf (Keine Diagnosen gem. Art. 9 DSGVO)</span>
                             </label>
                             <SpeechDictationButton
-                              onTranscript={(text) => {
-                                const newNotes = teacherNotes ? `${(teacherNotes || '').trim()}\n${text}` : text;
+                              value={teacherNotes || ''}
+                              onChange={(newNotes) => {
                                 setTeacherNotes(newNotes);
                                 setHasChanges(true);
                                 if (selectedActiveSongId) {
@@ -6821,6 +6505,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   triggerDebouncedAutoSave();
                                 }
                               }}
+                              joinWithNewline
                               title="Diktieren"
                             />
                           </div>
@@ -6994,7 +6679,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           }}
                           style={{
                             background: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
+                            border: 'none',
                             borderRadius: '100px',
                             padding: '4px 11px',
                             fontSize: '0.71rem',
@@ -7313,11 +6998,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         };
                         let audioNotes: any[] = [];
                         let homeworkNoteItems: string[] = [];
+                        let microScoresList: any[] = [];
                         let histWeekItem: any = null;
                         let isAudioCarriedOver = false;
                         let isNotesCarriedOver = false;
                         let isBooksCarriedOver = false;
                         let isSongsCarriedOver = false;
+                        let isMicroScoresCarriedOver = false;
                         let carriedOverWeekLabel = '';
                         let bridgedPastQuestion: any = null;
 
@@ -7330,6 +7017,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             item.homework_notes !== '""'
                           )
                         );
+
+                        const isWeekCommitted = hasCommittedCurrentWeekEntry(progressItems, viewingWeekIso, viewingWeekNum);
+                        const pastWeekSnapshotInfo = extractPastWeekSnapshot(progressItems, viewingWeekIso, viewingWeekNum);
 
                         if (isCurrentWeek || (isFutureWeek && hasTransferredWeek)) {
                           // === LIVE DRAFT FOR CURRENT ACTIVE LESSON WEEK & FUTURE WEEK PREVIEW ===
@@ -7377,9 +7067,20 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             const book = globalLehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId) || (g.title && assignment.bookTitle && g.title.toLowerCase().trim() === assignment.bookTitle.toLowerCase().trim()));
                             const resolvedTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
                             if (!resolvedTitle || !assignment.pageStates) return;
+
+                            const isRemoved = removedHomeworkBookTitles.some(r => {
+                              const rLower = (r || '').trim().toLowerCase();
+                              return rLower === resolvedTitle.toLowerCase() || rLower === cleanHomeworkTitle(resolvedTitle).toLowerCase() || cleanHomeworkTitle(rLower) === cleanHomeworkTitle(resolvedTitle).toLowerCase();
+                            });
+                            if (isRemoved) return;
                             
                             Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
                               if (pState?.status === 'homework' || pState?.isCurrentHomework) {
+                                if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                                  const isAdopted = adoptedPastItemIds.includes(`book-${cleanHomeworkTitle(resolvedTitle)}`) || adoptedPastItemIds.some(id => id.startsWith('book-') && id.toLowerCase().includes(cleanHomeworkTitle(resolvedTitle).toLowerCase()));
+                                  const isUpdatedThisWeek = pState.updatedAt && getISOWeek(pState.updatedAt) === viewingWeekIso;
+                                  if (!isAdopted && !isUpdatedThisWeek) return;
+                                }
                                 const pageNum = parseInt(pNumStr, 10);
                                 if (!isNaN(pageNum)) {
                                   if (!groupedLehrwerke[resolvedTitle]) groupedLehrwerke[resolvedTitle] = { pages: [], notes: [] };
@@ -7398,9 +7099,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
                               const parts = item.topic_name.split(' - Seite ');
                               const bookTitle = parts[0].trim();
+
+                              const isRemoved = removedHomeworkBookTitles.some(r => {
+                                const rLower = (r || '').trim().toLowerCase();
+                                return rLower === bookTitle.toLowerCase() || rLower === cleanHomeworkTitle(bookTitle).toLowerCase() || cleanHomeworkTitle(rLower) === cleanHomeworkTitle(bookTitle).toLowerCase();
+                              });
+                              if (isRemoved) return;
+
                               const book = globalLehrwerke.find(g => g.title === bookTitle || g.title?.toLowerCase().trim() === bookTitle.toLowerCase().trim());
                               const isBookAssigned = Boolean(book && assignedLehrwerke.some(a => String(a.lehrwerkId) === String(book.id) || (a.bookTitle && a.bookTitle.toLowerCase().trim() === bookTitle.toLowerCase().trim())));
                               if (!isBookAssigned && !item.is_current_homework) return;
+
+                              if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                                const isAdopted = adoptedPastItemIds.includes(`book-${cleanHomeworkTitle(bookTitle)}`) || adoptedPastItemIds.some(id => id.startsWith('book-') && id.toLowerCase().includes(cleanHomeworkTitle(bookTitle).toLowerCase()));
+                                const isUpdatedThisWeek = (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso) || (item.created_at && getISOWeek(item.created_at) === viewingWeekIso);
+                                if (!isAdopted && !isUpdatedThisWeek) return;
+                              }
 
                               const pageNum = parseInt(parts[1], 10);
                               if (!groupedLehrwerke[bookTitle]) groupedLehrwerke[bookTitle] = { pages: [], notes: [] };
@@ -7415,35 +7129,51 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           });
 
                           // 🏛️ 0,1% Goldstandard: Symmetrische Parität über AuthoritativeHomeworkContext (SSOT)
-                          if (authHw && Array.isArray(authHw.books) && authHw.books.length > 0) {
-                            authHw.books.forEach(b => {
-                              if (!groupedLehrwerke[b.title]) groupedLehrwerke[b.title] = { pages: [], notes: [] };
-                              (b.pages || []).forEach(p => {
-                                if (!groupedLehrwerke[b.title].pages.includes(p)) groupedLehrwerke[b.title].pages.push(p);
+                          if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                            // Im uncommitted Lehrer-Modus keine veralteten authHw / juniorSummary Altbestände injizieren
+                          } else {
+                            if (authHw && Array.isArray(authHw.books) && authHw.books.length > 0) {
+                              authHw.books.forEach(b => {
+                                const isRemoved = removedHomeworkBookTitles.some(r => {
+                                  const rLower = (r || '').trim().toLowerCase();
+                                  return rLower === (b.title || '').toLowerCase() || rLower === cleanHomeworkTitle(b.title || '').toLowerCase();
+                                });
+                                if (isRemoved) return;
+                                if (!groupedLehrwerke[b.title]) groupedLehrwerke[b.title] = { pages: [], notes: [] };
+                                (b.pages || []).forEach(p => {
+                                  if (!groupedLehrwerke[b.title].pages.includes(p)) groupedLehrwerke[b.title].pages.push(p);
+                                });
+                                (b.notes || []).forEach(n => {
+                                  if (!groupedLehrwerke[b.title].notes.includes(n)) groupedLehrwerke[b.title].notes.push(n);
+                                });
                               });
-                              (b.notes || []).forEach(n => {
-                                if (!groupedLehrwerke[b.title].notes.includes(n)) groupedLehrwerke[b.title].notes.push(n);
+                            }
+                            if (authHw && Array.isArray(authHw.songs) && authHw.songs.length > 0) {
+                              authHw.songs.forEach(s => {
+                                addSongToOtherHWs(s);
                               });
-                            });
-                          }
-                          if (authHw && Array.isArray(authHw.songs) && authHw.songs.length > 0) {
-                            authHw.songs.forEach(s => {
-                              addSongToOtherHWs(s);
-                            });
-                          }
+                            }
+                            if (authHw && Array.isArray(authHw.microScores) && authHw.microScores.length > 0) {
+                              authHw.microScores.forEach(ms => {
+                                if (ms && !microScoresList.some(existing => (existing.id && existing.id === ms.id) || (existing.title && ms.title && existing.title.toLowerCase() === ms.title.toLowerCase()))) {
+                                  microScoresList.push(ms);
+                                }
+                              });
+                            }
 
-                          // 🏛️ 100% Parität zum Hausaufgaben-Widget des Schüler-Dashboards (Briefing Board SSOT)
-                          const juniorSummary = deriveJuniorHomeworkSummary({
-                            studentId: student?.id,
-                            localProgress: assignedLehrwerke,
-                            lehrwerke: globalLehrwerke,
-                            progressItems,
-                            activeSongSkills,
-                            assignedCampusSongs
-                          });
-                          (juniorSummary.activeJuniorSongs || []).forEach(song => {
-                            addSongToOtherHWs(song);
-                          });
+                            // 🏛️ 100% Parität zum Hausaufgaben-Widget des Schüler-Dashboards (Briefing Board SSOT)
+                            const juniorSummary = deriveJuniorHomeworkSummary({
+                              studentId: student?.id,
+                              localProgress: assignedLehrwerke,
+                              lehrwerke: globalLehrwerke,
+                              progressItems,
+                              activeSongSkills,
+                              assignedCampusSongs
+                            });
+                            (juniorSummary.activeJuniorSongs || []).forEach(song => {
+                              addSongToOtherHWs(song);
+                            });
+                          }
 
                           (progressItems || []).forEach((item: any) => {
                             if (!item.topic_name || isWeeklySnapshotContainer(item.topic_name) || !item.is_current_homework) return;
@@ -7453,6 +7183,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               const pageNum = parseInt(parts[1], 10);
                               const book = globalLehrwerke.find(g => (g.title || '').trim().toLowerCase() === rawBookTitle.toLowerCase());
                               const resolvedTitle = book?.title || rawBookTitle;
+                              const cleanTitle = cleanHomeworkTitle(resolvedTitle).trim().toLowerCase();
+
+                              const isRemoved = removedHomeworkBookTitles.some(r => {
+                                const rLower = (r || '').trim().toLowerCase();
+                                return rLower === resolvedTitle.toLowerCase() || rLower === cleanTitle || cleanHomeworkTitle(rLower) === cleanTitle;
+                              });
+                              if (isRemoved) return;
+
+                              if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                                const isAdopted = adoptedPastItemIds.includes(`book-${cleanTitle}`) || adoptedPastItemIds.some(id => id.startsWith('book-') && id.toLowerCase().includes(cleanTitle));
+                                const isUpdatedThisWeek = (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso) || (item.created_at && getISOWeek(item.created_at) === viewingWeekIso);
+                                if (!isAdopted && !isUpdatedThisWeek) return;
+                              }
 
                               if (resolvedTitle && !isNaN(pageNum)) {
                                 if (!groupedLehrwerke[resolvedTitle]) groupedLehrwerke[resolvedTitle] = { pages: [], notes: [] };
@@ -7482,13 +7225,42 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           });
 
+                          otherHWs = otherHWs.filter(song => {
+                            const sTitle = song.title || song.topic_name || '';
+                            const sId = String(song.id || song.song_id || cleanHomeworkTitle(sTitle));
+                            const normTitle = sTitle.trim().toLowerCase();
+                            const cleanTitle = cleanHomeworkTitle(sTitle).trim().toLowerCase();
+
+                            const isRemoved = removedHomeworkSongIds.some(r => {
+                              const rLower = String(r).trim().toLowerCase();
+                              return rLower === sId.toLowerCase() || rLower === normTitle || rLower === cleanTitle;
+                            });
+                            if (isRemoved) return false;
+
+                            if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                              const isAdopted = adoptedPastItemIds.includes(`song-${sId}`) || adoptedPastItemIds.some(id => id.startsWith('song-') && sId && id.toLowerCase().includes(String(sId).toLowerCase()));
+                              const isUpdatedThisWeek = (song.updated_at && getISOWeek(song.updated_at) === viewingWeekIso) || (song.created_at && getISOWeek(song.created_at) === viewingWeekIso);
+                              return isAdopted || isUpdatedThisWeek;
+                            }
+                            return true;
+                          });
+
                           const realBk = Object.keys(groupedLehrwerke).find(k => k.toLowerCase() !== 'lehrwerk');
                           if (realBk && groupedLehrwerke['Lehrwerk']) {
                             groupedLehrwerke['Lehrwerk'].pages.forEach(p => { if (!groupedLehrwerke[realBk].pages.includes(p)) groupedLehrwerke[realBk].pages.push(p); });
                             (groupedLehrwerke['Lehrwerk'].notes || []).forEach(n => { if (!groupedLehrwerke[realBk].notes.includes(n)) groupedLehrwerke[realBk].notes.push(n); });
                             delete groupedLehrwerke['Lehrwerk'];
                           }
-                          lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => ({ title, pages: info.pages.sort((a: number, b: number) => a - b), notes: info.notes }));
+                          lehrwerkeList = Object.entries(groupedLehrwerke)
+                            .map(([title, info]) => ({ title, pages: info.pages.sort((a: number, b: number) => a - b), notes: info.notes }))
+                            .filter(item => {
+                              const norm = (item.title || '').trim().toLowerCase();
+                              const clean = cleanHomeworkTitle(norm).trim().toLowerCase();
+                              return !removedHomeworkBookTitles.some(r => {
+                                const rLower = (r || '').trim().toLowerCase();
+                                return rLower === norm || rLower === clean || cleanHomeworkTitle(rLower) === clean;
+                              });
+                            });
 
                           audioNotes = (homeworkNotesList || [])
                             .map((note, idx) => ({ note: typeof note === 'string' ? note : String(note || ''), idx }))
@@ -7509,7 +7281,30 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             })
                             .filter(a => !!a.url);
 
+                          if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                            audioNotes = audioNotes.filter(a => {
+                              const isAdopted = adoptedPastItemIds.some(id => id.startsWith('audio-'));
+                              const isToday = a.date && (a.date === new Date().toISOString().split('T')[0] || a.date.includes(new Date().getFullYear().toString()));
+                              return isAdopted || isToday;
+                            });
+                          }
+
                           homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
+                          if (!readOnly && isCurrentWeek && !isWeekCommitted) {
+                            const hasNoteAdopted = adoptedPastItemIds.some(id => id.startsWith('note-'));
+                            if (!hasNoteAdopted && !(generalHomeworkNotes || '').trim()) {
+                              homeworkNoteItems = [];
+                            }
+                          }
+
+                          const directMicroScores = parseMicroScoreEntries(
+                            (homeworkNotesList || []).map(n => (typeof n === 'string' ? n : String(n || '')))
+                          );
+                          directMicroScores.forEach(ms => {
+                            if (!microScoresList.some(existing => (existing.id && existing.id === ms.id) || (existing.title && ms.title && existing.title.toLowerCase() === ms.title.toLowerCase()))) {
+                              microScoresList.push(ms);
+                            }
+                          });
 
                           // 🛡️ Enterprise+ Cold-Cache & Mobile PWA Hydration: Symmetrical Snapshot Unpacking (Lehrwerke, Songs, Audios & Notes)
                           const curWeekSnapshotItem = deduplicatedItems.find(item => {
@@ -7529,31 +7324,52 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             try {
                               const parsedSnap = parseRawNotesArray(curWeekSnapshotItem.homework_notes);
                               if (parsedSnap.length > 0) {
-                                // 1. Lehrwerke snapshot unpacking (if lehrwerkeList is empty)
-                                if (lehrwerkeList.length === 0) {
+                                const isLiveDraftEditing = !readOnly && isCurrentWeek && !isWeekCommitted;
+
+                                // 1. Lehrwerke snapshot unpacking (if lehrwerkeList is empty and not live editing)
+                                if (!isLiveDraftEditing && lehrwerkeList.length === 0) {
                                   const snapLwEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
                                   if (snapLwEntry) {
                                     const unpacked = parseSnapshotLehrwerke(snapLwEntry);
-                                    if (unpacked.length > 0) lehrwerkeList = unpacked;
+                                    if (unpacked.length > 0) {
+                                      lehrwerkeList = unpacked.filter((item: any) => {
+                                        const norm = (item.title || '').trim().toLowerCase();
+                                        const clean = cleanHomeworkTitle(norm).trim().toLowerCase();
+                                        return !removedHomeworkBookTitles.some(r => {
+                                          const rLower = (r || '').trim().toLowerCase();
+                                          return rLower === norm || rLower === clean || cleanHomeworkTitle(rLower) === clean;
+                                        });
+                                      });
+                                    }
                                   }
                                 }
 
-                                // 2. Songs snapshot unpacking with deduplication (nur wenn aktuell noch keine Songs vorhanden sind)
-                                if (otherHWs.length === 0) {
+                                // 2. Songs snapshot unpacking with deduplication (nur wenn aktuell noch keine Songs vorhanden sind und nicht live editing)
+                                if (!isLiveDraftEditing && otherHWs.length === 0) {
                                   const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
                                   if (snapSongEntry) {
                                     const parsedSongs = parseSnapshotSongs(snapSongEntry);
                                     parsedSongs.forEach((song: any) => {
-                                      addSongToOtherHWs({
-                                        ...song,
-                                        is_current_homework: true,
-                                        homework_notes: getCleanPageNotes(song.homework_notes)
+                                      const sTitle = song.title || song.topic_name || '';
+                                      const sId = String(song.id || song.song_id || cleanHomeworkTitle(sTitle));
+                                      const normTitle = sTitle.trim().toLowerCase();
+                                      const cleanTitle = cleanHomeworkTitle(sTitle).trim().toLowerCase();
+                                      const isRemoved = removedHomeworkSongIds.some(r => {
+                                        const rLower = String(r).trim().toLowerCase();
+                                        return rLower === sId.toLowerCase() || rLower === normTitle || rLower === cleanTitle;
                                       });
+                                      if (!isRemoved) {
+                                        addSongToOtherHWs({
+                                          ...song,
+                                          is_current_homework: true,
+                                          homework_notes: getCleanPageNotes(song.homework_notes)
+                                        });
+                                      }
                                     });
                                   }
                                 }
 
-                                // 3. Audio recordings unpacking (guarantees all 6 recordings show on Mobile PWA)
+                                // 3. Audio recordings unpacking (guarantees all recordings show in live dock and mobile preview)
                                 const snapAudios = parseAudioEntries(parsedSnap);
                                 if (snapAudios.length > 0) {
                                   if (audioNotes.length === 0) {
@@ -7568,11 +7384,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }
 
                                 // 4. Didactic teacher remarks / text notes unpacking ("zusätzliche bemerkung")
-                                if (homeworkNoteItems.length === 0) {
+                                if (!isLiveDraftEditing && homeworkNoteItems.length === 0) {
                                   const snapTextNotes = parseDidacticTextNotes(parsedSnap);
                                   if (snapTextNotes.length > 0) {
                                     homeworkNoteItems = snapTextNotes;
                                   }
+                                }
+
+                                // 5. MicroScore snippets unpacking ("Notenschnipsel")
+                                if (!isLiveDraftEditing) {
+                                  const snapMicroScores = parseMicroScoreEntries(parsedSnap);
+                                  snapMicroScores.forEach(ms => {
+                                    if (!microScoresList.some(existing => (existing.id && existing.id === ms.id) || (existing.title && ms.title && existing.title.toLowerCase() === ms.title.toLowerCase()))) {
+                                      microScoresList.push(ms);
+                                    }
+                                  });
                                 }
                               }
                             } catch (snapErr) {
@@ -7582,10 +7408,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                           // 🌉 SMART VORWOCHEN-FALLBACK & AUDIO/NOTE BRIDGE: Pädagogische Kontinuität (Zero-LocalStorage)
                           // Wenn für die aktuelle Woche noch keine neuen Hausaufgaben eingetragen sind (oder auf Mobile/Cold Cache),
-                          // übernehme nahtlos Lehrwerke, Songs, Audioaufnahmen und Notizen der vorherigen Unterrichtsstunde
-                          // aus dem jüngsten Wochen-Snapshot.
-                          const hasActiveCurrentHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0);
-                          if (isCurrentWeek && (!hasActiveCurrentHomework || audioNotes.length === 0 || homeworkNoteItems.length === 0 || otherHWs.length === 0 || lehrwerkeList.length === 0)) {
+                          // übernehme nahtlos Lehrwerke, Songs, Notenschnipsel, Audioaufnahmen und Notizen der vorherigen Unterrichtsstunde
+                          // aus dem jüngsten Wochen-Snapshot (ausschließlich im Schüler-Modus readOnly, Lehrkraft nutzt TeacherPastHomeworkDock).
+                          const hasActiveCurrentHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0 || microScoresList.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0);
+                          if (readOnly && isCurrentWeek && !hasActiveCurrentHomework) {
                             const pastWeekSnapshots = (progressItems || []).filter((item: any) => {
                               if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                               const kwMatch = item.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
@@ -7744,6 +7570,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       bridgedPastQuestion = parseStudentQuestionFromNotes([pastQ]);
                                     }
                                   }
+
+                                  // 6. Notenschnipsel der Vorwoche übernehmen (falls aktuell noch keine)
+                                  if (microScoresList.length === 0) {
+                                    const pastMicroScores = parseMicroScoreEntries(parsedPastNotes);
+                                    if (pastMicroScores.length > 0) {
+                                      microScoresList = pastMicroScores;
+                                      isMicroScoresCarriedOver = true;
+                                    }
+                                  }
                                 } else if (typeof parsedPastNotes === 'string') {
                                   if (homeworkNoteItems.length === 0) {
                                     const pastNotes = getHomeworkNoteItems(parsedPastNotes);
@@ -7763,6 +7598,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           if (isCarriedOverDismissed && !readOnly) {
                             if (isBooksCarriedOver) lehrwerkeList = [];
                             if (isSongsCarriedOver) otherHWs = [];
+                            if (isMicroScoresCarriedOver) microScoresList = [];
                             if (isAudioCarriedOver) audioNotes = [];
                             if (isNotesCarriedOver) homeworkNoteItems = [];
                           }
@@ -7811,6 +7647,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                            !n.startsWith('AUDIO:') && 
                                            !n.startsWith('STICKER:') && 
                                            !n.startsWith('LOOP:') &&
+                                           !n.startsWith('MICROSCORE:') &&
                                            !lower.startsWith('latency:') && 
                                            !lower.startsWith('latency_calibration:') && 
                                            !n.startsWith('SYSTEM:') && 
@@ -7821,6 +7658,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   })
                                   .map((s: string) => s.trim())
                                   .filter(Boolean);
+
+                                microScoresList = parseMicroScoreEntries(parsedNotes);
 
                                 // 📦 1. Parse Lehrwerke-Snapshot aus Wochen-Snapshot
                                 const snapLwEntry = parsedNotes.find((n: string) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
@@ -8039,7 +7878,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         });
                         if (audioNotes.length === 0) isAudioCarriedOver = false;
 
-                        const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0 || effectiveWorldTourMasteries.length > 0;
+                        const hasActiveItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || microScoresList.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0 || effectiveWorldTourMasteries.length > 0;
                         
                         const currentHour = getSimulatedNow().getHours();
                         const isSilentTime = currentHour >= 20 || currentHour < 7;
@@ -8075,7 +7914,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 })()
                               : { hasQuestion: false, rawEntry: null, text: '', timestamp: null })) || { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
 
-                        const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !isCarriedOverDismissed;
+                        const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver || isMicroScoresCarriedOver) && !isCarriedOverDismissed;
 
                         const getActiveWeekExportData = () => {
                           const targetToken = student?.qr_token || student?.id || '';
@@ -8462,7 +8301,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         height: isMobileView ? '36px' : '32px',
                                         minHeight: isMobileView ? '36px' : '32px',
                                         borderRadius: '100px',
-                                        border: '1.5px solid #facc15',
+                                        border: 'none',
                                         background: '#fef08a',
                                         color: '#713f12',
                                         fontSize: '0.74rem',
@@ -8693,7 +8532,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         setIsCarriedOverDismissed(true);
                                       }}
                                       style={{ 
-                                        border: '1px solid #fee2e2', 
+                                        border: 'none', 
                                         background: '#fff1f2', 
                                         color: '#ef4444', 
                                         cursor: 'pointer', 
@@ -8822,7 +8661,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         fontSize: '0.70rem',
                                         color: '#15803d',
                                         background: '#dcfce7',
-                                        border: '1px solid #bbf7d0',
+                                        border: 'none',
                                         padding: '2px 8px',
                                         height: '24px',
                                         borderRadius: '100px',
@@ -8839,10 +8678,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       <span>{isCampusActive ? 'Live-Schülersicht' : 'Basis-Vorschau (Live-Woche)'}</span>
                                     </span>
                                   ) : (
-                                    <span style={{ fontSize: isJunior ? '1.02rem' : '0.98rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
-                                      <Music size={16} color="#16a34a" strokeWidth={2.4} />
-                                      <span>{isHistoryMode ? `Wochen-Fahrplan · KW ${viewingWeekNum}` : 'Dein Wochen-Fahrplan'}</span>
-                                    </span>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                      <span style={{ fontSize: isJunior ? '1.02rem' : '0.98rem', fontWeight: 900, color: '#15803d', letterSpacing: '-0.02em', display: 'inline-flex', alignItems: 'center', gap: '7px' }}>
+                                        <Music size={16} color="#16a34a" strokeWidth={2.4} />
+                                        <span>
+                                          {isHistoryMode 
+                                            ? `Wochen-Fahrplan · KW ${viewingWeekNum}` 
+                                            : (isCarriedOverPlan 
+                                                ? `📌 Letzte Hausaufgabe (${carriedOverWeekLabel || 'Vorwoche'})` 
+                                                : 'Dein Wochen-Fahrplan')}
+                                        </span>
+                                      </span>
+                                      {isCarriedOverPlan && !isHistoryMode && (
+                                        <span style={{ fontSize: '0.70rem', color: '#854d0e', fontWeight: 650, paddingLeft: '23px' }}>
+                                          Aus der letzten Stunde · Gilt, bis deine Lehrkraft neue Aufgaben einträgt
+                                        </span>
+                                      )}
+                                    </div>
                                    )}
                                  </div>
 
@@ -8865,7 +8717,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                            setViewingWeekOffset(0);
                                          }
                                        }}
-                                       style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '100px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)', flexShrink: 0 }}
+                                       style={{ background: '#f0fdf4', border: 'none', borderRadius: '100px', padding: '3px 10px', fontSize: '0.72rem', fontWeight: 800, color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)', flexShrink: 0 }}
                                        className="hover-scale-mini"
                                        title="Zurück zum aktuellen Wochenplan"
                                        aria-label="Zurück zum aktuellen Wochenplan"
@@ -8908,6 +8760,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                    )
                                  )}
                               </div>
+
+                              {/* 🏛️ VORWOCHEN-DOCK FÜR DIE LEHRKRAFT (0,1% Goldstandard: Tabula Rasa bei neuen Stunden + 1-Klick-Übernahme) */}
+                              {!readOnly && isCurrentWeek && pastWeekSnapshotInfo.hasItems && (
+                                <TeacherPastHomeworkDock
+                                  pastHomework={pastWeekSnapshotInfo}
+                                  onAdoptAll={() => handleAdoptAllPastHomework(pastWeekSnapshotInfo)}
+                                  onUnadoptAll={() => handleUnadoptAllPastHomework(pastWeekSnapshotInfo)}
+                                  onAdoptItem={handleAdoptPastHomeworkItem}
+                                  onUnadoptItem={handleUnadoptPastHomeworkItem}
+                                  adoptedItemIds={adoptedPastItemIds}
+                                  isMobileView={isMobileView}
+                                />
+                              )}
 
                               {/* 💬 SCHÜLER-FRAGE FÜR DEN UNTERRICHT (KIDS & JUNIOR GOLDSTANDARD - SOWOHL BEI AUFGABEN ALS AUCH IN FREIEN WOCHEN) */}
                               {readOnly && isQuestionEditorOpen && (
@@ -9371,7 +9236,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               {!readOnly && effectiveViewingQuestion?.hasQuestion && (
                                 <div style={{
                                   background: '#fffbeb',
-                                  border: '1.5px solid #fcd34d',
+                                  border: 'none',
                                   borderRadius: '16px',
                                   padding: '12px 16px',
                                   boxShadow: 'none',
@@ -9510,7 +9375,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     height: '46px',
                                     borderRadius: '14px',
                                     background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-                                    border: '1px solid #10b981',
+                                    border: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -9586,13 +9451,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     const bookObj = globalLehrwerke.find(b => (b.title || '').trim().toLowerCase() === item.title.trim().toLowerCase());
                                     const assignedBook = bookObj ? assignedLehrwerke.find(a => String(a.lehrwerkId || a.id) === String(bookObj.id || bookObj.lehrwerkId)) : null;
                                     
-                                    const pagesWithNotes = assignedBook ? item.pages.filter((p: number) => {
-                                      const pState = assignedBook.pageStates?.[p];
+                                    const pagesWithNotes = item.pages.filter((p: number) => {
+                                      const pState = assignedBook?.pageStates?.[p];
                                       if (pState && getCleanPageNotes(pState.homeworkNotes || pState.homework_notes) !== '') return true;
                                       const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
                                       if (dbItem && getCleanPageNotes(dbItem.homework_notes) !== '') return true;
                                       return false;
-                                    }) : [];
+                                    });
 
                                     const pagesGerman = formatPageNumbersGerman(item.pages);
                                     const bookNotesPhrases = pagesWithNotes.map((p: number) => {
@@ -9682,7 +9547,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   fontWeight: 850,
                                                   color: '#15803d',
                                                   background: '#dcfce7',
-                                                  border: '1px solid #bbf7d0',
+                                                  border: 'none',
                                                   padding: isJunior ? '3px 10px' : '2px 8px',
                                                   borderRadius: '99px',
                                                   display: 'inline-flex',
@@ -9758,128 +9623,212 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 <Volume2 size={isJunior ? 16 : 13} strokeWidth={2.2} />
                                               )}
                                             </button>
+                                            {!readOnly && (
+                                              <button
+                                                type="button"
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRemoveBookFromCurrentHomework(item.title, item.pages);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                  if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleRemoveBookFromCurrentHomework(item.title, item.pages);
+                                                  }
+                                                }}
+                                                title={`Lehrwerk ${item.title} aus Hausaufgabe entfernen`}
+                                                aria-label={`Lehrwerk ${item.title} aus Hausaufgabe entfernen`}
+                                                style={{
+                                                  border: '1px solid #cbd5e1',
+                                                  background: '#ffffff',
+                                                  color: '#64748b',
+                                                  borderRadius: isJunior ? '10px' : '8px',
+                                                  width: isJunior ? '34px' : '30px',
+                                                  height: isJunior ? '34px' : '30px',
+                                                  minWidth: isJunior ? '34px' : '30px',
+                                                  minHeight: isJunior ? '34px' : '30px',
+                                                  padding: 0,
+                                                  cursor: 'pointer',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  transition: 'all 0.15s ease',
+                                                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                                                  touchAction: 'manipulation',
+                                                  flexShrink: 0
+                                                }}
+                                                className="hover-scale-mini"
+                                              >
+                                                <X size={isJunior ? 16 : 13} strokeWidth={2.4} />
+                                              </button>
+                                            )}
                                           </div>
                                         </div>
 
-                                        {/* Specific Page Notes (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
-                                        {pagesWithNotes.map((p: number) => {
-                                          const pState = assignedBook?.pageStates?.[p];
-                                          let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
-                                          if (!noteText) {
-                                            const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
-                                            if (dbItem?.homework_notes) {
-                                              noteText = getCleanPageNotes(dbItem.homework_notes);
+                                        {/* Specific Page Notes or 0,1% Didactical Editorial Subtext */}
+                                        {pagesWithNotes.length > 0 ? (
+                                          pagesWithNotes.map((p: number) => {
+                                            const pState = assignedBook?.pageStates?.[p];
+                                            let noteText = getCleanPageNotes(pState?.homeworkNotes || pState?.homework_notes);
+                                            if (!noteText) {
+                                              const dbItem = deduplicatedItems.find((x: any) => x.topic_name === `${item.title} - Seite ${p}`);
+                                              if (dbItem?.homework_notes) {
+                                                noteText = getCleanPageNotes(dbItem.homework_notes);
+                                              }
                                             }
-                                          }
-                                          const isSpeakingThis = isTtsSpeaking && activeTtsKey === `book_note_${item.title}_${p}`;
+                                            const isSpeakingThis = isTtsSpeaking && activeTtsKey === `book_note_${item.title}_${p}`;
 
-                                          const parsedAnn = parseStudentAnnotation(noteText, studentFirstName, isTeacherMode);
-                                          if (readOnly && parsedAnn.isSpecificToAnother) return null;
+                                            const parsedAnn = parseStudentAnnotation(noteText, studentFirstName, isTeacherMode);
+                                            if (readOnly && parsedAnn.isSpecificToAnother) return null;
 
-                                          return (
-                                            <div key={`p-note-${p}`} style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'space-between',
-                                              gap: '8px',
-                                              fontSize: isJunior ? '0.98rem' : '0.88rem',
-                                              lineHeight: 1.5,
-                                              padding: isJunior ? '6px 10px' : '5px 8px',
-                                              marginLeft: isJunior ? '40px' : '32px',
-                                              borderRadius: '8px',
-                                              background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
-                                              border: parsedAnn.isSpecificToCurrent ? '1px solid #10b981' : 'none',
-                                              opacity: isFutureWeek ? 0.38 : 1,
-                                              transition: 'all 0.15s ease'
-                                            }}>
-                                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
-                                                <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: isJunior ? '0.98rem' : '0.88rem' }}>S. {p}:</span>
-                                                {parsedAnn.isSpecificToCurrent && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#dcfce7',
-                                                    color: '#15803d',
-                                                    border: '1px solid #10b981',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 6px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <Target size={11} strokeWidth={2.4} />
-                                                    <span>Für dich</span>
+                                            return (
+                                              <div key={`p-note-${p}`} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '8px',
+                                                fontSize: isJunior ? '0.98rem' : '0.88rem',
+                                                lineHeight: 1.5,
+                                                padding: isJunior ? '6px 10px' : '5px 8px',
+                                                marginLeft: isJunior ? '40px' : '32px',
+                                                borderRadius: '8px',
+                                                background: isSpeakingThis ? '#dcfce7' : (parsedAnn.isSpecificToCurrent ? '#f0fdf4' : 'transparent'),
+                                                border: parsedAnn.isSpecificToCurrent ? '1px solid #10b981' : 'none',
+                                                opacity: isFutureWeek ? 0.38 : 1,
+                                                transition: 'all 0.15s ease'
+                                              }}>
+                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', minWidth: 0 }}>
+                                                  <span style={{ fontWeight: 850, color: '#e11d48', flexShrink: 0, fontSize: isJunior ? '0.98rem' : '0.88rem' }}>S. {p}:</span>
+                                                  {parsedAnn.isSpecificToCurrent && (
+                                                    <span style={{
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px',
+                                                      background: '#dcfce7',
+                                                      color: '#15803d',
+                                                      border: 'none',
+                                                      borderRadius: '6px',
+                                                      padding: '2px 6px',
+                                                      fontSize: '0.72rem',
+                                                      fontWeight: 800,
+                                                      flexShrink: 0
+                                                    }}>
+                                                      <Target size={11} strokeWidth={2.4} />
+                                                      <span>Für dich</span>
+                                                    </span>
+                                                  )}
+                                                  {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
+                                                    <span style={{
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      gap: '3px',
+                                                      background: '#ede9fe',
+                                                      color: '#6d28d9',
+                                                      border: 'none',
+                                                      borderRadius: '6px',
+                                                      padding: '2px 6px',
+                                                      fontSize: '0.72rem',
+                                                      fontWeight: 800,
+                                                      flexShrink: 0
+                                                    }}>
+                                                      <User size={11} strokeWidth={2.4} />
+                                                      <span>@{parsedAnn.targetStudentName}</span>
+                                                    </span>
+                                                  )}
+                                                  <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {parsedAnn.cleanText}
                                                   </span>
-                                                )}
-                                                {isTeacherMode && parsedAnn.targetStudentName && parsedAnn.targetStudentName !== 'Alle' && (
-                                                  <span style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    background: '#ede9fe',
-                                                    color: '#6d28d9',
-                                                    border: '1px solid #c4b5fd',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 6px',
-                                                    fontSize: '0.72rem',
-                                                    fontWeight: 800,
-                                                    flexShrink: 0
-                                                  }}>
-                                                    <User size={11} strokeWidth={2.4} />
-                                                    <span>@{parsedAnn.targetStudentName}</span>
-                                                  </span>
-                                                )}
-                                                <span style={{ fontSize: '0.88rem', lineHeight: 1.5, fontWeight: parsedAnn.isSpecificToCurrent ? 650 : 550, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                  {parsedAnn.cleanText}
-                                                </span>
-                                              </div>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleSpeakText(`Seite ${p}: ${parsedAnn.cleanText}`, `book_note_${item.title}_${p}`);
-                                                  }}
-                                                  style={{
-                                                    border: 'none',
-                                                    background: isSpeakingThis ? '#bbf7d0' : 'none',
-                                                    color: isSpeakingThis ? '#15803d' : '#94a3b8',
-                                                    cursor: 'pointer',
-                                                    padding: '2px 4px',
-                                                    borderRadius: '4px',
-                                                    display: 'flex',
-                                                    alignItems: 'center'
-                                                  }}
-                                                  className="hover-scale-mini"
-                                                  title="Notiz vorlesen"
-                                                >
-                                                  <Volume2 size={13} strokeWidth={2.4} />
-                                                </button>
-
-                                                {!readOnly && (
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                                   <button
                                                     type="button"
-                                                    onClick={() => handleDeletePageNote(item.title, p)}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleSpeakText(`Seite ${p}: ${parsedAnn.cleanText}`, `book_note_${item.title}_${p}`);
+                                                    }}
                                                     style={{
                                                       border: 'none',
-                                                      background: 'none',
-                                                      color: '#94a3b8',
+                                                      background: isSpeakingThis ? '#bbf7d0' : 'none',
+                                                      color: isSpeakingThis ? '#15803d' : '#94a3b8',
                                                       cursor: 'pointer',
-                                                      fontSize: '0.70rem',
-                                                      fontWeight: 800,
-                                                      padding: '2px'
+                                                      padding: '2px 4px',
+                                                      borderRadius: '4px',
+                                                      display: 'flex',
+                                                      alignItems: 'center'
                                                     }}
                                                     className="hover-scale-mini"
-                                                    title="Notiz löschen"
+                                                    title="Notiz vorlesen"
                                                   >
-                                                    ✕
+                                                    <Volume2 size={13} strokeWidth={2.4} />
                                                   </button>
-                                                )}
+
+                                                  {!readOnly && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeletePageNote(item.title, p)}
+                                                      style={{
+                                                        border: 'none',
+                                                        background: 'none',
+                                                        color: '#94a3b8',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.70rem',
+                                                        fontWeight: 800,
+                                                        padding: '2px'
+                                                      }}
+                                                      className="hover-scale-mini"
+                                                      title="Notiz löschen"
+                                                    >
+                                                      ✕
+                                                    </button>
+                                                  )}
+                                                </div>
                                               </div>
+                                            );
+                                          })
+                                        ) : (
+                                          item.notes && item.notes.length > 0 ? (
+                                            item.notes.map((rawNote: string, nIdx: number) => {
+                                              const parsedAnn = parseStudentAnnotation(rawNote, studentFirstName, isTeacherMode);
+                                              if (readOnly && parsedAnn.isSpecificToAnother) return null;
+                                              return (
+                                                <div key={`n-note-${nIdx}`} style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  gap: '8px',
+                                                  fontSize: isJunior ? '0.94rem' : '0.86rem',
+                                                  lineHeight: 1.5,
+                                                  padding: isJunior ? '4px 10px' : '3px 8px',
+                                                  marginLeft: isJunior ? '40px' : '32px',
+                                                  color: '#475569'
+                                                }}>
+                                                  <span style={{ fontWeight: 650 }}>{parsedAnn.cleanText}</span>
+                                                </div>
+                                              );
+                                            })
+                                          ) : (
+                                            <div style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '8px',
+                                              fontSize: isJunior ? '0.94rem' : '0.86rem',
+                                              lineHeight: 1.5,
+                                              padding: isJunior ? '4px 10px' : '3px 8px',
+                                              marginLeft: isJunior ? '40px' : '32px',
+                                              color: '#475569'
+                                            }}>
+                                              <span style={{ fontWeight: 650 }}>
+                                                {item.pages && item.pages.length === 1
+                                                  ? `Ganze Seite ${item.pages[0]} bis zur nächsten Stunde üben & festigen.`
+                                                  : (item.pages && item.pages.length > 1
+                                                      ? `${formatPageNumbersGerman(item.pages).replace(/^auf/, 'Auf')} bis zur nächsten Stunde üben & festigen.`
+                                                      : 'Bis zur nächsten Stunde üben & festigen.')}
+                                              </span>
                                             </div>
-                                          );
-                                        })}
+                                          )
+                                        )}
                                       </div>
                                     );
                                   })}
@@ -9897,7 +9846,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     return (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                         {deduplicatedOtherHWs.map((item, idx) => {
-                                          const songNote = getCleanPageNotes(item.homework_notes);
+                                          const cachedSongNote = (student?.id && typeof window !== 'undefined') ? (
+                                            localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                                            localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
+                                            localStorage.getItem(`song_note_${student.id}_${item.songId}`)
+                                          ) : null;
+                                          const songNote = getCleanPageNotes(item.homework_notes) || getCleanPageNotes(cachedSongNote || '');
                                           const songInfo = extractSongArtistAndTitle(item);
                                           const rawSongTopic = item.topic_name || item.title || item.song_title || 'Song';
                                           const cleanSongDisplayTitle = rawSongTopic.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/\s*\([^)]*\)\s*$/, '').replace(/linken park/gi, 'Linkin Park');
@@ -10026,10 +9980,52 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     <Volume2 size={isJunior ? 16 : 13} strokeWidth={2.2} />
                                                   )}
                                                 </button>
+                                                {!readOnly && (
+                                                  <button
+                                                    type="button"
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleRemoveSongFromCurrentHomework(item);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                      if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleRemoveSongFromCurrentHomework(item);
+                                                      }
+                                                    }}
+                                                    title={`Song ${cleanSongDisplayTitle} aus Hausaufgabe entfernen`}
+                                                    aria-label={`Song ${cleanSongDisplayTitle} aus Hausaufgabe entfernen`}
+                                                    style={{
+                                                      border: '1px solid #cbd5e1',
+                                                      background: '#ffffff',
+                                                      color: '#64748b',
+                                                      borderRadius: isJunior ? '10px' : '8px',
+                                                      width: isJunior ? '34px' : '30px',
+                                                      height: isJunior ? '34px' : '30px',
+                                                      minWidth: isJunior ? '34px' : '30px',
+                                                      minHeight: isJunior ? '34px' : '30px',
+                                                      padding: 0,
+                                                      cursor: 'pointer',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      transition: 'all 0.15s ease',
+                                                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                                                      touchAction: 'manipulation',
+                                                      flexShrink: 0
+                                                    }}
+                                                    className="hover-scale-mini"
+                                                  >
+                                                    <X size={isJunior ? 16 : 13} strokeWidth={2.4} />
+                                                  </button>
+                                                )}
                                               </div>
                                             </div>
 
-                                            {/* Specific Song Practice Note (Frameless Editorial Flow + Micro TTS Speaker Pill) */}
+                                            {/* Specific Song Practice Note or 0,1% Didactical Editorial Subtext */}
                                             {songNote ? (() => {
                                               const parsedAnn = parseStudentAnnotation(songNote, studentFirstName, isTeacherMode);
                                               if (readOnly && parsedAnn.isSpecificToAnother) return null;
@@ -10062,7 +10058,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                         gap: '3px',
                                                         background: '#dcfce7',
                                                         color: '#15803d',
-                                                        border: '1px solid #10b981',
+                                                        border: 'none',
                                                         borderRadius: '6px',
                                                         padding: '2px 6px',
                                                         fontSize: '0.72rem',
@@ -10080,7 +10076,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                         gap: '3px',
                                                         background: '#ede9fe',
                                                         color: '#6d28d9',
-                                                        border: '1px solid #c4b5fd',
+                                                        border: 'none',
                                                         borderRadius: '6px',
                                                         padding: '2px 6px',
                                                         fontSize: '0.72rem',
@@ -10119,13 +10115,156 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   </button>
                                                 </div>
                                               );
-                                            })() : null}
+                                            })() : (
+                                              <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px',
+                                                fontSize: isJunior ? '0.94rem' : '0.86rem',
+                                                lineHeight: 1.5,
+                                                padding: isJunior ? '4px 10px' : '3px 8px',
+                                                marginLeft: isJunior ? '40px' : '32px',
+                                                color: '#475569'
+                                              }}>
+                                                <span style={{ fontWeight: 650 }}>
+                                                  Song bis zur nächsten Stunde im eigenen Tempo üben & festigen.
+                                                </span>
+                                              </div>
+                                            )}
                                           </div>
                                         );
                                       })}
                                     </div>
                                   );
                                 })()}
+
+                                  {/* Notenschnipsel (MicroScores 1–4 Takte) in Stage Box */}
+                                  {microScoresList.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobileView ? '10px' : '8px' }}>
+                                      {microScoresList.map((ms: any, msIdx: number) => {
+                                        const msId = ms.id || `ms-${msIdx}`;
+                                        const msTitle = ms.title || 'Notenschnipsel';
+                                        const msSubtitle = `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`;
+                                        const isSpeakingThisMs = isTtsSpeaking && activeTtsKey === `ms_head_${msIdx}`;
+                                        const msSpeechText = `Notenschnipsel: ${msTitle}. ${msSubtitle}.`;
+                                        return (
+                                          <div
+                                            key={`hw-ms-row-${msId}-${msIdx}`}
+                                            style={{
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: isMobileView ? '4px' : '5px',
+                                              background: isMobileView ? 'transparent' : (isSpeakingThisMs ? '#e0e7ff' : '#ffffff'),
+                                              border: isMobileView ? 'none' : '1px solid #f1f5f9',
+                                              borderRadius: isMobileView ? '0' : '14px',
+                                              padding: isMobileView ? '0 0 10px 0' : '12px 14px',
+                                              boxShadow: isMobileView ? 'none' : '0 1px 3px rgba(0,0,0,0.02)',
+                                              borderBottom: isMobileView ? (msIdx < microScoresList.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none') : '1px solid #f1f5f9'
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                              <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                minWidth: 0,
+                                                opacity: isFutureWeek ? 0.38 : 1,
+                                                transition: 'opacity 0.15s ease'
+                                              }}>
+                                                <MicroScoreSnippetButton
+                                                  studentId={student?.id}
+                                                  taskId={msId}
+                                                  taskTitle={msTitle}
+                                                  defaultInstrument={ms.instrument || student?.instrument}
+                                                  initialSnippet={ms}
+                                                  isJunior={isJunior}
+                                                  readOnly={readOnly}
+                                                />
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                                                  <span style={{
+                                                    fontSize: isJunior ? '1.14rem' : '1.05rem',
+                                                    fontWeight: 850,
+                                                    color: '#0f172a',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    lineHeight: 1.25
+                                                  }}>
+                                                    {msTitle}
+                                                  </span>
+                                                  <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                                                    {msSubtitle}
+                                                  </span>
+                                                </div>
+                                              </div>
+
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                {readOnly && (
+                                                  <StudentHomeworkStatusButton
+                                                    studentId={student?.id}
+                                                    taskId={msId}
+                                                    label={msTitle}
+                                                  />
+                                                )}
+                                                <button
+                                                  type="button"
+                                                  role="button"
+                                                  tabIndex={0}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isSpeakingThisMs) {
+                                                      handleStopSpeaking();
+                                                    } else {
+                                                      handleSpeakText(msSpeechText, `ms_head_${msIdx}`);
+                                                    }
+                                                  }}
+                                                  onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      if (isSpeakingThisMs) {
+                                                        handleStopSpeaking();
+                                                      } else {
+                                                        handleSpeakText(msSpeechText, `ms_head_${msIdx}`);
+                                                      }
+                                                    }
+                                                  }}
+                                                  title={isSpeakingThisMs ? "Vorlesen stoppen" : `Notenschnipsel ${msTitle} vorlesen`}
+                                                  aria-label={isSpeakingThisMs ? "Vorlesen stoppen" : `Notenschnipsel ${msTitle} vorlesen`}
+                                                  style={{
+                                                    border: isSpeakingThisMs ? '1px solid #10b981' : '1px solid #cbd5e1',
+                                                    background: isSpeakingThisMs ? '#dcfce7' : '#ffffff',
+                                                    color: isSpeakingThisMs ? '#15803d' : '#64748b',
+                                                    borderRadius: isJunior ? '10px' : '8px',
+                                                    width: isJunior ? '34px' : '30px',
+                                                    height: isJunior ? '34px' : '30px',
+                                                    minWidth: isJunior ? '34px' : '30px',
+                                                    minHeight: isJunior ? '34px' : '30px',
+                                                    padding: 0,
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.15s ease',
+                                                    boxShadow: isSpeakingThisMs ? '0 0 0 2px rgba(34, 197, 94, 0.2)' : '0 1px 2px rgba(0,0,0,0.02)',
+                                                    touchAction: 'manipulation',
+                                                    flexShrink: 0
+                                                  }}
+                                                  className="hover-scale-mini"
+                                                >
+                                                  {isSpeakingThisMs ? (
+                                                    <VolumeX size={isJunior ? 16 : 13} strokeWidth={2.4} />
+                                                  ) : (
+                                                    <Volume2 size={isJunior ? 16 : 13} strokeWidth={2.2} />
+                                                  )}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
 
                                   {/* Audio Badges in Live Preview */}
                                   {audioNotes.length > 0 && (
@@ -10148,6 +10287,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           } else if (handleDeleteNote) {
                                             await Promise.resolve(handleDeleteNote(target?.originalIdx ?? target?.idx ?? trackIdx));
                                           }
+                                          setAdoptedPastItemIds(prev => prev.filter(id => !id.startsWith('audio-')));
                                         } : undefined}
                                         readOnly={readOnly}
                                         isFutureWeek={isFutureWeek}
@@ -10232,7 +10372,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     gap: '3px',
                                                     background: '#dcfce7',
                                                     color: '#15803d',
-                                                    border: '1px solid #10b981',
+                                                    border: 'none',
                                                     borderRadius: '8px',
                                                     padding: '2px 7px',
                                                     fontSize: '0.72rem',
@@ -10252,7 +10392,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                     gap: '3px',
                                                     background: '#ede9fe',
                                                     color: '#6d28d9',
-                                                    border: '1px solid #c4b5fd',
+                                                    border: 'none',
                                                     borderRadius: '8px',
                                                     padding: '2px 7px',
                                                     fontSize: '0.72rem',
@@ -10481,6 +10621,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleDeleteSingleNoteItem(nIdx);
+                                                    setAdoptedPastItemIds(prev => prev.filter(id => id !== `note-${nIdx}`));
                                                   }}
                                                   style={{
                                                     border: 'none',
@@ -10564,7 +10705,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         gap: '8px',
                                         background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                        border: '1px solid #10b981',
+                                        border: 'none',
                                         borderRadius: '12px',
                                         padding: '6px 12px',
                                         fontSize: '0.78rem',
@@ -10730,7 +10871,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     height: "40px",
                     borderRadius: "12px",
                     background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
-                    border: "1px solid #bfdbfe",
+                    border: 'none',
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -10924,7 +11065,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 type="button"
                                 onClick={() => handleRestoreModule(hiddenKey)}
                                 style={{
-                                  background: "#22c55e",
+                                  background: "#34a853",
                                   color: "#ffffff",
                                   border: "none",
                                   borderRadius: "10px",
@@ -11028,9 +11169,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           key: 'skillradar' as StudioModuleKey,
                           title: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten-Radar',
                           badge: 'KOMPETENZ-PROFIL',
-                          badgeColor: '#d946ef',
-                          badgeBg: 'rgba(217, 70, 239, 0.08)',
-                          badgeBorder: '1px solid rgba(217, 70, 239, 0.22)',
+                          badgeColor: '#ec4899',
+                          badgeBg: 'rgba(236, 72, 153, 0.08)',
+                          badgeBorder: '1px solid rgba(236, 72, 153, 0.22)',
                           description: 'Visualisierung des didaktischen Fortschritts und aller Meilensteine',
                           pills: ['⭐ 5 Dimensionen', '📈 Langzeit-Entwicklung']
                         },
@@ -11038,9 +11179,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           key: 'worldtour' as StudioModuleKey,
                           title: 'Musik-Weltreise',
                           badge: 'DIDAKTISCHE EXPEDITION',
-                          badgeColor: '#0284c7',
-                          badgeBg: 'rgba(2, 132, 199, 0.08)',
-                          badgeBorder: '1px solid rgba(2, 132, 199, 0.22)',
+                          badgeColor: '#007acc',
+                          badgeBg: 'rgba(0, 122, 204, 0.08)',
+                          badgeBorder: '1px solid rgba(0, 122, 204, 0.22)',
                           description: 'Musikalische Entdeckungsreise durch Rhythmen und Kulturen der Welt',
                           pills: ['🌍 Kontinente & Stile', '🏆 Reisepass-Sticker']
                         },
@@ -11137,7 +11278,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 width: "52px",
                                 height: "30px",
                                 borderRadius: "15px",
-                                background: isUnlocked ? "#22c55e" : "#cbd5e1",
+                                background: isUnlocked ? "#34a853" : "#cbd5e1",
                                 border: "none",
                                 padding: "3px",
                                 cursor: "pointer",
@@ -11145,7 +11286,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 alignItems: "center",
                                 justifyContent: isUnlocked ? "flex-end" : "flex-start",
                                 transition: "all 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
-                                boxShadow: isUnlocked ? "0 0 12px rgba(34, 197, 94, 0.40)" : "none",
+                                boxShadow: "none",
                                 flexShrink: 0,
                                 outline: "none"
                               }}
@@ -11183,7 +11324,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     width: "7px",
                     height: "7px",
                     borderRadius: "50%",
-                    background: "#22c55e",
+                    background: "#34a853",
                     boxShadow: "none"
                   }} />
                   <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>

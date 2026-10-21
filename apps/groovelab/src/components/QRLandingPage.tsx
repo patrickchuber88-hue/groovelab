@@ -22,6 +22,7 @@ import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 import { playTriumphantXpChime, animateXpCountUp, CAMPUS_XP_EFFECTS_CSS } from '../utils/campusXpEffects';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';import { QrLessonAppointmentCard } from './student/schedule/QrLessonAppointmentCard';
 import { StudentRescheduleDecisionModal } from './student/modals/StudentRescheduleDecisionModal';
+import { OledFocusStudioStage } from './focus/OledFocusStudioStage';
 // ─── Helper: Device Key Storage ──────────────────────────────────────────────
 const DEVICE_KEY_PREFIX = 'gl_device_key_';
 
@@ -527,8 +528,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [unreadMessageOccurrences, setUnreadMessageOccurrences] = useState<string[]>([]);
   const [pastSectionExpanded, setPastSectionExpanded] = useState(false);
   const [expandedHistoryWeek, setExpandedHistoryWeek] = useState<string | null>(null);
+  const [isArchiveSectionOpen, setIsArchiveSectionOpen] = useState(false);
   const [timerRunning, setTimerRunning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
+  const isTimerPausedRef = useRef(false);
   
   const [parentUnlocked, setParentUnlocked] = useState(false);
   const [pinPurpose, setPinPurpose] = useState<'unlock_preview' | 'unlock_app' | 'setup_initial_pin'>('unlock_app');
@@ -1062,6 +1066,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     if (!isStudentOnly) {
       const interval = setInterval(() => {
+        if (isTimerPausedRef.current) return;
         setElapsedSeconds(s => s + 1);
       }, 1000);
       return () => clearInterval(interval);
@@ -1084,7 +1089,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
     // Timer interval
     const interval = setInterval(() => {
-      if (preStartCountdownRef.current !== null) {
+      if (preStartCountdownRef.current !== null || isTimerPausedRef.current) {
         return;
       }
 
@@ -3961,8 +3966,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       <div style={{
         width: '100%',
         maxWidth: '440px',
-        background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-        border: '1.5px solid #fde68a',
+        background: '#fef9c3',
+        border: 'none',
         borderRadius: '24px',
         padding: '18px 20px',
         boxShadow: 'none',
@@ -4002,7 +4007,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           background: '#ffffff',
           borderRadius: '16px',
           padding: '12px 14px',
-          border: '1px solid #fef08a',
+          border: '1px solid #e2e8f0',
           display: 'flex',
           flexDirection: 'column',
           gap: '6px'
@@ -4036,7 +4041,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             onClick={() => handleAcknowledgeOccurrence(occ)}
             style={{
               flex: 2,
-              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+              background: '#34a853',
               color: '#ffffff',
               border: 'none',
               borderRadius: '14px',
@@ -4386,7 +4391,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
               return needsAck || hasUnreadMsg;
             }) && (
-              <div style={{ background: '#fff7ed', border: '1px solid #ffedd5', color: '#c2410c', padding: '6px 12px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ background: '#fff7ed', border: 'none', color: '#c2410c', padding: '6px 12px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 800, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span>🔔</span>
                 <span>Du hast neue Termin-Änderungen oder Nachrichten!</span>
               </div>
@@ -4419,7 +4424,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {pinError && (
             <div style={{
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px',
               fontSize: '0.75rem',
@@ -4719,7 +4724,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 style={{
                   background: '#e6f4ea',
                   color: '#288d45',
-                  border: '1px solid #bbf7d0',
+                  border: 'none',
                   borderRadius: '10px',
                   padding: '5px 10px',
                   fontSize: '0.74rem',
@@ -4741,7 +4746,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 style={{
                   background: '#e6f4ea',
                   color: '#288d45',
-                  border: '1px solid #ceebd6',
+                  border: 'none',
                   borderRadius: '10px',
                   padding: '5px 10px',
                   fontSize: '0.74rem',
@@ -4820,8 +4825,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div 
               onClick={() => setShowActivationInfoModal(true)}
               style={{
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '1.5px solid #bbf7d0',
+                background: '#dcfce7',
+                border: 'none',
                 borderRadius: '20px',
                 padding: '16px 18px',
                 display: 'flex',
@@ -4840,7 +4845,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   height: '38px',
                   borderRadius: '12px',
                   background: '#ffffff',
-                  border: '1px solid #bbf7d0',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -4863,12 +4868,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 padding: '6px 14px',
                 borderRadius: '100px',
                 background: '#ffffff',
-                border: '1.5px solid #86efac',
+                border: 'none',
                 color: '#15803d',
                 fontWeight: 900,
                 fontSize: '0.76rem',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+                boxShadow: 'none'
               }}>
                 {isSchoolCovered ? 'Kostenfrei freischalten' : 'Aktivierung starten'}
               </div>
@@ -5259,7 +5264,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const filteredTextNotes = notesList.filter(note => {
       const t = (note || '').trim();
       const lower = t.toLowerCase();
-      return !t.startsWith("AUDIO:") && !t.includes("STICKER:") && !lower.includes("latency:") && !lower.includes("latency_calibration:") && !t.startsWith("SYSTEM:") && !t.startsWith("FEEDBACK:");
+      return !t.startsWith("AUDIO:") && !t.startsWith("MICROSCORE:") && !t.startsWith("SNAPSHOT_") && !t.startsWith("LOOP:") && !t.includes("STICKER:") && !lower.includes("latency:") && !lower.includes("latency_calibration:") && !t.startsWith("SYSTEM:") && !t.startsWith("FEEDBACK:");
     });
 
     const hasAnyHWItems = lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || filteredTextNotes.length > 0;
@@ -5297,236 +5302,268 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       if (sortedPastWeeks.length === 0) return null;
 
+      const isCampusActive = profile?.is_campus_active === true;
+
       return (
-        <div style={{
-          borderRadius: '20px',
-          background: '#ffffff',
-          border: '1px solid rgba(0, 0, 0, 0.06)',
-          padding: '16px 18px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* 🗂️ Kompakter 0,1% Goldstandard Archiv-Trigger (Maximale Platzersparnis) */}
+          <button
+            type="button"
+            onClick={() => setIsArchiveSectionOpen(prev => !prev)}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: '14px',
+              border: '1px solid #e2e8f0',
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: '0.80rem',
+              fontWeight: 750,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+            title="Vergangene Kalenderwochen & Hausaufgaben-Chronik einsehen"
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '7px',
-                background: '#64748b',
+                width: '22px',
+                height: '22px',
+                borderRadius: '6px',
+                background: isCampusActive ? '#ecfdf5' : '#f1f5f9',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: 'none'
+                color: isCampusActive ? '#16a34a' : '#64748b'
               }}>
-                <BookOpen size={13} color="#ffffff" strokeWidth={2.5} />
+                <BookOpen size={12} strokeWidth={2.5} />
               </div>
-              <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Verlauf &amp; Archiv
+              <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#1e293b' }}>
+                Unterrichts-Archiv &amp; Chronik ({sortedPastWeeks.length} Wochen)
               </span>
             </div>
-            <span style={{
-              fontSize: '0.66rem',
-              fontWeight: 800,
-              color: '#64748b',
-              background: '#f1f5f9',
-              border: '1px solid #e2e8f0',
-              padding: '2px 8px',
-              borderRadius: '100px'
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 650 }}>
+                {isArchiveSectionOpen ? 'Einklappen' : 'Anzeigen'}
+              </span>
+              <ChevronDown
+                size={14}
+                color="#64748b"
+                style={{
+                  transform: isArchiveSectionOpen ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.2s ease'
+                }}
+              />
+            </div>
+          </button>
+
+          {isArchiveSectionOpen && (
+            <div style={{
+              borderRadius: '16px',
+              background: '#ffffff',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              boxShadow: '0 4px 16px -2px rgba(0, 0, 0, 0.04)',
+              width: '100%',
+              boxSizing: 'border-box'
             }}>
-              Schuljahr
-            </span>
-          </div>
+              {/* List of Weeks */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {sortedPastWeeks.map(pw => {
+                  const pwNum = pw.split('-W')[1] || '';
+                  const isDirectPrevWeek = pw === previousWeekIso;
+                  const isExpanded = expandedHistoryWeek === pw;
+                  const isUnlocked = isCampusActive || isDirectPrevWeek;
 
-          {/* List of Weeks */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {sortedPastWeeks.map(pw => {
-              const pwNum = pw.split('-W')[1] || '';
-              const isDirectPrevWeek = pw === previousWeekIso;
-              const isExpanded = expandedHistoryWeek === pw;
+                  if (isUnlocked) {
+                    const prevItems = (progressItems || []).filter(item => getItemWeek(item) === pw && item.is_current_homework && !item.topic_name?.startsWith('Hausaufgabe KW '));
+                    const prevNotes = getHomeworkNotes(pw).filter(n => !n.startsWith('AUDIO:') && !n.startsWith('SNAPSHOT_') && !n.includes('STICKER:'));
 
-              if (isDirectPrevWeek) {
-                const prevItems = (progressItems || []).filter(item => getItemWeek(item) === pw && item.is_current_homework && !item.topic_name?.startsWith('Hausaufgabe KW '));
-                const prevNotes = getHomeworkNotes(pw).filter(n => !n.startsWith('AUDIO:') && !n.startsWith('SNAPSHOT_') && !n.includes('STICKER:'));
+                    return (
+                      <div
+                        key={pw}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setExpandedHistoryWeek(isExpanded ? null : pw)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setExpandedHistoryWeek(isExpanded ? null : pw);
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                              KW {pwNum}{isDirectPrevWeek ? ' (Letzte Woche)' : ''}
+                            </span>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 750,
+                              color: '#15803d',
+                              background: '#dcfce7',
+                              padding: '1px 7px',
+                              borderRadius: '6px'
+                            }}>
+                              {prevItems.length > 0 ? `${prevItems.length} Aufgaben` : (prevNotes.length > 0 ? 'Notiz vorhanden' : 'Dokumentiert')}
+                            </span>
+                          </div>
+                          <ChevronDown
+                            size={15}
+                            color="#64748b"
+                            style={{
+                              transform: isExpanded ? 'rotate(180deg)' : 'none',
+                              transition: 'transform 0.2s ease'
+                            }}
+                          />
+                        </div>
 
-                return (
-                  <div
-                    key={pw}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
+                        {isExpanded && (
+                          <div style={{
+                            borderTop: '1px solid #e2e8f0',
+                            paddingTop: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                          }}>
+                            {prevItems.length > 0 ? (
+                              prevItems.map((item, pIdx) => (
+                                <div key={pIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.80rem', color: '#334155', fontWeight: 650 }}>
+                                  <Check size={13} color="#16a34a" style={{ flexShrink: 0 }} />
+                                  <span>{item.topic_name || item.title || 'Übeaufgabe'}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                                Keine gesonderten Einträge aus dieser Woche archiviert.
+                              </div>
+                            )}
+                            {prevNotes.length > 0 && (
+                              <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {prevNotes.slice(0, 3).map((note, nIdx) => (
+                                  <div key={nIdx} style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <FileText size={11} color="#16a34a" style={{ flexShrink: 0 }} />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
                     <div
+                      key={pw}
                       role="button"
                       tabIndex={0}
-                      onClick={() => setExpandedHistoryWeek(isExpanded ? null : pw)}
+                      onClick={() => {
+                        setShowGiroCodeModal(true);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          setExpandedHistoryWeek(isExpanded ? null : pw);
+                          setShowGiroCodeModal(true);
                         }
                       }}
                       style={{
+                        background: '#f8fafc',
+                        border: '1px dashed #cbd5e1',
+                        borderRadius: '12px',
+                        padding: '8px 14px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        touchAction: 'manipulation'
+                        touchAction: 'manipulation',
+                        transition: 'all 0.15s ease'
                       }}
+                      className="hover-scale-mini"
+                      title="Schuljahres-Archiv im Campus-Vollzugang öffnen"
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
-                          KW {pwNum} (Letzte Woche)
-                        </span>
-                        <span style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 750,
-                          color: '#15803d',
-                          background: '#dcfce7',
-                          padding: '1px 7px',
-                          borderRadius: '6px'
-                        }}>
-                          {prevItems.length > 0 ? `${prevItems.length} Aufgaben` : 'Dokumentiert'}
+                        <Lock size={12} color="#64748b" />
+                        <span style={{ fontSize: '0.80rem', fontWeight: 750, color: '#64748b' }}>
+                          KW {pwNum} · Archiviert
                         </span>
                       </div>
-                      <ChevronDown
-                        size={15}
-                        color="#64748b"
-                        style={{
-                          transform: isExpanded ? 'rotate(180deg)' : 'none',
-                          transition: 'transform 0.2s ease'
-                        }}
-                      />
-                    </div>
-
-                    {isExpanded && (
-                      <div style={{
-                        borderTop: '1px solid #e2e8f0',
-                        paddingTop: '8px',
+                      <span style={{
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        color: '#34a853',
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px'
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
-                        {prevItems.length > 0 ? (
-                          prevItems.map((item, pIdx) => (
-                            <div key={pIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.80rem', color: '#334155', fontWeight: 650 }}>
-                              <Check size={13} color="#16a34a" style={{ flexShrink: 0 }} />
-                              <span>{item.topic_name || item.title || 'Übeaufgabe'}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
-                            Keine gesonderten Einträge aus der Vorwoche archiviert.
-                          </div>
-                        )}
-                        {prevNotes.length > 0 && (
-                          <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            {prevNotes.slice(0, 3).map((note, nIdx) => (
-                              <div key={nIdx} style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <FileText size={11} color="#16a34a" style={{ flexShrink: 0 }} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
+                        <span>Freischalten</span>
+                        <ChevronRight size={12} color="#34a853" />
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-              return (
-                <div
-                  key={pw}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setShowGiroCodeModal(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setShowGiroCodeModal(true);
-                    }
-                  }}
+              {/* Teaser Button für Eltern (NUR wenn Campus inaktiv) */}
+              {!isCampusActive && (
+                <button
+                  type="button"
+                  onClick={() => setShowGiroCodeModal(true)}
                   style={{
-                    background: '#f8fafc',
-                    border: '1px dashed #cbd5e1',
+                    marginTop: '4px',
+                    width: '100%',
+                    padding: '10px 14px',
                     borderRadius: '12px',
-                    padding: '8px 14px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    border: 'none',
+                    background: '#dcfce7',
+                    color: '#166534',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
                     cursor: 'pointer',
-                    userSelect: 'none',
-                    touchAction: 'manipulation',
-                    transition: 'all 0.15s ease'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease',
+                    minHeight: '44px',
+                    boxShadow: 'none'
                   }}
                   className="hover-scale-mini"
-                  title="Schuljahres-Archiv im Campus-Vollzugang öffnen"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Lock size={12} color="#64748b" />
-                    <span style={{ fontSize: '0.80rem', fontWeight: 750, color: '#64748b' }}>
-                      KW {pwNum} · Archiviert
-                    </span>
-                  </div>
-                  <span style={{
-                    fontSize: '0.70rem',
-                    fontWeight: 800,
-                    color: '#34a853',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <span>Freischalten</span>
-                    <ChevronRight size={12} color="#34a853" />
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Teaser Button für Eltern */}
-          <button
-            type="button"
-            onClick={() => setShowGiroCodeModal(true)}
-            style={{
-              marginTop: '4px',
-              width: '100%',
-              padding: '10px 14px',
-              borderRadius: '12px',
-              border: '1px solid #bbf7d0',
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-              color: '#166534',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease',
-              minHeight: '44px',
-              boxShadow: 'none'
-            }}
-            className="hover-scale-mini"
-          >
-            <Sparkles size={14} color="#16a34a" />
-            <span>Schuljahres-Archiv &amp; Audio-Biografie freischalten</span>
-          </button>
+                  <Sparkles size={14} color="#16a34a" />
+                  <span>Schuljahres-Archiv &amp; Audio-Biografie freischalten</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       );
     };
@@ -5692,7 +5729,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               <Calendar size={13} strokeWidth={2.5} />
             </div>
             <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Schülervorschau (KW {currentKw})
+              Aufgabenheft (KW {currentKw})
             </span>
           </div>
 
@@ -5860,13 +5897,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <div style={{
                       width: '26px',
                       height: '30px',
-                      background: `linear-gradient(135deg, ${bookColor.from}, ${bookColor.to})`,
+                      background: bookColor.from,
                       borderRadius: '6px',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+                      boxShadow: 'none',
                       color: bookColor.text
                     }}>
                       <BookOpen size={13} color={bookColor.text} />
@@ -5958,7 +5995,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           width: '26px',
                           height: '26px',
                           borderRadius: '8px',
-                          background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)',
+                          background: '#e0e7ff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -6051,7 +6088,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 if (isPublic) {
                   return (
-                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '5px 10px', borderRadius: '8px' }}>
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#166534', fontWeight: 750, background: '#f0fdf4', border: 'none', padding: '5px 10px', borderRadius: '8px' }}>
                       <span style={{ fontSize: '0.85rem' }}>💬</span>
                       <span>Frage: {cleanText}</span>
                     </div>
@@ -6060,7 +6097,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                 if (isPrivate) {
                   return (
-                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: '1px solid #fecaca', padding: '5px 10px', borderRadius: '8px' }}>
+                    <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'center', fontSize: '0.78rem', color: '#dc2626', fontWeight: 750, background: '#fef2f2', border: 'none', padding: '5px 10px', borderRadius: '8px' }}>
                       <span style={{ fontSize: '0.85rem' }}>🔒</span>
                       <span>Notiz: {cleanText}</span>
                     </div>
@@ -6157,14 +6194,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const borderColor = isCancelled 
         ? '1.5px solid #ef4444' 
         : isShiftedPending 
-          ? '1.5px dashed #eab308' 
+          ? '1.5px dashed #facc15' 
           : isPendingAdmin 
-            ? '1.5px dashed #eab308' 
+            ? '1.5px dashed #facc15' 
             : (styles.card ? styles.card.border : '1px solid #e2e8f0');
       const cardBg = isCancelled
-        ? 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)'
+        ? '#fee2e2'
         : isShiftedPending 
-          ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' 
+          ? '#fef9c3' 
           : '#ffffff';
 
       return (
@@ -6172,7 +6209,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           ...styles.card,
           padding: '16px',
           gap: '12px',
-          border: borderColor,
+          border: (isCancelled || isShiftedPending) ? 'none' : borderColor,
           background: cardBg
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -6181,7 +6218,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               fontWeight: 900, 
               color: isCancelled ? '#991b1b' : '#34a853', 
               background: isCancelled ? '#fee2e2' : '#e6f4ea', 
-              border: isCancelled ? '1px solid #fca5a5' : 'none',
+              border: 'none',
               padding: '3px 8px', 
               borderRadius: '6px', 
               textTransform: 'uppercase' 
@@ -6193,22 +6230,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 Entfällt
               </span>
             ) : isShiftedPending ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: 'none', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
                 🗓️ Termin verschoben (ausstehend)
               </span>
             ) : isShiftedConfirmed ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: 'none', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 🗓️ Termin verschoben <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
               </span>
             ) : isPendingAdmin ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: 'none', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
                 ⏳ In Prüfung
               </span>
             ) : null}
           </div>
 
           {isCancelled && (
-            <div style={{ fontSize: '0.78rem', color: '#991b1b', fontWeight: 700, background: '#fff5f5', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fecaca', marginTop: '2px' }}>
+            <div style={{ fontSize: '0.78rem', color: '#991b1b', fontWeight: 700, background: '#fff5f5', padding: '8px 12px', borderRadius: '8px', border: 'none', marginTop: '2px' }}>
               Dieser Unterrichtstermin entfällt (Lehrkraft verhindert).
             </div>
           )}
@@ -6259,7 +6296,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {isShiftedPending ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-                <div style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 700, background: '#fef9c3', padding: '8px 10px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+                <div style={{ fontSize: '0.75rem', color: '#854d0e', fontWeight: 700, background: '#fef9c3', padding: '8px 10px', borderRadius: '8px', border: 'none' }}>
                   Termin wurde verschoben. Bitte bestätige die neue Unterrichtszeit:
                 </div>
                 {nextLesson.occ && (
@@ -6356,7 +6393,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             onClick={() => setActiveTab('action')}
             style={{
               flex: 1,
-              padding: '8px 12px',
+              padding: '8px 8px',
               border: 'none',
               borderRadius: '11px',
               background: activeTab === 'action' ? '#ffffff' : 'transparent',
@@ -6369,10 +6406,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '4px',
+              whiteSpace: 'nowrap'
             }}
           >
-            {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 4 }} /> Üben</>}
+            {isParentMode ? 'Schnell-Eingabe' : <><Timer size={14} style={{ marginRight: 2 }} /> Üben</>}
           </button>
         )}
         <button
@@ -6380,7 +6418,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           onClick={() => setActiveTab('homework')}
           style={{
             flex: 1,
-            padding: '8px 12px',
+            padding: '8px 8px',
             border: 'none',
             borderRadius: '11px',
             background: activeTab === 'homework' ? '#ffffff' : 'transparent',
@@ -6393,17 +6431,18 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px'
+            gap: '4px',
+            whiteSpace: 'nowrap'
           }}
         >
-          <><BookOpen size={14} style={{ marginRight: 4 }} /> Hausaufgaben</>
+          <><BookOpen size={14} style={{ marginRight: 2 }} /> Aufgaben</>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('lessons')}
           style={{
             flex: 1,
-            padding: '8px 12px',
+            padding: '8px 8px',
             border: 'none',
             borderRadius: '11px',
             background: activeTab === 'lessons' ? '#ffffff' : 'transparent',
@@ -6416,11 +6455,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px',
-            position: 'relative'
+            gap: '4px',
+            position: 'relative',
+            whiteSpace: 'nowrap'
           }}
         >
-          <Calendar size={14} style={{ marginRight: 6 }} />
+          <Calendar size={14} style={{ marginRight: 4 }} />
           <span>Termine</span>
           {(() => {
             const pendingCount = occurrences.filter(occ => {
@@ -6469,7 +6509,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           }}
           style={{
             flex: 1,
-            padding: '8px 12px',
+            padding: '8px 8px',
             border: 'none',
             borderRadius: '11px',
             background: activeTab === 'settings' ? '#ffffff' : 'transparent',
@@ -6482,7 +6522,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '6px'
+            gap: '4px',
+            whiteSpace: 'nowrap'
           }}
         >
           <ShieldCheck size={14} style={{ color: '#0284c7' }} />
@@ -6520,7 +6561,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             width: '56px',
             height: '56px',
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            background: '#0ea5e9',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -6548,7 +6589,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             <div style={{
               padding: '8px 14px',
               background: '#fee2e2',
-              border: '1px solid #fca5a5',
+              border: 'none',
               borderRadius: '12px',
               color: '#dc2626',
               fontSize: '0.76rem',
@@ -6773,7 +6814,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               width: '44px',
               height: '44px',
               borderRadius: '14px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              background: '#0ea5e9',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -6912,7 +6953,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   fontSize: '1rem',
                   overflow: 'hidden',
                   flexShrink: 0,
-                  border: '2px solid #bae6fd'
+                  border: 'none'
                 }}>
                   {assignedTeacher?.photo_url ? (
                     <img src={assignedTeacher.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -6940,7 +6981,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 padding: '3px 8px',
                 borderRadius: '6px',
                 background: '#eff6ff',
-                border: '1px solid #dbeafe',
+                border: 'none',
                 color: '#1d4ed8',
                 fontSize: '0.68rem',
                 fontWeight: 800
@@ -7032,7 +7073,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             padding: '1px 5px',
                             borderRadius: '5px',
                             background: '#eff6ff',
-                            border: '1px solid #dbeafe',
+                            border: 'none',
                             color: '#1d4ed8',
                             fontSize: '0.62rem',
                             fontWeight: 800,
@@ -7048,13 +7089,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <div style={{
                         padding: '11px 15px',
                         borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                        background: isMe ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)' : '#ffffff',
+                        background: isMe ? '#34a853' : '#ffffff',
                         color: isMe ? '#ffffff' : '#0f172a',
                         border: isMe ? 'none' : '1px solid #e2e8f0',
                         fontSize: '0.88rem',
                         lineHeight: 1.45,
                         wordBreak: 'break-word',
-                        boxShadow: isMe ? '0 2px 8px rgba(21, 128, 61, 0.2)' : '0 1px 4px rgba(0,0,0,0.03)'
+                        boxShadow: 'none'
                       }}>
                         {msg.content}
                         <div style={{
@@ -7128,7 +7169,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  boxShadow: parentTypedMessage.trim() ? '0 3px 10px rgba(21, 128, 61, 0.25)' : 'none',
+                  boxShadow: 'none',
                   transition: 'all 0.15s ease'
                 }}
               >
@@ -7295,8 +7336,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             marginTop: '4px',
             padding: '14px 16px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #bfdbfe',
+            background: '#dbeafe',
+            border: 'none',
             display: 'flex',
             flexDirection: 'column',
             gap: '10px',
@@ -7327,7 +7368,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   padding: '10px 16px',
                   borderRadius: '12px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  background: '#0ea5e9',
                   color: '#ffffff',
                   fontSize: '0.82rem',
                   fontWeight: 800,
@@ -7403,7 +7444,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 width: '50px',
                 height: '50px',
                 borderRadius: '16px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                background: '#0ea5e9',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -7426,7 +7467,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 <div style={{
                   padding: '6px 12px',
                   background: '#fee2e2',
-                  border: '1px solid #fca5a5',
+                  border: 'none',
                   borderRadius: '10px',
                   color: '#dc2626',
                   fontSize: '0.74rem',
@@ -7709,8 +7750,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             padding: '14px 20px',
             borderRadius: '16px',
             border: 'none',
-            background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-            color: '#ffffff',
+            background: '#facc15',
+            color: '#0f172a',
             fontSize: '0.88rem',
             fontWeight: 800,
             cursor: 'pointer',
@@ -7725,7 +7766,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           onMouseDown={e => e.currentTarget.style.transform = 'scale(0.97)'}
           onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
         >
-          <Sparkles size={16} color="#ffffff" />
+          <Sparkles size={16} color="#0f172a" />
           Noch eine Session einlegen (Bonus-Zeit sammeln)
         </button>
       </div>
@@ -7798,7 +7839,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           </button>
 
           <div style={styles.brandFooter}>
-            <Music size={14} color="#eab308" />
+            <Music size={14} color="#facc15" />
             <span>Campus-Groovelab</span>
           </div>
         </div>
@@ -7821,12 +7862,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               width: '56px',
               height: '56px',
               borderRadius: '18px',
-              background: isParentPinMode ? '#e0f2fe' : '#e6f4ea',
+              background: isParentPinMode ? '#e0f2fe' : '#dcfce7',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 14px auto',
-              boxShadow: isParentPinMode ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none'
+              boxShadow: 'none'
             }}>
               {isParentPinMode ? <ShieldCheck size={28} color="#0284c7" /> : <Lock size={28} color="#34a853" />}
             </div>
@@ -7862,9 +7903,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 width: '100%',
                 padding: '9px 12px',
                 borderRadius: '12px',
-                border: `1px solid ${isParentPinMode ? '#dcfce7' : '#e0f2fe'}`,
-                background: isParentPinMode ? '#f0fdf4' : '#f0f9ff',
-                color: isParentPinMode ? '#16a34a' : '#0284c7',
+                border: 'none',
+                background: isParentPinMode ? '#dcfce7' : '#e0f2fe',
+                color: isParentPinMode ? '#15803d' : '#0369a1',
                 fontSize: '0.78rem',
                 fontWeight: 800,
                 cursor: 'pointer',
@@ -7916,7 +7957,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {pinError && (
             <div style={{
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 14px',
               fontSize: '0.82rem',
@@ -7947,17 +7988,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     padding: '14px',
                     minHeight: '56px',
                     borderRadius: '16px',
-                    border: 'none',
+                    border: key === '⌫' ? 'none' : '1px solid #e2e8f0',
                     background: key === '⌫' ? '#fee2e2' : key === 'C' ? '#f1f5f9' : '#f8fafc',
                     color: key === '⌫' ? '#ef4444' : '#0f172a',
                     fontSize: key === '⌫' ? '1.2rem' : '1.35rem',
                     fontWeight: 800,
                     cursor: 'pointer',
                     transition: 'background 0.15s, transform 0.1s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    borderWidth: '1px',
-                    borderStyle: 'solid',
-                    borderColor: key === '⌫' ? '#fecaca' : '#e2e8f0',
+                    boxShadow: 'none',
                     touchAction: 'manipulation'
                   }}
                   onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
@@ -7978,9 +8016,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               gap: '10px',
               padding: '12px',
               borderRadius: '14px',
-              background: isParentPinMode ? '#f0f9ff' : '#f0fdf4',
-              border: `1px solid ${isParentPinMode ? '#bae6fd' : '#bbf7d0'}`,
-              color: isParentPinMode ? '#0284c7' : '#16a34a',
+              background: isParentPinMode ? '#e0f2fe' : '#dcfce7',
+              border: 'none',
+              color: isParentPinMode ? '#0369a1' : '#15803d',
               fontSize: '0.88rem',
               fontWeight: 800
             }}>
@@ -8351,7 +8389,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         {activationStep === 'landing' && (
           <div style={{width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
             {/* Header / Profile Card */}
-            <div style={{...styles.card, padding: '24px 20px', gap: '16px', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', border: 'none', color: 'white', position: 'relative', overflow: 'hidden'}}>
+            <div style={{...styles.card, padding: '24px 20px', gap: '16px', background: '#34a853', border: 'none', color: 'white', position: 'relative', overflow: 'hidden'}}>
               <div style={{position: 'absolute', top: '-20px', right: '-20px', width: '120px', height: '120px', background: 'rgba(255,255,255,0.08)', borderRadius: '50%', pointerEvents: 'none'}} />
               <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
                 <div style={{width: '56px', height: '56px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid rgba(255, 255, 255, 0.3)', flexShrink: 0, overflow: 'hidden'}}>
@@ -8395,7 +8433,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 ) : (
                   <div style={{
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     borderRadius: '12px',
                     padding: '10px 14px',
                     display: 'flex',
@@ -8454,7 +8492,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     width: '100%',
                     padding: '14px 16px',
                     borderRadius: '14px',
-                    border: '1.5px solid #34a853',
+                    border: 'none',
                     background: '#f0fdf4',
                     color: '#166534',
                     fontSize: '0.9rem',
@@ -8511,7 +8549,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   padding: '16px',
                   borderRadius: '16px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #34a853 0%, #288d45 100%)',
+                  background: '#34a853',
                   color: '#ffffff',
                   fontSize: '0.95rem',
                   fontWeight: 900,
@@ -8537,7 +8575,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
             {/* Activation callout or Notice */}
             {activationError && (
-              <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '16px', color: '#991b1b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ padding: '12px 16px', background: '#fee2e2', border: 'none', borderRadius: '16px', color: '#991b1b', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={16} />
                 <span>{activationError}</span>
               </div>
@@ -8561,7 +8599,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fef2f2', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '999px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fef2f2', border: 'none', padding: '4px 8px', borderRadius: '999px' }}>
                       <Flame size={14} fill="#ef4444" color="#ef4444" />
                       <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#dc2626' }}>{profile.streak_flame || 0} Tage</span>
                     </div>
@@ -8622,7 +8660,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             ) : (
               // INACTIVE STUDENT WIDGETS
               activationAllowed ? (
-                <div style={{...styles.card, padding: '24px', gap: '16px', border: '1.5px solid #e6f4ea', background: '#e6f4ea', textAlign: 'center'}}>
+                <div style={{...styles.card, padding: '24px', gap: '16px', border: 'none', background: '#e6f4ea', textAlign: 'center'}}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                     <h3 style={{margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#34a853'}}>Jetzt Campus testen</h3>
                     <p style={{margin: 0, fontSize: '0.85rem', color: '#34a853', lineHeight: 1.5, fontWeight: 550}}>
@@ -8709,7 +8747,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </div>
             </div>
 
-            <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: '1px solid #e6f4ea'}}>
+            <div style={{fontSize: '0.85rem', color: '#334155', lineHeight: '1.5', background: '#e6f4ea', padding: '16px', borderRadius: '16px', border: 'none'}}>
               Die Aktivierung des Campus-Zugangs (Hausaufgabenheft, Übe-Timer, Loopstation &amp; Audio-Tresor) erfolgt für das laufende Schuljahr.
               <div style={{ marginTop: '8px', fontWeight: 900, color: '#34a853', fontSize: '0.98rem' }}>
                 Bereitstellungsgebühr: {price ? price.toFixed(2).replace('.', ',') : '5,39'} € (1. Monat kostenlos, max. 11 × 0,49 € für das Schuljahr)
@@ -8734,8 +8772,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   style={{
                     padding: '14px',
                     borderRadius: '14px',
-                    border: paymentMethod === 'bank_transfer' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                    background: paymentMethod === 'bank_transfer' ? '#ecfdf5' : 'white',
+                    border: paymentMethod === 'bank_transfer' ? 'none' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'bank_transfer' ? '#dcfce7' : 'white',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -8778,7 +8816,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     }}
                     style={{
                       background: '#ffffff',
-                      border: '1px solid #86efac',
+                      border: '1px solid #e2e8f0',
                       borderRadius: '8px',
                       padding: '6px 10px',
                       color: '#047857',
@@ -8798,8 +8836,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   style={{
                     padding: '12px 14px',
                     borderRadius: '14px',
-                    border: paymentMethod === 'debit' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                    background: paymentMethod === 'debit' ? '#e6f4ea' : 'white',
+                    border: paymentMethod === 'debit' ? 'none' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'debit' ? '#dcfce7' : 'white',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -8835,8 +8873,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   style={{
                     padding: '12px 14px',
                     borderRadius: '14px',
-                    border: paymentMethod === 'cash' ? '2.5px solid #34a853' : '1px solid #e2e8f0',
-                    background: paymentMethod === 'cash' ? '#e6f4ea' : 'white',
+                    border: paymentMethod === 'cash' ? 'none' : '1px solid #e2e8f0',
+                    background: paymentMethod === 'cash' ? '#dcfce7' : 'white',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -8900,7 +8938,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </label>
 
               {activationError && (
-                <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', fontSize: '0.8rem', color: '#dc2626', fontWeight: 700, textAlign: 'center' }}>
+                <div style={{ padding: '12px', background: '#fef2f2', border: 'none', borderRadius: '12px', fontSize: '0.8rem', color: '#dc2626', fontWeight: 700, textAlign: 'center' }}>
                   {activationError}
                 </div>
               )}
@@ -9039,7 +9077,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       // Primary Campus Theme Color
       const primaryColor = '#34a853';
-      const gradientBg = 'linear-gradient(135deg, #34a853 0%, #288d45 100%)';
+      const gradientBg = '#34a853';
 
       // Profile avatar
       const profileAvatar = (profile.role === 'admin' || profile.role === 'secretary')
@@ -9060,22 +9098,22 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (isAdminOrSecretary && roleTitles.length === 0) roleTitles.push('Schulleitung');
       const roleSubtitle = roleTitles.join(' · ');
 
-      // Spectrum Gradient Multi-Color Stripe (Tri-Tone)
+      // Spectrum Gradient Multi-Color Stripe (Solid Single-Color Note)
       const hasVerwaltung = isAdminOrSecretary;
       const hasCampus = profile.is_campus_active;
       const hasGrooveLab = profile.is_groovelab_active;
 
-      let spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 100%)';
+      let spectrumGradient = '#34a853';
       if (hasVerwaltung && hasCampus && hasGrooveLab) {
-        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 33.3%, #34a853 33.3%, #34a853 66.6%, #eab308 66.6%, #eab308 100%)';
+        spectrumGradient = '#ef4444';
       } else if (hasVerwaltung && hasCampus) {
-        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #34a853 50%, #34a853 100%)';
+        spectrumGradient = '#ef4444';
       } else if (hasVerwaltung && hasGrooveLab) {
-        spectrumGradient = 'linear-gradient(90deg, #ea4335 0%, #ea4335 50%, #eab308 50%, #eab308 100%)';
+        spectrumGradient = '#ef4444';
       } else if (hasCampus && hasGrooveLab) {
-        spectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+        spectrumGradient = '#34a853';
       } else if (hasVerwaltung) {
-        spectrumGradient = '#ea4335';
+        spectrumGradient = '#ef4444';
       } else {
         spectrumGradient = '#34a853';
       }
@@ -9139,7 +9177,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <span style={{ 
                     background: '#fce8e6', 
                     color: '#ea4335', 
-                    border: '1px solid #fad2cf',
+                    border: 'none',
                     padding: '3px 8px', 
                     borderRadius: '6px', 
                     fontSize: '0.6rem', 
@@ -9154,7 +9192,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <span style={{ 
                     background: '#e6f4ea', 
                     color: '#34a853', 
-                    border: '1px solid #ceebd6',
+                    border: 'none',
                     padding: '3px 8px', 
                     borderRadius: '6px', 
                     fontSize: '0.6rem', 
@@ -9169,7 +9207,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <span style={{ 
                     background: '#fefce8', 
                     color: '#ca8a04', 
-                    border: '1px solid #fef08a',
+                    border: 'none',
                     padding: '3px 8px', 
                     borderRadius: '6px', 
                     fontSize: '0.6rem', 
@@ -9205,7 +9243,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   width: '100%',
                   padding: '15px 20px',
                   borderRadius: '18px',
-                  background: 'linear-gradient(135deg, #34a853 0%, #288d45 100%)',
+                  background: '#34a853',
                   border: 'none',
                   color: '#ffffff',
                   fontWeight: 800,
@@ -9256,7 +9294,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         fontSize: '0.68rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+                        boxShadow: 'none'
                       }}
                     >
                       Alle
@@ -9272,7 +9310,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         fontSize: '0.68rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'campus' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+                        boxShadow: 'none'
                       }}
                     >
                       Campus
@@ -9283,12 +9321,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         padding: '5px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: teacherModuleFilter === 'groovelab' ? '#eab308' : 'transparent',
-                        color: teacherModuleFilter === 'groovelab' ? '#1c1c1e' : '#8e8e93',
+                        background: teacherModuleFilter === 'groovelab' ? '#facc15' : 'transparent',
+                        color: teacherModuleFilter === 'groovelab' ? '#0f172a' : '#8e8e93',
                         fontSize: '0.68rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        boxShadow: teacherModuleFilter === 'groovelab' ? '0 1px 3px rgba(234, 179, 8, 0.3)' : 'none'
+                        boxShadow: 'none'
                       }}
                     >
                       GrooveLab
@@ -9304,9 +9342,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   <div style={{ display: 'flex', flexDirection: 'column', borderTop: '1px solid #f2f2f7', overflowY: 'auto', flex: 1 }}>
                     {filteredLessons.map((item, idx) => {
                       const isGL = item.module === 'groovelab';
-                      const badgeColor = isGL ? '#d97706' : '#34a853';
-                      const badgeBg = isGL ? '#fefce8' : '#f0fdf4';
-                      const badgeBorder = isGL ? '#fde68a' : '#bbf7d0';
+                      const badgeColor = isGL ? '#854d0e' : '#15803d';
+                      const badgeBg = isGL ? '#fef9c3' : '#dcfce7';
+                      const badgeBorder = 'none';
 
                       return (
                         <div key={item.id || idx} style={{
@@ -9322,7 +9360,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               fontWeight: 800,
                               color: badgeColor,
                               background: badgeBg,
-                              border: `1px solid ${badgeBorder}`,
+                              border: badgeBorder,
                               padding: '3px 7px',
                               borderRadius: '6px',
                               minWidth: '44px',
@@ -9334,7 +9372,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1c1c1e', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {item.student_name}
                                 {isCampusTeacher && isGroovelabTeacher && (
-                                  <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, border: `1px solid ${badgeBorder}`, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
+                                  <span style={{ fontSize: '0.58rem', background: badgeBg, color: badgeColor, border: badgeBorder, padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>
                                     {isGL ? 'GL' : 'Campus'}
                                   </span>
                                 )}
@@ -9354,7 +9392,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 ) : (
                   <div style={{
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     borderRadius: '12px',
                     padding: '14px',
                     fontSize: '0.85rem',
@@ -9557,31 +9595,71 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const hasGrooveLabStudent = profile.is_groovelab_active;
     let studentSpectrumGradient = '#34a853';
     if (hasCampusStudent && hasGrooveLabStudent) {
-      studentSpectrumGradient = 'linear-gradient(90deg, #34a853 0%, #34a853 50%, #eab308 50%, #eab308 100%)';
+      studentSpectrumGradient = '#34a853';
     } else if (hasGrooveLabStudent && !hasCampusStudent) {
-      studentSpectrumGradient = 'repeating-linear-gradient(90deg, #eab308 0px, #eab308 8px, transparent 8px, transparent 14px)';
+      studentSpectrumGradient = '#facc15';
     } else if (hasCampusStudent && !hasGrooveLabStudent) {
       studentSpectrumGradient = '#34a853';
     } else {
-      // Campus inactive & GrooveLab inactive: Gestrichelter (dashed) grüner Akzentbalken!
-      studentSpectrumGradient = 'repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 14px)';
+      studentSpectrumGradient = '#e2e8f0';
+    }
+
+    // 🎓 WENN TIMER AKTIV IST -> 0,1% OLED DARK STUDIO FOCUS STAGE
+    if (timerRunning) {
+      return (
+        <OledFocusStudioStage
+          elapsedSeconds={elapsedSeconds}
+          targetMinutes={dailyGoal}
+          isPaused={isTimerPaused}
+          isGoalReached={isExtraTime || elapsedSeconds >= dailyGoal * 60}
+          preStartCountdown={preStartCountdown}
+          onTogglePause={() => {
+            const next = !isTimerPaused;
+            setIsTimerPaused(next);
+            isTimerPausedRef.current = next;
+          }}
+          onFinishSession={handleFinishFocusSession}
+          onAbortSession={() => {
+            setElapsedSeconds(0);
+            setTimerRunning(false);
+            setIsExtraTime(false);
+            setIsTimerPaused(false);
+            isTimerPausedRef.current = false;
+          }}
+          onOpenHomeworkBook={() => {
+            setIsTimerPaused(true);
+            isTimerPausedRef.current = true;
+            setActiveTab('homework');
+          }}
+          instrumentLabel={profile?.instrument || 'Dein Instrument'}
+          studentUser={profile}
+          studentId={profile?.id}
+          localProgress={localProgress}
+          lehrwerke={lehrwerke}
+          progressItems={progressItems}
+          activeSongSkills={activeSongSkills}
+          assignedCampusSongs={[]}
+          isPhoneFlat={isPhoneFlat}
+          isMusicStandMode={false}
+        />
+      );
     }
 
     return (
       <div style={{
         position: 'fixed',
         inset: 0,
-        background: timerRunning ? '#000000' : '#f2f2f7',
+        background: '#f2f2f7',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: timerRunning ? 'center' : 'flex-start',
+        justifyContent: 'flex-start',
         boxSizing: 'border-box',
         overflowY: 'auto',
         overscrollBehaviorY: 'auto',
         WebkitOverflowScrolling: 'touch',
         minHeight: '100dvh',
-        padding: timerRunning ? 0 : 'max(10px, env(safe-area-inset-top, 10px)) 10px calc(88px + env(safe-area-inset-bottom, 24px)) 10px',
+        padding: 'max(10px, env(safe-area-inset-top, 10px)) 10px calc(88px + env(safe-area-inset-bottom, 24px)) 10px',
         fontFamily: "'Outfit', 'Urbanist', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
         transition: 'background 0.5s ease'
       }}>
@@ -9668,7 +9746,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: '#34a853',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     flexShrink: 0
                   }}>
                     <Music size={14} />
@@ -9699,9 +9777,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         gap: '6px',
                         padding: '4px 11px',
                         borderRadius: '20px',
-                        border: '1px solid #bae6fd',
-                        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                        color: '#0284c7',
+                        border: 'none',
+                        background: '#e0f2fe',
+                        color: '#0369a1',
                         fontSize: '0.72rem',
                         fontWeight: 800,
                         cursor: 'pointer',
@@ -9711,7 +9789,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       }}
                       title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
                     >
-                      <User size={13} color="#0284c7" />
+                      <User size={13} color="#0369a1" />
                       <span>Schüleransicht</span>
                     </button>
                   )}
@@ -9737,7 +9815,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               position: 'sticky',
               top: 0,
               zIndex: 90,
-              background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
+              background: '#0ea5e9',
               color: '#ffffff',
               padding: '8px 16px',
               display: 'flex',
@@ -9859,7 +9937,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {parentPinErrorMsg && (
                   <div style={{
                     background: '#fee2e2',
-                    border: '1.5px solid #fca5a5',
+                    border: 'none',
                     borderRadius: '12px',
                     padding: '8px 12px',
                     color: '#b91c1c',
@@ -9878,7 +9956,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {parentPinSuccessMsg && (
                   <div style={{
                     background: '#e6f4ea',
-                    border: '1.5px solid #a7f3d0',
+                    border: 'none',
                     borderRadius: '12px',
                     padding: '8px 12px',
                     color: '#047857',
@@ -10311,7 +10389,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 }}>
                   {/* Header Hero Banner */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+                    background: '#0f172a',
                     padding: '28px 24px 24px',
                     borderRadius: '28px 28px 0 0',
                     position: 'relative',
@@ -10324,7 +10402,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       right: '-50px',
                       width: '180px',
                       height: '180px',
-                      background: 'radial-gradient(circle, rgba(52, 168, 83, 0.4) 0%, rgba(0,0,0,0) 70%)',
+                      background: 'transparent',
                       borderRadius: '50%',
                       pointerEvents: 'none'
                     }} />
@@ -10357,7 +10435,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     <span style={{
                       background: 'rgba(52, 168, 83, 0.15)',
                       color: '#34a853',
-                      border: '1px solid rgba(52, 168, 83, 0.3)',
+                      border: 'none',
                       fontSize: '0.7rem',
                       fontWeight: 900,
                       padding: '4px 12px',
@@ -10386,91 +10464,91 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         Icon: Timer,
                         title: 'Fokus-Timer, Streaks & Übe-Pfad',
                         desc: 'Fokussierte Übe-Sessions zum Gewohnheitsaufbau – mit Streaks, XP-Belohnungen & Level-Fortschritt.',
-                        color: '#16a34a',
+                        color: '#15803d',
                         iconBg: '#dcfce7',
-                        iconBorder: '#bbf7d0',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
-                        cardBorder: '#bbf7d0'
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: BookOpen,
                         title: 'Digitales Hausaufgabenheft & Protokoll',
                         desc: 'Alle Aufgaben, Lehrer-Feedback & Meisterwerk-Dokumentation an einem Ort.',
-                        color: '#0284c7',
+                        color: '#0369a1',
                         iconBg: '#e0f2fe',
-                        iconBorder: '#bae6fd',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%)',
-                        cardBorder: '#bae6fd'
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: Radio,
                         title: 'Präzise Audio-Loopstation & Aufnahmen',
                         desc: 'Nahtloser Multi-Track Looper mit automatischer Takt-Synchronisation, Aufnahmefunktion & Cloud-Archiv.',
-                        color: '#ca8a04',
+                        color: '#854d0e',
                         iconBg: '#fef9c3',
-                        iconBorder: '#fef08a',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
-                        cardBorder: '#fef08a'
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: Play,
                         title: 'Übe-Begleiter & Play-Alongs',
                         desc: 'Integriertes Metronom & Drum-Tracks zum aktiven Mitspielen beim täglichen Üben.',
-                        color: '#9333ea',
+                        color: '#7e22ce',
                         iconBg: '#f3e8ff',
-                        iconBorder: '#e9d5ff',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)',
-                        cardBorder: '#e9d5ff'
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: Calendar,
                         title: 'Stundenplan & Schuljahr-Termine',
                         desc: 'Vollständige Jahresübersicht aller Unterrichtstermine, Raumplanung & Verschiebungs-Anfragen.',
-                        color: '#4f46e5',
+                        color: '#4338ca',
                         iconBg: '#e0e7ff',
-                        iconBorder: '#c7d2fe',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)',
-                        cardBorder: '#c7d2fe'
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: MessageSquare,
                         title: 'Direktnachrichten & Termin-Shoutbox (DSGVO)',
                         desc: '100% datenschutzkonforme Nachrichten & terminbezogene 1:1 Shoutbox für jede Unterrichtsstunde.',
-                        color: '#059669',
-                        iconBg: '#ccfbf1',
-                        iconBorder: '#99f6e4',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%)',
-                        cardBorder: '#99f6e4'
+                        color: '#047857',
+                        iconBg: '#d1fae5',
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: Trophy,
                         title: 'Sticker & Errungenschaften',
                         desc: 'Sammelbare Abzeichen und Erfolge für erreichte Lern- und Übe-Meilensteine.',
-                        color: '#d97706',
-                        iconBg: '#fef3c7',
-                        iconBorder: '#fde047',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fffbeb 100%)',
-                        cardBorder: '#fde68a'
+                        color: '#c2410c',
+                        iconBg: '#ffedd5',
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: Award,
                         title: 'Performance & Highlights Board',
                         desc: 'Feiere persönliche Meilensteine, Klassen-Erfolge & deinen Beitrag zum Gesamterfolg deiner Musikschule.',
-                        color: '#7c3aed',
-                        iconBg: '#ede9fe',
-                        iconBorder: '#ddd6fe',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)',
-                        cardBorder: '#ddd6fe'
+                        color: '#7e22ce',
+                        iconBg: '#f3e8ff',
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       },
                       {
                         Icon: BarChart3,
                         title: 'Skill-Radar & Entwicklungs-Analyse',
                         desc: '360°-Visualisierung deiner musikalischen Stärken, Technik, Rhythmik & persönlichen Superkraft.',
-                        color: '#e11d48',
-                        iconBg: '#ffe4e6',
-                        iconBorder: '#fecdd3',
-                        cardBg: 'linear-gradient(135deg, #ffffff 0%, #fff1f2 100%)',
-                        cardBorder: '#fecdd3'
+                        color: '#b91c1c',
+                        iconBg: '#fee2e2',
+                        iconBorder: 'none',
+                        cardBg: '#f8fafc',
+                        cardBorder: 'none'
                       }
                     ].map((item, idx) => {
                       const IconComp = item.Icon;
@@ -10482,15 +10560,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           padding: '12px 14px',
                           borderRadius: '16px',
                           background: item.cardBg,
-                          border: `1px solid ${item.cardBorder}`,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                          border: '1px solid #e2e8f0',
+                          boxShadow: 'none'
                         }}>
                           <div style={{
                             width: '38px',
                             height: '38px',
                             borderRadius: '12px',
                             background: item.iconBg,
-                            border: `1px solid ${item.iconBorder}`,
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -10526,8 +10604,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           margin: '0 24px 12px 24px',
                           padding: '14px 16px',
                           borderRadius: '18px',
-                          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                          border: '1.5px solid #bbf7d0',
+                          background: '#dcfce7',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '12px',
@@ -10538,7 +10616,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             height: '38px',
                             borderRadius: '12px',
                             background: '#ffffff',
-                            border: '1px solid #bbf7d0',
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -10587,12 +10665,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         margin: '0 24px 12px 24px',
                         padding: '14px 16px',
                         borderRadius: '18px',
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        background: '#f8fafc',
                         border: '1.5px solid #cbd5e1',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '8px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                        boxShadow: 'none'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -10621,8 +10699,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           marginTop: '4px',
                           padding: '8px 12px',
                           borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                          border: '1px solid #86efac',
+                          background: '#dcfce7',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px'
@@ -10644,7 +10722,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           alignItems: 'flex-start',
                           gap: '8px'
                         }}>
-                          <Sparkles size={16} color="#22c55e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                          <Sparkles size={16} color="#34a853" style={{ flexShrink: 0, marginTop: '2px' }} />
                           <span style={{ fontSize: '0.72rem', color: '#475569', lineHeight: 1.35 }}>
                             <strong style={{ color: '#0f172a' }}>1. Monat 100% kostenfrei:</strong> Der Einstiegsmonat ist vollständig kostenlos (0,00 €). Sie zahlen für das gesamte Schuljahr maximal 11 × {monthlyPrice}. Keine automatische Verlängerung.
                           </span>
@@ -10682,7 +10760,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               width: '100%',
                               padding: '14px',
                               borderRadius: '14px',
-                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              background: '#34a853',
                               color: '#ffffff',
                               border: 'none',
                               fontWeight: 800,
@@ -10709,7 +10787,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               width: '100%',
                               padding: '14px',
                               borderRadius: '14px',
-                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              background: '#34a853',
                               color: '#ffffff',
                               border: 'none',
                               fontWeight: 800,
@@ -10736,7 +10814,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               width: '100%',
                               padding: '14px',
                               borderRadius: '14px',
-                              background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                              background: '#34a853',
                               color: '#ffffff',
                               border: 'none',
                               fontWeight: 800,
@@ -10818,7 +10896,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         type="button"
                         onClick={handleVollzugriffClick}
                         style={{
-                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          background: '#34a853',
                           color: '#ffffff',
                           border: 'none',
                           padding: '4px 10px',
@@ -10886,7 +10964,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                               padding: '16px 8px',
                               borderRadius: '20px',
                               border: 'none',
-                              background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                              background: '#34a853',
                               color: '#ffffff',
                               fontSize: '0.95rem',
                               fontWeight: 900,
@@ -10914,7 +10992,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {profile.app_usage_mode === 'parent_hybrid' && parentUnlocked && (
                   <div style={{
                     background: '#e6f4ea',
-                    border: '1.5px solid #e6f4ea',
+                    border: 'none',
                     borderRadius: '24px',
                     padding: '20px',
                     display: 'flex',
@@ -11079,7 +11157,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         type="button"
                         onClick={handleVollzugriffClick}
                         style={{
-                          background: 'linear-gradient(135deg, #34a853 0%, #248a3d 100%)',
+                          background: '#34a853',
                           color: '#ffffff',
                           border: 'none',
                           padding: '4px 10px',
@@ -11122,7 +11200,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                         {/* Tagesserie flame card (Red Gradient) */}
                         <div style={{
-                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                          background: '#ef4444',
                           borderRadius: '20px',
                           padding: '16px 14px',
                           display: 'flex',
@@ -11191,7 +11269,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         {/* XP points card (Purple/Indigo Gradient) */}
                         <style>{CAMPUS_XP_EFFECTS_CSS}</style>
                         <div style={{
-                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                          background: '#6366f1',
                           borderRadius: '20px',
                           padding: '16px 14px',
                           display: 'flex',
@@ -11199,13 +11277,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           justifyContent: 'space-between',
                           position: 'relative',
                           overflow: 'visible',
-                          boxShadow: isQRLandingXpPulsing
-                            ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 4px 14px rgba(99, 102, 241, 0.25)'
-                            : '0 4px 14px rgba(99, 102, 241, 0.25)',
+                          boxShadow: 'none',
                           color: '#ffffff',
                           minHeight: '86px',
                           boxSizing: 'border-box',
-                          border: isQRLandingXpPulsing ? '2px solid #facc15' : 'none',
+                          border: 'none',
                           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                         }} className={isQRLandingXpPulsing ? 'campus-xp-pulsing' : ''}>
                           {qrLandingFloatingXp !== null && (
@@ -11250,7 +11326,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     ) : (
                       <div style={{
                         background: timerRunning 
-                          ? (isExtraTime ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)' : '#000000') 
+                          ? (isExtraTime ? '#34a853' : '#000000') 
                           : '#ffffff',
                         border: timerRunning ? 'none' : '1px solid #e5e5ea',
                         borderRadius: '28px',
@@ -11445,7 +11521,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                                   padding: '16px',
                                   borderRadius: '18px',
                                   border: 'none',
-                                  background: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   fontSize: '0.95rem',
                                   fontWeight: 800,
@@ -11538,7 +11614,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 padding: '10px 14px',
                 borderRadius: '16px',
                 background: '#e6f4ea',
-                border: '1px solid #ceead6',
+                border: 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '6px',
@@ -11686,7 +11762,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                       type="button"
                       onClick={handleFinishFocusSession}
                       style={{
-                        background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                        background: '#34a853',
                         color: 'white',
                         border: 'none',
                         padding: '12px 28px',
@@ -11781,7 +11857,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     height: '72px',
                     borderRadius: '22px',
                     background: 'rgba(245, 158, 11, 0.12)',
-                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -11824,7 +11900,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   }}>
                     <div style={{
                       height: '100%',
-                      background: 'linear-gradient(90deg, #f59e0b 0%, #ef4444 100%)',
+                      background: '#f97316',
                       width: `${graceSecondsLeft * 10}%`,
                       transition: 'width 1s linear',
                       borderRadius: '3px'
@@ -11890,7 +11966,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     width: '72px',
                     height: '72px',
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
+                    background: '#34a853',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -12155,7 +12231,7 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #2c2a29 0%, #1a1817 100%)',
+      background: '#0f172a',
       borderRadius: '16px',
       padding: '16px',
       width: '320px',
@@ -12187,8 +12263,8 @@ const InlineAudioPlayer: React.FC<{ url: string; label: string; onDelete?: () =>
 
       {/* Sticker Label Area */}
       <div style={{
-        background: 'linear-gradient(to bottom, #dbeafe 0%, #eff6ff 100%)',
-        border: '2px solid #000',
+        background: '#dbeafe',
+        border: 'none',
         borderRadius: '6px',
         padding: '8px',
         display: 'flex',

@@ -1,11 +1,11 @@
 /**
- * 🏛️ Campus-Groovelab 0,1% Goldstandard: VdM-Notenschnipsel EMP & Früherziehung
+ * 🏛️ Campus-Groovelab 0,1% Goldstandard: Notenschnipsel EMP & Früherziehung
  * vdmEmpScoreSnippets.ts
  * 
  * Kanonischer Katalog für Elementare Musikpädagogik (EMP), Musikalische
- * Früherziehung (MFE) und die VdM-Grundstufe:
+ * Früherziehung (MFE) und die Grundstufe:
  * - 2- bis 5-Ton-Räume (Kuckucksruf, Pentatonik, Volksliedmotive)
- * - Sprachrhythmen & Silbenmetrik ("Scho-ko-la-de, Eis!")
+ * - Sprachrhythmen & Silbenmetrik ("Scho-ko-la-de, Eis, Eis!")
  * - Body-Percussion & Bewegungskanon (Stampfen, Patschen, Klatschen)
  * - Kontrastpaare (Hoch/Tief, Laut/Leise, Staccato/Legato)
  * - Call & Response (Echo-Spiele zur auditiven Wahrnehmung)
@@ -22,10 +22,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 80,
+    tempoBpm: 68,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Elementarstufe: Das fundamentale Ur-Intervall des Kindesgesangs (G4 - E4). Ideal für Glockenspiel, Xylophon und Gesang.',
+    description: 'Elementarstufe: Das fundamentale Ur-Intervall des Kindesgesangs (G4 - E4). Ideal für Glockenspiel, Xylophon und Gesang.',
     tags: ['EMP', 'Früherziehung', 'Kuckuck', 'Terz', 'Glockenspiel', 'Orff'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -49,10 +49,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 84,
+    tempoBpm: 72,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Elementarstufe: Die ersten beiden Takte des Volkslieds im Fünftonraum (G-E-E, F-D-D).',
+    description: 'Elementarstufe: Die ersten beiden Takte des Volkslieds im Fünftonraum (G-E-E, F-D-D).',
     tags: ['EMP', 'Hänschen Klein', 'Fünftonraum', 'Liedanfang', 'Grundstufe'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -75,10 +75,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 90,
+    tempoBpm: 72,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Früherziehung: Halbtontonlose Pentatonik. Klingen immer harmonisch, ideal für Boomwhackers und Klangbausteine.',
+    description: 'Früherziehung: Halbtonlose Pentatonik. Klingt immer harmonisch, ideal für Boomwhackers und Klangbausteine.',
     tags: ['EMP', 'Pentatonik', 'Orff', 'Boomwhackers', 'Klangbausteine'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -103,30 +103,28 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 80,
+    tempoBpm: 68,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Früherziehung & Grundstufe: Rhythmisches Sprechen und Klatschen. Vier Sechzehntel gefolgt von zwei Vierteln.',
-    tags: ['EMP', 'Sprachrhythmus', 'Klatschen', '16tel', 'Rhythmik'],
+    description: 'Früherziehung & Grundstufe: Rhythmisches Sprechen und Klatschen. Vier ruhige Achtel ("Scho-ko-la-de") gefolgt von zwei Vierteln ("Eis, Eis!").',
+    tags: ['EMP', 'Sprachrhythmus', 'Klatschen', 'Achtel', 'Rhythmik'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     authorRole: 'teacher',
     notes: [
-      { id: 'es1', barIndex: 0, beatFraction: 0, duration: '16', pitch: 'C4' },
-      { id: 'es2', barIndex: 0, beatFraction: 1, duration: '16', pitch: 'C4' },
-      { id: 'es3', barIndex: 0, beatFraction: 2, duration: '16', pitch: 'C4' },
-      { id: 'es4', barIndex: 0, beatFraction: 3, duration: '16', pitch: 'C4' },
-      { id: 'es5', barIndex: 0, beatFraction: 4, duration: '4', pitch: 'C4' },
-      { id: 'es6', barIndex: 0, beatFraction: 8, duration: '4', pitch: 'C4' },
-      { id: 'es7', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'REST' },
-      { id: 'es8', barIndex: 1, beatFraction: 0, duration: '16', pitch: 'C4' },
-      { id: 'es9', barIndex: 1, beatFraction: 1, duration: '16', pitch: 'C4' },
-      { id: 'es10', barIndex: 1, beatFraction: 2, duration: '16', pitch: 'C4' },
-      { id: 'es11', barIndex: 1, beatFraction: 3, duration: '16', pitch: 'C4' },
-      { id: 'es12', barIndex: 1, beatFraction: 4, duration: '4', pitch: 'C4' },
-      { id: 'es13', barIndex: 1, beatFraction: 8, duration: '4', pitch: 'C4' },
-      { id: 'es14', barIndex: 1, beatFraction: 12, duration: '4', pitch: 'C4' }
+      { id: 'es1', barIndex: 0, beatFraction: 0, duration: '8', pitch: 'C4' },
+      { id: 'es2', barIndex: 0, beatFraction: 2, duration: '8', pitch: 'C4' },
+      { id: 'es3', barIndex: 0, beatFraction: 4, duration: '8', pitch: 'C4' },
+      { id: 'es4', barIndex: 0, beatFraction: 6, duration: '8', pitch: 'C4' },
+      { id: 'es5', barIndex: 0, beatFraction: 8, duration: '4', pitch: 'C4' },
+      { id: 'es6', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'C4' },
+      { id: 'es8', barIndex: 1, beatFraction: 0, duration: '8', pitch: 'C4' },
+      { id: 'es9', barIndex: 1, beatFraction: 2, duration: '8', pitch: 'C4' },
+      { id: 'es10', barIndex: 1, beatFraction: 4, duration: '8', pitch: 'C4' },
+      { id: 'es11', barIndex: 1, beatFraction: 6, duration: '8', pitch: 'C4' },
+      { id: 'es12', barIndex: 1, beatFraction: 8, duration: '4', pitch: 'C4' },
+      { id: 'es13', barIndex: 1, beatFraction: 12, duration: '4', pitch: 'REST' }
     ]
   },
   {
@@ -138,10 +136,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     instrument: 'drums',
     clef: 'percussion',
     timeSignature: '4/4',
-    tempoBpm: 85,
+    tempoBpm: 70,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM EMP: Fußstampfen (Bassdrum F4), Oberschenkelpatschen (Snare C5) und Händeklatschen (Hi-Hat G5).',
+    description: 'Elementarstufe: Fußstampfen (Bassdrum F4), Oberschenkelpatschen (Snare C5) und Händeklatschen (Hi-Hat G5).',
     tags: ['EMP', 'Bodypercussion', 'Stampfen', 'Klatschen', 'Koordination'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -165,10 +163,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'piano',
     timeSignature: '4/4',
-    tempoBpm: 75,
+    tempoBpm: 68,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Früherziehung: Register- und Hörempfinden. Takt 1 tief und schwer (C2), Takt 2 hoch und leicht (C6).',
+    description: 'Früherziehung: Register- und Hörempfinden. Takt 1 tief und schwer (C2), Takt 2 hoch und leicht (C6).',
     tags: ['EMP', 'Kontraste', 'Hoch Tief', 'Register', 'Klavier'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -196,10 +194,10 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 80,
+    tempoBpm: 68,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Früherziehung: Echo-Spiel. Takt 1 ruft die Lehrkraft vor, Takt 2 antwortet das Kind exakt gleich.',
+    description: 'Früherziehung: Echo-Spiel. Takt 1 ruft die Lehrkraft vor, Takt 2 antwortet das Kind exakt gleich.',
     tags: ['EMP', 'Call & Response', 'Echo', 'Hören', 'Gehörbildung'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -224,27 +222,25 @@ export const VDM_EMP_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmLevel: 'elementar',
     instrument: 'universal',
     timeSignature: '4/4',
-    tempoBpm: 80,
+    tempoBpm: 68,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe Artikulation: Takt 1 kurze Staccato-Viertel mit Pausen, Takt 2 weich gebundene Legato-Halbe.',
+    description: 'Grundstufe Artikulation: Takt 1 kurze Staccato-Viertel mit Pausen, Takt 2 weich gebundene Legato-Halbe.',
     tags: ['EMP', 'Artikulation', 'Staccato', 'Legato', 'Klangfarben'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     authorRole: 'teacher',
     notes: [
-      // Takt 0: Dino (Staccato mit Pausen)
-      { id: 'eds1', barIndex: 0, beatFraction: 0, duration: '8', pitch: 'C4' },
-      { id: 'eds2', barIndex: 0, beatFraction: 2, duration: '8', pitch: 'REST' },
-      { id: 'eds3', barIndex: 0, beatFraction: 4, duration: '8', pitch: 'C4' },
-      { id: 'eds4', barIndex: 0, beatFraction: 6, duration: '8', pitch: 'REST' },
-      { id: 'eds5', barIndex: 0, beatFraction: 8, duration: '8', pitch: 'C4' },
-      { id: 'eds6', barIndex: 0, beatFraction: 10, duration: '8', pitch: 'REST' },
-      { id: 'eds7', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'C4' },
-      // Takt 1: Schmetterling (Legato)
+      // Takt 0: Dino (Viertel mit Viertelpausen)
+      { id: 'eds1', barIndex: 0, beatFraction: 0, duration: '4', pitch: 'C4' },
+      { id: 'eds2', barIndex: 0, beatFraction: 4, duration: '4', pitch: 'REST' },
+      { id: 'eds3', barIndex: 0, beatFraction: 8, duration: '4', pitch: 'C4' },
+      { id: 'eds4', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'REST' },
+      // Takt 1: Schmetterling (Legato Halbe)
       { id: 'eds8', barIndex: 1, beatFraction: 0, duration: '2', pitch: 'E4' },
       { id: 'eds9', barIndex: 1, beatFraction: 8, duration: '2', pitch: 'G4' }
     ]
   }
 ];
+

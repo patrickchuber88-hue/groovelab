@@ -113,7 +113,7 @@ export const AirplaneSprite: React.FC<{ size?: number; fill?: string; stroke?: s
 
       {/* Positionsleuchten an den Tragflächenenden (Backbord Rot / Steuerbord Grün) */}
       <circle cx="1.6" cy="15.8" r="0.8" fill="#ef4444" />
-      <circle cx="22.4" cy="15.8" r="0.8" fill="#22c55e" />
+      <circle cx="22.4" cy="15.8" r="0.8" fill="#34a853" />
 
       {/* Piloten-Cockpitkanzel mit Glanzreflex */}
       <path d="M11 4.5 C11.5 3.8 12.5 3.8 13 4.5 L13.3 7 L10.7 7 Z" fill="#0284c7" stroke="#38bdf8" strokeWidth="0.5" />
@@ -849,7 +849,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
         fill = '#bfdbfe';
         stroke = '#2563eb';
       } else if (isAfrica) {
-        // AFRIKA: Savannengold (Match zum goldgelben Button #eab308)
+        // AFRIKA: Savannengold (Match zum goldgelben Button #facc15)
         fill = '#fef08a';
         stroke = '#ca8a04';
       } else if (isAsia) {
@@ -1356,7 +1356,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             padding: '6px 14px',
             borderRadius: '100px',
             background: 'linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)',
-            border: '1.5px solid #7dd3fc',
+            border: 'none',
             fontSize: '0.80rem',
             fontWeight: 800,
             color: '#0369a1'
@@ -1947,7 +1947,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
             {/* 11. Touchdown-Feier-Ripples bei erfolgreicher Landung */}
             {touchdownPin && (
               <g transform={`translate(${touchdownPin.x}, ${touchdownPin.y}) scale(${pinScale})`} pointerEvents="none">
-                <circle cx="0" cy="0" r="18" fill="none" stroke="#22c55e" strokeWidth="3">
+                <circle cx="0" cy="0" r="18" fill="none" stroke="#34a853" strokeWidth="3">
                   <animate attributeName="r" values="18;48" dur="0.9s" repeatCount="1" />
                   <animate attributeName="opacity" values="1;0" dur="0.9s" repeatCount="1" />
                 </circle>
@@ -1986,7 +1986,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                 borderColor = '#38bdf8';
                 borderWidth = 2.4;
               } else if (isMastered) {
-                borderColor = '#22c55e';
+                borderColor = '#34a853';
                 borderWidth = 1.8;
               }
 
@@ -2196,7 +2196,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                     padding: '3px 9px',
                     borderRadius: '100px',
                     background: '#f0f9ff',
-                    border: '1px solid #bae6fd',
+                    border: 'none',
                     color: '#0284c7',
                     fontSize: '0.72rem',
                     fontWeight: 800,
@@ -2296,7 +2296,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                       padding: '4px 12px',
                       borderRadius: '100px',
                       background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                      border: '1.2px solid #bae6fd',
+                      border: 'none',
                       fontSize: '0.74rem',
                       fontWeight: 800,
                       color: '#0369a1',
@@ -2619,7 +2619,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                           padding: '3px 10px',
                           borderRadius: '100px',
                           background: '#e0f2fe',
-                          border: '1.2px solid #bae6fd',
+                          border: 'none',
                           color: '#0284c7',
                           fontWeight: 850,
                           fontSize: '0.68rem',
@@ -2803,7 +2803,7 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
                 background: '#fefce8',
                 borderRadius: '16px',
                 padding: '14px 18px',
-                border: '1.5px solid #fef08a',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '12px'

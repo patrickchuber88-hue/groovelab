@@ -29,7 +29,8 @@ import {
   parseHomeworkLehrwerke,
   extractActiveDidacticTags
 } from './wochenfahrplan';
-import { resolveStudentInstrument } from '../utils/teacherDashboardUtils';
+import { resolveStudentInstrument, getSimulatedNow } from '../utils/teacherDashboardUtils';
+import { useSimulatedTime } from '../../../hooks/useSimulatedTime';
 import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
 import { TagesKompassScoreSnippetPill } from './TagesKompassScoreSnippetPill';
 
@@ -84,6 +85,7 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
   onOpenDocument,
   teacher
 }) => {
+  const { now: simulatedNow } = useSimulatedTime();
   const [isEditingCurrentHomework, setIsEditingCurrentHomework] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingHomework, setIsDeletingHomework] = useState(false);
@@ -273,8 +275,8 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
 
   const studentInstrument = resolveStudentInstrument(activeStudent?.instrument, prep?.instrument, teacher?.instrument);
 
-  // Berechne Restzeit & Fortschrittsbalken
-  const now = new Date();
+  // Berechne Restzeit & Fortschrittsbalken (synchron mit getSimulatedNow / useSimulatedTime)
+  const now = simulatedNow || getSimulatedNow();
   const [startH, startM] = slotStartTime.split(':').map(Number);
   const [endH, endM] = slotEndTime.split(':').map(Number);
   const startMs = new Date(now).setHours(startH || 0, startM || 0, 0, 0);
@@ -362,7 +364,7 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
               fontWeight: 800,
               color: '#15803d',
               background: '#dcfce7',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               padding: '3px 9px',
               borderRadius: '100px',
               whiteSpace: 'nowrap'
@@ -387,7 +389,7 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
           style={{
             height: '100%',
             width: `${progressPercent}%`,
-            background: minutesRemaining <= 3 ? '#eab308' : '#34a853',
+            background: minutesRemaining <= 3 ? '#facc15' : '#34a853',
             transition: 'width 0.5s ease'
           }}
         />
@@ -707,7 +709,7 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             background: '#fffbeb',
-            border: '1px solid #fef08a',
+            border: 'none',
             borderRadius: '12px',
             padding: '8px 12px',
             animation: 'fadeIn 0.3s ease'

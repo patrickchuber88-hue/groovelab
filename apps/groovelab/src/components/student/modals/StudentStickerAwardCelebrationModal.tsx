@@ -62,10 +62,10 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
   // Slanted Ribbon
   const ribbonText = isSchuljahr ? 'NEUES SCHULJAHR!' : 'GEMEISTERT!';
   const ribbonBg = isLegendary || isSchuljahr
-    ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
+    ? '#facc15'
     : isEpic
       ? 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)'
-      : 'linear-gradient(135deg, #22c55e 0%, #15803d 100%)';
+      : '#34a853';
 
   // Border & Glow Accents
   const borderColor = isLegendary || isSchuljahr
@@ -377,7 +377,7 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
           <div
             style={{
               background: ribbonBg,
-              color: '#ffffff',
+              color: (isLegendary || isSchuljahr) ? '#0f172a' : '#ffffff',
               padding: '7px 28px',
               borderRadius: '100px',
               fontWeight: 950,

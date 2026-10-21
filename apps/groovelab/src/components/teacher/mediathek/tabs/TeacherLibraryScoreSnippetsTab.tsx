@@ -13,34 +13,45 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Music, Play, Square, Share2, Plus, Edit2, Trash2,
-  Clock, Sparkles, Filter, ChevronRight, Volume2,
-  LayoutGrid, List
+  Clock, Sparkles, Filter, ChevronRight, ChevronDown, Volume2,
+  LayoutGrid, List, Globe, Piano, Guitar, Drum, Wind, Activity, Mic, Layers, FolderOpen,
+  ArrowUpDown
 } from 'lucide-react';
 import { MicroScoreSnippet, MicroScoreInstrument } from '../../../student/meisterwerk/microscore/microScore.types';
 import { MicroScoreAudioSynthesizer, durationToSeconds } from '../../../student/meisterwerk/microscore/microScoreAudioSynthesizer';
-import { VDM_CATEGORIES, isOwnScoreSnippet } from '../../../../services/vdmScoreSnippetCatalog';
+import { INSTRUMENT_OPTIONS } from '../../../student/meisterwerk/microscore/vdmDrumPresets';
+import { VDM_CATEGORIES, isOwnScoreSnippet, VdmFolderCategory } from '../../../../services/vdmScoreSnippetCatalog';
 import { resolveSnippetForInstrument } from '../../../../services/canonicalScoreEngine';
-
-export const mapFilterToInstrument = (filter: string): MicroScoreInstrument => {
-  const f = filter.toLowerCase().trim();
-  if (f.includes('klavier') || f.includes('piano')) return 'piano';
-  if (f.includes('gitarre') || f.includes('guitar')) return 'guitar';
-  if (f.includes('bass')) return 'bass';
-  if (f.includes('schlagzeug') || f.includes('drums')) return 'drums';
-  if (f.includes('blockflöte') || f.includes('recorder')) return 'recorder';
-  if (f.includes('querflöte') || f.includes('flöte') || f.includes('flute')) return 'flute';
-  if (f.includes('klarinette') || f.includes('clarinet')) return 'clarinet';
-  if (f.includes('altsax') || f.includes('sax')) return 'altosax';
-  if (f.includes('trompete') || f.includes('trumpet')) return 'trumpet';
-  if (f.includes('posaune') || f.includes('trombone')) return 'trombone';
-  if (f.includes('streicher') || f.includes('strings') || f.includes('geige')) return 'strings';
-  return 'universal';
+import { MicroScoreCalmThumbnail } from '../components/MicroScoreCalmThumbnail';
+import {
+  sortScoreSnippets,
+  VdmSortMode,
+  VDM_SORT_OPTIONS,
+  getVdmLevelWeight,
+  getVdmLevelColor,
+  VDM_LEVEL_COLORS
+} from '../../../../services/vdmDidacticSortEngine';
+import {
+  mapFilterToInstrument,
+  mapInstrumentToFilter,
+  isSnippetMatchingInstrument,
+  INSTRUMENT_COLOR_MAP,
+  matchesLevelFilter,
+  getSnippetCategoryMeta,
+  TeacherScoreSnippetListRow
+} from './teacherScoreSnippetHelpers';
+export {
+  mapFilterToInstrument,
+  mapInstrumentToFilter,
+  isSnippetMatchingInstrument,
+  matchesLevelFilter,
+  getSnippetCategoryMeta
 };
 
 export interface TeacherLibraryScoreSnippetsTabProps {
   snippets: MicroScoreSnippet[];
   onAssign: (snippet: MicroScoreSnippet) => void;
-  onEdit: (snippet: MicroScoreSnippet) => void;
+  onEdit: (snippet: MicroScoreSnippet, snippetList?: MicroScoreSnippet[], initialIndex?: number) => void;
   onDelete: (snippetId: string) => void;
   onNewSnippet: () => void;
   searchQuery?: string;
@@ -48,75 +59,6 @@ export interface TeacherLibraryScoreSnippetsTabProps {
   setSelectedInstrumentFilter?: (filter: string) => void;
   showInstrumentFilterBar?: boolean;
 }
-
-export const isSnippetMatchingInstrument = (
-  snipInstrument: string = '',
-  filter: string = 'Alle',
-  tags: string[] = []
-): boolean => {
-  const f = (filter || 'alle').trim().toLowerCase();
-  if (!f || f === 'alle' || f === 'all' || f === 'allgemein' || f === 'all_instruments') {
-    return true;
-  }
-
-  const inst = (snipInstrument || '').toLowerCase();
-  const isUniversal = inst === 'universal' || inst === 'all' || inst === 'universell' || inst === 'allgemein';
-
-  // 0,1% Goldstandard: Expliziter Filter nach rein universellen Inhalten
-  if (f === 'universell' || f === 'universal') {
-    return isUniversal;
-  }
-
-  // 0,1% Goldstandard: Universelle Schnipsel (General-Score) matchen IMMER jedes Instrument
-  if (isUniversal) {
-    return true;
-  }
-
-  const label = (INSTRUMENT_COLOR_MAP[inst]?.label || inst).toLowerCase();
-  const tagStr = (tags || []).join(' ').toLowerCase();
-
-  if (inst === f || label === f || label.includes(f) || inst.includes(f)) {
-    return true;
-  }
-
-  // Instrument Family Grouping (0,1% Goldstandard)
-  if (f === 'bläser' || f === 'blaeser' || f === 'winds') {
-    return ['flute', 'recorder', 'clarinet', 'altosax', 'trumpet', 'trombone'].includes(inst) ||
-      tagStr.includes('bläser') || tagStr.includes('flöte') || tagStr.includes('long tones');
-  }
-  if (f === 'streicher' || f === 'strings') {
-    return ['strings', 'violin', 'viola', 'cello'].includes(inst) || tagStr.includes('streicher');
-  }
-  if (f === 'tasten' || f === 'klavier' || f === 'piano') {
-    return ['piano', 'keyboard', 'orgel'].includes(inst) || tagStr.includes('klavier') || tagStr.includes('tasten');
-  }
-  if (f === 'gitarre' || f === 'guitar') {
-    return ['guitar', 'gitarre', 'akustikgitarre', 'e-gitarre'].includes(inst) || tagStr.includes('gitarre');
-  }
-  if (f === 'bass' || f === 'e-bass') {
-    return ['bass', 'e-bass', 'kontrabass'].includes(inst) || tagStr.includes('bass');
-  }
-  if (f === 'drums' || f === 'schlagzeug' || f === 'percussion') {
-    return ['drums', 'schlagzeug', 'percussion'].includes(inst) || tagStr.includes('drums') || tagStr.includes('schlagzeug');
-  }
-
-  return false;
-};
-
-const INSTRUMENT_COLOR_MAP: Record<string, { bg: string; text: string; label: string; border: string }> = {
-  universal: { bg: '#eef2ff', text: '#4338ca', label: '🌐 Universell', border: '#c7d2fe' },
-  piano: { bg: '#eef2ff', text: '#4338ca', label: 'Klavier', border: '#c7d2fe' },
-  guitar: { bg: '#eef2ff', text: '#4338ca', label: 'Gitarre', border: '#c7d2fe' },
-  bass: { bg: '#eef2ff', text: '#4338ca', label: 'E-Bass', border: '#c7d2fe' },
-  drums: { bg: '#eef2ff', text: '#4338ca', label: 'Schlagzeug', border: '#c7d2fe' },
-  recorder: { bg: '#eef2ff', text: '#4338ca', label: 'Blockflöte', border: '#c7d2fe' },
-  flute: { bg: '#eef2ff', text: '#4338ca', label: 'Querflöte', border: '#c7d2fe' },
-  clarinet: { bg: '#eef2ff', text: '#4338ca', label: 'Klarinette', border: '#c7d2fe' },
-  altosax: { bg: '#eef2ff', text: '#4338ca', label: 'Altsaxophon', border: '#c7d2fe' },
-  trumpet: { bg: '#eef2ff', text: '#4338ca', label: 'Trompete', border: '#c7d2fe' },
-  trombone: { bg: '#eef2ff', text: '#4338ca', label: 'Posaune', border: '#c7d2fe' },
-  strings: { bg: '#eef2ff', text: '#4338ca', label: 'Streicher', border: '#c7d2fe' }
-};
 
 export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippetsTabProps> = ({
   snippets,
@@ -140,7 +82,9 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
 
   const [selectedCategory, setSelectedCategory] = useState<string>('Alle');
   const [selectedSubFolder, setSelectedSubFolder] = useState<string>('all');
+  const [selectedLevelFilter, setSelectedLevelFilter] = useState<string>('all');
   const [playingSnippetId, setPlayingSnippetId] = useState<string | null>(null);
+  const [cardInstrumentOverrides, setCardInstrumentOverrides] = useState<Record<string, MicroScoreInstrument>>({});
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     try {
       return (localStorage.getItem('teacher_score_snippet_view_mode') as 'grid' | 'list') || 'grid';
@@ -153,6 +97,21 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
     setViewMode(mode);
     try {
       localStorage.setItem('teacher_score_snippet_view_mode', mode);
+    } catch {}
+  };
+
+  const [sortMode, setSortMode] = useState<VdmSortMode>(() => {
+    try {
+      return (localStorage.getItem('teacher_score_snippet_sort_mode') as VdmSortMode) || 'didactic';
+    } catch {
+      return 'didactic';
+    }
+  });
+
+  const handleSetSortMode = (mode: VdmSortMode) => {
+    setSortMode(mode);
+    try {
+      localStorage.setItem('teacher_score_snippet_sort_mode', mode);
     } catch {}
   };
 
@@ -183,20 +142,16 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
     return mapFilterToInstrument(currentInstFilter);
   }, [currentInstFilter]);
 
-  const handleOpenSnippet = useCallback((rawSnippet: MicroScoreSnippet) => {
-    const targetInst = rawSnippet.instrument === 'drums' || rawSnippet.clef === 'percussion' ? 'drums' : activeTargetInstrument;
-    const resolved = resolveSnippetForInstrument(rawSnippet, targetInst);
-    onEdit(resolved);
-  }, [activeTargetInstrument, onEdit]);
 
-  const handleAssignSnippet = useCallback((rawSnippet: MicroScoreSnippet) => {
-    const targetInst = rawSnippet.instrument === 'drums' || rawSnippet.clef === 'percussion' ? 'drums' : activeTargetInstrument;
+  const handleAssignSnippet = useCallback((rawSnippet: MicroScoreSnippet, instrumentOverride?: MicroScoreInstrument) => {
+    const chosenInst = instrumentOverride || cardInstrumentOverrides[rawSnippet.id] || activeTargetInstrument;
+    const targetInst = (chosenInst && chosenInst !== 'universal') ? chosenInst : (rawSnippet.instrument || 'piano');
     const resolved = resolveSnippetForInstrument(rawSnippet, targetInst);
     onAssign(resolved);
-  }, [activeTargetInstrument, onAssign]);
+  }, [activeTargetInstrument, cardInstrumentOverrides, onAssign]);
 
   // Quick Playback
-  const togglePlaySnippet = useCallback((rawSnippet: MicroScoreSnippet) => {
+  const togglePlaySnippet = useCallback((rawSnippet: MicroScoreSnippet, instrumentOverride?: MicroScoreInstrument) => {
     if (playingSnippetId === rawSnippet.id) {
       stopPlayback();
       return;
@@ -205,8 +160,10 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
     stopPlayback();
     setPlayingSnippetId(rawSnippet.id);
 
-    const filterInst = mapFilterToInstrument(currentInstFilter);
-    const targetInst = rawSnippet.instrument === 'drums' || rawSnippet.clef === 'percussion' ? 'drums' : filterInst;
+    const chosenInst = instrumentOverride || cardInstrumentOverrides[rawSnippet.id] || mapFilterToInstrument(currentInstFilter);
+    const targetInst = (chosenInst && chosenInst !== 'universal')
+      ? chosenInst
+      : (rawSnippet.instrument === 'drums' || rawSnippet.clef === 'percussion' ? 'drums' : (rawSnippet.instrument || 'piano'));
     const snippet = resolveSnippetForInstrument(rawSnippet, targetInst);
 
     const synth = synthRef.current || new MicroScoreAudioSynthesizer();
@@ -260,16 +217,17 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
         }
       }
     }, sixteenthMs);
-  }, [playingSnippetId, stopPlayback, currentInstFilter]);
+  }, [playingSnippetId, stopPlayback, cardInstrumentOverrides, currentInstFilter]);
 
-  // Filterung
+  // Filterung mit didaktischer 0,1% Goldstandard Sortier-Engine
   const filteredSnippets = useMemo(() => {
     const q = (searchQuery || '').toLowerCase().trim();
-    return snippets.filter(snip => {
+    const result = snippets.filter(snip => {
       const instLabel = INSTRUMENT_COLOR_MAP[snip.instrument]?.label || snip.instrument || 'Allgemein';
-      const matchInst = isSnippetMatchingInstrument(snip.instrument, currentInstFilter, snip.tags);
-
+      const matchInst = isSnippetMatchingInstrument(snip, currentInstFilter);
       if (!matchInst) return false;
+
+      if (!matchesLevelFilter(snip, selectedLevelFilter)) return false;
 
       // Kategorie-Filter
       if (selectedCategory !== 'Alle') {
@@ -299,10 +257,22 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
         (snip.tags && snip.tags.some(t => t.toLowerCase().includes(q)))
       );
     });
-  }, [snippets, searchQuery, currentInstFilter, selectedCategory, selectedSubFolder]);
+
+    // 0,1% Goldstandard: VdM Didactic Sort Engine
+    return sortScoreSnippets(result, sortMode);
+  }, [snippets, searchQuery, currentInstFilter, selectedLevelFilter, selectedCategory, selectedSubFolder, sortMode]);
+
+  // 🏛️ 0,1% Goldstandard: Schnipsel öffnen mit voller Listen-Kontext & Index für Blätter-Navigation
+  const handleOpenSnippet = useCallback((rawSnippet: MicroScoreSnippet, instrumentOverride?: MicroScoreInstrument) => {
+    const chosenInst = instrumentOverride || cardInstrumentOverrides[rawSnippet.id] || activeTargetInstrument;
+    const targetInst = (chosenInst && chosenInst !== 'universal') ? chosenInst : (rawSnippet.instrument || 'piano');
+    const resolved = resolveSnippetForInstrument(rawSnippet, targetInst);
+    const idx = filteredSnippets.findIndex(s => s.id === rawSnippet.id);
+    onEdit(resolved, filteredSnippets, idx >= 0 ? idx : 0);
+  }, [activeTargetInstrument, cardInstrumentOverrides, filteredSnippets, onEdit]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Action Bar oben: Neuanlage & Zähler */}
       <div style={{
         display: 'flex',
@@ -381,6 +351,42 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
               <List size={14} />
             </button>
           </div>
+
+          {/* 0,1% Goldstandard Sortier-Cockpit (VdM Didactic Sort Engine) */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: '#f1f5f9',
+            borderRadius: '8px',
+            padding: '2px 8px',
+            marginLeft: '4px',
+            border: '1px solid #e2e8f0',
+            gap: '5px'
+          }}>
+            <ArrowUpDown size={12} style={{ color: '#64748b' }} aria-hidden="true" />
+            <select
+              value={sortMode}
+              onChange={e => handleSetSortMode(e.target.value as VdmSortMode)}
+              title="Didaktische Sortierung der Notenschnipsel"
+              aria-label="Didaktische Sortierung der Notenschnipsel"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                padding: '2px 0',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              {VDM_SORT_OPTIONS.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <button
@@ -399,6 +405,8 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             alignItems: 'center',
             gap: '8px',
             boxShadow: 'none',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             transition: 'all 0.15s ease'
           }}
         >
@@ -407,60 +415,132 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
         </button>
       </div>
 
-      {/* Instrument Filter Schnellwahl (0,1% Goldstandard) */}
+      {/* Achse 2 & 3: Instrument-Filter + Ausbildungsstufen-Filter (0,1% Goldstandard) */}
       {showInstrumentFilterBar !== false && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          overflowX: 'auto',
-          paddingBottom: '2px'
-        }} className="hide-scrollbar">
-          {[
-            { id: 'Alle', label: 'Alle Instrumente' },
-            { id: 'Universell', label: '🌐 Universell' },
-            { id: 'Klavier', label: '🎹 Klavier' },
-            { id: 'Gitarre', label: '🎸 Gitarre' },
-            { id: 'E-Bass', label: '🎸 E-Bass' },
-            { id: 'Schlagzeug', label: '🥁 Schlagzeug' },
-            { id: 'Bläser', label: '🎷 Bläser' },
-            { id: 'Streicher', label: '🎻 Streicher' }
-          ].map(inst => {
-            const isActive = currentInstFilter.toLowerCase() === inst.id.toLowerCase() ||
-              (inst.id === 'Alle' && (!currentInstFilter || currentInstFilter.toLowerCase() === 'all' || currentInstFilter.toLowerCase() === 'alle'));
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            paddingBottom: '2px'
+          }} className="hide-scrollbar">
+            {[
+              { id: 'Alle', label: 'Alle Instrumente', icon: null },
+              { id: 'Universell', label: 'Universell', icon: Globe },
+              { id: 'Klavier', label: 'Klavier', icon: Piano },
+              { id: 'Gitarre', label: 'Gitarre', icon: Guitar },
+              { id: 'E-Bass', label: 'E-Bass', icon: Guitar },
+              { id: 'Schlagzeug', label: 'Schlagzeug', icon: Drum },
+              { id: 'Blockflöte', label: 'Blockflöte', icon: Wind },
+              { id: 'Bläser', label: 'Bläser', icon: Wind },
+              { id: 'Streicher', label: 'Streicher', icon: Activity },
+              { id: 'Vokal', label: 'Vokal', icon: Mic }
+            ].map(inst => {
+              const IconComp = inst.icon;
+              const isActive = currentInstFilter.toLowerCase() === inst.id.toLowerCase() ||
+                (inst.id === 'Alle' && (!currentInstFilter || currentInstFilter.toLowerCase() === 'all' || currentInstFilter.toLowerCase() === 'alle'));
 
-            return (
-              <button
-                key={inst.id}
-                type="button"
-                onClick={() => setInstFilter(inst.id)}
-                style={{
-                  background: isActive ? '#0f172a' : '#ffffff',
-                  color: isActive ? '#ffffff' : '#475569',
-                  border: isActive ? 'none' : '1px solid #cbd5e1',
-                  borderRadius: '10px',
-                  padding: '5px 12px',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  boxShadow: isActive ? '0 2px 8px rgba(15, 23, 42, 0.18)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {inst.label}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={inst.id}
+                  type="button"
+                  onClick={() => setInstFilter(inst.id)}
+                  style={{
+                    background: isActive ? '#0f172a' : '#ffffff',
+                    color: isActive ? '#ffffff' : '#475569',
+                    border: isActive ? 'none' : '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '5px 12px',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: isActive ? '0 2px 8px rgba(15, 23, 42, 0.18)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {IconComp && (
+                    <IconComp
+                      size={13}
+                      strokeWidth={2.2}
+                      style={{ color: isActive ? '#ffffff' : '#64748b' }}
+                    />
+                  )}
+                  <span>{inst.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 3. Achse: Ausbildungsstufen-Filter (Elementar / Grundstufe | Unterstufe | Mittelstufe) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            overflowX: 'auto',
+            paddingBottom: '2px'
+          }} className="hide-scrollbar">
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 800,
+              color: '#64748b',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap',
+              marginRight: '2px'
+            }}>
+              <Layers size={12} strokeWidth={2.2} />
+              <span>Ausbildungsstufe:</span>
+            </span>
+            {[
+              { id: 'all', label: 'Alle Stufen', color: null },
+              { id: 'elementar', label: 'Elementar', color: VDM_LEVEL_COLORS[0] },
+              { id: 'leicht', label: 'Leicht', color: VDM_LEVEL_COLORS[1] },
+              { id: 'mittel', label: 'Mittel', color: VDM_LEVEL_COLORS[2] },
+              { id: 'schwer', label: 'Schwer', color: VDM_LEVEL_COLORS[3] }
+            ].map(lvl => {
+              const isLvlActive = selectedLevelFilter === lvl.id;
+              const activeBg = lvl.color ? lvl.color.text : '#334155';
+              const inactiveBg = lvl.color ? lvl.color.bg : '#f8fafc';
+              const inactiveColor = lvl.color ? lvl.color.text : '#475569';
+              return (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() => setSelectedLevelFilter(lvl.id)}
+                  style={{
+                    background: isLvlActive ? activeBg : inactiveBg,
+                    color: isLvlActive ? '#ffffff' : inactiveColor,
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '3px 10px',
+                    fontSize: '0.70rem',
+                    fontWeight: isLvlActive ? 800 : 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: isLvlActive ? `0 2px 6px ${activeBg}35` : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {lvl.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* VdM-Kategorie Tabs Bar (0,1% Goldstandard) */}
+      {/* Fachbereichs-Rubriken Tabs Bar (0,1% Goldstandard) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        overflowX: 'auto',
+        flexWrap: 'wrap',
         paddingBottom: '2px'
       }} className="hide-scrollbar">
         <button
@@ -483,14 +563,14 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             transition: 'all 0.15s ease'
           }}
         >
-          Alle ({snippets.length})
+          Alle ({snippets.filter(s => isSnippetMatchingInstrument(s, currentInstFilter) && matchesLevelFilter(s, selectedLevelFilter)).length})
         </button>
 
         {VDM_CATEGORIES.map(cat => {
           const isSelected = selectedCategory === cat.id;
           const count = cat.id === 'Eigene'
-            ? snippets.filter(isOwnScoreSnippet).length
-            : snippets.filter(s => s.category === cat.id).length;
+            ? snippets.filter(s => isOwnScoreSnippet(s) && isSnippetMatchingInstrument(s, currentInstFilter) && matchesLevelFilter(s, selectedLevelFilter)).length
+            : snippets.filter(s => s.category === cat.id && isSnippetMatchingInstrument(s, currentInstFilter) && matchesLevelFilter(s, selectedLevelFilter)).length;
 
           return (
             <button
@@ -545,21 +625,22 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            overflowX: 'auto',
+            flexWrap: 'wrap',
             paddingBottom: '2px'
           }} className="hide-scrollbar">
             {catObj.subFolders.map(sub => {
               const isSubActive = selectedSubFolder === sub.id;
               const subCount = snippets.filter(s => {
+                if (!matchesLevelFilter(s, selectedLevelFilter)) return false;
                 if (catObj.id === 'Eigene') {
                   if (!isOwnScoreSnippet(s)) return false;
                   if (sub.id === 'drafts' && s.taskId) return false;
                   if (sub.id === 'assigned' && !s.taskId) return false;
-                  return isSnippetMatchingInstrument(s.instrument, currentInstFilter, s.tags);
+                  return isSnippetMatchingInstrument(s, currentInstFilter);
                 }
                 if (s.category !== catObj.id) return false;
                 if (sub.id !== 'all' && s.vdmFolder !== sub.id) return false;
-                return isSnippetMatchingInstrument(s.instrument, currentInstFilter, s.tags);
+                return isSnippetMatchingInstrument(s, currentInstFilter);
               }).length;
 
               return (
@@ -667,11 +748,12 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             </button>
 
             {/* Filter zurücksetzen Button */}
-            {(currentInstFilter !== 'Alle' || selectedCategory !== 'Alle' || selectedSubFolder !== 'all' || (searchQuery && searchQuery.trim())) && (
+            {(currentInstFilter !== 'Alle' || selectedLevelFilter !== 'all' || selectedCategory !== 'Alle' || selectedSubFolder !== 'all' || (searchQuery && searchQuery.trim())) && (
               <button
                 type="button"
                 onClick={() => {
                   setInstFilter('Alle');
+                  setSelectedLevelFilter('all');
                   setSelectedCategory('Alle');
                   setSelectedSubFolder('all');
                 }}
@@ -694,304 +776,225 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             )}
           </div>
         </div>
-      ) : (
-        <div style={viewMode === 'list' ? {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px'
-        } : {
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
-          gap: '12px'
-        }}>
-          {filteredSnippets.map(snippet => {
-            const isPlaying = playingSnippetId === snippet.id;
-            const instMeta = INSTRUMENT_COLOR_MAP[snippet.instrument] || {
-              bg: '#f1f5f9',
-              text: '#334155',
-              label: snippet.instrument || 'Allgemein',
-              border: '#e2e8f0'
-            };
-            const noteCount = (snippet.notes || []).filter(n => n.pitch !== 'REST').length;
-            const isOwn = isOwnScoreSnippet(snippet);
+      ) : (() => {
+        const renderSnippetCollection = (items: MicroScoreSnippet[]) => (
+          <div style={viewMode === 'list' ? {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          } : {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 330px), 1fr))',
+            gap: '12px',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}>
+            {items.map(snippet => {
+              const isPlaying = playingSnippetId === snippet.id;
+              const catMeta = getSnippetCategoryMeta(snippet);
+              const activeCardInst: MicroScoreInstrument = cardInstrumentOverrides[snippet.id] ||
+                (currentInstFilter && currentInstFilter !== 'Alle' && currentInstFilter !== 'Universell'
+                  ? mapFilterToInstrument(currentInstFilter)
+                  : (snippet.instrument || 'piano'));
+              const resolvedForCard = resolveSnippetForInstrument(snippet, activeCardInst);
+              const instMeta = INSTRUMENT_COLOR_MAP[activeCardInst] || {
+                bg: '#f1f5f9',
+                text: '#475569',
+                label: INSTRUMENT_OPTIONS.find(o => o.value === activeCardInst)?.label || activeCardInst,
+                border: 'transparent'
+              };
+              const isOwn = isOwnScoreSnippet(snippet);
+              const levelMeta = getVdmLevelColor(snippet.vdmLevel);
 
-            // ==========================================
-            // MODELL B: 0,1% Goldstandard Listen-Ansicht
-            // ==========================================
-            if (viewMode === 'list') {
+              // ==========================================
+              // MODELL B: 0,1% Goldstandard Listen-Ansicht
+              // ==========================================
+              if (viewMode === 'list') {
+                return (
+                  <TeacherScoreSnippetListRow
+                    key={snippet.id}
+                    snippet={snippet}
+                    resolvedForCard={resolvedForCard}
+                    activeCardInst={activeCardInst}
+                    isPlaying={isPlaying}
+                    catMeta={catMeta}
+                    isOwn={isOwn}
+                    onOpenSnippet={handleOpenSnippet}
+                    onTogglePlay={togglePlaySnippet}
+                    onSelectInstrument={(id, nextInst) =>
+                      setCardInstrumentOverrides(prev => ({ ...prev, [id]: nextInst }))
+                    }
+                    onAssign={handleAssignSnippet}
+                    onDelete={onDelete}
+                  />
+                );
+              }
+
+              // ==========================================
+              // MODELL A: 0,1% Goldstandard Kompakt-Kachel
+              // ==========================================
               return (
                 <div
                   key={snippet.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleOpenSnippet(snippet, activeCardInst)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleOpenSnippet(snippet, activeCardInst);
+                    } else if (e.code === 'Space' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePlaySnippet(snippet, activeCardInst);
+                    }
+                  }}
                   style={{
                     background: '#ffffff',
-                    border: isPlaying ? '1.5px solid #4f46e5' : '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '8px 12px',
+                    border: isPlaying ? `1.5px solid ${catMeta.color.activeBg}` : '1px solid #e2e8f0',
+                    borderLeft: `3.5px solid ${catMeta.color.activeBg}`,
+                    borderRadius: '14px',
+                    padding: '12px 14px',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    boxShadow: isPlaying ? '0 4px 12px rgba(79, 70, 229, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
-                    transition: 'all 0.15s ease'
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: isPlaying ? `0 6px 20px ${catMeta.color.activeBg}25` : '0 1px 3px rgba(0,0,0,0.02)',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    outline: 'none',
+                    position: 'relative',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={e => {
+                    if (!isPlaying) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      e.currentTarget.style.borderLeftColor = catMeta.color.activeBg;
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isPlaying) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.borderLeftColor = catMeta.color.activeBg;
+                    }
                   }}
                 >
-                  {/* Links: Vorhören + Instrument + Titel + Meta */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                    <button
-                      type="button"
-                      onClick={() => togglePlaySnippet(snippet)}
-                      title={isPlaying ? 'Audio stoppen' : 'Audio direkt vorhören'}
-                      aria-label={isPlaying ? 'Audio stoppen' : 'Audio direkt vorhören'}
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        background: isPlaying ? '#0f172a' : '#f8fafc',
-                        color: isPlaying ? '#ffffff' : '#334155',
-                        border: isPlaying ? 'none' : '1px solid #cbd5e1',
-                        borderRadius: '7px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={e => {
-                        if (!isPlaying) {
-                          e.currentTarget.style.background = '#f1f5f9';
-                          e.currentTarget.style.borderColor = '#94a3b8';
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!isPlaying) {
-                          e.currentTarget.style.background = '#f8fafc';
-                          e.currentTarget.style.borderColor = '#cbd5e1';
-                        }
-                      }}
-                    >
-                      {isPlaying ? <Square size={11} fill="#ffffff" /> : <Volume2 size={13} strokeWidth={2.2} />}
-                    </button>
-
-                    <span style={{
-                      fontSize: '0.66rem',
-                      fontWeight: 800,
-                      background: instMeta.bg,
-                      color: instMeta.text,
-                      padding: '2px 6px',
-                      borderRadius: '5px',
-                      border: `1px solid ${instMeta.border}`,
-                      flexShrink: 0
-                    }}>
-                      {instMeta.label}
-                    </span>
-
-                    <span
-                      onClick={() => handleOpenSnippet(snippet)}
-                      title="Klicken, um Noten im Studio zu öffnen"
-                      style={{
-                        fontSize: '0.84rem',
+                  {/* 1. Header: Kategorie-Badge + Stufe + Metadaten inline + Admin-Aktionen */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
+                      {/* Kategorie-Pill: Soft-Tinted (Apple 2-Farben-Doktrin, border: none) */}
+                      <span style={{
+                        fontSize: '0.68rem',
                         fontWeight: 800,
-                        color: '#0f172a',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#4338ca'; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = '#0f172a'; }}
-                    >
-                      {snippet.title}
-                    </span>
-
-                    <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      • {snippet.barsCount || 2}T • {snippet.timeSignature || '4/4'} • {snippet.tempoBpm || 80} BPM
-                    </span>
-                  </div>
-
-                  {/* Rechts: Kompakte Aktionen */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenSnippet(snippet)}
-                      title="Noten im interaktiven Studio öffnen & mitspielen"
-                      aria-label="Noten öffnen"
-                      style={{
-                        height: '28px',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '7px',
-                        padding: '0 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        color: '#0f172a',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#94a3b8';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = '#ffffff';
-                        e.currentTarget.style.borderColor = '#cbd5e1';
-                      }}
-                    >
-                      <Play size={10} fill="#0f172a" />
-                      <span>Noten</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAssignSnippet(snippet)}
-                      title="Als Hausaufgabe an Schüler zuweisen"
-                      aria-label="Als Hausaufgabe zuweisen"
-                      style={{
-                        height: '28px',
-                        background: '#eef2ff',
-                        color: '#4338ca',
+                        background: catMeta.color.bg,
+                        color: catMeta.color.text,
+                        padding: '2px 7px',
+                        borderRadius: '6px',
                         border: 'none',
-                        borderRadius: '7px',
-                        padding: '0 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        transition: 'all 0.15s ease'
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = '#e0e7ff';
-                        e.currentTarget.style.color = '#3730a3';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = '#eef2ff';
-                        e.currentTarget.style.color = '#4338ca';
-                      }}
-                    >
-                      <Share2 size={11} strokeWidth={2.2} />
-                      <span>Zuweisen</span>
-                    </button>
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {catMeta.name}
+                      </span>
 
-                    {isOwn && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '2px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenSnippet(snippet)}
-                          title="Noten direkt bearbeiten"
-                          aria-label="Notenschnipsel bearbeiten"
+                      {!isOwn && (
+                        <span style={{
+                          fontSize: '0.64rem',
+                          fontWeight: 800,
+                          background: levelMeta.bg,
+                          color: levelMeta.text,
+                          padding: '2px 7px',
+                          borderRadius: '5px',
+                          border: 'none',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {levelMeta.shortLabel}
+                        </span>
+                      )}
+
+                      {/* Metadaten: Interaktiver Instrumenten-Selektor (Alle 13 Instrumente wählbar) + Takt + BPM */}
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          position: 'relative',
+                          flexShrink: 0
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
+                      >
+                        <select
+                          value={activeCardInst}
+                          onChange={e => {
+                            e.stopPropagation();
+                            const nextInst = e.target.value as MicroScoreInstrument;
+                            setCardInstrumentOverrides(prev => ({
+                              ...prev,
+                              [snippet.id]: nextInst
+                            }));
+                          }}
+                          aria-label={`Instrument für ${snippet.title} wählen`}
                           style={{
-                            width: '26px',
-                            height: '26px',
-                            background: 'transparent',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: '#334155',
+                            background: '#f1f5f9',
                             border: 'none',
-                            color: '#64748b',
                             borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            padding: '2px 18px 2px 7px',
                             cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = '#f1f5f9';
-                            e.currentTarget.style.color = '#0f172a';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = '#64748b';
+                            outline: 'none',
+                            appearance: 'none',
+                            WebkitAppearance: 'none'
                           }}
                         >
-                          <Edit2 size={12} strokeWidth={2} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(snippet.id)}
-                          title="Schnipsel löschen"
-                          aria-label="Notenschnipsel löschen"
+                          {INSTRUMENT_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown
+                          size={11}
                           style={{
-                            width: '26px',
-                            height: '26px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#94a3b8',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
+                            position: 'absolute',
+                            right: '5px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            pointerEvents: 'none',
+                            color: '#64748b'
                           }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = '#fef2f2';
-                            e.currentTarget.style.color = '#dc2626';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = '#94a3b8';
-                          }}
-                        >
-                          <Trash2 size={12} strokeWidth={2} />
-                        </button>
+                        />
                       </div>
-                    )}
-                  </div>
-                </div>
-              );
-            }
 
-            // ==========================================
-            // MODELL A: 0,1% Goldstandard Kompakt-Kachel
-            // ==========================================
-            return (
-              <div
-                key={snippet.id}
-                style={{
-                  background: '#ffffff',
-                  border: isPlaying ? '1.5px solid #4f46e5' : '1px solid #e2e8f0',
-                  borderRadius: '14px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  boxShadow: isPlaying ? '0 6px 20px rgba(79, 70, 229, 0.14)' : '0 1px 4px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* 1. Header: Instrument-Badge + Metadaten inline + Admin-Aktionen */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
-                    <span style={{
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      background: instMeta.bg,
-                      color: instMeta.text,
-                      padding: '2px 7px',
-                      borderRadius: '6px',
-                      border: `1px solid ${instMeta.border}`,
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {instMeta.label}
-                    </span>
-                    <span style={{
-                      fontSize: '0.70rem',
-                      color: '#64748b',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {snippet.barsCount || 2}T • {snippet.timeSignature || '4/4'} • {snippet.tempoBpm || 80} BPM
-                    </span>
-                  </div>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        color: '#64748b',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        • {resolvedForCard.barsCount || 2}T • {resolvedForCard.tempoBpm || 80} BPM
+                      </span>
+                    </div>
 
-                  {/* Admin-Aktionen nur bei eigenen Schnipseln dezent im Header */}
+                  {/* Admin-Aktionen nur bei eigenen Schnipseln */}
                   {isOwn && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}
+                      onClick={e => e.stopPropagation()}
+                      onKeyDown={e => e.stopPropagation()}
+                    >
                       <button
                         type="button"
-                        onClick={() => handleOpenSnippet(snippet)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleOpenSnippet(snippet, activeCardInst);
+                        }}
                         title="Schnipsel bearbeiten"
                         aria-label="Schnipsel bearbeiten"
                         style={{
@@ -1020,7 +1023,10 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDelete(snippet.id)}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onDelete(snippet.id);
+                        }}
                         title="Schnipsel löschen"
                         aria-label="Schnipsel löschen"
                         style={{
@@ -1051,151 +1057,133 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                   )}
                 </div>
 
-                {/* 2. Titel mit Direktsprung ins Noten-Studio */}
+                {/* 2. Titel mit 2-Zeilen-Umbruch (kein vorschnelles ... Truncation) */}
                 <div>
                   <h3
-                    onClick={() => handleOpenSnippet(snippet)}
-                    title="Klicken, um Noten im Studio zu öffnen"
                     style={{
                       margin: 0,
-                      fontSize: '0.90rem',
+                      fontSize: '0.88rem',
                       fontWeight: 800,
                       color: '#0f172a',
-                      lineHeight: 1.25,
-                      cursor: 'pointer',
+                      lineHeight: 1.3,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.color = '#4338ca';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.color = '#0f172a';
+                      minHeight: '2.4em'
                     }}
                   >
-                    {snippet.title}
+                    {resolvedForCard.title || snippet.title}
                   </h3>
                 </div>
 
-                {/* 3. 0,1% Goldstandard Action-Dock: Vorhören + Noten öffnen + Zuweisen in einer Zeile */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '2px'
-                }}>
-                  {/* 1. Vorhören (32x32px) */}
+                {/* 3. 🏛️ Minimalistische Notenminiatur (MicroScoreCalmThumbnail in Kategorie-Farbe) */}
+                <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+                  <MicroScoreCalmThumbnail
+                    snippet={resolvedForCard}
+                    accentColor={catMeta.color.activeBg}
+                    height={44}
+                    isPlaying={isPlaying}
+                  />
+                </div>
+
+                {/* 4. Beruhigtes Action-Dock: Vorhören + Zuweisen (Nur 2 Aktionen) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    marginTop: '2px'
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* 1. Vorhören Quick-Action */}
                   <button
                     type="button"
-                    onClick={() => togglePlaySnippet(snippet)}
+                    onClick={e => {
+                      e.stopPropagation();
+                      togglePlaySnippet(snippet, activeCardInst);
+                    }}
                     title={isPlaying ? 'Audio stoppen' : 'Audio direkt vorhören'}
                     aria-label={isPlaying ? 'Audio stoppen' : 'Audio direkt vorhören'}
                     style={{
-                      width: '32px',
-                      height: '32px',
-                      background: isPlaying ? '#0f172a' : '#f8fafc',
-                      color: isPlaying ? '#ffffff' : '#334155',
-                      border: isPlaying ? 'none' : '1px solid #cbd5e1',
+                      height: '30px',
+                      padding: '0 10px',
+                      background: isPlaying ? catMeta.color.activeBg : '#f8fafc',
+                      color: isPlaying ? '#ffffff' : '#475569',
+                      border: isPlaying ? 'none' : '1px solid #e2e8f0',
                       borderRadius: '8px',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: '6px',
                       cursor: 'pointer',
                       flexShrink: 0,
-                      boxShadow: isPlaying ? '0 2px 6px rgba(15,23,42,0.2)' : 'none',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      boxShadow: isPlaying ? `0 2px 8px ${catMeta.color.activeBg}40` : 'none',
                       transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={e => {
                       if (!isPlaying) {
                         e.currentTarget.style.background = '#f1f5f9';
-                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.color = '#0f172a';
                       }
                     }}
                     onMouseLeave={e => {
                       if (!isPlaying) {
                         e.currentTarget.style.background = '#f8fafc';
-                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.color = '#475569';
                       }
                     }}
                   >
                     {isPlaying ? (
-                      <Square size={12} fill="#ffffff" strokeWidth={1} />
+                      <>
+                        <Square size={11} fill="#ffffff" strokeWidth={1} />
+                        <span>Stopp</span>
+                      </>
                     ) : (
-                      <Volume2 size={15} strokeWidth={2.2} />
+                      <>
+                        <Volume2 size={13} strokeWidth={2.2} />
+                        <span>Vorhören</span>
+                      </>
                     )}
                   </button>
 
-                  {/* 2. Noten öffnen (Kompakt) */}
+                  {/* 2. Zuweisen CTA (Soft-Tinted in Kategorie-Farbe, border: none) */}
                   <button
                     type="button"
-                    onClick={() => handleOpenSnippet(snippet)}
-                    title="Noten im interaktiven Studio öffnen & mitspielen"
-                    aria-label="Noten öffnen"
-                    style={{
-                      flex: 1,
-                      height: '32px',
-                      minWidth: 0,
-                      background: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '0 8px',
-                      fontSize: '0.76rem',
-                      fontWeight: 800,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 0.15s ease'
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleAssignSnippet(snippet, activeCardInst);
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = '#f8fafc';
-                      e.currentTarget.style.borderColor = '#94a3b8';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = '#ffffff';
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                    }}
-                  >
-                    <Play size={11} fill="#0f172a" strokeWidth={1} />
-                    <span>Noten öffnen</span>
-                  </button>
-
-                  {/* 3. Als Hausaufgabe zuweisen (Kompakter Soft-Lavender CTA) */}
-                  <button
-                    type="button"
-                    onClick={() => handleAssignSnippet(snippet)}
                     title="Als Hausaufgabe an Schüler zuweisen"
                     aria-label="Als Hausaufgabe zuweisen"
                     style={{
-                      flex: 1.15,
-                      height: '32px',
-                      minWidth: 0,
-                      background: '#eef2ff',
-                      color: '#4338ca',
+                      height: '30px',
+                      background: catMeta.color.bg,
+                      color: catMeta.color.text,
                       border: 'none',
                       borderRadius: '8px',
-                      padding: '0 8px',
-                      fontSize: '0.76rem',
+                      padding: '0 12px',
+                      fontSize: '0.74rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
                       gap: '5px',
                       whiteSpace: 'nowrap',
                       transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = '#e0e7ff';
-                      e.currentTarget.style.color = '#3730a3';
+                      e.currentTarget.style.background = catMeta.color.badgeBg;
+                      e.currentTarget.style.color = catMeta.color.badgeText;
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = '#eef2ff';
-                      e.currentTarget.style.color = '#4338ca';
+                      e.currentTarget.style.background = catMeta.color.bg;
+                      e.currentTarget.style.color = catMeta.color.text;
                     }}
                   >
                     <Share2 size={12} strokeWidth={2.2} />
@@ -1205,8 +1193,72 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
               </div>
             );
           })}
-        </div>
-      )}
+          </div>
+        );
+
+        const activeCatObj = selectedCategory !== 'Alle' && selectedCategory !== 'Eigene'
+          ? VDM_CATEGORIES.find(c => c.id === selectedCategory)
+          : null;
+
+        if (activeCatObj && selectedSubFolder === 'all' && !(searchQuery && searchQuery.trim())) {
+          const realSubFolders = activeCatObj.subFolders.filter(sf => sf.id !== 'all');
+          const assignedIds = new Set<string>();
+          const sections = realSubFolders.map(sf => {
+            const items = filteredSnippets.filter(s => s.vdmFolder === sf.id);
+            items.forEach(s => assignedIds.add(s.id));
+            return { sf, items };
+          }).filter(sec => sec.items.length > 0);
+
+          const unassignedItems = filteredSnippets.filter(s => !assignedIds.has(s.id));
+
+          if (sections.length > 0) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {sections.map(({ sf, items }) => (
+                  <div key={sf.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      padding: '6px 12px',
+                      background: '#f8fafc',
+                      borderRadius: '10px',
+                      borderLeft: `3px solid ${activeCatObj.color.activeBg}`
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <FolderOpen size={14} strokeWidth={2.2} style={{ color: activeCatObj.color.text }} />
+                        <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#0f172a' }}>
+                          {sf.label}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                          — {sf.description}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        background: activeCatObj.color.bg,
+                        color: activeCatObj.color.text,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {items.length} {items.length === 1 ? 'Übung' : 'Übungen'}
+                      </span>
+                    </div>
+                    {renderSnippetCollection(items)}
+                  </div>
+                ))}
+                {unassignedItems.length > 0 && renderSnippetCollection(unassignedItems)}
+              </div>
+            );
+          }
+        }
+
+        return renderSnippetCollection(filteredSnippets);
+      })()}
     </div>
   );
 };

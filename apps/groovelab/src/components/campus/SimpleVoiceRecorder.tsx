@@ -475,7 +475,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
               padding: '8px 12px',
               borderRadius: '10px',
               background: '#eff6ff',
-              border: '1px solid #bfdbfe',
+              border: 'none',
               color: '#1e40af',
               fontSize: '0.78rem',
               fontWeight: 700,

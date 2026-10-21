@@ -199,7 +199,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
                 fontWeight: 800,
                 color: '#059669',
                 background: '#ecfdf5',
-                border: '1px solid #10b981',
+                border: 'none',
                 borderRadius: '100px',
                 padding: '1px 6px',
                 lineHeight: 1.3,
@@ -935,18 +935,18 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         onClick={(e) => { e.stopPropagation(); setIsNotesModalOpen(true); }}
         aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
         style={{
-          border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
-          background: notesCount > 0 ? '#fff7ed' : '#ffffff',
-          color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px', padding: '0 8px', borderRadius: '10px',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 750,
-          boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          border: notesCount > 0 ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
+          background: notesCount > 0 ? '#ef4444' : '#ffffff',
+          color: notesCount > 0 ? '#ffffff' : '#475569',
+          height: isMobile ? '44px' : '36px', minWidth: isMobile ? '44px' : '36px', padding: '0 9px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800,
+          boxShadow: notesCount > 0 ? '0 2px 8px rgba(239, 68, 68, 0.35)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
       >
-        <MessageSquareQuote size={15} strokeWidth={2.2} />
+        <MessageSquareQuote size={15} strokeWidth={2.4} fill={notesCount > 0 ? 'rgba(255,255,255,0.2)' : 'none'} />
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
@@ -1090,7 +1090,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             minWidth: '42px',
             minHeight: '42px',
             borderRadius: '50%',
-            background: hasError ? '#fee2e2' : (countInStep !== null ? '#f59e0b' : (isPlaying ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)')),
+            background: hasError ? '#fee2e2' : (countInStep !== null ? '#facc15' : '#34a853'),
             color: hasError ? '#ef4444' : '#ffffff',
             border: 'none',
             cursor: hasError ? 'not-allowed' : 'pointer',
@@ -1766,18 +1766,18 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         onClick={(e) => { e.stopPropagation(); setIsNotesModalOpen(true); }}
         aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
         style={{
-          border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
-          background: notesCount > 0 ? '#fff7ed' : '#ffffff',
-          color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px', padding: '0 8px', borderRadius: '10px',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 750,
-          boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          border: notesCount > 0 ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
+          background: notesCount > 0 ? '#ef4444' : '#ffffff',
+          color: notesCount > 0 ? '#ffffff' : '#475569',
+          height: isMobile ? '44px' : '34px', minWidth: isMobile ? '44px' : '34px', padding: '0 9px', borderRadius: '10px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800,
+          boxShadow: notesCount > 0 ? '0 2px 8px rgba(239, 68, 68, 0.35)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease', touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
       >
-        <MessageSquareQuote size={15} strokeWidth={2.2} />
+        <MessageSquareQuote size={15} strokeWidth={2.4} fill={notesCount > 0 ? 'rgba(255,255,255,0.2)' : 'none'} />
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
@@ -1915,7 +1915,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           padding: '0 8px',
           background: '#f0fdf4',
           borderRadius: '99px',
-          border: '1px solid #bbf7d0',
+          border: 'none',
           boxSizing: 'border-box'
         }}>
           <Mic size={12} style={{ color: '#16a34a' }} />
@@ -1934,7 +1934,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
               fontWeight: 800,
               color: '#059669',
               background: '#ecfdf5',
-              border: '1px solid #10b981',
+              border: 'none',
               borderRadius: '100px',
               padding: '1px 6px',
               lineHeight: 1.3,
@@ -2079,10 +2079,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             background: hasError
               ? '#fee2e2'
               : (countInStep !== null
-                ? '#f59e0b'
-                : (isPlaying 
-                    ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)' 
-                    : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)')),
+                ? '#facc15'
+                : '#34a853'),
             color: hasError ? '#ef4444' : '#ffffff',
             border: 'none',
             cursor: hasError ? 'not-allowed' : 'pointer',

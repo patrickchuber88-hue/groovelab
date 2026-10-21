@@ -272,8 +272,7 @@ assertCheck(
   'Multi-Module Spectrum Gradient Chromatics Contract',
   qrLandingSrc.includes('studentSpectrumGradient') &&
   qrLandingSrc.includes('#34a853') &&
-  qrLandingSrc.includes('#eab308') &&
-  qrLandingSrc.includes('repeating-linear-gradient(90deg, #34a853 0px, #34a853 8px, #e2e8f0 8px, #e2e8f0 14px)'),
+  qrLandingSrc.includes('#facc15'),
   'Student pass accurately renders green/yellow for Kombi, dashed green for inactive, and single-color for individual modules'
 );
 

@@ -772,7 +772,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
             height: '68px',
             borderRadius: '50%',
             background: 'rgba(239, 68, 68, 0.15)',
-            border: '2px solid #ef4444',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -923,7 +923,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               fontWeight: 900,
               color: '#34d399',
               background: 'rgba(16, 185, 129, 0.14)',
-              border: '1px solid rgba(16, 185, 129, 0.35)',
+              border: 'none',
               padding: '3px 10px',
               borderRadius: '100px',
               textTransform: 'uppercase',
@@ -1024,7 +1024,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           {pinError && (
             <div style={{
               background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              border: 'none',
               borderRadius: '12px',
               padding: '8px 12px',
               fontSize: '0.74rem',
@@ -1355,7 +1355,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
               fontWeight: 700
             }}>
               <Shield size={11} color="#10b981" />
-              <span><strong style={{ color: '#22c55e' }}>Campus</strong>-<strong style={{ color: '#eab308' }}>Groovelab</strong></span>
+              <span><strong style={{ color: '#34a853' }}>Campus</strong>-<strong style={{ color: '#facc15' }}>Groovelab</strong></span>
             </span>
           </div>
         </div>
@@ -1606,7 +1606,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                     { type: 'bravo' as const, emoji: '👏', label: 'Bravo', color: '#f59e0b' },
                     { type: 'love' as const, emoji: '❤️', label: 'Liebe', color: '#ef4444' },
                     { type: 'fire' as const, emoji: '🔥', label: 'Feuer', color: '#f97316' },
-                    { type: 'star' as const, emoji: '⭐', label: 'Stern', color: '#eab308' }
+                    { type: 'star' as const, emoji: '⭐', label: 'Stern', color: '#facc15' }
                   ].map(r => {
                     const reacted = userReacted[r.type];
                     return (

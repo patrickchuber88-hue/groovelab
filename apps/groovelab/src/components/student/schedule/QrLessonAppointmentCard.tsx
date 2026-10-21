@@ -125,15 +125,15 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
       dateBlockBg = '#f8fafc';
       dateBlockBorder = '1px solid rgba(0, 0, 0, 0.05)';
       rowBg = '#ffffff';
-      rowBorder = '1.5px solid #eab308';
+      rowBorder = '1.5px solid #facc15';
     } else {
       // Handlungsbedarf (Schüler-Entscheidung ausstehend): Amber Call-to-Action Raster
       textColor = '#854d0e';
       subColor = '#d97706';
       dateBlockBg = '#fef3c7';
       rowBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-      rowBorder = '2px dashed #eab308';
-      dateBlockBorder = '1.5px dashed #eab308';
+      rowBorder = '2px dashed #facc15';
+      dateBlockBorder = '1.5px dashed #facc15';
     }
   }
 
@@ -234,7 +234,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
                 fontWeight: 800,
                 background: isConfirmedOcc ? '#fefce8' : '#fefce8',
                 color: '#b45309',
-                border: isConfirmedOcc ? '1px solid #eab308' : '1.5px dashed #eab308',
+                border: isConfirmedOcc ? '1px solid #facc15' : '1.5px dashed #facc15',
                 padding: '1px 6px',
                 borderRadius: '6px',
                 textTransform: 'uppercase',
@@ -253,7 +253,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
                 fontWeight: 800,
                 background: '#fee2e2',
                 color: '#991b1b',
-                border: '1.5px solid #ef4444',
+                border: 'none',
                 padding: '1px 6px',
                 borderRadius: '6px',
                 textTransform: 'uppercase',
@@ -268,7 +268,7 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
                 fontWeight: 800,
                 background: '#fffbeb',
                 color: '#b45309',
-                border: '1px solid #fef3c7',
+                border: 'none',
                 padding: '1px 6px',
                 borderRadius: '6px',
                 textTransform: 'uppercase',
@@ -398,8 +398,8 @@ export const QrLessonAppointmentCard: React.FC<QrLessonAppointmentCardProps> = (
           >
             <MessageSquare 
               size={17} 
-              color={hasMessages ? '#ca8a04' : '#64748b'}
-              fill={hasMessages ? '#eab308' : 'none'} 
+              color={hasMessages ? '#854d0e' : '#64748b'}
+              fill={hasMessages ? '#facc15' : 'none'} 
             />
           </button>
         )}

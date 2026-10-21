@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard, Clock, BookOpen, Bell } from 'lucide-react';
 
 export interface CarouselTabItem {
@@ -46,8 +46,8 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       icon: LayoutDashboard,
       content: (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '20px', width: '100%', maxWidth: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
-          {heroBanner}
           {kpisGrid}
+          {heroBanner}
           {effectiveAbsenceWidget}
         </div>
       )
@@ -64,7 +64,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
     },
     {
       id: 'hausaufgaben',
-      label: 'Hausaufgaben',
+      label: 'Kompass',
       icon: BookOpen,
       content: (
         <div style={{ paddingBottom: '20px', width: '100%', boxSizing: 'border-box', animation: 'fadeIn 0.25s ease-out' }}>
@@ -88,6 +88,31 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
     additionalTabs ? [...defaultTabs, ...additionalTabs] : defaultTabs
   );
 
+  const handleSelectTab = (idx: number) => {
+    setActiveIndex(idx);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(10); } catch { /* ignore */ }
+    }
+    const scrollContainer = document.getElementById('main-content') || document.querySelector('.main-content');
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    const handleSwitchTabEvent = (e: Event) => {
+      const customEvt = e as CustomEvent<{ tabId?: string; index?: number }>;
+      if (typeof customEvt.detail?.index === 'number') {
+        handleSelectTab(customEvt.detail.index);
+      } else if (customEvt.detail?.tabId) {
+        const targetIdx = tabs.findIndex(t => t.id === customEvt.detail.tabId);
+        if (targetIdx !== -1) handleSelectTab(targetIdx);
+      }
+    };
+    window.addEventListener('campus_mobile_briefing_switch_tab', handleSwitchTabEvent);
+    return () => window.removeEventListener('campus_mobile_briefing_switch_tab', handleSwitchTabEvent);
+  }, [tabs.length]);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
   };
@@ -99,12 +124,12 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
   const handleTouchEnd = () => {
     if (!touchStartX.current || !touchEndX.current) return;
     const diffX = touchStartX.current - touchEndX.current;
-    const minSwipeDistance = 40;
+    const minSwipeDistance = 50;
 
     if (diffX > minSwipeDistance && activeIndex < tabs.length - 1) {
-      setActiveIndex(prev => prev + 1);
+      handleSelectTab(activeIndex + 1);
     } else if (diffX < -minSwipeDistance && activeIndex > 0) {
-      setActiveIndex(prev => prev - 1);
+      handleSelectTab(activeIndex - 1);
     }
 
     touchStartX.current = null;
@@ -119,134 +144,12 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
         display: 'flex', 
         flexDirection: 'column', 
         gap: '12px',
+        paddingBottom: '88px',
         boxSizing: 'border-box',
         overflowX: 'hidden'
       }}
     >
-      {/* Top Segment Pills Navigation (100% Zero-Scrollbar Apple Segmented Control) */}
-      <div 
-        role="tablist"
-        aria-label="Briefing Navigation"
-        className="no-scrollbar"
-        style={{ 
-          display: 'grid', 
-          gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`,
-          alignItems: 'center', 
-          background: 'rgba(255, 255, 255, 0.85)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderRadius: '100px',
-          padding: '3px',
-          border: '1px solid rgba(226, 232, 240, 0.8)',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-          overflow: 'hidden',
-          width: '100%',
-          maxWidth: '100%',
-          boxSizing: 'border-box'
-        }}
-      >
-        {tabs.map((tab, idx) => {
-          const isActive = activeIndex === idx;
-          const IconComponent = tab.icon;
-          const iconSize = 13;
-          const iconDimension = '13px';
-
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              id={`mobile-briefing-tab-${tab.id}`}
-              aria-controls={`mobile-briefing-panel-${tab.id}`}
-              aria-selected={isActive}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => setActiveIndex(idx)}
-              style={{
-                width: '100%',
-                minWidth: 0,
-                minHeight: '40px',
-                padding: '6px 3px',
-                borderRadius: '100px',
-                border: 'none',
-                background: isActive ? themeColor : 'transparent',
-                color: isActive ? '#ffffff' : '#64748b',
-                fontWeight: isActive ? 800 : 700,
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                boxSizing: 'border-box',
-                touchAction: 'manipulation'
-              }}
-            >
-              <IconComponent 
-                size={iconSize} 
-                color={isActive ? '#ffffff' : '#64748b'} 
-                strokeWidth={2.2}
-                style={{ 
-                  width: iconDimension, 
-                  height: iconDimension, 
-                  minWidth: iconDimension, 
-                  minHeight: iconDimension, 
-                  maxWidth: iconDimension,
-                  maxHeight: iconDimension,
-                  flexShrink: 0 
-                }} 
-              />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Instagram-Style Page Indicator Dots (Positioned under top pills) */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          gap: '4px', 
-          padding: '2px 0 6px 0' 
-        }}
-      >
-        {tabs.map((tab, idx) => (
-          <button
-            key={idx}
-            type="button"
-            aria-label={`Gehe zu Tab ${tab.label}`}
-            onClick={() => setActiveIndex(idx)}
-            style={{
-              minWidth: '24px',
-              minHeight: '24px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              touchAction: 'manipulation'
-            }}
-          >
-            <span
-              style={{
-                width: activeIndex === idx ? '18px' : '6px',
-                height: '6px',
-                borderRadius: '100px',
-                background: activeIndex === idx ? themeColor : '#cbd5e1',
-                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                display: 'block'
-              }}
-            />
-          </button>
-        ))}
-      </div>
-
-      {/* Swipeable Viewport */}
+      {/* Active Tab Content Viewport */}
       <div
         role="tabpanel"
         id={`mobile-briefing-panel-${tabs[activeIndex]?.id}`}
@@ -266,6 +169,122 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       >
         {tabs[activeIndex]?.content}
       </div>
+
+      {/* 🏛️ 0.1% Goldstandard: True Fixed Bottom Bar in the Thumb Zone across all tabs (Cockpit | Tagesplan | Kompass | Feed | Notizen) */}
+      <nav
+        role="tablist"
+        aria-label="Briefing Schnellzugriff Navigation"
+        className="mobile-briefing-bottom-dock student-briefing-mobile-bottom-dock"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          zIndex: 900,
+          height: 'calc(52px + max(20px, env(safe-area-inset-bottom, 20px)))',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+          paddingTop: '6px',
+          background: 'rgba(255, 255, 255, 0.94)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '0.5px solid rgba(0, 0, 0, 0.10)',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          boxSizing: 'border-box',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif"
+        }}
+      >
+        {tabs.map((tab, idx) => {
+          const isActive = activeIndex === idx;
+          const IconComponent = tab.icon;
+
+          return (
+            <React.Fragment key={tab.id}>
+              {idx > 0 && (
+                <div
+                  style={{
+                    width: '1px',
+                    height: '22px',
+                    background: 'rgba(0, 0, 0, 0.08)',
+                    borderRadius: '1px',
+                    flexShrink: 0
+                  }}
+                />
+              )}
+              <button
+                type="button"
+                role="tab"
+                id={`mobile-briefing-tab-${tab.id}`}
+                aria-controls={`mobile-briefing-panel-${tab.id}`}
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => handleSelectTab(idx)}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  height: '100%',
+                  minHeight: '44px',
+                  border: 'none',
+                  borderRadius: 0,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  padding: '2px 2px',
+                  outline: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  boxSizing: 'border-box',
+                  position: 'relative',
+                  touchAction: 'manipulation'
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '38px',
+                    height: '24px',
+                    borderRadius: '12px',
+                    background: isActive ? `${themeColor}18` : 'transparent',
+                    position: 'relative',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  <IconComponent
+                    size={16}
+                    color={isActive ? themeColor : '#94a3b8'}
+                    strokeWidth={isActive ? 2.4 : 1.9}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontSize: '0.66rem',
+                    fontWeight: isActive ? 800 : 600,
+                    color: isActive ? themeColor : '#64748b',
+                    letterSpacing: isActive ? '-0.01em' : '0',
+                    lineHeight: 1,
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </nav>
     </div>
   );
 };

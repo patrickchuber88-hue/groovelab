@@ -836,7 +836,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                               color: '#b45309',
                               padding: '2px 7px',
                               borderRadius: '100px',
-                              border: '1px solid #fde68a'
+                              border: 'none'
                             }}>
                               ⭐ Hauptsponsor
                             </span>
@@ -900,7 +900,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                           height: '32px',
                           borderRadius: '8px',
                           background: '#fef2f2',
-                          border: '1px solid #fee2e2',
+                          border: 'none',
                           color: '#ef4444',
                           cursor: 'pointer',
                           display: 'flex',
@@ -1103,7 +1103,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '4px' }}>
                     Branche / Zusatz
@@ -1145,7 +1145,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
                   height: '24px',
                   borderRadius: '50%',
                   background: 'rgba(34, 197, 94, 0.15)',
-                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  border: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1236,7 +1236,7 @@ export const SecretarySponsorsModal: React.FC<SecretarySponsorsModalProps> = ({
               ) && (
                 <div style={{
                   background: '#fef2f2',
-                  border: '1px solid #fecaca',
+                  border: 'none',
                   borderRadius: '10px',
                   padding: '9px 12px',
                   fontSize: '0.73rem',

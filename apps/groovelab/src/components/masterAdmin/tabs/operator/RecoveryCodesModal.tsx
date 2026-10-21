@@ -104,7 +104,7 @@ export const RecoveryCodesModal: React.FC<RecoveryCodesModalProps> = ({
 
         <div style={{
           background: '#fef2f2',
-          border: '1px solid #fecaca',
+          border: 'none',
           borderRadius: '14px',
           padding: '14px',
           fontSize: '0.78rem',

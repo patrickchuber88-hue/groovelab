@@ -60,29 +60,23 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
         const effRescheduled = Boolean(!effCancelled && (isRescheduled || isOccurrenceRescheduled(nextOcc)));
         const isPendingProposal = Boolean(effRescheduled && isOccurrencePendingReschedule(nextOcc));
 
-        // 🏛️ 0,1% Goldstandard: Tone-in-Tone Unifarben-Doktrin (Zero Color-Clash)
-        let cardBg = 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)';
-        let cardColor = '#15803d';
-        let cardBorder = '1px solid rgba(52, 168, 83, 0.22)';
+        // 🏛️ 0,1% Goldstandard: Apple Modern Soft Tonal Fill (Campus-Grün #34a853)
+        let cardBg = 'rgba(52, 168, 83, 0.10)';
+        let cardColor = '#34a853';
+        const cardBorder = 'none';
         let cardTitle = 'Nächster Unterricht – Klicke für Details & Aktionen';
         let cardAriaLabel = `Nächster Unterricht: ${lessonText}`;
 
         if (effCancelled) {
-          // 🔴 Ausfall = Rot
-          cardBg = '#fef2f2';
-          cardColor = '#dc2626';
-          cardBorder = '1px dashed rgba(239, 68, 68, 0.5)';
+          // 🔴 Ausfall = Rot Solid Tonal
+          cardBg = '#fee2e2';
+          cardColor = '#b91c1c';
           cardTitle = 'Unterricht abgesagt – Klicke für Details oder Reaktivierung';
           cardAriaLabel = `Abgesagter Unterricht: ${lessonText}`;
         } else if (effRescheduled) {
-          // 🟡 Verschoben = Gelb / Amber
-          cardBg = isPendingProposal 
-            ? '#fffbeb' 
-            : 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%)';
+          // 🟡 Verschoben = Gelb / Amber Solid Tonal
+          cardBg = '#fef3c7';
           cardColor = '#b45309';
-          cardBorder = isPendingProposal 
-            ? '1.5px dashed #f59e0b' 
-            : '1px solid rgba(245, 158, 11, 0.35)';
           cardTitle = isPendingProposal 
             ? 'Terminvorschlag prüfen (Bestätigen oder Ablehnen)' 
             : 'Verschobener Unterrichtstermin – Klicke für Details';
@@ -115,7 +109,7 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               fontWeight: 850, 
               border: cardBorder,
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+              boxShadow: 'none',
               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
               width: isMobile ? '100%' : 'auto',
               touchAction: 'manipulation'
@@ -149,15 +143,15 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
             alignItems: 'center', 
             justifyContent: isMobile ? 'center' : 'flex-start',
             gap: '8px', 
-            background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.08) 0%, rgba(52, 168, 83, 0.02) 100%)', 
-            color: '#15803d', 
+            background: 'rgba(52, 168, 83, 0.10)', 
+            color: '#34a853', 
             padding: '10px 16px', 
             minHeight: '44px', 
             boxSizing: 'border-box', 
             borderRadius: '14px', 
             fontSize: '0.82rem', 
             fontWeight: 850, 
-            border: '1px solid rgba(52, 168, 83, 0.18)',
+            border: 'none',
             width: isMobile ? '100%' : 'auto'
           }}
         >
@@ -190,38 +184,36 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              background: unreadMsgCount > 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasMessage ? '#f8fafc' : '#ffffff'), 
-              color: unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#1e293b' : '#334155'), 
+              background: unreadMsgCount > 0 ? '#16a34a' : (hasMessage ? '#e0f2fe' : '#f1f5f9'), 
+              color: unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#0369a1' : '#0f172a'), 
               padding: isMusicStandMode ? '10px 18px' : '10px 16px', 
               minHeight: '44px', 
               boxSizing: 'border-box', 
               borderRadius: '14px', 
               fontSize: isMusicStandMode ? '0.88rem' : '0.82rem', 
               fontWeight: 850, 
-              border: unreadMsgCount > 0 ? 'none' : '1px solid #cbd5e1', 
+              border: 'none', 
               cursor: 'pointer',
-              boxShadow: unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : '0 2px 6px rgba(0, 0, 0, 0.04)',
+              boxShadow: 'none',
               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
               width: isMobile ? '100%' : 'auto',
               touchAction: 'manipulation'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : (hasMessage ? '#f1f5f9' : '#f8fafc');
-              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.40)' : '0 4px 12px rgba(0, 0, 0, 0.08)';
+              e.currentTarget.style.background = unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#bae6fd' : '#e2e8f0');
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (hasMessage ? '#f8fafc' : '#ffffff');
-              e.currentTarget.style.boxShadow = unreadMsgCount > 0 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : '0 2px 6px rgba(0, 0, 0, 0.04)';
+              e.currentTarget.style.background = unreadMsgCount > 0 ? '#16a34a' : (hasMessage ? '#e0f2fe' : '#f1f5f9');
             }}
             title="1:1 Shoutbox zum Unterrichtstermin"
             aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
           >
             <MessageSquare 
               size={15} 
-              color={unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#334155' : '#64748b')} 
-              fill={unreadMsgCount > 0 ? '#bbf7d0' : (hasMessage ? '#e2e8f0' : 'none')} 
+              color={unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#0369a1' : '#334155')} 
+              fill={unreadMsgCount > 0 ? '#bbf7d0' : 'none'} 
             />
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {unreadMsgCount > 0 
@@ -258,7 +250,7 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              background: '#ffffff', 
+              background: '#f1f5f9', 
               color: '#0f172a', 
               padding: '10px 16px', 
               minHeight: '44px', 
@@ -266,27 +258,25 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               borderRadius: '14px', 
               fontSize: '0.82rem', 
               fontWeight: 850, 
-              border: '1px solid #cbd5e1', 
+              border: 'none', 
               cursor: 'pointer', 
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)', 
+              boxShadow: 'none', 
               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
               width: isMobile ? '100%' : 'auto',
               touchAction: 'manipulation'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
-              e.currentTarget.style.borderColor = '#34a853';
+              e.currentTarget.style.background = '#e2e8f0';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)';
-              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.background = '#f1f5f9';
             }}
             title="Praxis-Toolbox: Metronom & Stimmgerät öffnen"
             aria-label="Praxis-Toolbox mit Metronom und Stimmgerät öffnen"
           >
-            <Sliders size={15} color="#0f172a" />
+            <Sliders size={15} color="#34a853" />
             <span style={{ whiteSpace: 'nowrap' }}>
               {isMobile ? 'Praxis-Tools' : 'Praxis-Toolbox'}
             </span>

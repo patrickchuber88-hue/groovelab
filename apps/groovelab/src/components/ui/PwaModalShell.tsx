@@ -218,21 +218,22 @@ export const PwaModalShell: React.FC<PwaModalShellProps> = ({
               <button
                 onClick={onClose}
                 type="button"
+                data-testid="modal-close-btn"
                 aria-label="Dialog schließen"
                 title="Schließen"
                 style={{
                   background: '#f1f5f9',
                   border: 'none',
                   borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
-                  minWidth: '36px',
-                  minHeight: '36px',
+                  width: '44px',
+                  height: '44px',
+                  minWidth: '44px',
+                  minHeight: '44px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  color: '#64748b',
+                  color: '#475569',
                   transition: 'all 0.15s ease',
                   flexShrink: 0,
                   touchAction: 'manipulation',
@@ -243,7 +244,7 @@ export const PwaModalShell: React.FC<PwaModalShellProps> = ({
                 onMouseOver={(e) => (e.currentTarget.style.background = '#e2e8f0')}
                 onMouseOut={(e) => (e.currentTarget.style.background = '#f1f5f9')}
               >
-                <X size={18} />
+                <X size={20} strokeWidth={2.3} />
               </button>
             )}
           </header>

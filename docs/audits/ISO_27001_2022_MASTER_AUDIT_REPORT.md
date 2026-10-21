@@ -84,7 +84,7 @@ Die Risikobewertung erfolgt nach der Formel: $Risikowert = Eintrittswahrscheinli
 * **Forensischer Befund:** 35 von 37 Kontrollen sind vollständig wirksam implementiert.
 * **Besondere Stärken:**
   1. **Revisionssichere GoBD-Abrechnung:** Vollständige Trennung von Rechnungssequenzen und WORM-Schutz verhindert Manipulationen von Finanzdaten rückwirkend (`BILLING_CANONICAL_LOGIC.md`).
-  2. **Lieferantensouveränität:** Hetzner Online GmbH ist vertraglich lückenlos über einen AVV nach Art. 28 DSGVO gebunden. Es existieren keinerlei Abhängigkeiten von US-Hyperscalern oder ausländischen CDNs. Alle Fonts (Plus Jakarta Sans) und Assets werden 100% lokal ausgeliefert.
+  2. **Lieferantensouveränität:** Die IONOS SE (Montabaur/Deutschland – Primärer Produktionscluster `85.215.73.216`) sowie die Hetzner Online GmbH (Falkenstein/Nürnberg – DR & Storage Box) sind vertraglich lückenlos über AVVs nach Art. 28 DSGVO gebunden. Es existieren keinerlei Abhängigkeiten von US-Hyperscalern oder ausländischen CDNs. Alle Fonts (Plus Jakarta Sans) und Assets werden 100% lokal ausgeliefert.
 
 ### Domäne A.6: Personenbezogene Maßnahmen
 * **Forensischer Befund:** 7 von 8 Kontrollen wirksam implementiert.
@@ -94,7 +94,7 @@ Die Risikobewertung erfolgt nach der Formel: $Risikowert = Eintrittswahrscheinli
 
 ### Domäne A.7: Physische Sicherheit
 * **Forensischer Befund:** 14 von 14 Kontrollen (100 %) vollumfänglich erfüllt.
-* **Vererbung:** Die Rechenzentren der Hetzner Online GmbH in Falkenstein/Vogtland und Nürnberg sind nach ISO/IEC 27001 zertifiziert. Der physische Schutz umfasst 2-Faktor-Zutrittskontrollen, biometrische Handvenenscanner, getrennte Brandabschnitte, Inergen-Löschanlagen und redundante N+1 Dieselgeneratoren.
+* **Vererbung:** Die Rechenzentren der IONOS SE (Berlin/Frankfurt) sowie der Hetzner Online GmbH (Falkenstein/Vogtland und Nürnberg) sind nach ISO/IEC 27001 zertifiziert. Der physische Schutz umfasst 2-Faktor-Zutrittskontrollen, biometrische Handvenenscanner, getrennte Brandabschnitte, Inergen-Löschanlagen und redundante N+1 Dieselgeneratoren.
 
 ### Domäne A.8: Technologische Maßnahmen (Forensische Kernprüfung)
 * **Forensischer Befund:** 32 von 34 Kontrollen angewendet und mit 98,4% Exzellenz bewertet. (2 Kontrollen begründet nicht anwendbar gem. SoA).

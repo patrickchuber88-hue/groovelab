@@ -1,13 +1,12 @@
 /**
- * 🏛️ Campus-Groovelab 0,1% Goldstandard: VdM-Notenschnipsel-Katalog
+ * 🏛️ Campus-Groovelab 0,1% Goldstandard: Kuratierter Notenschnipsel-Katalog
  * vdmScoreSnippetCatalog.ts
  * 
- * Kanonischer Lehrplan-Katalog angelehnt an das Rahmenlehrplanwerk des
- * Verbands deutscher Musikschulen (VdM):
- * - 4 Hauptkategorien: Tonleitern, Akkorde & Kadenzen, Rhythmus & Grooves, Technik & Warm-ups
+ * Kanonischer Musikschul-Katalog über alle Instrumentalfächer und Ausbildungsstufen:
+ * - 8 Fachkategorien + Eigene Schnipsel mit 3-Achsen-Taxonomie (Rubrik x Sub-Ordner x Ausbildungsstufe)
  * - Exakte 1–4 Takte MicroScores mit polyphoner Synthese & Notenmatrix
- * - 100% DSGVO & UrhG-konform (§§ 2, 51, 60a UrhG)
- * - Durchgängige Einteilung in Elementar-, Unter- und Mittelstufe
+ * - 100% DSGVO-, MarkenG- & UrhG-konform (§§ 2, 51, 60a UrhG)
+ * - Durchgängige Einteilung in Elementar-/Grundstufe, Unterstufe und Mittelstufe
  */
 
 import { MicroScoreSnippet } from '../components/student/meisterwerk/microscore/microScore.types';
@@ -16,6 +15,9 @@ import { VDM_EMP_SCORE_SNIPPETS } from './vdmEmpScoreSnippets';
 import { VDM_GUITAR_UKE_SNIPPETS } from './vdmGuitarUkuleleSnippets';
 import { VDM_INSTRUMENTAL_WARMUPS } from './vdmInstrumentalWarmups';
 import { VDM_BAND_SYNC_PACKS } from './vdmBandSyncPacks';
+import { BESTOF_CURRICULUM_EXPANSION } from './bestOfCurriculumExpansion';
+import { INSTRUMENT_CURRICULUM_EXPANSION } from './instrumentCurriculumExpansion';
+import { VDM_MASTERPIECE_CURRICULUM_EXPANSION } from './vdmMasterpieceCurriculumExpansion';
 
 export interface VdmSubFolder {
   id: string;
@@ -55,11 +57,10 @@ export interface VdmFolderCategory {
 /**
  * 🏛️ Campus-Groovelab 0,1% Goldstandard Wächter:
  * Erkennt autoritativ, ob ein Notenschnipsel von der Lehrkraft selbst
- * erstellt/gespeichert wurde oder aus dem VdM-Kanon-Katalog stammt.
+ * erstellt/gespeichert wurde oder aus dem kuratierten Standard-Katalog stammt.
  */
 export const isOwnScoreSnippet = (s: MicroScoreSnippet): boolean => {
   if (!s || !s.id) return false;
-  // Kuratierte VdM-Katalog-Presets beginnen ausnahmslos mit 'vdm-' und sind niemals eigene Schnipsel
   if (s.id.startsWith('vdm-') || (s as any).isVdmStandard) return false;
   return s.category === 'Eigene' || s.category === 'Eigene Notenschnipsel' || s.isCustom === true || !s.id.startsWith('vdm-');
 };
@@ -70,7 +71,7 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     name: 'Eigene Notenschnipsel',
     iconName: 'sparkles',
     description: 'Individuell erstellte Schnipsel & Hausaufgaben der Lehrkraft',
-    color: { bg: '#fdf4ff', border: '#f5d0fe', text: '#86198f', badgeBg: '#fae8ff', badgeText: '#701a75', activeBg: '#9333ea', activeText: '#ffffff', shadow: '0 3px 12px rgba(147, 51, 234, 0.35)' },
+    color: { bg: '#f3e8ff', border: '#a855f7', text: '#7e22ce', badgeBg: '#f3e8ff', badgeText: '#7e22ce', activeBg: '#a855f7', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle eigenen Schnipsel', description: 'Alle von Ihnen erstellten Notenschnipsel' },
       { id: 'drafts', label: 'Entwürfe', description: 'Noch nicht als Hausaufgabe vergebene Schnipsel' },
@@ -81,12 +82,13 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     id: 'Tonleitern',
     name: 'Tonleitern & Pentatonik',
     iconName: 'music',
-    description: 'Dur, Moll, Pentatonik, Blues & Kirchentonarten',
-    color: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', badgeBg: '#dbeafe', badgeText: '#1e3a8a', activeBg: '#2563eb', activeText: '#ffffff', shadow: '0 3px 12px rgba(37, 99, 235, 0.35)' },
+    description: '5-Ton-Räume, Dur, Moll, Pentatonik, Blues & Kirchentonarten',
+    color: { bg: '#dbeafe', border: '#3b82f6', text: '#1d4ed8', badgeBg: '#dbeafe', badgeText: '#1d4ed8', activeBg: '#3b82f6', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Tonleitern', description: 'Alle Tonleiter-Übungen im Überblick' },
+      { id: 'fuenfton', label: '5-Ton-Raum (Einstieg)', description: 'Erste 5 Töne C-D-E-F-G ohne Lagenwechsel' },
       { id: 'dur', label: 'Dur (Grund- & Unterstufe)', description: 'C-, G-, F-, D- und B-Dur Tonleitern' },
-      { id: 'moll', label: 'Moll (natürlich/harmonisch)', description: 'a-, e- und d-Moll mit Leittönen' },
+      { id: 'moll', label: 'Moll (natürlich/harmonisch/melodisch)', description: 'a-, e- und d-Moll mit Leittönen' },
       { id: 'pentatonik', label: 'Pentatonik & Blues', description: '5-Ton-Räume & Pentatonik-Licks' },
       { id: 'modal', label: 'Modal & Chromatisch', description: 'Kirchentonarten & Halbton-Schritte' }
     ]
@@ -95,13 +97,16 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     id: 'Akkorde',
     name: 'Akkorde & Kadenzen',
     iconName: 'layers',
-    description: 'Dreiklänge, Umkehrungen, Kadenzen & Pop-Patterns',
-    color: { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', badgeBg: '#dcfce7', badgeText: '#14532d', activeBg: '#16a34a', activeText: '#ffffff', shadow: '0 3px 12px rgba(22, 163, 74, 0.35)' },
+    description: 'Zweiklänge, Dreiklänge, Arpeggios, Umkehrungen & Kadenzen',
+    color: { bg: '#e6f4ea', border: '#34a853', text: '#137333', badgeBg: '#e6f4ea', badgeText: '#137333', activeBg: '#34a853', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
-      { id: 'all', label: 'Alle Akkorde', description: 'Alle Akkord- & Kadenzübungen' },
-      { id: 'zweiklang-einstieg', label: '2-Akkord-Einstieg (Em-Am/D)', description: 'Die einfachsten Akkordwechsel für Anfänger' },
-      { id: 'dreiklaenge', label: 'Dreiklänge & Umkehrungen', description: 'Grunddreiklänge als Block & Umkehrungen' },
-      { id: 'kadenzen', label: 'Hauptkadenzen & Pop-Formeln', description: 'I-IV-V-I & die berühmten 4-Chords' },
+      { id: 'all', label: 'Alle Akkorde', description: 'Alle Akkord-, Arpeggio- & Kadenzübungen' },
+      { id: 'zweiklang-einstieg', label: 'Zweiklänge (Terzen & Quinten)', description: 'Zweistimmiger Harmonie-Einstieg' },
+      { id: 'akkordwechsel', label: '2-Akkord-Wechsel (Em-Am / C-G)', description: 'Die wichtigsten ersten Akkordwechsel' },
+      { id: 'dreiklaenge', label: 'Block-Dreiklänge (Dur & Moll)', description: 'Grunddreiklänge im simultanen Anschlag' },
+      { id: 'arpeggio', label: 'Gebrochene Dreiklänge (Arpeggio)', description: 'Melodisch zerlegte Dreiklänge für alle Instrumente' },
+      { id: 'umkehrungen', label: 'Umkehrungen (Sext & Quartsext)', description: 'Grundstellung, 1. und 2. Umkehrung' },
+      { id: 'kadenzen', label: 'Hauptkadenzen & Pop-Formeln', description: 'I-IV-V-I, G7-Auflösung, Moll-Kadenz & 4-Chords' },
       { id: 'jazz-vierklaenge', label: 'Jazz & Septakkorde', description: 'II-V-I Verbindung, Dominant-7 & Maj7' }
     ]
   },
@@ -109,34 +114,36 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     id: 'Rhythmus',
     name: 'Rhythmus & Grooves',
     iconName: 'drum',
-    description: 'Metronom-Drills, Triolen, Synkopen & Taktarten',
-    color: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', badgeBg: '#fef3c7', badgeText: '#78350f', activeBg: '#d97706', activeText: '#ffffff', shadow: '0 3px 12px rgba(217, 119, 6, 0.35)' },
+    description: 'Grundpuls, Achtel, Punktierungen, 16tel, Triolen & Drum-Grooves',
+    color: { bg: '#fef9c3', border: '#facc15', text: '#854d0e', badgeBg: '#fef9c3', badgeText: '#854d0e', activeBg: '#facc15', activeText: '#0f172a', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Rhythmen', description: 'Alle Rhythmus- und Metronomübungen' },
-      { id: 'grooves', label: '🥁 Schlagzeug & Drum Grooves', description: 'Rock, Funk, Disco, Halftime & Tom-Fills' },
-      { id: 'grundpuls', label: 'Viertel & Achtelpuls', description: 'Präzises Timing & Pausenzählen im 4/4' },
+      { id: 'grundpuls', label: 'Viertel & Achtelpuls', description: 'Präzises Timing, Achtel-Paare & Pausenzählen' },
       { id: 'punktiert-synkopen', label: 'Punktierungen & Synkopen', description: 'Klassische Punktierung & Off-Beats' },
+      { id: 'sechzehntel', label: '16tel-Figuren & Galopp', description: 'Binäre 16tel-Gruppen & Galopp-Motive' },
       { id: 'triolen-shuffle', label: 'Triolen & Shuffle', description: 'Achtel-Triolen & Blues Shuffle-Feel' },
-      { id: 'ungerade', label: '3/4 Walzer & 6/8 Takt', description: 'Dreiertakt & Wiegender 6/8 Rhythmus' }
+      { id: 'ungerade', label: '3/4 Walzer & 6/8 Takt', description: 'Dreiertakt & wiegender 6/8 Rhythmus' },
+      { id: 'grooves', label: 'Schlagzeug & Drum Grooves', description: 'Rock, Funk, Disco, Halftime & Tom-Fills' }
     ]
   },
   {
     id: 'Technik',
     name: 'Warm-ups & Fitness',
     iconName: 'zap',
-    description: 'Hanon, Spider-Drill, Long Tones & Rudiments',
-    color: { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8', badgeBg: '#f3e8ff', badgeText: '#581c87', activeBg: '#7e22ce', activeText: '#ffffff', shadow: '0 3px 12px rgba(126, 34, 206, 0.35)' },
+    description: 'Blockflöte, Bläser, Streicher, Tasten, Gitarre & Drum-Rudiments',
+    color: { bg: '#e0e7ff', border: '#6366f1', text: '#4338ca', badgeBg: '#e0e7ff', badgeText: '#4338ca', activeBg: '#6366f1', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Warm-ups', description: 'Alle Fingerübungen und Technik-Drills' },
+      { id: 'blockfloete-holz', label: 'Blockflöte & Holzbläser', description: 'H-A-G Einstieg, Fünftonraum & Überblasen' },
+      { id: 'blaeser-longtones', label: 'Bläser (Long Tones)', description: 'Intonations-Stütze & Dynamik p < f > p' },
+      { id: 'blaeser-flexibility', label: 'Bläser (Lippenbindung & Zunge)', description: 'Naturtöne & Doppelzunge' },
+      { id: 'streicher-bogen', label: 'Streicher (Bogen & Saitenwechsel)', description: 'Leersaiten Ab-/Aufstrich & Saitenwechsel' },
+      { id: 'streicher-lagen', label: 'Streicher (1. Lage)', description: 'Dur/Moll Griffmuster' },
       { id: 'klavier-hanon', label: 'Tasten (Hanon No. 1)', description: 'Fingerunabhängigkeit & Lockerung' },
       { id: 'klavier-daumen', label: 'Tasten (Daumenuntersatz)', description: '1-2-3-1 Legato Oktave' },
       { id: 'klavier-alberti', label: 'Tasten (Alberti-Bass)', description: 'C-E-G-E Sonatinenbegleitung' },
-      { id: 'streicher-bogen', label: 'Streicher (Bogeneinteilung)', description: 'Leersaiten Ab-/Aufstrich' },
-      { id: 'streicher-lagen', label: 'Streicher (1. Lage)', description: 'Dur/Moll Griffmuster' },
-      { id: 'blaeser-flexibility', label: 'Bläser (Lippenbindung & Zunge)', description: 'Naturtöne & Doppelzunge' },
       { id: 'gitarre-spider', label: 'Gitarre & Bass (Spider)', description: '1-2-3-4 Wechselschlag & Koordination' },
-      { id: 'blaeser-longtones', label: 'Bläser (Long Tones)', description: 'Intonations-Stütze, Dynamik p < f > p' },
-      { id: 'drums-rudiments', label: 'Drums (Paradiddle)', description: 'Single Stroke & Paradiddle Stick-Control' }
+      { id: 'drums-rudiments', label: 'Drums (Rudiments & Rolls)', description: 'Single Stroke, Double Stroke & Paradiddle' }
     ]
   },
   {
@@ -144,13 +151,13 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     name: 'Früherziehung & EMP',
     iconName: 'smile',
     description: 'Kuckucksruf, Fünftonraum, Pentatonik, Bodypercussion & Sprachrhythmen',
-    color: { bg: '#fdf2f8', border: '#fbcfe8', text: '#9d174d', badgeBg: '#fce7f3', badgeText: '#831843', activeBg: '#db2777', activeText: '#ffffff', shadow: '0 3px 12px rgba(219, 39, 119, 0.35)' },
+    color: { bg: '#fee2e2', border: '#ef4444', text: '#b91c1c', badgeBg: '#fee2e2', badgeText: '#b91c1c', activeBg: '#ef4444', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle EMP-Schnipsel', description: 'Alle Früherziehungs-Übungen' },
-      { id: 'emp-terz', label: 'Kuckucksruf & Terzen', description: 'Moll-Terz G-E Ur-Intervall' },
-      { id: 'emp-fuenfton', label: 'Fünftonraum & Lieder', description: 'Hänschen Klein & Liedanfänge' },
+      { id: 'emp-terz', label: 'Kuckucksruf & 3-Ton-Raum', description: 'Moll-Terz G-E & Ringe-Reihe' },
+      { id: 'emp-fuenfton', label: 'Fünftonraum & Lieder', description: 'Tonleiter-Treppe & Hänschen Klein' },
       { id: 'emp-pentatonik', label: 'Pentatonischer Garten', description: 'C-D-E-G-A ohne Halbtonschritte' },
-      { id: 'emp-sprache', label: 'Sprachrhythmus', description: 'Sprechverse & Silbenmetrik' },
+      { id: 'emp-sprache', label: 'Sprachrhythmus & Puls', description: 'Sprechverse, Silbenmetrik & Uhr-Ticken' },
       { id: 'emp-bodypercussion', label: 'Body-Percussion', description: 'Stampfen, Patschen, Klatschen' },
       { id: 'emp-register', label: 'Register & Kontraste', description: 'Elefant vs. Maus' },
       { id: 'emp-echo', label: 'Call & Response', description: 'Glöckchen-Echo' },
@@ -162,10 +169,11 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     name: 'Gitarre, Ukulele & Bass',
     iconName: 'guitar',
     description: 'Calypso-Strumming, PIMA-Arpeggios, Powerchords & Slap-Bass',
-    color: { bg: '#fff7ed', border: '#fed7aa', text: '#9a3412', badgeBg: '#ffedd5', badgeText: '#7c2d12', activeBg: '#ea580c', activeText: '#ffffff', shadow: '0 3px 12px rgba(234, 88, 12, 0.35)' },
+    color: { bg: '#ffedd5', border: '#f97316', text: '#c2410c', badgeBg: '#ffedd5', badgeText: '#c2410c', activeBg: '#f97316', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Zupfinstrumente', description: 'Alle Gitarren-, Ukulele- und Bass-Übungen' },
       { id: 'ukulele-basics', label: 'Ukulele (Calypso & Chords)', description: 'Calypso Strumming & Magic 4 Chords' },
+      { id: 'gitarre-openchords', label: 'Gitarre (Shuffle & Riffs)', description: 'Blues Shuffle Riff & Begleitung' },
       { id: 'gitarre-arpeggio', label: 'Gitarre (PIMA Arpeggio)', description: 'Carcassi Zupfmuster & Lagen' },
       { id: 'rock-powerchords', label: 'Rock (Powerchords & P.M.)', description: 'E5-G5-A5 mit abgedämpfter Kante' },
       { id: 'gitarre-barre', label: 'Gitarre (Barré Vorbereitung)', description: 'Mini-Barré & Kraftaufbau' },
@@ -177,7 +185,7 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     name: 'Vokal & Gehörbildung',
     iconName: 'mic',
     description: 'Stimm-Sirene, Belcanto-Arpeggio, Zwerchfell-Staccato & Solmisation',
-    color: { bg: '#f0fdfa', border: '#99f6e4', text: '#115e59', badgeBg: '#ccfbf1', badgeText: '#134e4a', activeBg: '#0d9488', activeText: '#ffffff', shadow: '0 3px 12px rgba(13, 148, 136, 0.35)' },
+    color: { bg: '#cffafe', border: '#06b6d4', text: '#0e7490', badgeBg: '#cffafe', badgeText: '#0e7490', activeBg: '#06b6d4', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Vokalübungen', description: 'Alle Gesangs- & Gehörbildungsübungen' },
       { id: 'vokal-sirene', label: 'Stimm-Sirene (Register)', description: 'Brust- zu Kopfstimme Ausgleich' },
@@ -191,7 +199,7 @@ export const VDM_CATEGORIES: VdmFolderCategory[] = [
     name: 'GrooveLab Band-Packs',
     iconName: 'users',
     description: 'Synchrone 3-Pack Ensembles (Drums + Bass + Keys/Melodie)',
-    color: { bg: '#f8fafc', border: '#cbd5e1', text: '#1e293b', badgeBg: '#e2e8f0', badgeText: '#0f172a', activeBg: '#334155', activeText: '#ffffff', shadow: '0 3px 12px rgba(51, 65, 85, 0.35)' },
+    color: { bg: '#f1f5f9', border: '#94a3b8', text: '#475569', badgeBg: '#f1f5f9', badgeText: '#475569', activeBg: '#0f172a', activeText: '#ffffff', shadow: 'none' },
     subFolders: [
       { id: 'all', label: 'Alle Band-Packs', description: 'Alle synchronen Ensembles' },
       { id: 'band-funk', label: 'Funk Drive in Dm (96 BPM)', description: '16tel Ghost-Hi-Hat, Slap Bass, Dm9 Stabs' },
@@ -216,8 +224,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Gleichmäßige Achtelnoten im 4/4-Takt auf- und abwärts von C4 bis C5 und zurück zum Grundton C4.',
-    tags: ['VdM Grundstufe', 'C-Dur', 'Auf & Ab', 'Metronom'],
+    description: 'Grundstufe: Gleichmäßige Achtelnoten im 4/4-Takt auf- und abwärts von C4 bis C5 und zurück zum Grundton C4.',
+    tags: ['Grundstufe', 'C-Dur', 'Auf & Ab', 'Metronom'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -251,8 +259,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Tonleiter mit 1 Kreuz-Vorzeichen (Fis) über 1 Oktave auf- und abwärts.',
-    tags: ['VdM Unterstufe', 'G-Dur', 'Kreuz-Tonart', 'Auf & Ab'],
+    description: 'Unterstufe 1: Tonleiter mit 1 Kreuz-Vorzeichen (Fis) über 1 Oktave auf- und abwärts.',
+    tags: ['Unterstufe', 'G-Dur', 'Kreuz-Tonart', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -286,8 +294,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Tonleiter mit 1 B-Vorzeichen (Bb) auf- und abwärts in gleichmäßigem Fluss.',
-    tags: ['VdM Unterstufe', 'F-Dur', 'B-Tonart', 'Auf & Ab'],
+    description: 'Unterstufe 1: Tonleiter mit 1 B-Vorzeichen (Bb) auf- und abwärts in gleichmäßigem Fluss.',
+    tags: ['Unterstufe', 'F-Dur', 'B-Tonart', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -321,8 +329,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 84,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 2: D-Dur mit Fis und Cis auf- und abwärts über 1 Oktave.',
-    tags: ['VdM Unterstufe', 'D-Dur', 'Auf & Ab', 'Fis & Cis'],
+    description: 'Unterstufe 2: D-Dur mit Fis und Cis auf- und abwärts über 1 Oktave.',
+    tags: ['Unterstufe', 'D-Dur', 'Auf & Ab', 'Fis & Cis'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -356,8 +364,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Natürliche Moll-Tonleiter (parallele Molltonart zu C-Dur) über 1 Oktave auf- und abwärts.',
-    tags: ['A-Moll', 'Natürliches Moll', 'VdM Unterstufe', 'Auf & Ab'],
+    description: 'Unterstufe 1: Natürliche Moll-Tonleiter (parallele Molltonart zu C-Dur) über 1 Oktave auf- und abwärts.',
+    tags: ['A-Moll', 'Natürliches Moll', 'Unterstufe', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -391,8 +399,8 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 2: Erhöhter 7. Ton (Gis5) als Leitton zum Grundton A auf- und abwärts.',
-    tags: ['A-Moll', 'Harmonisch', 'Leitton', 'VdM Unterstufe', 'Auf & Ab'],
+    description: 'Unterstufe 2: Erhöhter 7. Ton (Gis5) als Leitton zum Grundton A auf- und abwärts.',
+    tags: ['A-Moll', 'Harmonisch', 'Leitton', 'Unterstufe', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -426,7 +434,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Mittelstufe: Harmonisches e-Moll mit Fis und Leitton Dis auf- und abwärts.',
+    description: 'Mittelstufe: Harmonisches e-Moll mit Fis und Leitton Dis auf- und abwärts.',
     tags: ['E-Moll', 'Harmonisch', 'Leitton', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -461,7 +469,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 88,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Universelle Pentatonik (C-D-E-G-A) im flüssigen Achtellauf auf- und abwärts.',
+    description: 'Grundstufe: Universelle Pentatonik (C-D-E-G-A) im flüssigen Achtellauf auf- und abwärts.',
     tags: ['C-Dur', 'Pentatonik', 'Melodie-Bildung', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -496,7 +504,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 90,
     barsCount: 2,
     displayMode: 'both',
-    description: 'VdM Unterstufe: Klassischer Einstieg in das Solo-Spiel (A-C-D-E-G) mit authentischer Bund-Notation.',
+    description: 'Unterstufe: Klassischer Einstieg in das Solo-Spiel (A-C-D-E-G) mit authentischer Bund-Notation.',
     tags: ['A-Moll', 'Pentatonik', 'Solo-Lick', 'Gitarre'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -531,7 +539,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 84,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Mittelstufe: A-Blues-Tonleiter (A-C-D-Eb-E-G-A) mit charakteristischer Blue Note Eb auf- und abwärts.',
+    description: 'Mittelstufe: A-Blues-Tonleiter (A-C-D-Eb-E-G-A) mit charakteristischer Blue Note Eb auf- und abwärts.',
     tags: ['Blues', 'Blue Note', 'Saxophon & Bläser', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -564,7 +572,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Mittelstufe: Dorische Tonleiter mit charakteristischer großer Sexte B4 auf- und abwärts.',
+    description: 'Mittelstufe: Dorische Tonleiter mit charakteristischer großer Sexte B4 auf- und abwärts.',
     tags: ['Kirchentonart', 'Modal', 'Dorisch', 'Querflöte', 'Auf & Ab'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -603,7 +611,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 72,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Simultan zweistimmiges Spiel (Terzen und Quinten) zur Grundlegung polyphonen Hörens.',
+    description: 'Grundstufe: Simultan zweistimmiges Spiel (Terzen und Quinten) zur Grundlegung polyphonen Hörens.',
     tags: ['Zweiklang', 'Terzen', 'Quinten', 'Harmonie-Einstieg'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -631,7 +639,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 72,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Gleichzeitiger Anschlag aller 3 Akkordtöne (C-E-G) im Viertelpuls.',
+    description: 'Grundstufe: Gleichzeitiger Anschlag aller 3 Akkordtöne (C-E-G) im Viertelpuls.',
     tags: ['C-Dur', 'Dreiklang', 'Blockakkord', 'Grundstufe'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -673,7 +681,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Simultaner Anschlag der parallelen Molldreiklänge Am und Em.',
+    description: 'Unterstufe 1: Simultaner Anschlag der parallelen Molldreiklänge Am und Em.',
     tags: ['A-Moll', 'E-Moll', 'Moll-Dreiklang', 'Simultan'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -715,7 +723,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Der fundamentale 2-Akkord-Wechsel. Takt 1: Em, Takt 2: Am simultan im 4/4-Puls.',
+    description: 'Unterstufe 1: Der fundamentale 2-Akkord-Wechsel. Takt 1: Em, Takt 2: Am simultan im 4/4-Puls.',
     tags: ['Akkordwechsel', 'Em-Am', 'Liedbegleitung', 'Basis'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -757,7 +765,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Klassischer Lagerfeuer- und Pop-Wechsel zwischen E-Moll und D-Dur.',
+    description: 'Unterstufe 1: Klassischer Lagerfeuer- und Pop-Wechsel zwischen E-Moll und D-Dur.',
     tags: ['Akkordwechsel', 'Em-D', 'Folk', 'Rock'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -799,7 +807,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Die Ur-Harmonie I ⇄ V. Simultaner Blockanschlag mit sauberem Fingerwechsel.',
+    description: 'Unterstufe 1: Die Ur-Harmonie I ⇄ V. Simultaner Blockanschlag mit sauberem Fingerwechsel.',
     tags: ['Akkordwechsel', 'C-G', 'Tonika-Dominante', 'Basis'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -841,7 +849,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 76,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Ökonomischer Fingerwechsel zwischen C-Dur und A-Moll mit gemeinsamen Tönen C und E.',
+    description: 'Unterstufe 1: Ökonomischer Fingerwechsel zwischen C-Dur und A-Moll mit gemeinsamen Tönen C und E.',
     tags: ['Akkordwechsel', 'C-Am', 'Parallele', 'Liedbegleitung'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -883,7 +891,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 70,
     barsCount: 4,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Tonika (C), Subdominante (F), Dominante (G), Tonika (C) in simultaner Stimmführung.',
+    description: 'Unterstufe 1: Tonika (C), Subdominante (F), Dominante (G), Tonika (C) in simultaner Stimmführung.',
     tags: ['Kadenz', 'Harmonielehre', 'I-IV-V-I', 'Stimmführung'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -921,7 +929,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 4,
     displayMode: 'notes',
-    description: 'VdM Unterstufe: Das universelle 4-Chord Pop-Schema mit simultanen Viertelschlägen.',
+    description: 'Unterstufe: Das universelle 4-Chord Pop-Schema mit simultanen Viertelschlägen.',
     tags: ['Pop-Kadenz', 'Akkordwechsel', 'C-G-Am-F', '4 Chords'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -999,7 +1007,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 84,
     barsCount: 4,
     displayMode: 'notes',
-    description: 'VdM Unterstufe: Der Hit-Standard in G-Dur mit 4 simultanen Schlägen pro Takt.',
+    description: 'Unterstufe: Der Hit-Standard in G-Dur mit 4 simultanen Schlägen pro Takt.',
     tags: ['Pop-Kadenz', 'G-D-Em-C', 'Hit-Schema', '4 Chords'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1077,7 +1085,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 68,
     barsCount: 3,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 2: Grundstellung (C-E-G), 1. Umkehrung (E-G-C), 2. Umkehrung (G-C-E) als simultane Akkorde.',
+    description: 'Unterstufe 2: Grundstellung (C-E-G), 1. Umkehrung (E-G-C), 2. Umkehrung (G-C-E) als simultane Akkorde.',
     tags: ['Umkehrungen', 'Sextakkord', 'Quartsextakkord', 'Simultan'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1118,7 +1126,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 85,
     barsCount: 3,
     displayMode: 'notes',
-    description: 'VdM Mittelstufe: Vierstimmige simultane Jazz-Voicings mit sanfter Stimmführung.',
+    description: 'Mittelstufe: Vierstimmige simultane Jazz-Voicings mit sanfter Stimmführung.',
     tags: ['Jazz', 'II-V-I', 'Septakkorde', 'Vierklänge', 'Simultan'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1170,7 +1178,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Viertelnoten im Wechsel mit Viertelpausen. Metronom-Stabilisation.',
+    description: 'Grundstufe: Viertelnoten im Wechsel mit Viertelpausen. Metronom-Stabilisation.',
     tags: ['Metronom', 'Pausen', 'Grundstufe', 'Timing'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1198,7 +1206,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Klassisches Motiv – punktierte Viertel mit anschließender Achtel.',
+    description: 'Unterstufe 1: Klassisches Motiv – punktierte Viertel mit anschließender Achtel.',
     tags: ['Punktierung', 'Rhythmus', 'Klassik'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1224,7 +1232,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 88,
     barsCount: 2,
     displayMode: 'both',
-    description: 'VdM Mittelstufe: Betonung auf den Und-Zählzeiten (Off-Beat) für Funk & Pop.',
+    description: 'Mittelstufe: Betonung auf den Und-Zählzeiten (Off-Beat) für Funk & Pop.',
     tags: ['Synkope', 'Off-Beat', 'Funk', 'Bass'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1232,11 +1240,12 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     authorRole: 'teacher',
     notes: [
       { id: 'rs1', barIndex: 0, beatFraction: 0, duration: '8', pitch: 'REST' },
-      { id: 'rs2', barIndex: 0, beatFraction: 2, duration: '4', pitch: 'A2', fret: 0, stringIndex: 4 },
-      { id: 'rs3', barIndex: 0, beatFraction: 6, duration: '4', pitch: 'C3', fret: 3, stringIndex: 4 },
-      { id: 'rs4', barIndex: 0, beatFraction: 10, duration: '4', pitch: 'D3', fret: 0, stringIndex: 3 },
-      { id: 'rs5', barIndex: 0, beatFraction: 14, duration: '8', pitch: 'E3', fret: 2, stringIndex: 3 },
-      { id: 'rs6', barIndex: 1, beatFraction: 0, duration: '2', pitch: 'A2', fret: 0, stringIndex: 4 }
+      { id: 'rs2', barIndex: 0, beatFraction: 2, duration: '4', pitch: 'A3', fret: 0, stringIndex: 4 },
+      { id: 'rs3', barIndex: 0, beatFraction: 6, duration: '4', pitch: 'C4', fret: 3, stringIndex: 4 },
+      { id: 'rs4', barIndex: 0, beatFraction: 10, duration: '4', pitch: 'D4', fret: 0, stringIndex: 3 },
+      { id: 'rs5', barIndex: 0, beatFraction: 14, duration: '8', pitch: 'E4', fret: 2, stringIndex: 3 },
+      { id: 'rs6', barIndex: 1, beatFraction: 0, duration: '2', pitch: 'A3', fret: 0, stringIndex: 4 },
+      { id: 'rs7', barIndex: 1, beatFraction: 8, duration: '2', pitch: 'REST' }
     ]
   },
   {
@@ -1250,7 +1259,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 85,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Mittelstufe: 3 Triolennoten pro Viertelschlag sauber aufgeteilt.',
+    description: 'Mittelstufe: 3 Triolennoten pro Viertelschlag sauber aufgeteilt.',
     tags: ['Triolen', 'Metronom', 'Drill', 'Schlagzeug'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1279,7 +1288,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 108,
     barsCount: 3,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Bass auf Zählzeit 1, Akkord-Nachschläge auf 2 und 3.',
+    description: 'Unterstufe 1: Bass auf Zählzeit 1, Akkord-Nachschläge auf 2 und 3.',
     tags: ['3/4 Takt', 'Walzer', 'Begleitung'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1299,7 +1308,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
         instrument: 'drums',
         clef: 'percussion',
         displayMode: 'notes',
-        description: 'VdM Schlagzeug 3/4 Walzer (PAS-Standard): Bass Drum auf 1, Snare auf 2 und 3, durchgehende Hi-Hat auf allen 3 Vierteln.',
+        description: 'Schlagzeug 3/4 Walzer (PAS-Standard): Bass Drum auf 1, Snare auf 2 und 3, durchgehende Hi-Hat auf allen 3 Vierteln.',
         notes: [
           // Takt 1
           { id: 'wz0_hh0', barIndex: 0, beatFraction: 0, duration: '4', pitch: 'G5' },
@@ -1338,7 +1347,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 72,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 2: Gleichmäßiger Anschlag und Fingerunabhängigkeit für alle 5 Finger.',
+    description: 'Unterstufe 2: Gleichmäßiger Anschlag und Fingerunabhängigkeit für alle 5 Finger.',
     tags: ['Hanon', 'Klavier', 'Fingerkraft', 'Legato'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1374,21 +1383,21 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 75,
     barsCount: 2,
     displayMode: 'both',
-    description: 'VdM Unterstufe 1: Wechselschlag (i-m oder Plektrum) über Bund 1 bis 4.',
+    description: 'Unterstufe 1: Wechselschlag (i-m oder Plektrum) über Bund 1 bis 4 auf E- und A-Saite.',
     tags: ['Spider', 'Gitarre', 'Wechselschlag', 'Finger-Fitness'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     authorRole: 'teacher',
     notes: [
-      { id: 'ts1', barIndex: 0, beatFraction: 0, duration: '4', pitch: 'F2', fret: 1, stringIndex: 5 },
-      { id: 'ts2', barIndex: 0, beatFraction: 4, duration: '4', pitch: 'F#2', fret: 2, stringIndex: 5 },
-      { id: 'ts3', barIndex: 0, beatFraction: 8, duration: '4', pitch: 'G2', fret: 3, stringIndex: 5 },
-      { id: 'ts4', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'G#2', fret: 4, stringIndex: 5 },
-      { id: 'ts5', barIndex: 1, beatFraction: 0, duration: '4', pitch: 'A#2', fret: 1, stringIndex: 4 },
-      { id: 'ts6', barIndex: 1, beatFraction: 4, duration: '4', pitch: 'B2', fret: 2, stringIndex: 4 },
-      { id: 'ts7', barIndex: 1, beatFraction: 8, duration: '4', pitch: 'C3', fret: 3, stringIndex: 4 },
-      { id: 'ts8', barIndex: 1, beatFraction: 12, duration: '4', pitch: 'C#3', fret: 4, stringIndex: 4 }
+      { id: 'ts1', barIndex: 0, beatFraction: 0, duration: '4', pitch: 'F3', fret: 1, stringIndex: 5 },
+      { id: 'ts2', barIndex: 0, beatFraction: 4, duration: '4', pitch: 'F#3', fret: 2, stringIndex: 5 },
+      { id: 'ts3', barIndex: 0, beatFraction: 8, duration: '4', pitch: 'G3', fret: 3, stringIndex: 5 },
+      { id: 'ts4', barIndex: 0, beatFraction: 12, duration: '4', pitch: 'G#3', fret: 4, stringIndex: 5 },
+      { id: 'ts5', barIndex: 1, beatFraction: 0, duration: '4', pitch: 'A#3', fret: 1, stringIndex: 4 },
+      { id: 'ts6', barIndex: 1, beatFraction: 4, duration: '4', pitch: 'B3', fret: 2, stringIndex: 4 },
+      { id: 'ts7', barIndex: 1, beatFraction: 8, duration: '4', pitch: 'C4', fret: 3, stringIndex: 4 },
+      { id: 'ts8', barIndex: 1, beatFraction: 12, duration: '4', pitch: 'C#4', fret: 4, stringIndex: 4 }
     ]
   },
   {
@@ -1402,7 +1411,7 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     tempoBpm: 60,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Grundstufe: Gleichmäßiger Luftstrom, Intonations-Haltebogen und Dynamikschwellung.',
+    description: 'Grundstufe: Gleichmäßiger Luftstrom, Intonations-Haltebogen und Dynamikschwellung.',
     tags: ['Long Tones', 'Bläser', 'Trompete', 'Intonation', 'Atmung'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -1420,30 +1429,36 @@ export const VDM_SCORE_SNIPPETS: MicroScoreSnippet[] = [
     vdmFolder: 'drums-rudiments',
     vdmLevel: 'unterstufe',
     instrument: 'drums',
+    clef: 'percussion',
     timeSignature: '4/4',
-    tempoBpm: 85,
+    tempoBpm: 80,
     barsCount: 2,
     displayMode: 'notes',
-    description: 'VdM Unterstufe 1: Das fundamentale Rudiment für saubere Stockkontrolle und Akzente.',
+    description: 'Unterstufe 1: Das fundamentale Rudiment für saubere Stockkontrolle und Akzente auf der Snare (C5).',
     tags: ['Paradiddle', 'Drums', 'Stick Control', 'Rudiment'],
     isVdmStandard: true,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     authorRole: 'teacher',
     notes: [
-      { id: 'tpd1', barIndex: 0, beatFraction: 0, duration: '8', pitch: 'C4' },
-      { id: 'tpd2', barIndex: 0, beatFraction: 2, duration: '8', pitch: 'D4' },
-      { id: 'tpd3', barIndex: 0, beatFraction: 4, duration: '8', pitch: 'C4' },
-      { id: 'tpd4', barIndex: 0, beatFraction: 6, duration: '8', pitch: 'C4' },
-      { id: 'tpd5', barIndex: 0, beatFraction: 8, duration: '8', pitch: 'D4' },
-      { id: 'tpd6', barIndex: 0, beatFraction: 10, duration: '8', pitch: 'C4' },
-      { id: 'tpd7', barIndex: 0, beatFraction: 12, duration: '8', pitch: 'D4' },
-      { id: 'tpd8', barIndex: 0, beatFraction: 14, duration: '8', pitch: 'D4' },
-      { id: 'tpd9', barIndex: 1, beatFraction: 0, duration: '1', pitch: 'C4' }
+      { id: 'tpd1', barIndex: 0, beatFraction: 0, duration: '8', pitch: 'C5' },
+      { id: 'tpd2', barIndex: 0, beatFraction: 2, duration: '8', pitch: 'C5' },
+      { id: 'tpd3', barIndex: 0, beatFraction: 4, duration: '8', pitch: 'C5' },
+      { id: 'tpd4', barIndex: 0, beatFraction: 6, duration: '8', pitch: 'C5' },
+      { id: 'tpd5', barIndex: 0, beatFraction: 8, duration: '8', pitch: 'C5' },
+      { id: 'tpd6', barIndex: 0, beatFraction: 10, duration: '8', pitch: 'C5' },
+      { id: 'tpd7', barIndex: 0, beatFraction: 12, duration: '8', pitch: 'C5' },
+      { id: 'tpd8', barIndex: 0, beatFraction: 14, duration: '8', pitch: 'C5' },
+      { id: 'tpd9', barIndex: 1, beatFraction: 0, duration: '4', pitch: 'C5' },
+      { id: 'tpd10', barIndex: 1, beatFraction: 4, duration: '4', pitch: 'E5' },
+      { id: 'tpd11', barIndex: 1, beatFraction: 8, duration: '2', pitch: 'C5' }
     ]
   },
   ...VDM_EMP_SCORE_SNIPPETS,
   ...VDM_GUITAR_UKE_SNIPPETS,
   ...VDM_INSTRUMENTAL_WARMUPS,
-  ...VDM_BAND_SYNC_PACKS
+  ...VDM_BAND_SYNC_PACKS,
+  ...BESTOF_CURRICULUM_EXPANSION,
+  ...INSTRUMENT_CURRICULUM_EXPANSION,
+  ...VDM_MASTERPIECE_CURRICULUM_EXPANSION
 ];

@@ -97,6 +97,7 @@ export interface SecretaryAnnouncementsViewProps {
   setExpandedResponseIds?: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   handleExportAnnouncementPdf?: () => void;
   handleExportAnnouncementCsv?: () => void;
+  windowWidth?: number;
 
   // Backward-compatibility props aliases
   duties?: AnnouncementItem[];
@@ -190,6 +191,9 @@ export const SecretaryAnnouncementsView: React.FC<SecretaryAnnouncementsViewProp
   const setExpandedResponseIds = props.setExpandedResponseIds || (() => {});
   const handleExportAnnouncementPdf = props.handleExportAnnouncementPdf || props.handleExportDutyPdf;
   const handleExportAnnouncementCsv = props.handleExportAnnouncementCsv || props.handleExportDutyCsv;
+  const effectiveWidth = props.windowWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
+  const isMobileView = effectiveWidth <= 768;
+  const isTabletOrMobile = effectiveWidth <= 1180;
 
   const [newQuestionInput, setNewQuestionInput] = useState('');
   const [newQuestionType, setNewQuestionType] = useState<'text' | 'choice' | 'boolean'>('text');
@@ -241,7 +245,7 @@ export const SecretaryAnnouncementsView: React.FC<SecretaryAnnouncementsViewProp
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '24px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isTabletOrMobile ? '1fr' : '1.2fr 1.8fr', gap: isMobileView ? '16px' : '24px', alignItems: 'start', minWidth: 0 }}>
         
         {/* LEFT COLUMN: CREATE FORM */}
         <div className="google-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -295,7 +299,7 @@ export const SecretaryAnnouncementsView: React.FC<SecretaryAnnouncementsViewProp
           <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#ea4335', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2. Zielgruppe & Dringlichkeit</div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Dringlichkeit</label>
                 <select
@@ -510,7 +514,7 @@ export const SecretaryAnnouncementsView: React.FC<SecretaryAnnouncementsViewProp
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Rückmeldung erbeten bis</label>
               <input

@@ -19,16 +19,20 @@ import {
   GUITAR_STRINGS, 
   BASS_STRINGS, 
   VIOLIN_STRINGS,
+  UKE_STRINGS,
   GuitarStringInfo,
   pitchToBestFretAndString, 
-  fretAndStringToPitch 
+  fretAndStringToPitch,
+  getInstrumentStrings
 } from './guitarFretboardEngine';
+import { getPitchColorTheme, getPitchLetter } from './microScoreGridEngine';
 
 export interface MicroScoreFretboardFullWidthProps {
   instrument: MicroScoreInstrument;
   activePitches: string[];
   activeNotes?: Array<{ pitch: string; stringIndex?: number; fret?: number }>;
   clef?: 'treble' | 'bass' | 'percussion';
+  isColorGuide?: boolean;
   onPlayPreviewPitch?: (pitch: string) => void;
   onInsertPitch?: (pitch: string, stringIndex?: number, fret?: number) => void;
   readOnly?: boolean;
@@ -54,6 +58,7 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
   instrument,
   activePitches,
   activeNotes,
+  isColorGuide = true,
   onPlayPreviewPitch,
   onInsertPitch,
   readOnly = false
@@ -62,13 +67,12 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
 
   const isBass = instrument === 'bass';
   const isStrings = instrument === 'strings';
+  const isUkulele = instrument === 'ukulele';
 
   // Saiten-Konfiguration
   const strings: GuitarStringInfo[] = useMemo(() => {
-    if (isStrings) return VIOLIN_STRINGS;
-    if (isBass) return BASS_STRINGS;
-    return GUITAR_STRINGS;
-  }, [isBass, isStrings]);
+    return getInstrumentStrings(instrument);
+  }, [instrument]);
 
   const stringCount = strings.length;
   const fretCount = 12;
@@ -139,7 +143,7 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
 
   // Vertikale Dimensionierung: 2,2× Anhebung für maximale Lesbarkeit & Barrierefreiheit
   const fretboardTopY = 22;
-  const fretboardHeight = isBass || isStrings ? 152 : 184;
+  const fretboardHeight = isBass || isStrings || isUkulele ? 152 : 184;
   const stringMarginTop = 16;
   const effectiveStringHeight = fretboardHeight - stringMarginTop * 2;
   const stringSpacing = stringCount > 1 ? effectiveStringHeight / (stringCount - 1) : 30;
@@ -167,12 +171,19 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
 
   const handleCellClick = (stringIndex: number, fret: number) => {
     const pitch = fretAndStringToPitch(stringIndex, fret, instrument);
-    if (onPlayPreviewPitch) onPlayPreviewPitch(pitch);
-    if (!readOnly && onInsertPitch) onInsertPitch(pitch, stringIndex, fret);
+    if (!readOnly && onInsertPitch) {
+      onInsertPitch(pitch, stringIndex, fret);
+    } else if (onPlayPreviewPitch) {
+      onPlayPreviewPitch(pitch);
+    }
   };
 
   // Saitenstärken & Wound-Charakteristik je Instrument
   const getStringThickness = (sIdx: number): number => {
+    if (isUkulele) {
+      const ukeGauges = [1.4, 1.8, 2.2, 1.6]; // A4, E4, C4, G4 (Re-entrant Tuning)
+      return ukeGauges[sIdx] || 1.8;
+    }
     if (isBass) {
       const bassGauges = [2.4, 3.2, 4.2, 5.2];
       return bassGauges[sIdx] || 3.0;
@@ -187,18 +198,21 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
   };
 
   const isWoundString = (sIdx: number): boolean => {
+    if (isUkulele) return false;
     if (isBass) return true;
     if (isStrings) return sIdx >= 1;
     return sIdx >= 3; // D, A, E bei Gitarre
   };
 
-  const instrumentTitle = isStrings 
+  const instrumentTitle = isUkulele
+    ? 'Ukulele (4-Saiter · G-C-E-A · Bünde 0–12)'
+    : isStrings 
     ? 'Violine (4-Saiter · G-D-A-E · 1. Lage)' 
     : isBass 
     ? 'E-Bass (4-Saiter · E-A-D-G · Bünde 0–12)' 
     : 'Gitarre (6-Saiter · E-A-D-G-B-e · Bünde 0–12)';
 
-  const instrumentIcon = isStrings ? '🎻' : '🎸';
+  const instrumentIcon = isUkulele ? '🪕' : (isStrings ? '🎻' : '🎸');
 
   return (
     <div
@@ -580,10 +594,14 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
                     height={cellH}
                     fill={isHovered ? 'rgba(99, 102, 241, 0.22)' : 'transparent'}
                     rx="4"
-                    style={{ cursor: 'pointer', transition: 'fill 0.1s ease' }}
+                    style={{ cursor: 'pointer', transition: 'fill 0.1s ease', touchAction: 'manipulation' }}
                     onMouseEnter={() => setHoveredCell({ stringIndex: sIdx, fret: fIdx })}
                     onMouseLeave={() => setHoveredCell(null)}
-                    onClick={() => handleCellClick(sIdx, fIdx)}
+                    onPointerDown={(e) => {
+                      if (e.pointerType === 'mouse' && e.button !== 0) return;
+                      e.preventDefault();
+                      handleCellClick(sIdx, fIdx);
+                    }}
                     role="button"
                     tabIndex={0}
                     aria-label={`Saite ${str.name}, Bund ${fIdx}, Ton ${cellPitch}`}
@@ -594,53 +612,73 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
                       }
                     }}
                   />
-                  {/* Didaktischer Hover-Indikator: Zeigt Tonname beim Überfahren dezent an */}
-                  {isHovered && !activeFretboardPositions.some(p => p.stringIndex === sIdx && p.fret === fIdx) && (
-                    <text
-                      x={getFretCenterX(fIdx)}
-                      y={y + 3.5}
-                      textAnchor="middle"
-                      fontSize="10"
-                      fontWeight="800"
-                      fontFamily="'Plus Jakarta Sans', sans-serif"
-                      fill="#e0e7ff"
-                      pointerEvents="none"
-                    >
-                      {cellPitch.replace(/\d+$/, '')}
-                    </text>
-                  )}
+                  {/* Didaktischer Hover-Indikator: Zeigt Tonname (C, D, E, F, G, A, H) in Boomwhacker-Farbe beim Überfahren */}
+                  {isHovered && !activeFretboardPositions.some(p => p.stringIndex === sIdx && p.fret === fIdx) && (() => {
+                    const displayHoverPitch = getPitchLetter(cellPitch) || cellPitch.replace(/\d+$/, '');
+                    const hoverTheme = getPitchColorTheme(cellPitch);
+                    const hoverFill = isColorGuide ? hoverTheme.border : '#0f172a';
+                    const isYellowHover = isColorGuide && (cellPitch.toUpperCase().startsWith('E') && !cellPitch.includes('#') && !cellPitch.toLowerCase().includes('b'));
+                    return (
+                      <g pointerEvents="none">
+                        <circle
+                          cx={getFretCenterX(fIdx)}
+                          cy={y}
+                          r="11.5"
+                          fill={hoverFill}
+                          stroke="#ffffff"
+                          strokeWidth="1.8"
+                        />
+                        <text
+                          x={getFretCenterX(fIdx)}
+                          y={y + 3.8}
+                          textAnchor="middle"
+                          fontSize="10"
+                          fontWeight="900"
+                          fontFamily="'Plus Jakarta Sans', sans-serif"
+                          fill={isYellowHover ? '#0f172a' : '#ffffff'}
+                        >
+                          {displayHoverPitch}
+                        </text>
+                      </g>
+                    );
+                  })()}
                 </g>
               );
             });
           })}
 
           {/* ----------------------------------------------------------------- */}
-          {/* H. ZERO-OVERLAP NOTEN-PILLS MIT HARMONISCHER GRUNDTON-HIERARCHIE  */}
+          {/* H. ZERO-OVERLAP NOTEN-PILLS MIT 100% BOOMWHACKER-FARBPARITÄT      */}
           {/* ----------------------------------------------------------------- */}
           {activeFretboardPositions.map((pos, pIdx) => {
             const y = getStringY(pos.stringIndex);
             const x = getFretCenterX(pos.fret);
-            const displayPitch = pos.pitch.replace(/\d+$/, '');
-            const isRoot = displayPitch === rootPitchClass;
+            const rawPitchClass = pos.pitch.replace(/\d+$/, '');
+            const displayPitch = getPitchLetter(pos.pitch) || rawPitchClass;
+            const isRoot = rawPitchClass === rootPitchClass;
+            const pitchTheme = getPitchColorTheme(pos.pitch);
+            const noteFillColor = isColorGuide ? pitchTheme.border : '#0f172a';
+            const isYellowNote = isColorGuide && (pos.pitch.toUpperCase().startsWith('E') && !pos.pitch.includes('#') && !pos.pitch.toLowerCase().includes('b'));
+            const textColor = isYellowNote ? '#0f172a' : '#ffffff';
 
             return (
               <g key={`active-pos-${pIdx}-${pos.stringIndex}-${pos.fret}`} pointerEvents="none">
                 {isRoot ? (
-                  // 🌟 1. GRUNDTON (Root Note) - Gold/Amber Glow & Doppelring
+                  // 🌟 1. GRUNDTON (Root Note) - Echte Boomwhacker-Tonhöhenfarbe (oder Klassisch Schwarz) mit Doppelring-Aura
                   <>
                     <circle
                       cx={x}
                       cy={y}
                       r="14.5"
-                      fill="#f59e0b"
-                      filter="url(#fret-glow-root)"
+                      fill={noteFillColor}
+                      opacity={0.35}
                     />
                     <circle
                       cx={x}
                       cy={y}
                       r="12.5"
-                      fill="#b45309"
-                      stroke="#fef3c7"
+                      fill={noteFillColor}
+                      stroke="#ffffff"
                       strokeWidth="2.5"
                     />
                     <text
@@ -650,26 +688,26 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
                       fontSize="11"
                       fontWeight="900"
                       fontFamily="'Plus Jakarta Sans', sans-serif"
-                      fill="#ffffff"
+                      fill={textColor}
                     >
                       {displayPitch}
                     </text>
                   </>
                 ) : (
-                  // 🎵 2. AKKORDTON (Terz, Quinte, etc.) - Royal Indigo mit weißem Rand
+                  // 🎵 2. WEITERER SPIEL-/AKKORDTON - Exakte Boomwhacker-Tonhöhenfarbe (oder Klassisch Schwarz) mit weißem Rand
                   <>
                     <circle
                       cx={x}
                       cy={y}
                       r="13.5"
-                      fill="#4f46e5"
-                      filter="url(#fret-glow-chord)"
+                      fill={noteFillColor}
+                      opacity={0.28}
                     />
                     <circle
                       cx={x}
                       cy={y}
                       r="11.5"
-                      fill="#6366f1"
+                      fill={noteFillColor}
                       stroke="#ffffff"
                       strokeWidth="2"
                     />
@@ -680,7 +718,7 @@ export const MicroScoreFretboardFullWidth: React.FC<MicroScoreFretboardFullWidth
                       fontSize="10.5"
                       fontWeight="900"
                       fontFamily="'Plus Jakarta Sans', sans-serif"
-                      fill="#ffffff"
+                      fill={textColor}
                     >
                       {displayPitch}
                     </text>

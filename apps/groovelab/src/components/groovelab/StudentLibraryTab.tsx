@@ -54,6 +54,7 @@ export function StudentLibraryTab({
 
   const filteredLibrary = useMemo(() => {
     return (globalSongs || []).filter((s: any) => {
+      if (s.is_groovelab_active !== true) return false;
       const term = searchQuery.toLowerCase();
       const matchesSearch = searchType === 'title' 
         ? (s.title || '').toLowerCase().includes(term)
@@ -467,7 +468,7 @@ export function StudentLibraryTab({
                           onClick={() => setActiveStudentTab?.('practice')}
                           style={{ 
                             background: '#e6f4ea', 
-                            border: '1px solid #ceead6', 
+                            border: 'none', 
                             padding: '12px 24px', 
                             borderRadius: '16px', 
                             display: 'flex', 

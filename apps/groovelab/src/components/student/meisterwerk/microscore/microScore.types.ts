@@ -17,7 +17,7 @@ export type MicroScoreTimeSignature = '4/4' | '3/4' | '2/4' | '6/8';
 export type MicroScoreDisplayMode = 'notes' | 'tabs' | 'both';
 
 export type MicroScoreInstrument = 
-  | 'universal'      // 🌐 Alle Instrumente (General Score / VdM Basis)
+  | 'universal'      // Alle Instrumente (General Score)
   | 'recorder'       // Blockflöte
   | 'flute'          // Querflöte
   | 'clarinet'       // Klarinette
@@ -26,8 +26,10 @@ export type MicroScoreInstrument =
   | 'trombone'       // Posaune
   | 'piano'          // Klavier / Keys
   | 'guitar'         // Akustik-Gitarre
+  | 'ukulele'        // Ukulele (G-C-E-A)
   | 'bass'           // E-Bass
   | 'strings'        // Violine / Streicher
+  | 'vocals'         // Vokal / Gesang
   | 'drums';         // Schlagzeug / Percussion
 
 export interface MicroScoreChord {
@@ -80,7 +82,7 @@ export interface MicroScoreSnippet {
   studentId?: string;
   category?: 'Tonleitern' | 'Akkorde' | 'Rhythmus' | 'Technik' | 'Früherziehung' | 'Zupfinstrumente' | 'Vokal' | 'BandPacks' | string;
   vdmFolder?: string;        // z. B. 'dur' | 'moll' | 'pentatonik' | 'dreiklaenge' | 'kadenzen' etc.
-  vdmLevel?: 'elementar' | 'unterstufe' | 'mittelstufe' | 'oberstufe';
+  vdmLevel?: 'Elementarstufe' | 'Grundstufe' | 'Unterstufe' | 'Mittelstufe' | 'Oberstufe' | 'elementar' | 'unterstufe' | 'mittelstufe' | 'oberstufe' | string;
   description?: string;
   tags?: string[];
   isVdmStandard?: boolean;

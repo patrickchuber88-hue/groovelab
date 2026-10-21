@@ -1,10 +1,7 @@
 import React, { Suspense, lazy, useMemo, useState } from 'react';
-import { 
-  Calendar, ChevronLeft, ChevronRight, X, Palmtree, CalendarX, 
-  Users, Check, Sparkles, Activity, AlertTriangle, Zap,
-  Clock, ShieldCheck, HelpCircle, Timer, AlertCircle, Edit3, Sliders, Wrench, Compass
-} from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, X, Palmtree, CalendarX, Users, Check, Sparkles, Activity, AlertTriangle, Zap, Clock, ShieldCheck, HelpCircle, Timer, AlertCircle, Edit3, Sliders, Wrench, Compass } from 'lucide-react';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
+import { TeacherPasskeyNudgeBanner } from '../../auth/TeacherPasskeyNudgeBanner';
 import { CampusSponsorIngressBanner } from '../../ui/CampusSponsorIngressBanner';
 import { MobileBriefingCarousel } from '../../ui/MobileBriefingCarousel';
 import { TourStartButton } from '../../PremiumOnboardingTour';
@@ -13,12 +10,8 @@ import { BriefingToolboxCard } from '../../campus/BriefingToolboxCard';
 import { TeacherQuickToolboxDrawer } from '../TeacherQuickToolboxDrawer';
 import { TeacherMakeupRadarWidget } from '../TeacherMakeupRadarWidget';
 import { formatAbsenceEndDate } from '../../../utils/teacherAbsenceHelper';
-import { 
-  cleanRoomName, 
-  getSimulatedNow, 
-  resolveStudentInstrument, 
-  splitAndNormalizeStudents 
-} from '../utils/teacherDashboardUtils';
+import { cleanRoomName, getSimulatedNow, resolveStudentInstrument, splitAndNormalizeStudents } from '../utils/teacherDashboardUtils';
+import { isInstrumentAvatar, resolveCampusStudentAvatar } from '../../../utils/avatarResolutionEngine';
 
 const TeacherFeedWidget = lazy(() => import('../TeacherFeedWidget').then(m => ({ default: m.TeacherFeedWidget })));
 import { TeacherHausaufgabenWidget } from '../TeacherHausaufgabenWidget';
@@ -27,326 +20,124 @@ const TeacherTourDemoSchedule = lazy(() => import('../TeacherTagesplanWidget').t
 import { getTeacherActiveBoards } from '../hooks/useTeacherTagesplan';
 
 export interface TeacherBriefingTabProps {
-  userId: string;
-  teacher: any;
-  schoolData: any;
-  activePlatform: 'campus' | 'groovelab';
-  isMobileDevice: boolean;
-  windowWidth: number;
-  isTeacherBriefingSidebarCollapsed: boolean;
-  handleToggleTeacherBriefingSidebar: (collapsed: boolean) => void;
-  hasTeacherAppointmentAlerts: boolean;
-  hasTeacherFeedAlerts: boolean;
-  teacherSidebarTotalAlertsCount: number;
-  briefingLoading: boolean;
-  briefingData: any;
-  activePlanningEvents: any[];
-  dismissedBanners: Record<string, boolean>;
-  setDismissedBanners: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  isTodayHoliday: any;
-  isTeacherCurrentlyAbsent: boolean;
-  bypassAbsenceView: boolean;
-  setBypassAbsenceView: (val: boolean) => void;
-  handleEndAbsence: () => Promise<void>;
-  submittingAbsence: boolean;
-  totalAbsenceCancellationsCount: number;
-  unreadCancellationsCount: number;
-  setShowAbsenceOverviewModal: (show: boolean) => void;
-  setShowAbsenceModal: (show: boolean) => void;
-  resolvedTeacherFullName: string;
-  teacherBriefingAvatarSrc: string;
-  activeMakeupTokens: any[];
-  showRealNames: boolean;
-  toggleRealNames: (val?: boolean) => void;
-  setSelectedMakeupToken: (token: any) => void;
-  setSelectedMakeupSlot: (slot: any) => void;
-  setMakeupModalMode: (mode: any) => void;
-  setIsMakeupModalOpen: (open: boolean) => void;
-  activeChatOcc: any;
-  setActiveChatOcc: (occ: any) => void;
-  activeChatOccIds?: Set<string>;
-  unreadChatOccIds?: Set<string>;
-  docStudent: any;
-  setDocStudent: (student: any) => void;
-  allStudents: any[];
-  isAbsenceWidgetExpanded: boolean;
-  setIsAbsenceWidgetExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-  absenceStartDate: string;
-  setAbsenceStartDate: (date: string) => void;
-  absenceUntilDate: string;
-  setAbsenceUntilDate: React.Dispatch<React.SetStateAction<string>>;
-  setQuickAbsencePreset: (preset: any) => void;
-  currentTimeStr: string;
-  quickAudioStudent: any;
-  setQuickAudioStudent: (student: any) => void;
-  loadingPrepMirror: boolean;
-  activeTimelineSlotRef: any;
-  relevantRoomIssuesToday: any[];
-  teacherTodayRooms: string[];
-  isFreeDay: boolean;
-  isWeekend: boolean;
-  isTourDemoScheduleActive: boolean;
-  urgentCancellations: any[];
-  setIsUrgentModalOpen: (open: boolean) => void;
-  handleResolveRoomIssueInTagesplan: (issueId: string) => Promise<void>;
-  handleUpdateIssueRoomInTagesplan: (issueId: string, newRoom: string) => Promise<void>;
-  leftColumnTab: 'briefing' | 'notes' | 'toolbox';
-  setLeftColumnTab: (tab: 'briefing' | 'notes' | 'toolbox') => void;
-  onTabChange?: (tab: string) => void;
-  activeStudent: any;
-  activeGroupStudents: any[];
-  selectedGroupStudentId: string | null;
-  setSelectedGroupStudentId: (id: string | null) => void;
-  selectedStudentProfile: any;
-  setSelectedStudentProfile: (prof: any) => void;
-  dynamicPrepMirror: any;
-  setDynamicPrepMirror: (val: any) => void;
-  setLoadingPrepMirror: React.Dispatch<React.SetStateAction<boolean>>;
-  firstSlotStartStr: string;
-  widgetState: any;
-  startTour: () => void;
-  emergencyUnconfirmedAppointments?: any[];
-  handleSendEmergencyCalloutPush?: (apt: any) => Promise<void>;
-  handleEmergencyShoutbox?: (occ: any) => void;
-  rooms: any[];
-  holidays: any[];
-  myBookings: any[];
-  myChangedAppointments: any[];
-  showAllChangedAppointments: boolean;
-  setShowAllChangedAppointments: React.Dispatch<React.SetStateAction<boolean>>;
-  showAllBookings: boolean;
-  setShowAllBookings: React.Dispatch<React.SetStateAction<boolean>>;
-  adminFeedbackRequests: any[];
-  adminFeedbackResponses: any[];
-  campusFeedAnnouncements: any[];
-  feedInteractions: any[];
-  teacherFeedTab: 'campus' | 'class';
-  setTeacherFeedTab: (tab: 'campus' | 'class') => void;
-  classFeedPosts: any[];
-  classFeedInteractions: any[];
-  respondingToRequestId: string | null;
-  setRespondingToRequestId: React.Dispatch<React.SetStateAction<string | null>>;
-  questionnaireAnswers: Record<string, string>;
-  setQuestionnaireAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  submittingFeedback: boolean;
-  adminFeedbackTab: 'open' | 'done';
-  setAdminFeedbackTab: (tab: 'open' | 'done') => void;
-  planningEvents: any[];
-  mySubmittedProgramPoints: any[];
-  visibleChangedAppointments: any[];
-  handleBookingClick: (booking: any) => void;
-  handleDeleteMyBooking: (id: string) => Promise<void>;
-  handleMarkRequestAsDone: (id: string) => Promise<void>;
-  handleReactToPost: (id: string, emoji: string, type?: 'campus' | 'class') => Promise<void>;
-  handleSubmitFeedbackResponse: (id: string) => Promise<void>;
-  getCountdownString: (date: any) => string;
-  setMyChangedAppointments: (val: any) => void;
-  todayTagesplanStudents: any[];
-  activeTimelineSlot: any;
-  setShowNotesDrawer: (val: boolean) => void;
-  checkHasStudentQuestion?: (sId: string) => boolean;
-  checkHasTodayAudio?: (sId: string) => boolean;
-  getIssueRoomLabel?: (issue: any) => string;
-  isStudentBirthdayToday?: (student: any) => boolean;
+  userId: string; teacher: any; schoolData: any; activePlatform: 'campus' | 'groovelab'; isMobileDevice: boolean; windowWidth: number;
+  isTeacherBriefingSidebarCollapsed: boolean; handleToggleTeacherBriefingSidebar: (collapsed: boolean) => void;
+  hasTeacherAppointmentAlerts: boolean; hasTeacherFeedAlerts: boolean; teacherSidebarTotalAlertsCount: number;
+  briefingLoading: boolean; briefingData: any; activePlanningEvents: any[];
+  dismissedBanners: Record<string, boolean>; setDismissedBanners: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  isTodayHoliday: any; isTeacherCurrentlyAbsent: boolean; bypassAbsenceView: boolean; setBypassAbsenceView: (val: boolean) => void;
+  handleEndAbsence: () => Promise<void>; submittingAbsence: boolean; totalAbsenceCancellationsCount: number; unreadCancellationsCount: number;
+  setShowAbsenceOverviewModal: (show: boolean) => void; setShowAbsenceModal: (show: boolean) => void;
+  resolvedTeacherFullName: string; teacherBriefingAvatarSrc: string; activeMakeupTokens: any[];
+  showRealNames: boolean; toggleRealNames: (val?: boolean) => void;
+  setSelectedMakeupToken: (token: any) => void; setSelectedMakeupSlot: (slot: any) => void; setMakeupModalMode: (mode: any) => void; setIsMakeupModalOpen: (open: boolean) => void;
+  activeChatOcc: any; setActiveChatOcc: (occ: any) => void; activeChatOccIds?: Set<string>; unreadChatOccIds?: Set<string>;
+  docStudent: any; setDocStudent: (student: any) => void; allStudents: any[];
+  isAbsenceWidgetExpanded: boolean; setIsAbsenceWidgetExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+  absenceStartDate: string; setAbsenceStartDate: (date: string) => void; absenceUntilDate: string; setAbsenceUntilDate: React.Dispatch<React.SetStateAction<string>>;
+  setQuickAbsencePreset: (preset: any) => void; currentTimeStr: string; quickAudioStudent: any; setQuickAudioStudent: (student: any) => void;
+  loadingPrepMirror: boolean; activeTimelineSlotRef: any; relevantRoomIssuesToday: any[]; teacherTodayRooms: string[];
+  isFreeDay: boolean; isWeekend: boolean; isTourDemoScheduleActive: boolean; urgentCancellations: any[]; setIsUrgentModalOpen: (open: boolean) => void;
+  handleResolveRoomIssueInTagesplan: (issueId: string) => Promise<void>; handleUpdateIssueRoomInTagesplan: (issueId: string, newRoom: string) => Promise<void>;
+  leftColumnTab: 'briefing' | 'notes' | 'toolbox'; setLeftColumnTab: (tab: 'briefing' | 'notes' | 'toolbox') => void; onTabChange?: (tab: string) => void;
+  activeStudent: any; activeGroupStudents: any[]; selectedGroupStudentId: string | null; setSelectedGroupStudentId: (id: string | null) => void;
+  selectedStudentProfile: any; setSelectedStudentProfile: (prof: any) => void; dynamicPrepMirror: any; setDynamicPrepMirror: (val: any) => void;
+  setLoadingPrepMirror: React.Dispatch<React.SetStateAction<boolean>>; firstSlotStartStr: string; widgetState: any; startTour: () => void;
+  emergencyUnconfirmedAppointments?: any[]; handleSendEmergencyCalloutPush?: (apt: any) => Promise<void>; handleEmergencyShoutbox?: (occ: any) => void;
+  rooms: any[]; holidays: any[]; myBookings: any[]; myChangedAppointments: any[];
+  showAllChangedAppointments: boolean; setShowAllChangedAppointments: React.Dispatch<React.SetStateAction<boolean>>;
+  showAllBookings: boolean; setShowAllBookings: React.Dispatch<React.SetStateAction<boolean>>;
+  adminFeedbackRequests: any[]; adminFeedbackResponses: any[]; campusFeedAnnouncements: any[]; feedInteractions: any[];
+  teacherFeedTab: 'campus' | 'class'; setTeacherFeedTab: (tab: 'campus' | 'class') => void; classFeedPosts: any[]; classFeedInteractions: any[];
+  respondingToRequestId: string | null; setRespondingToRequestId: React.Dispatch<React.SetStateAction<string | null>>;
+  questionnaireAnswers: Record<string, string>; setQuestionnaireAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  submittingFeedback: boolean; adminFeedbackTab: 'open' | 'done'; setAdminFeedbackTab: (tab: 'open' | 'done') => void;
+  planningEvents: any[]; mySubmittedProgramPoints: any[]; visibleChangedAppointments: any[];
+  handleBookingClick: (booking: any) => void; handleDeleteMyBooking: (id: string) => Promise<void>;
+  handleMarkRequestAsDone: (id: string) => Promise<void>; handleReactToPost: (id: string, emoji: string, type?: 'campus' | 'class') => Promise<void>;
+  handleSubmitFeedbackResponse: (id: string) => Promise<void>; getCountdownString: (date: any) => string; setMyChangedAppointments: (val: any) => void;
+  todayTagesplanStudents: any[]; activeTimelineSlot: any; setShowNotesDrawer: (val: boolean) => void;
+  checkHasStudentQuestion?: (sId: string) => boolean; checkHasTodayAudio?: (sId: string) => boolean;
+  getIssueRoomLabel?: (issue: any) => string; isStudentBirthdayToday?: (student: any) => boolean;
 }
 
 export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => {
   const {
-    userId,
-    teacher,
-    schoolData,
-    activePlatform,
-    isMobileDevice,
-    windowWidth,
-    isTeacherBriefingSidebarCollapsed,
-    handleToggleTeacherBriefingSidebar,
-    hasTeacherAppointmentAlerts,
-    hasTeacherFeedAlerts,
-    teacherSidebarTotalAlertsCount,
-    briefingLoading,
-    briefingData,
-    activePlanningEvents,
-    dismissedBanners,
-    setDismissedBanners,
-    isTodayHoliday,
-    isTeacherCurrentlyAbsent,
-    bypassAbsenceView,
-    setBypassAbsenceView,
-    handleEndAbsence,
-    submittingAbsence,
-    totalAbsenceCancellationsCount,
-    unreadCancellationsCount,
-    setShowAbsenceOverviewModal,
-    setShowAbsenceModal,
-    resolvedTeacherFullName,
-    teacherBriefingAvatarSrc,
-    activeMakeupTokens,
-    showRealNames,
-    toggleRealNames,
-    setSelectedMakeupToken,
-    setSelectedMakeupSlot,
-    setMakeupModalMode,
-    setIsMakeupModalOpen,
-    activeChatOcc,
-    setActiveChatOcc,
-    activeChatOccIds,
-    unreadChatOccIds,
-    docStudent,
-    setDocStudent,
-    allStudents,
-    isAbsenceWidgetExpanded,
-    setIsAbsenceWidgetExpanded,
-    absenceStartDate,
-    setAbsenceStartDate,
-    absenceUntilDate,
-    setAbsenceUntilDate,
-    setQuickAbsencePreset,
-    currentTimeStr,
-    quickAudioStudent,
-    setQuickAudioStudent,
-    loadingPrepMirror,
-    activeTimelineSlotRef,
-    relevantRoomIssuesToday,
-    teacherTodayRooms,
-    isFreeDay,
-    isWeekend,
-    isTourDemoScheduleActive,
-    urgentCancellations,
-    setIsUrgentModalOpen,
-    handleResolveRoomIssueInTagesplan,
-    handleUpdateIssueRoomInTagesplan,
-    leftColumnTab,
-    setLeftColumnTab,
-    onTabChange,
-    activeStudent,
-    activeGroupStudents,
-    selectedGroupStudentId,
-    setSelectedGroupStudentId,
-    selectedStudentProfile,
-    setSelectedStudentProfile,
-    dynamicPrepMirror,
-    setDynamicPrepMirror,
-    setLoadingPrepMirror,
-    firstSlotStartStr,
-    widgetState,
-    startTour,
-    emergencyUnconfirmedAppointments = [],
-    rooms,
-    holidays,
-    myBookings,
-    myChangedAppointments,
-    showAllChangedAppointments,
-    setShowAllChangedAppointments,
-    showAllBookings,
-    setShowAllBookings,
-    adminFeedbackRequests,
-    adminFeedbackResponses,
-    campusFeedAnnouncements,
-    feedInteractions,
-    teacherFeedTab,
-    setTeacherFeedTab,
-    classFeedPosts,
-    classFeedInteractions,
-    respondingToRequestId,
-    setRespondingToRequestId,
-    questionnaireAnswers,
-    setQuestionnaireAnswers,
-    submittingFeedback,
-    adminFeedbackTab,
-    setAdminFeedbackTab,
-    planningEvents,
-    mySubmittedProgramPoints,
-    visibleChangedAppointments,
-    handleBookingClick,
-    handleDeleteMyBooking,
-    handleMarkRequestAsDone,
-    handleReactToPost,
-    handleSubmitFeedbackResponse,
-    getCountdownString,
-    setMyChangedAppointments,
-    todayTagesplanStudents,
-    activeTimelineSlot,
-    setShowNotesDrawer,
-    checkHasStudentQuestion = () => false,
-    checkHasTodayAudio = () => false,
-    getIssueRoomLabel = () => 'Raum',
-    isStudentBirthdayToday = () => false
+    userId, teacher, schoolData, activePlatform, isMobileDevice: rawIsMobileDevice, windowWidth: rawWindowWidth,
+    isTeacherBriefingSidebarCollapsed, handleToggleTeacherBriefingSidebar, hasTeacherAppointmentAlerts, hasTeacherFeedAlerts,
+    teacherSidebarTotalAlertsCount, briefingLoading, briefingData, activePlanningEvents, dismissedBanners, setDismissedBanners,
+    isTodayHoliday, isTeacherCurrentlyAbsent, bypassAbsenceView, setBypassAbsenceView, handleEndAbsence, submittingAbsence,
+    totalAbsenceCancellationsCount, unreadCancellationsCount, setShowAbsenceOverviewModal, setShowAbsenceModal,
+    resolvedTeacherFullName, teacherBriefingAvatarSrc, activeMakeupTokens, showRealNames, toggleRealNames,
+    setSelectedMakeupToken, setSelectedMakeupSlot, setMakeupModalMode, setIsMakeupModalOpen, activeChatOcc, setActiveChatOcc,
+    activeChatOccIds, unreadChatOccIds, docStudent, setDocStudent, allStudents, isAbsenceWidgetExpanded, setIsAbsenceWidgetExpanded,
+    absenceStartDate, setAbsenceStartDate, absenceUntilDate, setAbsenceUntilDate, setQuickAbsencePreset, currentTimeStr,
+    quickAudioStudent, setQuickAudioStudent, loadingPrepMirror, activeTimelineSlotRef, relevantRoomIssuesToday, teacherTodayRooms,
+    isFreeDay, isWeekend, isTourDemoScheduleActive, urgentCancellations, setIsUrgentModalOpen,
+    handleResolveRoomIssueInTagesplan, handleUpdateIssueRoomInTagesplan, leftColumnTab, setLeftColumnTab, onTabChange,
+    activeStudent, activeGroupStudents, selectedGroupStudentId, setSelectedGroupStudentId, selectedStudentProfile,
+    setSelectedStudentProfile, dynamicPrepMirror, setDynamicPrepMirror, setLoadingPrepMirror, firstSlotStartStr, widgetState,
+    startTour, emergencyUnconfirmedAppointments = [], rooms, holidays, myBookings, myChangedAppointments,
+    showAllChangedAppointments, setShowAllChangedAppointments, showAllBookings, setShowAllBookings,
+    adminFeedbackRequests, adminFeedbackResponses, campusFeedAnnouncements, feedInteractions, teacherFeedTab, setTeacherFeedTab,
+    classFeedPosts, classFeedInteractions, respondingToRequestId, setRespondingToRequestId, questionnaireAnswers,
+    setQuestionnaireAnswers, submittingFeedback, adminFeedbackTab, setAdminFeedbackTab, planningEvents, mySubmittedProgramPoints,
+    visibleChangedAppointments, handleBookingClick, handleDeleteMyBooking, handleMarkRequestAsDone, handleReactToPost,
+    handleSubmitFeedbackResponse, getCountdownString, setMyChangedAppointments, todayTagesplanStudents, activeTimelineSlot,
+    setShowNotesDrawer, checkHasStudentQuestion = () => false, checkHasTodayAudio = () => false,
+    getIssueRoomLabel = () => 'Raum', isStudentBirthdayToday = () => false
   } = props;
 
+  const simWidth = typeof document !== 'undefined' ? Number(document.documentElement.getAttribute('data-sim-width')) : 0;
+  const windowWidth = simWidth > 0 ? simWidth : rawWindowWidth;
+  const isMobileDevice = rawIsMobileDevice || windowWidth <= 768 || (typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile')));
   const [isQuickToolboxOpen, setIsQuickToolboxOpen] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
-
   const isRestDay = isWeekend || isFreeDay;
   const effectiveLeftColumnTab = leftColumnTab;
 
   const resolvedAvatarSrc = useMemo(() => {
-    if (avatarLoadError || !teacherBriefingAvatarSrc || (activePlatform === 'campus' && teacherBriefingAvatarSrc.includes('avatar_ghost'))) {
-      return activePlatform === 'groovelab' 
-        ? '/avatar_ghost.jpg' 
-        : '/avatars/gitarre_avatar_new.png';
+    if (avatarLoadError || !teacherBriefingAvatarSrc || !isInstrumentAvatar(teacherBriefingAvatarSrc)) {
+      return resolveCampusStudentAvatar({
+        ...(teacher || {}),
+        role: 'teacher',
+        isTeacherContext: true,
+        instrument: teacher?.instrument || 'Gitarre'
+      });
     }
     return teacherBriefingAvatarSrc;
-  }, [avatarLoadError, teacherBriefingAvatarSrc, activePlatform]);
+  }, [avatarLoadError, teacherBriefingAvatarSrc, teacher]);
 
   const { activeLessonsCount, totalActiveStudentsToday } = useMemo(() => {
     if (!briefingData?.timeline) return { activeLessonsCount: 0, totalActiveStudentsToday: 0 };
-    
-    // Group timeline items by timeSlot to get distinct teaching units (UE)
     const uniqueSlotsMap = new Map<string, any[]>();
     briefingData.timeline.forEach((s: any) => {
-      if (
-        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
-        !s.isBreak &&
-        !s.is_room_booking &&
-        !s.isRoomBooking &&
-        s.status !== 'canceled_by_student' &&
-        s.status !== 'teacher_ausfall' &&
-        s.status !== 'cancelled' &&
-        s.status !== 'canceled_by_teacher_ausfall' &&
-        s.status !== 'rescheduled_away'
-      ) {
+      if ((s.student || (s.students && s.students.length > 0) || s.isGroup) && !s.isBreak && !s.is_room_booking && !s.isRoomBooking && !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status)) {
         const timeKey = s.timeSlot || s.id;
-        if (!uniqueSlotsMap.has(timeKey)) {
-          uniqueSlotsMap.set(timeKey, []);
-        }
+        if (!uniqueSlotsMap.has(timeKey)) uniqueSlotsMap.set(timeKey, []);
         uniqueSlotsMap.get(timeKey)!.push(s);
       }
     });
-
     const ueCount = uniqueSlotsMap.size;
     let studentsCount = 0;
     uniqueSlotsMap.forEach((slots) => {
       const studentIds = new Set<string>();
       slots.forEach((slot: any) => {
         if (slot.students && Array.isArray(slot.students)) {
-          slot.students.forEach((st: any) => {
-            if (st.id) studentIds.add(st.id);
-            else if (st.name) studentIds.add(st.name);
-          });
-        } else if (slot.student?.id) {
-          studentIds.add(slot.student.id);
-        } else if (slot.student?.name) {
-          studentIds.add(slot.student.name);
-        }
+          slot.students.forEach((st: any) => { if (st.id) studentIds.add(st.id); else if (st.name) studentIds.add(st.name); });
+        } else if (slot.student?.id) studentIds.add(slot.student.id);
+        else if (slot.student?.name) studentIds.add(slot.student.name);
       });
       studentsCount += Math.max(1, studentIds.size);
     });
-
     return { activeLessonsCount: ueCount, totalActiveStudentsToday: studentsCount };
   }, [briefingData?.timeline]);
 
-  // 🏛️ Active students assigned to teacher (for rest days / baseline metrics)
   const teacherStudents = useMemo(() => {
     const tid = teacher?.id;
     if (!tid) return [];
-    const directMatches = (allStudents || []).filter((s: any) => 
-      s.teacher_id === tid || 
-      (Array.isArray(s.teacher_ids) && s.teacher_ids.includes(tid)) ||
-      s.primary_teacher_id === tid
-    );
+    const directMatches = (allStudents || []).filter((s: any) => s.teacher_id === tid || (Array.isArray(s.teacher_ids) && s.teacher_ids.includes(tid)) || s.primary_teacher_id === tid);
     if (directMatches.length > 0) return directMatches;
-
-    // Fallback: extract distinct students from teacher's active boards
     const boards = getTeacherActiveBoards(tid, teacher);
     const boardStudentNames = new Set<string>();
     const boardStudentIds = new Set<string>();
@@ -364,21 +155,16 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         }
       });
     });
-
     const matchedFromAll = (allStudents || []).filter((s: any) => {
       const sFullName = `${s.first_name || ''} ${s.last_name || ''}`.trim();
-      return (s.id && boardStudentIds.has(s.id)) || 
-        (s.name && boardStudentNames.has(s.name)) ||
-        (sFullName && boardStudentNames.has(sFullName));
+      return (s.id && boardStudentIds.has(s.id)) || (s.name && boardStudentNames.has(s.name)) || (sFullName && boardStudentNames.has(sFullName));
     });
-
     return matchedFromAll.length > 0 ? matchedFromAll : (allStudents || []);
   }, [allStudents, teacher]);
 
   const totalTeacherStudentsCount = useMemo(() => {
     if (teacherStudents.length > 0) return teacherStudents.length;
-    const tid = teacher?.id;
-    const boards = getTeacherActiveBoards(tid, teacher);
+    const boards = getTeacherActiveBoards(teacher?.id, teacher);
     const uniqueNames = new Set<string>();
     boards.forEach((b: any) => {
       (b.students || []).forEach((slot: any) => {
@@ -394,45 +180,24 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     const weeklyFocusMap: Record<string, number> = briefingData?.weeklyFocusMap || {};
     const focusMinutesList: number[] = [];
     const countedStudentIds = new Set<string>();
-
     if (!isRestDay && briefingData?.timeline) {
-      const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
-        (s.student || (s.students && s.students.length > 0) || s.isGroup) && 
-        !s.isBreak && !s.is_room_booking && !s.isRoomBooking &&
-        !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status)
-      );
-
+      const activeTimelineStudents = briefingData.timeline.filter((s: any) => (s.student || (s.students && s.students.length > 0) || s.isGroup) && !s.isBreak && !s.is_room_booking && !s.isRoomBooking && !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status));
       activeTimelineStudents.forEach((slot: any) => {
         const studentList = slot.students && slot.students.length > 0 ? slot.students : (slot.student ? [slot.student] : []);
         studentList.forEach((st: any) => {
           const sId = st?.id || st?.student_id;
-          if (sId && !countedStudentIds.has(String(sId))) {
-            countedStudentIds.add(String(sId));
-            focusMinutesList.push(weeklyFocusMap[String(sId)] || 0);
-          }
+          if (sId && !countedStudentIds.has(String(sId))) { countedStudentIds.add(String(sId)); focusMinutesList.push(weeklyFocusMap[String(sId)] || 0); }
         });
       });
     }
-
-    // If rest day or timeline had no active students, calculate across teacher's active students (entire class)
     if (focusMinutesList.length === 0 && teacherStudents.length > 0) {
       teacherStudents.forEach((st: any) => {
         const sId = st?.id || st?.student_id;
-        if (sId && !countedStudentIds.has(String(sId))) {
-          countedStudentIds.add(String(sId));
-          focusMinutesList.push(weeklyFocusMap[String(sId)] || 0);
-        }
+        if (sId && !countedStudentIds.has(String(sId))) { countedStudentIds.add(String(sId)); focusMinutesList.push(weeklyFocusMap[String(sId)] || 0); }
       });
     }
-
-    // Genuine weekly average calculation (zero fake fallback)
-    const avgMins = focusMinutesList.length > 0 
-      ? Math.round(focusMinutesList.reduce((a, b) => a + b, 0) / focusMinutesList.length)
-      : 0;
-
-    return avgMins >= 60 
-      ? { value: (avgMins / 60).toFixed(1), unit: 'Std', rawMins: avgMins }
-      : { value: String(avgMins), unit: 'Min', rawMins: avgMins };
+    const avgMins = focusMinutesList.length > 0 ? Math.round(focusMinutesList.reduce((a, b) => a + b, 0) / focusMinutesList.length) : 0;
+    return avgMins >= 60 ? { value: (avgMins / 60).toFixed(1), unit: 'Std', rawMins: avgMins } : { value: String(avgMins), unit: 'Min', rawMins: avgMins };
   }, [isRestDay, briefingData?.timeline, briefingData?.weeklyFocusMap, teacherStudents]);
 
   const workloadMinutes = useMemo(() => {
@@ -440,22 +205,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     const countedTimeSlots = new Set<string>();
     let totalMins = 0;
     briefingData.timeline.forEach((s: any) => {
-      if (
-        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
-        !s.isBreak &&
-        !s.is_room_booking &&
-        !s.isRoomBooking &&
-        s.status !== 'canceled_by_student' &&
-        s.status !== 'teacher_ausfall' &&
-        s.status !== 'cancelled' &&
-        s.status !== 'canceled_by_teacher_ausfall' &&
-        s.status !== 'rescheduled_away'
-      ) {
+      if ((s.student || (s.students && s.students.length > 0) || s.isGroup) && !s.isBreak && !s.is_room_booking && !s.isRoomBooking && !['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status)) {
         const timeKey = s.timeSlot || s.id;
-        if (!countedTimeSlots.has(timeKey)) {
-          countedTimeSlots.add(timeKey);
-          totalMins += (s.duration || 30);
-        }
+        if (!countedTimeSlots.has(timeKey)) { countedTimeSlots.add(timeKey); totalMins += (s.duration || 30); }
       }
     });
     return totalMins;
@@ -463,33 +215,19 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
 
   const workloadHours = Math.floor(workloadMinutes / 60);
   const workloadRemainingMinutes = workloadMinutes % 60;
-  const workloadHoursStr = workloadRemainingMinutes > 0 
-    ? `${workloadHours}h ${workloadRemainingMinutes}m` 
-    : `${workloadHours}h`;
+  const workloadHoursStr = workloadRemainingMinutes > 0 ? `${workloadHours}h ${workloadRemainingMinutes}m` : `${workloadHours}h`;
 
   const regularWeeklyPensum = useMemo(() => {
-    const tid = teacher?.id;
-    const boards = getTeacherActiveBoards(tid, teacher);
+    const boards = getTeacherActiveBoards(teacher?.id, teacher);
     let totalMinutes = 0;
     if (boards && boards.length > 0) {
       boards.forEach((b: any) => {
         (b.students || []).forEach((slot: any) => {
-          if (!slot.isBreak && (slot.id || slot.name || slot.studentId || slot.first_name || slot.student_id)) {
-            totalMinutes += (slot.duration || 30);
-          }
+          if (!slot.isBreak && (slot.id || slot.name || slot.studentId || slot.first_name || slot.student_id)) totalMinutes += (slot.duration || 30);
         });
       });
     }
-    if (totalMinutes === 0) {
-      if (workloadMinutes > 0) {
-        totalMinutes = workloadMinutes * 5;
-      } else if (totalTeacherStudentsCount > 0) {
-        totalMinutes = totalTeacherStudentsCount * 30;
-      } else {
-        totalMinutes = 18 * 45;
-      }
-    }
-
+    if (totalMinutes === 0) totalMinutes = workloadMinutes > 0 ? workloadMinutes * 5 : (totalTeacherStudentsCount > 0 ? totalTeacherStudentsCount * 30 : 18 * 45);
     const hours = Math.floor(totalMinutes / 60);
     const remMins = totalMinutes % 60;
     return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
@@ -497,27 +235,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
 
   const cancellationsCount = useMemo(() => {
     if (!briefingData?.timeline) return 0;
-    return briefingData.timeline.filter((s: any) => 
-      !s.isBreak && !s.is_room_booking && !s.isRoomBooking &&
-      (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
-      (s.isRescheduledPending || ['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status))
-    ).length;
+    return briefingData.timeline.filter((s: any) => !s.isBreak && !s.is_room_booking && !s.isRoomBooking && (s.student || (s.students && s.students.length > 0) || s.isGroup) && (s.isRescheduledPending || ['canceled_by_student', 'teacher_ausfall', 'cancelled', 'canceled_by_teacher_ausfall', 'rescheduled_away'].includes(s.status))).length;
   }, [briefingData?.timeline]);
 
   const dynamicGreeting = useMemo(() => {
     const hours = parseInt((currentTimeStr || '13:00').split(':')[0], 10);
-    let greeting = 'Guten Tag';
-    if (hours >= 5 && hours < 11.5) {
-      greeting = 'Guten Morgen';
-    } else if (hours >= 11.5 && hours < 17.5) {
-      greeting = 'Guten Tag';
-    } else if (hours >= 17.5 && hours < 23) {
-      greeting = 'Guten Abend';
-    }
-    return {
-      greeting,
-      subtitle: 'Hier ist deine Übersicht für einen produktiven Tag.'
-    };
+    const greeting = hours >= 5 && hours < 11.5 ? 'Guten Morgen' : hours >= 17.5 && hours < 23 ? 'Guten Abend' : 'Guten Tag';
+    return { greeting, subtitle: 'Hier ist deine Übersicht für einen produktiven Tag.' };
   }, [currentTimeStr]);
 
   const renderMobileKpis = () => {
@@ -527,106 +251,152 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
       <div 
         style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '8px', 
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', 
+          gap: '10px', 
           width: '100%', 
+          minWidth: 0,
           boxSizing: 'border-box' 
         }}
       >
-        {/* KPI 1: UE heute / Schüler aktiv */}
+        {/* KPI 1: Schüler Heute / Gesamtschüler */}
         <div style={{
-          background: '#4f46e5',
-          borderRadius: '16px',
-          padding: '10px 8px',
-          color: '#ffffff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
+          flex: '1 1 0px',
+          minWidth: 0,
+          position: 'relative', overflow: 'hidden',
+          background: '#6366f1',
+          color: 'white',
+          borderRadius: '20px',
           boxShadow: 'none',
-          minWidth: 0
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          minHeight: '72px',
+          padding: '14px 16px',
+          boxSizing: 'border-box',
+          border: 'none'
         }}>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {isRestDay ? 'Schüler' : 'UE'}
-          </span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            {isRestDay ? totalTeacherStudentsCount : activeLessonsCount}
-          </span>
-          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-            {isRestDay ? 'aktiv' : `${totalActiveStudentsToday} Sch.`}
-          </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+              {isRestDay ? 'Schüler' : 'Schüler Heute'}
+            </span>
+            <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
+              <Users size={14} color="white" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+              {isRestDay ? totalTeacherStudentsCount : activeLessonsCount}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+              {isRestDay ? 'aktiv' : 'UE'}
+            </span>
+            {!isRestDay && totalActiveStudentsToday > 0 && (
+              <span style={{ fontSize: '0.68rem', fontWeight: 750, opacity: 0.85, color: 'white' }}>
+                ({totalActiveStudentsToday} Sch.)
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* KPI 2: Ø Übe-Zeit / Ø Fokus */}
+        {/* KPI 2: Ø Übe-Zeit / Ø Klassen-Fokus */}
         <div style={{
-          background: '#16a34a',
-          borderRadius: '16px',
-          padding: '10px 8px',
-          color: '#ffffff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
+          flex: '1 1 0px',
+          minWidth: 0,
+          position: 'relative', overflow: 'hidden',
+          background: '#34a853',
+          color: 'white',
+          borderRadius: '20px',
           boxShadow: 'none',
-          minWidth: 0
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          minHeight: '72px',
+          padding: '14px 16px',
+          boxSizing: 'border-box',
+          border: 'none'
         }}>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {isRestDay ? 'Ø Fokus' : 'Ø Üben'}
-          </span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{avgPracticeTime.value}</span>
-          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8 }}>{avgPracticeTime.unit}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+              {isRestDay ? 'Ø Fokus' : 'Ø Übe-Zeit'}
+            </span>
+            <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
+              <Timer size={14} color="white" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+              {avgPracticeTime.value}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+              {avgPracticeTime.unit}
+            </span>
+          </div>
         </div>
 
         {/* KPI 3: Tages-Pensum / Wochen-Pensum */}
         <div style={{
-          background: '#eab308',
-          borderRadius: '16px',
-          padding: '10px 8px',
+          flex: '1 1 0px',
+          minWidth: 0,
+          position: 'relative', overflow: 'hidden',
+          background: '#facc15',
           color: '#0f172a',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
+          borderRadius: '20px',
           boxShadow: 'none',
-          minWidth: 0
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          minHeight: '72px',
+          padding: '14px 16px',
+          boxSizing: 'border-box',
+          border: 'none'
         }}>
-          <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {isRestDay ? 'Woche' : 'Pensum'}
-          </span>
-          <span style={{ fontSize: '1.15rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1, color: '#0f172a' }}>
-            {isRestDay ? regularWeeklyPensum : workloadHoursStr}
-          </span>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0f172a', opacity: 0.85 }}>
-            {isRestDay ? 'Regulär' : 'Heute'}
-          </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a' }}>
+              {isRestDay ? 'Wochen-Pensum' : 'Tages-Pensum'}
+            </span>
+            <div style={{ background: 'rgba(15, 23, 42, 0.12)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
+              <Clock size={14} color="#0f172a" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a' }}>
+              {isRestDay ? regularWeeklyPensum : workloadHoursStr}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+              {isRestDay ? 'Regulär' : 'Heute'}
+            </span>
+          </div>
         </div>
 
         {/* KPI 4: Ausfälle / Status */}
         <div style={{
-          background: '#dc2626',
-          borderRadius: '16px',
-          padding: '10px 8px',
-          color: '#ffffff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
+          flex: '1 1 0px',
+          minWidth: 0,
+          position: 'relative', overflow: 'hidden',
+          background: '#ef4444',
+          color: 'white',
+          borderRadius: '20px',
           boxShadow: 'none',
-          minWidth: 0
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          minHeight: '72px',
+          padding: '14px 16px',
+          boxSizing: 'border-box',
+          border: 'none'
         }}>
-          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {isRestDay ? 'Status' : 'Ausfälle'}
-          </span>
-          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            {isRestDay ? 'Frei' : cancellationsCount}
-          </span>
-          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8 }}>
-            {isRestDay ? 'Erholung' : (cancellationsCount === 0 ? 'Planmäßig' : 'Heute')}
-          </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+              {isRestDay ? 'Status' : 'Ausfälle'}
+            </span>
+            <div style={{ background: 'rgba(255, 255, 255, 0.25)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
+              {isRestDay || cancellationsCount === 0 ? (
+                <ShieldCheck size={14} color="white" />
+              ) : (
+                <AlertCircle size={14} color="white" />
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
+            <span style={{ fontSize: isRestDay ? '1.25rem' : '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+              {isRestDay ? 'Frei' : cancellationsCount}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
+              {isRestDay ? 'Erholung' : (cancellationsCount === 0 ? 'Planmäßig' : 'Heute')}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -663,9 +433,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           style={{ 
             padding: '12px 16px', 
             borderRadius: '22px',
-            background: 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
+            background: '#ffffff',
             boxShadow: 'none',
-            border: '1.5px solid #fecaca',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -681,7 +451,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               width: '38px',
               height: '38px',
               borderRadius: '12px',
-              background: 'rgba(239, 68, 68, 0.1)',
+              background: '#fee2e2',
               color: '#dc2626',
               display: 'flex',
               alignItems: 'center',
@@ -726,7 +496,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             }}
             style={{
               height: '36px',
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              background: '#dc2626',
               color: '#ffffff',
               border: 'none',
               padding: '0 16px',
@@ -751,8 +521,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
 
     return (
       <div style={{
-        background: 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
-        border: '1.5px solid #fca5a5',
+        background: '#fee2e2',
+        border: 'none',
         borderRadius: '22px',
         padding: '16px',
         display: 'flex',
@@ -789,7 +559,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             style={{
               background: '#ffffff',
               color: '#991b1b',
-              border: '1px solid #fca5a5',
+              border: 'none',
               padding: '6px 12px',
               borderRadius: '10px',
               fontSize: '0.74rem',
@@ -836,8 +606,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
 
     return (
       <div style={{
-        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
-        border: '1.5px solid #fed7aa',
+        background: '#ffedd5',
+        border: 'none',
         borderRadius: compact ? '20px' : '28px',
         padding: compact ? '16px' : '22px 24px',
         boxShadow: 'none',
@@ -876,7 +646,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                   borderRadius: '100px',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
-                  border: '1px solid #fdba74',
+                  border: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px'
@@ -902,6 +672,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     <TeacherHausaufgabenWidget
       teacher={teacher}
       activeStudent={activeStudent}
+      activeTimelineSlot={activeTimelineSlot}
+      currentTimeStr={currentTimeStr}
       activeGroupStudents={activeGroupStudents}
       selectedGroupStudentId={selectedGroupStudentId}
       setSelectedGroupStudentId={setSelectedGroupStudentId}
@@ -1079,25 +851,28 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     </Suspense>
   );
 
+  const isTabletPortrait = !isMobileDevice && windowWidth >= 768 && windowWidth <= 1024;
+  const isTabletViewport = !isMobileDevice && windowWidth >= 768 && windowWidth <= 1280;
+
   return (
     <div style={{ 
       display: 'flex', 
       flexDirection: 'row', 
       flexWrap: 'wrap', 
-      gap: isTeacherBriefingSidebarCollapsed ? '0px' : '10px', 
+      gap: (isTeacherBriefingSidebarCollapsed || isTabletViewport) ? '0px' : '10px', 
       alignItems: 'start', 
       width: '100%',
-      position: 'relative'
+      position: (windowWidth < 768 || isMobileDevice) ? 'static' : 'relative'
     }} className="dashboard-main-grid">
 
-      {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only) */}
-      {isTeacherBriefingSidebarCollapsed && !isMobileDevice && (() => {
+      {/* Floating Right-Edge Toggle Button when Collapsed (Wide Desktop > 1280px only; on iPad it sits cleanly in the Hero Header) */}
+      {isTeacherBriefingSidebarCollapsed && !isMobileDevice && !isTabletViewport && (() => {
         const isCampus = activePlatform === 'campus';
-        const btnBg = isCampus ? '#34a853' : '#eab308';
-        const btnColor = isCampus ? '#ffffff' : '#713f12';
-        const btnShadow = isCampus ? '-4px 0 20px rgba(52, 168, 83, 0.35), inset 1px 1px 0 rgba(255, 255, 255, 0.25)' : '-4px 0 20px rgba(234, 179, 8, 0.35), inset 1px 1px 0 rgba(255, 255, 255, 0.3)';
-        const badgeBg = hasTeacherAppointmentAlerts ? '#f59e0b' : (isCampus ? '#ffffff' : '#713f12');
-        const badgeTextColor = hasTeacherAppointmentAlerts ? '#ffffff' : (isCampus ? '#15803d' : '#ffffff');
+        const btnBg = isCampus ? '#34a853' : '#facc15';
+        const btnColor = isCampus ? '#ffffff' : '#0f172a';
+        const btnShadow = 'none';
+        const badgeBg = hasTeacherAppointmentAlerts ? '#f97316' : (isCampus ? '#ffffff' : '#0f172a');
+        const badgeTextColor = hasTeacherAppointmentAlerts ? '#ffffff' : (isCampus ? '#34a853' : '#ffffff');
 
         return (
           <button
@@ -1158,7 +933,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
       })()}
       
       <div style={{ 
-        flex: isTeacherBriefingSidebarCollapsed ? '1 1 100%' : '1 1 600px',
+        flex: (isTeacherBriefingSidebarCollapsed || isTabletViewport) ? '1 1 100%' : '1 1 600px',
         minWidth: (windowWidth < 768 || isMobileDevice) ? '0px' : '320px',
         maxWidth: '100%',
         width: '100%',
@@ -1167,7 +942,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         gap: '10px',
         maxHeight: (windowWidth < 768 || isMobileDevice) ? 'none' : 'calc(100vh - 60px)',
         overflowY: (windowWidth < 768 || isMobileDevice) ? 'visible' : 'auto',
-        paddingRight: (isTeacherBriefingSidebarCollapsed && !isMobileDevice) ? '56px' : ((windowWidth < 768 || isMobileDevice) ? '0px' : '10px'),
+        paddingRight: (isTeacherBriefingSidebarCollapsed && !isMobileDevice && !isTabletViewport) ? '56px' : ((windowWidth < 768 || isMobileDevice || isTabletViewport) ? '0px' : '10px'),
         paddingBottom: (windowWidth < 768 || isMobileDevice) ? '20px' : '80px',
         boxSizing: 'border-box',
         transition: 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -1179,6 +954,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             {renderEmergencyCallout(false)}
             <CampusSponsorIngressBanner schoolId={schoolData?.id || teacher?.school_id} sponsorSettings={schoolData?.sponsor_settings} isReady={!briefingLoading} />
             <UpdateAnnouncementHero userId={userId} activePlatform={activePlatform} />
+            <TeacherPasskeyNudgeBanner user={teacher} schoolData={schoolData} />
 
             {/* Planning Active Banners */}
             {activePlanningEvents.map(ev => {
@@ -1187,8 +963,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 <div
                   key={`planning-banner-${ev.id}`}
                   style={{
-                    background: 'linear-gradient(to right, #ffedd5, #fffbeb)',
-                    border: '1.5px solid #ffedd5',
+                    background: '#ffedd5',
+                    border: 'none',
                     borderRadius: '16px',
                     padding: '12px 20px',
                     display: 'flex',
@@ -1256,10 +1032,10 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             {/* Holiday Banner */}
             {isTodayHoliday && (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.1) 0%, rgba(255, 255, 255, 0.98) 100%)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid rgba(52, 168, 83, 0.18)',
+                background: 'rgba(52, 168, 83, 0.10)',
+                backdropFilter: 'none',
+                WebkitBackdropFilter: 'none',
+                border: 'none',
                 padding: '18px 24px',
                 borderRadius: '16px',
                 display: 'flex',
@@ -1270,8 +1046,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 overflow: 'hidden'
               }}>
                 <div style={{
-                  background: 'rgba(52, 168, 83, 0.08)',
-                  border: '1.5px solid rgba(52, 168, 83, 0.12)',
+                  background: '#ffffff',
+                  border: 'none',
                   color: '#34a853',
                   padding: '10px',
                   borderRadius: '12px',
@@ -1299,14 +1075,14 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '24px',
-                background: 'rgba(255, 255, 255, 0.45)',
-                backdropFilter: 'blur(24px)',
+                background: '#ffffff',
+                backdropFilter: 'none',
                 borderRadius: '24px',
                 padding: '32px',
                 boxSizing: 'border-box'
               }}>
                 <div style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)',
+                  background: '#f1f5f9',
                   borderRadius: '20px',
                   padding: '32px',
                   textAlign: 'center'
@@ -1327,7 +1103,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     style={{
                       background: '#ffffff',
                       color: '#991b1b',
-                      border: '1.5px solid #fca5a5',
+                      border: 'none',
                       padding: '12px 22px',
                       minHeight: '44px',
                       borderRadius: '12px',
@@ -1347,9 +1123,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     type="button"
                     onClick={() => setBypassAbsenceView(true)}
                     style={{
-                      background: 'transparent',
+                      background: '#f1f5f9',
                       color: '#475569',
-                      border: '1px solid #cbd5e1',
+                      border: 'none',
                       padding: '12px 20px',
                       minHeight: '44px',
                       borderRadius: '12px',
@@ -1387,67 +1163,239 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               </div>
             ) : isMobileDevice ? (
               <MobileBriefingCarousel
-                themeColor={activePlatform === 'campus' ? '#34a853' : '#eab308'}
+                themeColor={activePlatform === 'campus' ? '#34a853' : '#facc15'}
                 heroBanner={
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
+                  <div style={{
+                    background: '#ffffff',
+                    backdropFilter: 'none',
+                    WebkitBackdropFilter: 'none',
+                    border: 'none',
+                    borderRadius: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    boxShadow: 'none',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {/* Top Avatar Stage (StudentBriefingTab Parity) */}
                     <div style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                      backdropFilter: 'blur(24px)',
-                      borderRadius: '24px',
-                      padding: '18px 16px',
+                      width: '100%',
+                      height: '150px',
+                      background: '#0f172a',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)'
+                      justifyContent: 'center',
+                      zIndex: 2,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderBottom: 'none'
                     }}>
-                      <div>
-                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
-                          Hi, <span style={{ color: '#2563eb' }}>{resolvedTeacherFullName}</span>!
-                        </h2>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 600 }}>
-                          {isWeekend ? 'Schönes Wochenende!' : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei!' : 'Dein Tagesplan ist bereit.')}
-                        </p>
+                      <img
+                        src={resolvedAvatarSrc}
+                        alt={resolvedTeacherFullName ? `${resolvedTeacherFullName} Avatar` : 'Lehrkraft Avatar'}
+                        width={190}
+                        height={150}
+                        loading="eager"
+                        decoding="async"
+                        onError={() => setAvatarLoadError(true)}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          zIndex: 2,
+                          transform: 'scale(1.03)',
+                          transition: 'transform 0.5s ease'
+                        }}
+                      />
+                      <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 5 }}>
+                        <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    </div>
+
+                    {/* Content & Action Stack (StudentBriefingTab Parity) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, zIndex: 2, padding: '20px 20px' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+                        <div style={{
+                          background: '#e0e7ff',
+                          color: '#4f46e5',
+                          fontSize: '0.68rem',
+                          fontWeight: 900,
+                          borderRadius: '100px',
+                          padding: '4px 12px',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          border: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
+                          <span>🎓 CAMPUS LEHRKRAFT • {currentTimeStr || '13:00'} UHR</span>
+                        </div>
+                      </div>
+
+                      <h3 style={{
+                        margin: 0,
+                        fontSize: '26px',
+                        fontWeight: 950,
+                        color: '#0f172a',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        lineHeight: 1.15,
+                        letterSpacing: '-0.02em'
+                      }}>
+                        Hi {resolvedTeacherFullName}!
+                      </h3>
+
+                      <p style={{
+                        margin: '8px 0 0 0',
+                        fontSize: '0.92rem',
+                        color: '#475569',
+                        fontWeight: 650,
+                        lineHeight: 1.45
+                      }}>
+                        {isWeekend
+                          ? 'Schönes Wochenende! Keine Termine heute – Zeit zum Durchatmen.'
+                          : ((isFreeDay && !isTourDemoScheduleActive)
+                              ? 'Heute unterrichtsfrei • Alle Systeme synchronisiert.'
+                              : 'Bereit für deine Unterrichtssession? Dein Tagesplan und Kompass stehen bereit.')}
+                      </p>
+
+                      {/* Quick-Action Buttons (StudentBriefingActionButtons 1:1 Pattern) */}
+                      <div style={{
+                        marginTop: '16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        gap: '10px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        {/* 1. Primary Status / Tagesplan Button */}
                         <button
                           type="button"
-                          role="button"
-                          aria-label="Toolbox öffnen"
-                          tabIndex={0}
-                          onClick={() => setIsQuickToolboxOpen(true)}
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('campus_mobile_briefing_switch_tab', { detail: { tabId: 'tagesplan' } }));
+                          }}
                           style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '12px',
-                            border: activePlatform === 'campus' ? '1.5px solid #bbf7d0' : '1.5px solid #fef08a',
-                            background: activePlatform === 'campus' ? '#f0fdf4' : '#fefce8',
-                            color: activePlatform === 'campus' ? '#16a34a' : '#ca8a04',
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            gap: '8px',
+                            background: 'rgba(52, 168, 83, 0.10)',
+                            color: '#34a853',
+                            padding: '10px 16px',
+                            minHeight: '44px',
+                            boxSizing: 'border-box',
+                            borderRadius: '14px',
+                            fontSize: '0.82rem',
+                            fontWeight: 850,
+                            border: 'none',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                            boxShadow: 'none',
+                            width: '100%',
+                            touchAction: 'manipulation'
                           }}
                           className="hover-scale"
-                          title="Stimmgerät &amp; Metronom"
+                          aria-label="Zum Tagesplan wechseln"
                         >
-                          <Wrench size={18} />
+                          <Calendar size={15} color="currentColor" />
+                          <span>
+                            {isRestDay
+                              ? 'Tagesplan: Heute unterrichtsfrei'
+                              : `Heutiger Tagesplan: ${activeLessonsCount} UE (${totalActiveStudentsToday} Schüler)`}
+                          </span>
                         </button>
-                        <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
+
+                        {/* 2. Quick-Action Duo: Ausfall melden & Praxis-Tools (50/50 Grid) */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          alignItems: 'center',
+                          gap: '10px',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const today = getSimulatedNow().toLocaleDateString('sv-SE');
+                              setAbsenceStartDate(today);
+                              setAbsenceUntilDate(today);
+                              setQuickAbsencePreset('today');
+                              setShowAbsenceModal(true);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              background: '#fee2e2',
+                              color: '#991b1b',
+                              padding: '10px 14px',
+                              minHeight: '44px',
+                              boxSizing: 'border-box',
+                              borderRadius: '14px',
+                              fontSize: '0.82rem',
+                              fontWeight: 850,
+                              border: 'none',
+                              cursor: 'pointer',
+                              boxShadow: 'none',
+                              width: '100%',
+                              touchAction: 'manipulation'
+                            }}
+                            className="hover-scale"
+                            aria-label="Ausfall melden"
+                          >
+                            <CalendarX size={15} color="#dc2626" />
+                            <span>Ausfall melden</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsQuickToolboxOpen(true)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              background: '#f1f5f9',
+                              color: '#0f172a',
+                              padding: '10px 14px',
+                              minHeight: '44px',
+                              boxSizing: 'border-box',
+                              borderRadius: '14px',
+                              fontSize: '0.82rem',
+                              fontWeight: 850,
+                              border: 'none',
+                              cursor: 'pointer',
+                              boxShadow: 'none',
+                              width: '100%',
+                              touchAction: 'manipulation'
+                            }}
+                            className="hover-scale"
+                            aria-label="Praxis-Tools öffnen"
+                          >
+                            <Sliders size={15} color="#34a853" />
+                            <span>Praxis-Tools</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 }
                 kpisGrid={renderMobileKpis()}
                 tagesplanWidget={isTourDemoScheduleActive ? renderTourDemoScheduleJSX() : renderTagesplanWidget()}
-                absenceWidget={renderAbsenceCardWidget()}
+                absenceWidget={isTeacherCurrentlyAbsent ? renderAbsenceCardWidget() : null}
                 hausaufgabenWidget={renderHausaufgabenWidget()}
                 mitteilungenWidget={renderFeedWidget()}
                 additionalTabs={[
                   {
                     id: 'notes',
                     label: 'Notizen',
-                    icon: Calendar,
+                    icon: Edit3,
                     content: (
                       <BriefingNotesCard
                         user={teacher}
@@ -1465,38 +1413,32 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         widgetState={widgetState}
                       />
                     )
-                  },
-                  {
-                    id: 'toolbox',
-                    label: 'Toolbox',
-                    icon: Sliders,
-                    content: <BriefingToolboxCard />
                   }
                 ]}
               />
             ) : (
               /* Desktop Layout (1:1 Goldstandard Parity) */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-                {/* Gamified KPI Cards row (Desktop 1:1 Server Parity) */}
+                {/* Gamified KPI Cards row (Adaptive 2x2 on iPad Portrait, 4x1 on iPad Landscape & Desktop) */}
                 {(!isTeacherCurrentlyAbsent || bypassAbsenceView) && (
-                  <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                  <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: isTabletPortrait ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))', gap: '12px' }}>
 
                     {/* Card 1: Heutige Schüler / Gesamtschüler */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: '#4f46e5', color: 'white',
+                      background: '#6366f1', color: 'white',
                       borderRadius: '22px', 
                       boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.18)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           {isRestDay ? 'Gesamtschüler' : 'Schüler Heute'}
                         </span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', padding: '6px', borderRadius: '10px' }}>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px' }}>
                           <Users size={14} color="white" />
                         </div>
                       </div>
@@ -1524,19 +1466,19 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     {/* Card 2: Ø Übe-Zeit / Ø Klassen-Fokus */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: '#16a34a', color: 'white',
+                      background: '#34a853', color: 'white',
                       borderRadius: '22px', 
                       boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.18)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           {isRestDay ? 'Ø Klassen-Fokus' : 'Ø Übe-Zeit'}
                         </span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)', padding: '6px', borderRadius: '10px' }}>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px' }}>
                           <Timer size={14} color="white" />
                         </div>
                       </div>
@@ -1550,13 +1492,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     {/* Card 3: Tages-Pensum / Wochen-Pensum */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: '#eab308', color: '#0f172a',
+                      background: '#facc15', color: '#0f172a',
                       borderRadius: '22px', 
                       boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.25)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -1579,13 +1521,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     {/* Card 4: Ausfälle / Dienst-Status */}
                     <div style={{
                       position: 'relative', overflow: 'hidden',
-                      background: '#dc2626', color: 'white',
+                      background: '#ef4444', color: 'white',
                       borderRadius: '22px', 
                       boxShadow: 'none',
                       display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
                       padding: '16px 18px', boxSizing: 'border-box',
                       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: '1px solid rgba(255, 255, 255, 0.18)'
+                      border: 'none'
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -1621,79 +1563,125 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                   </div>
                 )}
 
-                {/* 2-Column Desktop Grid */}
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch', width: '100%' }}>
+                {/* 2-Column Adaptive Grid (Stacks vertically on iPad Portrait 768-1024px; 45/55 Split on iPad Landscape; 50/50 on Desktop) */}
+                <div style={{ display: 'flex', flexDirection: isTabletPortrait ? 'column' : 'row', gap: '16px', alignItems: 'stretch', width: '100%' }}>
                   {/* Left Column: Hero Card + Switcher + Content */}
-                  <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, minHeight: windowWidth >= 768 ? '520px' : undefined }}>
-                    {/* Hero Card Banner */}
+                  <div style={{ flex: isTabletPortrait ? '1 1 100%' : (isTabletViewport ? '0 0 45%' : '1 1 50%'), display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, minHeight: (!isTabletPortrait && windowWidth >= 768) ? '520px' : undefined }}>
+                    {/* Hero Card Banner (StudentBriefingTab Split Hero Deck Parity) */}
                     <div style={{
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
-                      backdropFilter: 'blur(24px) saturate(1.8)',
-                      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      background: '#ffffff',
+                      backdropFilter: 'none',
+                      WebkitBackdropFilter: 'none',
+                      border: 'none',
                       borderRadius: '24px',
                       display: 'flex',
                       alignItems: 'stretch',
                       justifyContent: 'space-between',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                      boxShadow: 'none',
                       transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                       width: '100%',
-                      minHeight: '170px',
+                      minHeight: '185px',
                       flex: '0 1 auto',
                       boxSizing: 'border-box',
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      position: 'relative'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        width: isTabletViewport && !isTabletPortrait ? '145px' : '175px',
+                        background: '#0f172a',
+                        flexShrink: 0,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRight: 'none'
+                      }} className="hover-scale hero-avatar-container">
+                        <img 
+                          src={resolvedAvatarSrc} 
+                          alt={resolvedTeacherFullName ? `${resolvedTeacherFullName} Avatar` : 'Lehrkraft Avatar'} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.03)' }} 
+                          onError={() => setAvatarLoadError(true)}
+                        />
+                      </div>
+                      <div style={{ padding: isTabletViewport && !isTabletPortrait ? '18px 20px' : '22px 26px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
                         <div style={{
-                          width: '135px',
-                          height: '135px',
-                          margin: '14px 0 14px 14px',
-                          borderRadius: '18px',
-                          flexShrink: 0,
-                          position: 'relative',
-                          overflow: 'hidden',
-                          boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-                          border: '1px solid rgba(0, 0, 0, 0.06)'
-                        }} className="hover-scale hero-avatar-container">
-                          <img 
-                            src={resolvedAvatarSrc} 
-                            alt="" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                            onError={() => setAvatarLoadError(true)}
-                          />
-                        </div>
-                        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '8px',
+                          marginBottom: '10px',
+                          flexWrap: 'wrap'
+                        }}>
                           <div style={{
+                            background: '#e0e7ff',
+                            color: '#4f46e5',
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            borderRadius: '100px',
+                            padding: '4px 12px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '6px',
-                            background: '#ffffff',
-                            border: '1px solid rgba(0, 0, 0, 0.06)',
-                            borderRadius: '100px',
-                            padding: '4px 10px',
-                            alignSelf: 'flex-start',
-                            marginBottom: '6px',
-                            flexShrink: 0
+                            gap: '6px'
                           }}>
-                            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
-                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-                              {currentTimeStr || '13:00'} UHR
-                            </span>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
+                            <span>🎓 CAMPUS LEHRKRAFT • {currentTimeStr || '13:00'} UHR</span>
                           </div>
 
-                          <h3 style={{ margin: 0, fontSize: '26px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
-                            {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
-                            <span style={{ color: '#2563eb', fontWeight: 900, letterSpacing: '-0.01em', display: 'inline' }}>
-                              {resolvedTeacherFullName}
-                            </span>!
-                          </h3>
-                          <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.35, maxWidth: '420px' }}>
-                            {isWeekend
-                              ? 'Keine Termine heute – Zeit zum Durchatmen und Erholen.'
-                              : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute unterrichtsfrei • Alle Systeme synchronisiert.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
-                            }
-                          </p>
+                          {/* iPad Slide-Over Trigger for Termine & Mitteilungen */}
+                          {isTabletViewport && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTeacherBriefingSidebar(!isTeacherBriefingSidebarCollapsed)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#f1f5f9',
+                                color: '#0f172a',
+                                padding: '6px 12px',
+                                minHeight: '36px',
+                                borderRadius: '10px',
+                                fontSize: '0.78rem',
+                                fontWeight: 850,
+                                border: 'none',
+                                cursor: 'pointer',
+                                boxShadow: 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                              title="Termine & Mitteilungen ein-/ausblenden"
+                              aria-label="Termine & Mitteilungen ein-/ausblenden"
+                            >
+                              <Calendar size={14} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
+                              <span>Termine &amp; News</span>
+                              {teacherSidebarTotalAlertsCount > 0 && (
+                                <span style={{
+                                  background: hasTeacherAppointmentAlerts ? '#f59e0b' : '#ef4444',
+                                  color: '#ffffff',
+                                  fontSize: '0.66rem',
+                                  fontWeight: 950,
+                                  padding: '1px 6px',
+                                  borderRadius: '100px'
+                                }}>
+                                  {teacherSidebarTotalAlertsCount}
+                                </span>
+                              )}
+                            </button>
+                          )}
                         </div>
+
+                        <h3 style={{ margin: 0, fontSize: '26px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.15, letterSpacing: '-0.02em' }}>
+                          Hi {resolvedTeacherFullName}!
+                        </h3>
+                        <p style={{ margin: '8px 0 0 0', fontSize: '0.90rem', color: '#475569', fontWeight: 650, lineHeight: 1.4, maxWidth: '460px' }}>
+                          {isWeekend
+                            ? 'Keine Termine heute – Zeit zum Durchatmen und Erholen.'
+                            : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute unterrichtsfrei • Alle Systeme synchronisiert.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
+                          }
+                        </p>
                       </div>
                     </div>
 
@@ -1703,12 +1691,12 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                       aria-label="Hauptansichten linke Spalte"
                       style={{
                         display: 'flex',
-                        background: 'rgba(241, 245, 249, 0.85)',
+                        background: '#e2e8f0',
                         padding: '4px',
                         borderRadius: '14px',
-                        border: '1px solid #e2e8f0',
+                        border: 'none',
                         gap: '4px',
-                        backdropFilter: 'blur(8px)',
+                        backdropFilter: 'none',
                         flexShrink: 0
                       }}
                     >
@@ -1724,13 +1712,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           flex: 1,
                           padding: '8px 10px',
                           borderRadius: '10px',
-                          border: effectiveLeftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
+                          border: 'none',
                           background: effectiveLeftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
-                          color: effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
+                          color: effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#475569',
                           fontWeight: effectiveLeftColumnTab === 'briefing' ? 850 : 600,
                           fontSize: '0.78rem',
                           cursor: 'pointer',
-                          boxShadow: effectiveLeftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease',
                           display: 'flex',
                           alignItems: 'center',
@@ -1738,7 +1726,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           gap: '6px'
                         }}
                       >
-                        <Compass size={14} color={effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
+                        <Compass size={14} color={effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#475569'} />
                         <span>Tages-Kompass</span>
                       </button>
 
@@ -1754,13 +1742,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           flex: 1,
                           padding: '8px 10px',
                           borderRadius: '10px',
-                          border: effectiveLeftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
+                          border: 'none',
                           background: effectiveLeftColumnTab === 'notes' ? '#ffffff' : 'transparent',
-                          color: effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b',
+                          color: effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#475569',
                           fontWeight: effectiveLeftColumnTab === 'notes' ? 850 : 600,
                           fontSize: '0.78rem',
                           cursor: 'pointer',
-                          boxShadow: effectiveLeftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease',
                           display: 'flex',
                           alignItems: 'center',
@@ -1768,7 +1756,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           gap: '6px'
                         }}
                       >
-                        <Edit3 size={14} color={effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
+                        <Edit3 size={14} color={effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#475569'} />
                         <span>Notizen</span>
                       </button>
 
@@ -1784,13 +1772,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           flex: 1,
                           padding: '8px 10px',
                           borderRadius: '10px',
-                          border: effectiveLeftColumnTab === 'toolbox' ? '1px solid #cbd5e1' : 'none',
+                          border: 'none',
                           background: effectiveLeftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
-                          color: effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
+                          color: effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#475569',
                           fontWeight: effectiveLeftColumnTab === 'toolbox' ? 850 : 600,
                           fontSize: '0.78rem',
                           cursor: 'pointer',
-                          boxShadow: effectiveLeftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease',
                           display: 'flex',
                           alignItems: 'center',
@@ -1798,7 +1786,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           gap: '6px'
                         }}
                       >
-                        <Sliders size={14} color={effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b'} />
+                        <Sliders size={14} color={effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#475569'} />
                         <span>Tools</span>
                       </button>
                     </div>
@@ -1837,7 +1825,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                   </div>
 
                   {/* Right Column: Tagesplan */}
-                  <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, minHeight: windowWidth >= 768 ? '520px' : undefined }}>
+                  <div style={{ flex: isTabletPortrait ? '1 1 100%' : (isTabletViewport ? '1 1 55%' : '1 1 50%'), display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, minHeight: (!isTabletPortrait && windowWidth >= 768) ? '520px' : undefined }}>
                     {isTourDemoScheduleActive ? renderTourDemoScheduleJSX() : renderTagesplanWidget()}
                   </div>
                 </div>
@@ -1849,25 +1837,52 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         )}
       </div>
 
-      {/* Right Desktop Sidebar */}
+      {/* iPad Slide-Over Backdrop when Right Sidebar is open */}
+      {isTabletViewport && !isTeacherBriefingSidebarCollapsed && (
+        <div
+          onClick={() => handleToggleTeacherBriefingSidebar(true)}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.35)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            zIndex: 1099
+          }}
+        />
+      )}
+
+      {/* Right Desktop / iPad Slide-Over Sidebar */}
       {!isMobileDevice && (
         <aside style={{
-          maxWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '100%' : '320px'),
-          minWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0px' : '320px'),
-          width: isTeacherBriefingSidebarCollapsed ? '0px' : '100%',
+          position: isTabletViewport ? 'fixed' : 'static',
+          top: isTabletViewport ? 0 : undefined,
+          right: isTabletViewport ? 0 : undefined,
+          bottom: isTabletViewport ? 0 : undefined,
+          zIndex: isTabletViewport ? 1100 : undefined,
+          background: isTabletViewport ? 'rgba(255, 255, 255, 0.98)' : undefined,
+          backdropFilter: isTabletViewport ? 'blur(24px)' : undefined,
+          WebkitBackdropFilter: isTabletViewport ? 'blur(24px)' : undefined,
+          boxShadow: (isTabletViewport && !isTeacherBriefingSidebarCollapsed) ? '-12px 0 40px rgba(15, 23, 42, 0.18)' : undefined,
+          borderLeft: (isTabletViewport && !isTeacherBriefingSidebarCollapsed) ? '1px solid #e2e8f0' : undefined,
+          maxWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (isTabletViewport ? '360px' : (windowWidth < 768 ? '100%' : '320px')),
+          minWidth: isTeacherBriefingSidebarCollapsed ? '0px' : (isTabletViewport ? '360px' : (windowWidth < 768 ? '0px' : '320px')),
+          width: isTeacherBriefingSidebarCollapsed ? '0px' : (isTabletViewport ? '360px' : '100%'),
           opacity: isTeacherBriefingSidebarCollapsed ? 0 : 1,
-          transform: isTeacherBriefingSidebarCollapsed ? 'translateX(20px)' : 'translateX(0)',
+          transform: isTeacherBriefingSidebarCollapsed ? 'translateX(100%)' : 'translateX(0)',
           pointerEvents: isTeacherBriefingSidebarCollapsed ? 'none' : 'auto',
           overflowY: isTeacherBriefingSidebarCollapsed ? 'hidden' : (windowWidth < 768 ? 'visible' : 'auto'),
           overflowX: 'hidden',
           display: 'flex', 
           flexDirection: 'column', 
           gap: '20px',
-          maxHeight: windowWidth < 768 ? 'none' : 'calc(100vh - 80px)',
-          paddingRight: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0' : '6px'),
-          paddingBottom: isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '20px' : '80px'),
+          maxHeight: isTabletViewport ? '100dvh' : (windowWidth < 768 ? 'none' : 'calc(100vh - 80px)'),
+          padding: isTabletViewport ? (isTeacherBriefingSidebarCollapsed ? '0px' : '20px 18px 40px 18px') : undefined,
+          paddingRight: !isTabletViewport ? (isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '0' : '6px')) : undefined,
+          paddingBottom: !isTabletViewport ? (isTeacherBriefingSidebarCollapsed ? '0px' : (windowWidth < 768 ? '20px' : '80px')) : undefined,
           boxSizing: 'border-box',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
         }} className="briefing-right-sidebar">
           <div style={{
             display: 'flex',
@@ -1883,7 +1898,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                 width: '28px',
                 height: '28px',
                 borderRadius: '8px',
-                background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
+                background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.10)' : '#fef9c3',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1905,7 +1920,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               </span>
               {teacherSidebarTotalAlertsCount > 0 && (
                 <span style={{
-                  background: hasTeacherAppointmentAlerts ? '#f59e0b' : (activePlatform === 'campus' ? '#34a853' : '#eab308'),
+                  background: hasTeacherAppointmentAlerts ? '#f59e0b' : (activePlatform === 'campus' ? '#34a853' : '#facc15'),
                   color: activePlatform === 'campus' || hasTeacherAppointmentAlerts ? '#ffffff' : '#000000',
                   fontSize: '0.65rem',
                   fontWeight: 900,
@@ -1919,26 +1934,30 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             </div>
 
             <button
+              type="button"
               onClick={() => handleToggleTeacherBriefingSidebar(true)}
-              aria-label="Sidebar einklappen"
-              title="Sidebar einklappen"
+              aria-label="Sidebar schließen"
+              title="Sidebar schließen"
               style={{
-                width: '28px',
-                height: '28px',
+                width: isTabletViewport ? '44px' : '32px',
+                height: isTabletViewport ? '44px' : '32px',
+                minWidth: isTabletViewport ? '44px' : '32px',
+                minHeight: isTabletViewport ? '44px' : '32px',
                 background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.10)' : 'rgba(234, 179, 8, 0.12)',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: isTabletViewport ? '12px' : '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
                 color: activePlatform === 'campus' ? '#34a853' : '#ca8a04',
                 transition: 'all 0.15s ease',
-                flexShrink: 0
+                flexShrink: 0,
+                touchAction: 'manipulation'
               }}
               className="hover-scale"
             >
-              <ChevronRight size={16} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
+              <ChevronRight size={18} color={activePlatform === 'campus' ? '#34a853' : '#ca8a04'} />
             </button>
           </div>
           

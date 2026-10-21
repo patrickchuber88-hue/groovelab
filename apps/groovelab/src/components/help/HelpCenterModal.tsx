@@ -610,7 +610,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
               >
                 {availableCategories.map(cat => {
                   const isSelected = selectedCategory === cat.key;
-                  const isYellow = activeTierConfig.color === '#facc15' || activeTierConfig.color === '#eab308';
+                  const isYellow = activeTierConfig.color === '#facc15';
                   return (
                     <button
                       key={cat.key}
@@ -782,7 +782,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                 color: '#16a34a',
                 fontWeight: 750
               }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
                 <span>
                   {effectiveTier === 'student' 
                     ? '100% Datenschutz & Kindersicherheit' 
@@ -1069,7 +1069,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                             background: '#ffffff',
                             borderRadius: '18px',
                             padding: '18px 22px',
-                            border: isCompleted ? '1.5px solid #22c55e40' : '1px solid #e2e8f0',
+                            border: isCompleted ? '1.5px solid rgba(52, 168, 83, 0.4)' : '1px solid #e2e8f0',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
                             display: 'flex',
                             alignItems: 'flex-start',
@@ -1086,7 +1086,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                               height: '28px',
                               borderRadius: '50%',
                               border: isCompleted ? 'none' : '2px solid #cbd5e1',
-                              background: isCompleted ? '#22c55e' : 'transparent',
+                              background: isCompleted ? '#34a853' : 'transparent',
                               color: '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
@@ -1161,7 +1161,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                       background: '#fffbeb',
                       borderRadius: '20px',
                       padding: '22px 26px',
-                      border: '1.5px solid #fef3c7'
+                      border: 'none'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', color: '#b45309', fontWeight: 900, fontSize: '0.90rem' }}>
                         <Lightbulb size={18} />
@@ -1213,7 +1213,7 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({
                       background: '#f0fdf4',
                       borderRadius: '20px',
                       padding: '20px 24px',
-                      border: '1px solid #bbf7d0'
+                      border: 'none'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: '#15803d', fontWeight: 900, fontSize: '0.86rem' }}>
                         <ShieldCheck size={18} />

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
-import { resolveUserCampusId } from '../../utils/campusIdHelper';
+import { resolveUserCampusId, normalizeCampusIdToNumeric } from '../../utils/campusIdHelper';
 
 // ─── APPLE STYLE TOKEN FIELD ──────────────────────────────────────────────────
 interface AppleStyleTokenFieldProps {
@@ -688,7 +688,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                 <div
                   style={{
                     background: '#fefce8',
-                    border: '1px solid #fef08a',
+                    border: 'none',
                     borderRadius: '20px',
                     padding: '18px 22px',
                     display: 'flex',
@@ -1007,7 +1007,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                           borderRadius: '12px',
                           background: '#fee2e2',
                           color: '#991b1b',
-                          border: '1px solid #fca5a5',
+                          border: 'none',
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           cursor: revokingPasskey ? 'not-allowed' : 'pointer',
@@ -1151,7 +1151,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                     padding: '16px 20px',
                     borderRadius: '16px',
                     background: '#fffbeb',
-                    border: '1px solid #fde68a',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
@@ -1162,7 +1162,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                       Aktuelle Ausweis-ID / Support-PIN
                     </span>
                     <strong style={{ display: 'block', fontSize: '1.45rem', fontFamily: 'monospace', color: '#b45309', letterSpacing: '0.08em', marginTop: '2px' }}>
-                      {formData.ausweisNummer || 'Keine PIN'}
+                      {normalizeCampusIdToNumeric(formData.ausweisNummer) || 'Keine PIN'}
                     </strong>
                   </div>
 
@@ -1170,7 +1170,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                     <button
                       type="button"
                       onClick={async () => {
-                        navigator.clipboard.writeText(formData.ausweisNummer);
+                        navigator.clipboard.writeText(normalizeCampusIdToNumeric(formData.ausweisNummer));
                         setCopiedPin(true);
                         setTimeout(() => setCopiedPin(false), 2000);
                       }}
@@ -1265,7 +1265,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                       borderRadius: '12px',
                       background: '#ffffff',
                       color: '#dc2626',
-                      border: '1.5px solid #fca5a5',
+                      border: 'none',
                       fontSize: '0.78rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -1504,7 +1504,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Music size={20} style={{ color: '#eab308' }} />
+                      <Music size={20} style={{ color: '#facc15' }} />
                       <div>
                         <strong style={{ display: 'block', fontSize: '0.86rem', color: '#0f172a' }}>GrooveLab-Modul</strong>
                         <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Band-Coaching, Songverwaltung, Repertoire &amp; Live Lab</span>
@@ -1514,7 +1514,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                       type="checkbox"
                       checked={formData.isGroovelabActive}
                       onChange={(e) => setFormData({ ...formData, isGroovelabActive: e.target.checked })}
-                      style={{ width: '20px', height: '20px', accentColor: '#eab308', cursor: 'pointer' }}
+                      style={{ width: '20px', height: '20px', accentColor: '#facc15', cursor: 'pointer' }}
                     />
                   </label>
 
@@ -1554,7 +1554,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
                 style={{
                   padding: '20px 24px',
                   borderRadius: '20px',
-                  border: '1.5px solid #fee2e2',
+                  border: 'none',
                   background: '#fef2f2',
                   display: 'flex',
                   justifyContent: 'space-between',

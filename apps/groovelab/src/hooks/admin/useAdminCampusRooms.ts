@@ -11,6 +11,7 @@ export interface UseAdminCampusRoomsParams {
   teachers?: any[];
   activeWorkspace?: string | null;
   userRole?: string;
+  activeTab?: string;
 }
 
 export function useAdminCampusRooms({
@@ -22,7 +23,8 @@ export function useAdminCampusRooms({
   fetchData,
   teachers = [],
   activeWorkspace,
-  userRole
+  userRole,
+  activeTab
 }: UseAdminCampusRoomsParams) {
   const [campusBookings, setCampusBookings] = useState<any[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -55,8 +57,21 @@ export function useAdminCampusRooms({
   const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
 
+  const roomsRef = useRef(rooms);
+  roomsRef.current = rooms;
+  const teachersRef = useRef(teachers);
+  teachersRef.current = teachers;
+  const adminRef = useRef(admin);
+  adminRef.current = admin;
+  const hasHydratedRoomsDataRef = useRef<string>('');
+
+  const resolvedSchoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+
   const fetchDbRoomBookings = useCallback(async () => {
-    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+    const curAdmin = adminRef.current;
+    const curRooms = roomsRef.current;
+    const curTeachers = teachersRef.current;
+    const schoolId = curAdmin?.school_id || (curRooms.length > 0 ? curRooms[0].school_id : null);
     if (!schoolId) return;
 
     try {
@@ -112,7 +127,7 @@ export function useAdminCampusRooms({
         const startTime = row.start_time ? row.start_time.substring(0, 5) : '00:00';
         const endTime = row.end_time ? row.end_time.substring(0, 5) : '00:00';
         const purpose = row.title || 'Raumbuchung';
-        const teacher = (teachers || []).find((t: any) => t.id === row.booked_by) || (admin && admin.id === row.booked_by ? admin : null);
+        const teacher = (curTeachers || []).find((t: any) => t.id === row.booked_by) || (curAdmin && curAdmin.id === row.booked_by ? curAdmin : null);
         const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : 'Lehrer';
 
         const isConfirmed = (row.status === 'confirmed') && (row.is_confirmed === true);
@@ -140,10 +155,10 @@ export function useAdminCampusRooms({
     } catch (err) {
       console.error('[useAdminCampusRooms] Error fetching dbRoomBookings:', err);
     }
-  }, [admin, rooms, teachers]);
+  }, [resolvedSchoolId]);
 
   const fetchScheduleOccurrences = useCallback(async () => {
-    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+    const schoolId = resolvedSchoolId;
     if (!schoolId) return;
 
     try {
@@ -174,12 +189,12 @@ export function useAdminCampusRooms({
     } catch (err) {
       console.error('[useAdminCampusRooms] Error fetching scheduleOccurrences:', err);
     }
-  }, [admin?.school_id, rooms]);
+  }, [resolvedSchoolId]);
 
   const reloadCampusBookingsFromStorage = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
-      const sId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+      const sId = resolvedSchoolId;
       const key = sId ? `groovelab_campus_bookings_${sId}` : 'groovelab_campus_bookings';
       const stored = (sId ? localStorage.getItem(key) : null) || localStorage.getItem('groovelab_campus_bookings');
       if (stored) {
@@ -212,12 +227,18 @@ export function useAdminCampusRooms({
     } catch (e) {
       console.error('[useAdminCampusRooms] Error parsing stored campus bookings:', e);
     }
-  }, [admin?.school_id, rooms]);
+  }, [resolvedSchoolId]);
+
+  const isRoomsTabRelevant = !activeTab || activeTab === 'rooms' || activeTab === 'setup';
 
   useEffect(() => {
-    fetchDbRoomBookings();
-    fetchScheduleOccurrences();
-    reloadCampusBookingsFromStorage();
+    if (!resolvedSchoolId || !isRoomsTabRelevant) return;
+    if (hasHydratedRoomsDataRef.current !== resolvedSchoolId) {
+      hasHydratedRoomsDataRef.current = resolvedSchoolId;
+      fetchDbRoomBookings();
+      fetchScheduleOccurrences();
+      reloadCampusBookingsFromStorage();
+    }
 
     const handleRefresh = () => {
       fetchDbRoomBookings();
@@ -227,28 +248,22 @@ export function useAdminCampusRooms({
 
     window.addEventListener('refresh-bookings', handleRefresh);
 
-    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
-    let channel: any = null;
-    if (schoolId) {
-      channel = supabase
-        .channel(`room_bookings_campus_rooms_${schoolId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'room_bookings', filter: `school_id=eq.${schoolId}` },
-          () => {
-            fetchDbRoomBookings();
-          }
-        )
-        .subscribe();
-    }
+    const channel = supabase
+      .channel(`room_bookings_campus_rooms_${resolvedSchoolId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_bookings', filter: `school_id=eq.${resolvedSchoolId}` },
+        () => {
+          fetchDbRoomBookings();
+        }
+      )
+      .subscribe();
 
     return () => {
       window.removeEventListener('refresh-bookings', handleRefresh);
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      supabase.removeChannel(channel);
     };
-  }, [fetchDbRoomBookings, fetchScheduleOccurrences, reloadCampusBookingsFromStorage, admin?.school_id, rooms]);
+  }, [resolvedSchoolId, isRoomsTabRelevant, fetchDbRoomBookings, fetchScheduleOccurrences, reloadCampusBookingsFromStorage]);
   const [roomSearchQuery, setRoomSearchQuery] = useState('');
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>('');
   const [selectedFloor, setSelectedFloor] = useState<string>('Alle');
@@ -416,7 +431,7 @@ export function useAdminCampusRooms({
       if (currentNum === 1 || currentNum === 2) color = '#ef4444';
       else if (currentNum === 3 || currentNum === 4) color = '#a855f7';
       else if (currentNum === 5 || currentNum === 6) color = '#3b82f6';
-      else if (currentNum === 7 || currentNum === 8) color = '#eab308';
+      else if (currentNum === 7 || currentNum === 8) color = '#facc15';
 
       stationsToInsert.push({
         room_id: roomId,

@@ -3,7 +3,7 @@ export const GROOVELAB_THEME = {
   name: 'GrooveLab',
   moduleKey: 'groovelab',
   primaryColor: '#facc15',
-  primaryHover: '#eab308',
+  primaryHover: '#fde047',
   bgLight: '#fefce8',
   bgSoft: '#fef08a',
   borderColor: 'rgba(250, 204, 21, 0.3)',

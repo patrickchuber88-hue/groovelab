@@ -39,7 +39,7 @@ export const ParentScreenTimeSettingsView: React.FC<ParentScreenTimeSettingsView
         background: 'linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)',
         borderRadius: '20px',
         padding: '20px',
-        border: '1.5px solid #bae6fd',
+        border: 'none',
         boxShadow: 'none',
         textAlign: 'left'
       }}>
@@ -458,7 +458,7 @@ export const ParentScreenTimeSettingsView: React.FC<ParentScreenTimeSettingsView
                 fontSize: '0.78rem',
                 fontWeight: 850,
                 background: '#fee2e2',
-                border: '1.5px solid #fca5a5',
+                border: 'none',
                 color: '#b91c1c',
                 cursor: 'pointer'
               }}
@@ -478,7 +478,7 @@ export const ParentScreenTimeSettingsView: React.FC<ParentScreenTimeSettingsView
         padding: '12px 16px',
         borderRadius: '14px',
         background: '#e6f4ea',
-        border: '1px solid #bbf7d0',
+        border: 'none',
         color: '#15803d',
         fontSize: '0.78rem',
         fontWeight: 750

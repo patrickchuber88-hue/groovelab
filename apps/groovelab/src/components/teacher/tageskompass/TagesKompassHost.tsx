@@ -85,8 +85,17 @@ export const TagesKompassHost: React.FC<TagesKompassHostProps> = ({
     : null;
 
   // Letzte Endzeit des Tages
-  const lastSlot = [...timeline].reverse().find(s => !s.isBreak && (s.end_time || s.timeSlot));
-  const lastSlotEndStr = lastSlot?.end_time || lastSlot?.timeSlot?.split('-')?.[1]?.trim() || '16:45';
+  const lastSlot = [...timeline].reverse().find(s => !s.isBreak && (s.end_time || (s as any).endTime || s.timeSlot));
+  const lastSlotEndStr = useMemo(() => {
+    if (!lastSlot) return '16:45';
+    const explicitEnd = (lastSlot as any).endTime || lastSlot.end_time?.substring(0, 5) || lastSlot.timeSlot?.split('-')?.[1]?.trim();
+    if (explicitEnd && explicitEnd.includes(':')) return explicitEnd.substring(0, 5);
+    const startRaw = (lastSlot as any).startTime || lastSlot.start_time?.substring(0, 5) || lastSlot.timeSlot?.split('-')?.[0]?.trim() || '16:15';
+    const [sh, sm] = String(startRaw).substring(0, 5).split(':').map(Number);
+    const durationMin = Number((lastSlot as any).duration || (lastSlot as any).duration_minutes) || 30;
+    const totalMin = (Number.isFinite(sh) ? sh : 16) * 60 + (Number.isFinite(sm) ? sm : 15) + durationMin;
+    return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+  }, [lastSlot]);
 
   // Berechne unfertige Schüler für Zustand 3 (Feierabend)
   const unfinishedStudents = useMemo(() => {

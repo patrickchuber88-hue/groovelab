@@ -339,8 +339,9 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
         if (isUUID(sId)) {
           const { data: latestHw } = await supabase
             .from('progress_matrix')
-            .select('homework_notes')
+            .select('homework_notes, is_current_homework')
             .eq('student_id', sId)
+            .eq('is_current_homework', true)
             .ilike('topic_name', 'Hausaufgabe KW %')
             .order('updated_at', { ascending: false })
             .limit(1)
@@ -350,6 +351,13 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
             const parsedPayload = parseHomeworkNotesPayload(latestHw.homework_notes);
             if (parsedPayload.didacticNotes.length > 0) {
               initialText = parsedPayload.didacticNotes.join('\n\n');
+              foundExisting = true;
+            } else if (
+              parsedPayload.lehrwerke.length > 0 ||
+              parsedPayload.songs.length > 0 ||
+              parsedPayload.audioItems.length > 0 ||
+              parsedPayload.microScores.length > 0
+            ) {
               foundExisting = true;
             }
           }
@@ -627,7 +635,12 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
     if (!window.confirm('Möchtest du diese Hausaufgabe für heute wirklich unwiderruflich löschen?')) return;
     setIsSaving(true);
     try {
-      await deleteCurrentHomeworkAuthoritative(effectiveStudentId);
+      const simNow = getSimulatedNow();
+      const currentWeek = getISOWeekRaw(simNow, 1);
+      const weekNum = currentWeek.split('-W')[1] || '01';
+      await deleteCurrentHomeworkAuthoritative(effectiveStudentId, weekNum);
+      setFahrplanText('');
+      setHasExistingHomework(false);
       onClose();
     } catch (err: any) {
       alert('Fehler beim Löschen: ' + (err?.message || err));
@@ -694,32 +707,54 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
       const rawText = fahrplanText.trim();
       const didacticNotesList = rawText.split('\n\n').map(s => s.trim()).filter(Boolean);
 
-      // E) Kanonisches homework_notes JSON schnüren
-      const jsonPayload = buildHomeworkNotesPayload({
-        didacticNotes: didacticNotesList,
-        lehrwerke: lehrwerkeSnapshot,
-        songs: songsSnapshot,
-        audioTokens: audioTokens
-      });
+      // E) Bestehende Notenschnipsel (MICROSCORE:) bewahren & kanonisches homework_notes JSON schnüren
+      let existingMicroScores: string[] = [];
+      try {
+        const localHwRaw = sId ? localStorage.getItem(`campus_homework_notes_${sId}`) : null;
+        if (localHwRaw) {
+          const parsedLocal = parseHomeworkNotesPayload(localHwRaw);
+          existingMicroScores = parsedLocal.microScores.map(m => m.rawToken);
+        }
+      } catch {}
 
-      // F) In progress_matrix upserten (SSOT)
+      let existingMatrixRow: { id: string; homework_notes?: any } | null = null;
       if (isUUID(sId)) {
         const { data: existingMatrix } = await supabase
           .from('progress_matrix')
-          .select('id')
+          .select('id, homework_notes')
           .eq('student_id', sId)
           .ilike('topic_name', `Hausaufgabe KW %`)
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        existingMatrixRow = existingMatrix || null;
+        if (existingMatrixRow?.homework_notes) {
+          const parsedDb = parseHomeworkNotesPayload(existingMatrixRow.homework_notes);
+          parsedDb.microScores.forEach(m => {
+            if (!existingMicroScores.includes(m.rawToken)) {
+              existingMicroScores.push(m.rawToken);
+            }
+          });
+        }
+      }
 
-        if (existingMatrix?.id) {
+      const jsonPayload = buildHomeworkNotesPayload({
+        didacticNotes: didacticNotesList,
+        lehrwerke: lehrwerkeSnapshot,
+        songs: songsSnapshot,
+        audioTokens: audioTokens,
+        microScores: existingMicroScores
+      });
+
+      // F) In progress_matrix upserten (SSOT)
+      if (isUUID(sId)) {
+        if (existingMatrixRow?.id) {
           await supabase.from('progress_matrix').update({
             homework_notes: jsonPayload,
             topic_name: topicName,
             is_current_homework: true,
             updated_at: new Date().toISOString()
-          }).eq('id', existingMatrix.id);
+          }).eq('id', existingMatrixRow.id);
         } else {
           await supabase.from('progress_matrix').insert({
             student_id: sId,
@@ -1092,7 +1127,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                             padding: '4px 10px',
                             borderRadius: '100px',
                             background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
+                            border: 'none',
                             color: '#1d4ed8',
                             fontSize: '0.74rem',
                             fontWeight: 800,
@@ -1117,7 +1152,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                             padding: '4px 10px',
                             borderRadius: '100px',
                             background: '#faf5ff',
-                            border: '1px solid #e9d5ff',
+                            border: 'none',
                             color: '#7e22ce',
                             fontSize: '0.74rem',
                             fontWeight: 800,
@@ -1697,7 +1732,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                         style={{
                           padding: '6px 12px',
                           borderRadius: '8px',
-                          border: '1px solid #a7f3d0',
+                          border: 'none',
                           background: '#f0fdf4',
                           color: '#047857',
                           fontSize: '0.74rem',

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Play, Square, Headphones, Mic, RotateCcw, Radio, Award, AlertCircle, Search, Timer, Sparkles, X } from 'lucide-react';
 import { WorldTourCountry } from '../../../../types/worldTour';
 import { projectScoreForInstrument, TransposedScoreResult, isTablatureEligible } from '../../../../domain/worldTourTransposer';
-import { worldTourAudio, AudioNoteEvent } from '../../../../utils/worldTourAudioEngine';
+import { worldTourAudio, AudioNoteEvent, WorldTourCountInPhase } from '../../../../utils/worldTourAudioEngine';
 import { WorldTourService } from '../../../../services/worldTourService';
 import { playTriumphantXpChime } from '../../../../utils/campusXpEffects';
 import { WorldTourStaffNotation } from './WorldTourStaffNotation';
@@ -34,7 +34,11 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
   const [challengeResult, setChallengeResult] = useState<{ scorePercent: number; stars: number } | null>(null);
   const [isDroneActive, setIsDroneActive] = useState(false);
   const [isMetronomeActive, setIsMetronomeActive] = useState(true);
-  const [countInInfo, setCountInInfo] = useState<{ currentBeat: number; totalBeats: number } | null>(null);
+  const [countInInfo, setCountInInfo] = useState<{
+    currentBeat: number;
+    totalBeats: number;
+    phaseInfo?: WorldTourCountInPhase;
+  } | null>(null);
   const [isAborted, setIsAborted] = useState(false);
   const [micError, setMicError] = useState(false);
   const [isRequestingMic, setIsRequestingMic] = useState(false);
@@ -271,9 +275,9 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
         transposed.notes,
         tempo,
         playMode,
-        (noteIdx, currentBeat, totalBeats) => {
+        (noteIdx, currentBeat, totalBeats, phaseInfo) => {
           if (noteIdx === -1 && currentBeat !== undefined && totalBeats !== undefined) {
-            setCountInInfo({ currentBeat, totalBeats });
+            setCountInInfo({ currentBeat, totalBeats, phaseInfo });
             setActiveNoteIdx(-1);
           } else {
             setCountInInfo(null);
@@ -431,41 +435,131 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
                   padding: '4px 10px',
                   borderRadius: '10px',
                   background: '#e0f2fe',
-                  border: '1px solid #bae6fd'
+                  border: 'none'
                 }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', marginRight: '2px' }}>
-                    Einzählen:
-                  </span>
-                  {Array.from({ length: countInInfo.totalBeats }, (_, i) => i + 1).map((b) => {
-                    const isCurrent = b === countInInfo.currentBeat;
-                    const isPast = b < countInInfo.currentBeat;
-                    return (
-                      <div
-                        key={b}
-                        style={{
-                          width: isCurrent ? '28px' : '22px',
-                          height: isCurrent ? '28px' : '22px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 900,
-                          fontSize: isCurrent ? '0.90rem' : '0.74rem',
-                          background: isCurrent
-                            ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
-                            : isPast
-                            ? '#38bdf8'
-                            : '#ffffff',
-                          color: isCurrent || isPast ? '#ffffff' : '#94a3b8',
-                          boxShadow: isCurrent ? '0 0 0 3px rgba(2, 132, 199, 0.35)' : 'none',
-                          transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
-                          transition: 'all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)'
-                        }}
-                      >
-                        {b}
+                  {countInInfo.phaseInfo ? (
+                    <>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', marginRight: '2px' }}>
+                        {countInInfo.phaseInfo.phase === 1 ? 'Vorzählen:' : 'Auftakt:'}
+                      </span>
+                      {/* Phase 1: Voller Vorzähltakt */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {Array.from({ length: countInInfo.phaseInfo.preCountBeats }, (_, i) => i + 1).map((b) => {
+                          const isCurrent = countInInfo.phaseInfo!.phase === 1 && b === countInInfo.phaseInfo!.beatInPhase;
+                          const isPast = countInInfo.phaseInfo!.phase === 2 || (countInInfo.phaseInfo!.phase === 1 && b < countInInfo.phaseInfo!.beatInPhase);
+                          return (
+                            <div
+                              key={`p1-${b}`}
+                              style={{
+                                width: isCurrent ? '26px' : '20px',
+                                height: isCurrent ? '26px' : '20px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 900,
+                                fontSize: isCurrent ? '0.86rem' : '0.70rem',
+                                background: isCurrent
+                                  ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                                  : isPast
+                                  ? '#38bdf8'
+                                  : '#ffffff',
+                                color: isCurrent || isPast ? '#ffffff' : '#94a3b8',
+                                boxShadow: isCurrent ? '0 0 0 3px rgba(2, 132, 199, 0.35)' : 'none',
+                                transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
+                                transition: 'all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                              }}
+                            >
+                              {b}
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+
+                      {/* Taktstrich-Trenner */}
+                      <div style={{ width: '2px', height: '16px', background: '#94a3b8', opacity: 0.5, margin: '0 2px' }} />
+
+                      {/* Phase 2: Auftakttakt */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {Array.from({ length: countInInfo.phaseInfo.anacrusisLeadBeats }, (_, i) => i + 1).map((b) => {
+                          const isCurrent = countInInfo.phaseInfo!.phase === 2 && b === countInInfo.phaseInfo!.beatInPhase;
+                          const isPast = countInInfo.phaseInfo!.phase === 2 && b < countInInfo.phaseInfo!.beatInPhase;
+                          return (
+                            <div
+                              key={`p2-${b}`}
+                              style={{
+                                width: isCurrent ? '26px' : '20px',
+                                height: isCurrent ? '26px' : '20px',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 900,
+                                fontSize: isCurrent ? '0.86rem' : '0.70rem',
+                                background: isCurrent
+                                  ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                                  : isPast
+                                  ? '#38bdf8'
+                                  : '#ffffff',
+                                color: isCurrent || isPast ? '#ffffff' : '#94a3b8',
+                                boxShadow: isCurrent ? '0 0 0 3px rgba(2, 132, 199, 0.35)' : 'none',
+                                transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
+                                transition: 'all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                              }}
+                            >
+                              {b}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Auftakt-Startindikator */}
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        color: countInInfo.phaseInfo.phase === 2 ? '#0284c7' : '#94a3b8',
+                        marginLeft: '2px'
+                      }}>
+                        ➔ Einsatz
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', marginRight: '2px' }}>
+                        Einzählen:
+                      </span>
+                      {Array.from({ length: countInInfo.totalBeats }, (_, i) => i + 1).map((b) => {
+                        const isCurrent = b === countInInfo.currentBeat;
+                        const isPast = b < countInInfo.currentBeat;
+                        return (
+                          <div
+                            key={b}
+                            style={{
+                              width: isCurrent ? '28px' : '22px',
+                              height: isCurrent ? '28px' : '22px',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 900,
+                              fontSize: isCurrent ? '0.90rem' : '0.74rem',
+                              background: isCurrent
+                                ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                                : isPast
+                                ? '#38bdf8'
+                                : '#ffffff',
+                              color: isCurrent || isPast ? '#ffffff' : '#94a3b8',
+                              boxShadow: isCurrent ? '0 0 0 3px rgba(2, 132, 199, 0.35)' : 'none',
+                              transform: isCurrent ? 'scale(1.15)' : 'scale(1)',
+                              transition: 'all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                            }}
+                          >
+                            {b}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               ) : mode === 'challenge' ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -860,7 +954,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
             padding: '12px 18px',
             borderRadius: '14px',
             background: '#fff1f2',
-            border: '1.5px solid #fecdd3',
+            border: 'none',
             color: '#9f1239'
           }}
         >
@@ -1007,7 +1101,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
           padding: '14px 18px',
           borderRadius: '16px',
           background: challengeResult.stars >= 2 ? 'linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)' : '#fffbeb',
-          border: `2px solid ${challengeResult.stars >= 2 ? '#22c55e' : challengeResult.stars === 1 ? '#f59e0b' : '#cbd5e1'}`,
+          border: `2px solid ${challengeResult.stars >= 2 ? '#34a853' : challengeResult.stars === 1 ? '#f59e0b' : '#cbd5e1'}`,
           boxShadow: 'none',
           animation: 'fade-in 0.3s ease'
         }}>
@@ -1016,7 +1110,7 @@ export const WorldTourScorePlayer: React.FC<WorldTourScorePlayerProps> = ({
               width: '40px',
               height: '40px',
               borderRadius: '50%',
-              background: challengeResult.stars >= 2 ? '#22c55e' : challengeResult.stars === 1 ? '#f59e0b' : '#94a3b8',
+              background: challengeResult.stars >= 2 ? '#34a853' : challengeResult.stars === 1 ? '#f59e0b' : '#94a3b8',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

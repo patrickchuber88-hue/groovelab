@@ -146,8 +146,8 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     fontSize: '0.85rem',
                     fontWeight: 800,
                     background: showRealNames ? '#fee2e2' : '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    color: showRealNames ? '#ef4444' : '#64748b',
+                    border: showRealNames ? 'none' : '1px solid #cbd5e1',
+                    color: showRealNames ? '#b91c1c' : '#64748b',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
@@ -168,7 +168,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                       padding: '14px 24px',
                       borderRadius: '24px',
                       border: 'none',
-                      background: activePlatform === 'campus' ? '#34a853' : '#eab308',
+                      background: activePlatform === 'campus' ? '#34a853' : '#facc15',
                       color: activePlatform === 'campus' ? 'white' : '#000000',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -209,7 +209,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
               <button 
                 onClick={() => setStudentLetter(null)}
                 style={{
-                  background: studentLetter === null ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent',
+                  background: studentLetter === null ? (activePlatform === 'campus' ? '#34a853' : '#facc15') : 'transparent',
                   color: studentLetter === null ? (activePlatform === 'campus' ? 'white' : '#000000') : '#64748b',
                   border: 'none',
                   padding: '8px 16px',
@@ -231,7 +231,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     key={letter}
                     onClick={() => setStudentLetter(isActive ? null : letter)}
                     style={{
-                      background: isActive ? (activePlatform === 'campus' ? '#34a853' : '#eab308') : 'transparent',
+                      background: isActive ? (activePlatform === 'campus' ? '#34a853' : '#facc15') : 'transparent',
                       color: isActive ? (activePlatform === 'campus' ? 'white' : '#000000') : hasStudents ? '#1e293b' : '#cbd5e1',
                       border: 'none',
                       width: '32px',
@@ -286,7 +286,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     const isStudentActive = isGrooveLab 
                       ? (student.is_groovelab_active || student.isGroovelabActive)
                       : (student.is_campus_active || student.isCampusActive);
-                    const studentRainbowColor = studentRosterColorMap.get(student.id) || (activePlatform === 'campus' ? '#34a853' : '#eab308');
+                    const studentRainbowColor = studentRosterColorMap.get(student.id) || (activePlatform === 'campus' ? '#34a853' : '#facc15');
 
                     return (
                       <div 
@@ -307,9 +307,9 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           display: 'flex', 
                           flexDirection: 'column', 
                           gap: '12px',
-                          border: isSessionActive ? `2px solid ${isGrooveLab ? '#eab308' : '#34a853'}` : '1px solid #e2e8f0',
+                          border: isSessionActive ? `2px solid ${isGrooveLab ? '#facc15' : '#34a853'}` : '1px solid #e2e8f0',
                           borderLeft: `4px solid ${studentRainbowColor}`,
-                          boxShadow: `0 4px 16px rgba(0, 0, 0, 0.02), -2px 0 10px ${studentRainbowColor}25`,
+                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
                           cursor: 'pointer',
                           width: '100%',
                           maxWidth: '100%',
@@ -328,7 +328,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                             overflow: 'hidden', 
                             border: '2px solid white', 
                             background: `${studentRainbowColor}18`,
-                            boxShadow: `0 4px 10px ${studentRainbowColor}20`, 
+                            boxShadow: 'none', 
                             flexShrink: 0 
                           }}>
                             <AvatarImage src={student.photo_url} user={student} activePlatform={activePlatform} />
@@ -349,9 +349,9 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                             <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               {isStudentActive ? (
                                 <span style={{ 
-                                  background: isGrooveLab ? '#fefce8' : '#d1fae5', 
-                                  color: isGrooveLab ? '#ca8a04' : '#065f46', 
-                                  border: isGrooveLab ? '1px solid #fef08a' : 'none',
+                                  background: isGrooveLab ? '#fef9c3' : '#d1fae5', 
+                                  color: isGrooveLab ? '#854d0e' : '#047857', 
+                                  border: 'none',
                                   fontSize: '0.68rem', 
                                   fontWeight: 800, 
                                   padding: '2px 8px', 
@@ -375,7 +375,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                     gap: '3px',
                                     background: '#fee2e2',
                                     color: '#b91c1c',
-                                    border: '1px solid #fca5a5',
+                                    border: 'none',
                                     fontSize: '0.65rem',
                                     fontWeight: 800,
                                     padding: '2px 7px',
@@ -396,7 +396,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                     gap: '3px',
                                     background: '#fef3c7',
                                     color: '#92400e',
-                                    border: '1px solid #fcd34d',
+                                    border: 'none',
                                     fontSize: '0.65rem',
                                     fontWeight: 800,
                                     padding: '2px 7px',
@@ -411,7 +411,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                         </div>
 
                         {activePlatform === 'campus' && (
-                          <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: '1px solid #f1f5f9', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '16px', border: 'none', fontSize: '0.75rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span style={{ color: '#64748b', fontWeight: 600 }}>Instrument:</span>
                               <span style={{ fontWeight: 800 }}>{formatDisplaySubjectOrInstrument(student, teacher)}</span>
@@ -510,7 +510,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           width: '60px',
                           height: '60px',
                           borderRadius: '20px',
-                          border: studentInstrumentFilter === 'all' ? '2.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                          border: studentInstrumentFilter === 'all' ? '2.5px solid #a855f7' : 'none',
                           background: studentInstrumentFilter === 'all' ? '#ffffff' : '#f1f5f9',
                           color: '#1e293b',
                           fontSize: '0.9rem',
@@ -521,7 +521,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           cursor: 'pointer',
                           fontFamily: 'Urbanist',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: studentInstrumentFilter === 'all' ? '0 4px 12px -2px rgba(139, 92, 246, 0.2)' : 'none',
+                          boxShadow: 'none',
                           transform: studentInstrumentFilter === 'all' ? 'scale(1.08)' : 'scale(1)'
                         }}
                         onMouseEnter={(e) => {
@@ -561,7 +561,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                               width: '60px',
                               height: '60px',
                               borderRadius: '20px',
-                              border: isActive ? '2.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                              border: isActive ? '2.5px solid #a855f7' : 'none',
                               background: isActive ? '#ffffff' : '#f1f5f9',
                               padding: 0,
                               overflow: 'hidden',
@@ -570,7 +570,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                               justifyContent: 'center',
                               cursor: 'pointer',
                               transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              boxShadow: isActive ? '0 4px 12px -2px rgba(139, 92, 246, 0.2)' : 'none',
+                              boxShadow: 'none',
                               transform: isActive ? 'scale(1.08)' : 'scale(1)'
                             }}
                             onMouseEnter={(e) => {
@@ -625,7 +625,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                       padding: '6px 12px',
                       borderRadius: '20px',
                       background: '#f5f3ff',
-                      border: '1px solid #ddd6fe',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',

@@ -4,7 +4,7 @@ import { resolveCampusStudentAvatar } from '../../StudioAvatar';
 
 const INSTRUMENT_COLORS: Record<string, string> = {
   "Guitar": "#ef4444", "E-Gitarre": "#ef4444",
-  "Bass": "#eab308", "E-Bass": "#eab308", 
+  "Bass": "#facc15", "E-Bass": "#facc15", 
   "Drums": "#3b82f6", "E-Drums": "#3b82f6", 
   "Vocals": "#34a853", 
   "Piano": "#a855f7", "E-Piano": "#a855f7", "Keys": "#a855f7" 
@@ -110,7 +110,7 @@ export const AdminBandEditModal: React.FC<AdminBandEditModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
               <div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bandname</label>
                 <input 

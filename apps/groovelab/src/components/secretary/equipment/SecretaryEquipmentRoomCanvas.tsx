@@ -166,7 +166,7 @@ export const SecretaryEquipmentRoomCanvas: React.FC<SecretaryEquipmentRoomCanvas
           background: '#f0fdf4', 
           padding: '3px 10px', 
           borderRadius: '9999px',
-          border: '1px solid rgba(22, 163, 74, 0.15)'
+          border: 'none'
         }}>
           {freeCount} frei
         </span>

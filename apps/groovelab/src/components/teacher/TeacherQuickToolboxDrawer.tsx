@@ -28,7 +28,7 @@ export const TeacherQuickToolboxDrawer: React.FC<TeacherQuickToolboxDrawerProps>
   if (!isOpen) return null;
 
   const isCampus = activePlatform === 'campus';
-  const accentColor = isCampus ? '#34a853' : '#eab308';
+  const accentColor = isCampus ? '#34a853' : '#facc15';
 
   return (
     <div

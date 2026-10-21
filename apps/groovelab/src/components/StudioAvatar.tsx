@@ -157,7 +157,8 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   const [isLoaded, setIsLoaded] = useState(false);
   const [resolvedInstrument, setResolvedInstrument] = useState<string | null>(() => user ? getEffectiveInstrument(user) : null);
   
-  const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
+  const rawPlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus');
+  const activePlat = rawPlat === 'groovelab' ? 'groovelab' : (rawPlat === 'secretary' ? 'secretary' : 'campus');
   
   useEffect(() => {
     let isCancelled = false;

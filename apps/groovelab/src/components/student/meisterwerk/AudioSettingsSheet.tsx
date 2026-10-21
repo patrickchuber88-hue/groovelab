@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Volume2, 
@@ -12,7 +12,9 @@ import {
   Info,
   Mic,
   Zap,
-  Radio
+  Radio,
+  Laptop,
+  AlertCircle
 } from 'lucide-react';
 import { audioLatencyService, AudioRouteInfo } from '../../../services/audioLatencyService';
 
@@ -30,11 +32,14 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [calibrationStatus, setCalibrationStatus] = useState('');
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [promptReason, setPromptReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    // Refresh audio route on open
+    setPromptReason(audioLatencyService.getPendingPromptReason());
+
+    // Refresh audio route on open (matches active user & current hardware device)
     audioLatencyService.refreshRoute().then(setRouteInfo);
 
     // Subscribe to dynamic route changes (e.g. plugging in headphones or connecting AirPods)
@@ -51,7 +56,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        onClose();
+        handleCloseModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -61,10 +66,26 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
   // Toast timer
   useEffect(() => {
     if (successToast) {
-      const timer = setTimeout(() => setSuccessToast(null), 3000);
+      const timer = setTimeout(() => setSuccessToast(null), 3500);
       return () => clearTimeout(timer);
     }
   }, [successToast]);
+
+  const handleCloseModal = (proceedIfCalibrated: boolean = false) => {
+    if (proceedIfCalibrated && audioLatencyService.isCurrentRouteCalibrated()) {
+      audioLatencyService.clearPendingPrompt(true);
+    } else {
+      audioLatencyService.clearPendingPrompt(false);
+    }
+    setPromptReason(null);
+    onClose();
+  };
+
+  const handleSkipForSession = () => {
+    audioLatencyService.dismissPromptForSession();
+    setPromptReason(null);
+    onClose();
+  };
 
   const handleStartCalibration = async () => {
     if (isCalibrating) return;
@@ -77,8 +98,9 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
         setCalibrationProgress(progress);
         setCalibrationStatus(statusText);
       });
-      setSuccessToast(`Perfekt! Latenz auf ${result.latencyMs} ms kalibriert.`);
-      audioLatencyService.refreshRoute().then(setRouteInfo);
+      setSuccessToast(`Perfekt! Latenz auf ${result.latencyMs > 0 ? `+${result.latencyMs}` : result.latencyMs} ms für dieses Gerät gespeichert.`);
+      const updated = await audioLatencyService.refreshRoute();
+      setRouteInfo(updated);
     } catch (err: any) {
       console.warn('[AudioSettingsSheet] Calibration error:', err);
       setCalibrationStatus(err?.message || 'Kalibrierung fehlgeschlagen. Bitte Mikrofonzugriff erlauben.');
@@ -89,7 +111,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
-    audioLatencyService.setManualLatencyMs(val);
+    audioLatencyService.setManualLatencyMs(val, 'manual_slider');
   };
 
   const handleReset = () => {
@@ -102,8 +124,10 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
 
   if (!isOpen) return null;
 
-  const currentMs = routeInfo?.effectiveLatencyMs ?? 42;
+  const currentMs = routeInfo?.effectiveLatencyMs ?? 70;
   const isBluetooth = routeInfo?.isBluetooth;
+  const isCalibrated = Boolean(routeInfo?.isCalibrated);
+  const savedDevices = routeInfo?.savedDevices || [];
 
   return (
     <div
@@ -122,7 +146,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
         justifyContent: 'center',
         padding: '16px'
       }}
-      onClick={onClose}
+      onClick={() => handleCloseModal(true)}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -180,7 +204,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => handleCloseModal(true)}
             style={{
               width: '32px',
               height: '32px',
@@ -202,24 +226,50 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
         </div>
 
         {/* 📜 CONTENT */}
-        <div style={{ padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Toast Notification */}
           {successToast && (
             <div style={{
               background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               color: '#15803d',
-              fontSize: '0.8rem',
+              fontSize: '0.78rem',
               fontWeight: 750
             }}>
-              <CheckCircle2 size={16} />
+              <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
               <span>{successToast}</span>
+            </div>
+          )}
+
+          {/* ⚡ JUST-IN-TIME ERST-KALIBRIERUNGS-AUFFORDERUNG FÜR NEUE GERÄTE */}
+          {!isCalibrated && (
+            <div style={{
+              background: '#fef3c7',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              color: '#92400e'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.78rem', fontWeight: 850 }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>
+                  {promptReason
+                    ? `Gerät vor ${promptReason} einmalig kalibrieren`
+                    : 'Dieses Gerät ist noch nicht kalibriert'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.72rem', lineHeight: 1.45, fontWeight: 600 }}>
+                Für <strong>{routeInfo?.deviceName || 'dieses Audio-Gerät'}</strong> liegt noch kein eigener Messwert vor (aktuell Schätzwert {routeInfo?.baselineLatencyMs ?? 70} ms). Starte jetzt die 3-Sekunden-Messung, um den perfekten Wert dauerhaft für dieses Gerät zu speichern.
+              </div>
             </div>
           )}
 
@@ -246,7 +296,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
                   height: '38px',
                   borderRadius: '11px',
                   background: isBluetooth ? '#0f172a' : '#ffffff',
-                  border: '1px solid #cbd5e1',
+                  border: isBluetooth ? 'none' : '1px solid #cbd5e1',
                   color: isBluetooth ? '#ffffff' : '#0f172a',
                   display: 'flex',
                   alignItems: 'center',
@@ -297,7 +347,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', minWidth: 0, flex: 1, textAlign: 'right' }}>
                 <div style={{ minWidth: 0, overflow: 'hidden' }}>
                   <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
                     <span>Aufnahme</span>
                   </div>
                   <div style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={routeInfo?.inputDeviceName}>
@@ -322,23 +372,34 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
               </div>
             </div>
 
-            {/* ROUTEN-META-ZEILE */}
+            {/* ROUTEN-META-ZEILE MIT KALIBRIERUNGS-STATUS */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '6px',
               fontSize: '0.68rem',
               color: '#64748b',
               fontWeight: 650,
-              paddingTop: '6px',
+              paddingTop: '8px',
               borderTop: '1px dashed #e2e8f0'
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <span>Hardware-Route:</span>
                 <strong style={{ color: '#0f172a' }}>{routeInfo?.routeType.toUpperCase()}</strong>
+                <span>· Baseline: <strong style={{ color: '#0f172a' }}>{routeInfo?.baselineLatencyMs ?? 70} ms</strong></span>
               </span>
-              <span>
-                Baseline: <strong style={{ color: '#0f172a' }}>{routeInfo?.baselineLatencyMs ?? 45} ms</strong>
+              <span style={{
+                padding: '2px 8px',
+                borderRadius: '100px',
+                border: 'none',
+                fontSize: '0.64rem',
+                fontWeight: 800,
+                background: isCalibrated ? '#dcfce7' : '#f1f5f9',
+                color: isCalibrated ? '#166534' : '#475569'
+              }}>
+                {isCalibrated ? '✓ Gerät kalibriert' : 'Standard-Schätzwert'}
               </span>
             </div>
           </div>
@@ -359,13 +420,13 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
                 <Sparkles size={15} style={{ color: '#6366f1' }} />
                 <span>Akustische Auto-Kalibrierung</span>
               </div>
-              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#4338ca', background: '#e0e7ff', padding: '2px 8px', borderRadius: '100px', border: '1px solid #c7d2fe' }}>
+              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#4338ca', background: '#e0e7ff', padding: '2px 8px', borderRadius: '100px', border: 'none' }}>
                 ±2 ms Präzision
               </span>
             </div>
 
             <p style={{ margin: 0, fontSize: '0.74rem', color: '#475569', lineHeight: 1.45 }}>
-              Spielt 3 kurze, dezente Test-Signale ab und misst die exakte akustische Laufzeit über dein Mikrofon.
+              Spielt 3 kurze, dezente Test-Signale ab, misst die exakte akustische Laufzeit über dein Mikrofon und speichert sie für dieses Gerät.
             </p>
 
             {isCalibrating && (
@@ -411,7 +472,13 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
               className="hover-scale-mini"
             >
               <Play size={13} fill="#ffffff" />
-              <span>{isCalibrating ? 'Messe Laufzeit...' : 'Signal-Messung starten (3 Sek.)'}</span>
+              <span>
+                {isCalibrating
+                  ? 'Messe Laufzeit...'
+                  : isCalibrated
+                    ? 'Signal-Messung neu starten (3 Sek.)'
+                    : 'Signal-Messung starten (3 Sek.)'}
+              </span>
             </button>
           </div>
 
@@ -446,7 +513,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
             {/* 3 ONE-TAP PRESET PILLS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
               {[
-                { label: 'Kabel / Intern', value: routeInfo && !routeInfo.isBluetooth ? routeInfo.baselineLatencyMs : 42, icon: <Zap size={12} color="#0f172a" /> },
+                { label: 'Kabel / Intern', value: routeInfo && !routeInfo.isBluetooth ? routeInfo.baselineLatencyMs : 70, icon: <Zap size={12} color="#0f172a" /> },
                 { label: 'AirPods / BT', value: 210, icon: <Bluetooth size={12} color="#0284c7" /> },
                 { label: 'HiFi / AirPlay', value: 420, icon: <Radio size={12} color="#64748b" /> }
               ].map((p) => {
@@ -456,12 +523,12 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
                     key={p.label}
                     type="button"
                     onClick={() => {
-                      audioLatencyService.setManualLatencyMs(p.value);
+                      audioLatencyService.setManualLatencyMs(p.value, 'preset');
                       audioLatencyService.refreshRoute().then(setRouteInfo);
                     }}
                     style={{
-                      background: isSelected ? '#f1f5f9' : '#ffffff',
-                      border: `1.5px solid ${isSelected ? '#0f172a' : '#e2e8f0'}`,
+                      background: isSelected ? '#0f172a' : '#ffffff',
+                      border: isSelected ? 'none' : '1.5px solid #e2e8f0',
                       borderRadius: '10px',
                       padding: '7px 6px',
                       display: 'flex',
@@ -470,15 +537,15 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
                       gap: '3px',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
+                      boxShadow: isSelected ? '0 2px 6px rgba(15, 23, 42, 0.18)' : 'none'
                     }}
                     className="hover-scale-mini"
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 800, color: '#0f172a' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 800, color: isSelected ? '#ffffff' : '#0f172a' }}>
                       {p.icon}
                       <span>{p.label}</span>
                     </div>
-                    <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isSelected ? '#0f172a' : '#64748b', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 700, color: isSelected ? '#cbd5e1' : '#64748b', fontFamily: 'monospace' }}>
                       ~{p.value} ms
                     </span>
                   </button>
@@ -510,6 +577,56 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
             </div>
           </div>
 
+          {/* 💻 MULTI-DEVICE ÜBERSICHT DES USERS */}
+          {savedDevices.length > 0 && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '10px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 800, color: '#475569' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Laptop size={12} />
+                  <span>Gespeicherte Geräte-Kalibrierungen ({savedDevices.length})</span>
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '96px', overflowY: 'auto' }}>
+                {savedDevices.slice(0, 5).map((dev) => {
+                  const isActiveDev = dev.profile_key === routeInfo?.profileKey;
+                  return (
+                    <div
+                      key={dev.profile_key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '5px 8px',
+                        borderRadius: '8px',
+                        background: isActiveDev ? '#e0e7ff' : '#ffffff',
+                        border: 'none',
+                        fontSize: '0.68rem',
+                        color: isActiveDev ? '#312e81' : '#334155',
+                        fontWeight: isActiveDev ? 800 : 650
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '72%' }}>
+                        {dev.device_name} · {dev.route_type.toUpperCase()}
+                        {isActiveDev ? ' (Aktiv)' : ''}
+                      </span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 850 }}>
+                        {dev.latency_ms > 0 ? `+${dev.latency_ms}` : dev.latency_ms} ms
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* ℹ️ DIDAKTISCHER ZERO-LATENCY HINWEIS */}
           <div style={{
             background: '#f8fafc',
@@ -525,7 +642,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
           }}>
             <Info size={15} style={{ flexShrink: 0, marginTop: '1px', color: '#0284c7' }} />
             <div>
-              <strong style={{ color: '#0f172a' }}>🎯 Zero-Latency Sync:</strong> Gleicht die Verzögerung bei Aufnahmen zu PlayAlongs oder Backing Tracks automatisch aus, sodass die Spur sample-genau im Takt sitzt.
+              <strong style={{ color: '#0f172a' }}>🎯 Zero-Latency Sync:</strong> Gleicht die Verzögerung bei Aufnahmen zu PlayAlongs oder Backing Tracks automatisch pro Gerät aus, sodass die Spur sample-genau im Takt sitzt.
             </div>
           </div>
 
@@ -537,11 +654,31 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
           borderTop: '1px solid #f1f5f9',
           background: '#fafafa',
           display: 'flex',
-          justifyContent: 'flex-end'
+          alignItems: 'center',
+          justifyContent: promptReason && !isCalibrated ? 'space-between' : 'flex-end',
+          gap: '10px'
         }}>
+          {promptReason && !isCalibrated && (
+            <button
+              type="button"
+              onClick={handleSkipForSession}
+              style={{
+                background: '#f1f5f9',
+                color: '#475569',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                fontSize: '0.74rem',
+                fontWeight: 750,
+                cursor: 'pointer'
+              }}
+            >
+              Später ({routeInfo?.baselineLatencyMs ?? 70} ms Standard nutzen)
+            </button>
+          )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => handleCloseModal(true)}
             style={{
               background: '#0f172a',
               color: '#ffffff',
@@ -555,7 +692,7 @@ export const AudioSettingsSheet: React.FC<AudioSettingsSheetProps> = ({
             }}
             className="hover-scale-mini"
           >
-            Fertig
+            {promptReason && isCalibrated ? 'Weiter zur Aufnahme' : 'Fertig'}
           </button>
         </div>
 

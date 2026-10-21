@@ -521,11 +521,17 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
   // 🔄 Cross-Module Realtime Latency Sync
   useEffect(() => {
-    return UniversalLatencyEngine.subscribe((newMs) => {
+    const unsub = UniversalLatencyEngine.subscribe((newMs) => {
       setLatencyOffsetMs(newMs);
       // Synchronize acoustic onset offset proportionally with calibrated hardware latency
       setAcousticLatencyOffsetMs(Math.max(10, Math.min(60, Math.round(newMs * 0.4))));
     });
+    const handleOpen = () => setShowAudioSettingsSheet(true);
+    window.addEventListener('campus_open_audio_settings', handleOpen);
+    return () => {
+      unsub();
+      window.removeEventListener('campus_open_audio_settings', handleOpen);
+    };
   }, []);
 
   // 🎙️ 1% Goldstandard 2026: Dedicated Hardware Microphone Capture Latency (SSOT)
@@ -1929,7 +1935,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             borderRadius: '10px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
           }} title="Gesammelte XP">
-            <Zap size={isNotebook ? 13 : 12} fill="#eab308" color="#eab308" />
+            <Zap size={isNotebook ? 13 : 12} fill="#facc15" color="#ca8a04" />
             <span style={{ fontSize: isNotebook ? '0.78rem' : '0.72rem', fontWeight: 950, color: '#0f172a' }}>
               {studentBaseXp + sessionAccumulatedXp} XP
             </span>
@@ -2896,9 +2902,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           borderRadius: isNotebook ? '12px' : '10px'
         }}>
           <div style={{ display: 'flex', gap: '3px' }}>
-            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 1 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 1 ? '#eab308' : 'none'} />
-            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 2 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 2 ? '#eab308' : 'none'} />
-            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 3 ? '#eab308' : '#cbd5e1'} fill={starsEarned >= 3 ? '#eab308' : 'none'} />
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 1 ? '#ca8a04' : '#cbd5e1'} fill={starsEarned >= 1 ? '#facc15' : 'none'} />
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 2 ? '#ca8a04' : '#cbd5e1'} fill={starsEarned >= 2 ? '#facc15' : 'none'} />
+            <Star size={isNotebook ? 18 : 15} color={starsEarned >= 3 ? '#ca8a04' : '#cbd5e1'} fill={starsEarned >= 3 ? '#facc15' : 'none'} />
           </div>
           {totalHits > 0 && (
             <span style={{
@@ -2922,7 +2928,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               onClick={handleTogglePlay}
               style={{
                 background: '#fee2e2',
-                border: '1px solid #fecaca',
+                border: 'none',
                 color: '#dc2626',
                 borderRadius: isNotebook ? '12px' : '10px',
                 padding: isNotebook ? '7px 16px' : '5px 12px',

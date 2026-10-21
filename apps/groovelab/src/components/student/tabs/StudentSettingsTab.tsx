@@ -554,28 +554,28 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   title: isAdultStudent ? 'App-Design & Freigaben' : 'Kinderschutz & Freigaben',
                   subtitle: isAdultStudent ? 'Altersstufe, didaktische Freigaben und Feature-Toggles.' : 'Altersstufen-Standards und didaktische Freigaben.',
                   icon: isAdultStudent ? Compass : ShieldCheck,
-                  iconBg: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #facc15 0%, #d97706 100%)' : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                  iconBg: currentPlatform === 'groovelab' ? '#facc15' : '#0ea5e9'
                 };
               case 'screentime':
                 return {
                   title: 'Bildschirmzeit & Ruhe',
                   subtitle: 'Nachtruhe, Fokusfenster und Sofortpause für ein gesundes Maß.',
                   icon: Moon,
-                  iconBg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                  iconBg: '#6366f1'
                 };
               case 'security':
                 return {
                   title: isAdultStudent ? 'Persönliche PIN & Sicherheit' : 'PIN & Gerätesicherheit',
                   subtitle: isAdultStudent ? '4-stellige persönliche PIN verwalten.' : '6-stellige Eltern-Master-PIN und 4-stellige Schüler-PIN.',
                   icon: Lock,
-                  iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  iconBg: '#f97316'
                 };
               case 'notifications':
                 return {
                   title: 'Mitteilungen & Alerts',
                   subtitle: 'Push-Kanäle für Hausaufgaben, Stundenplan und wichtige Schul-Alerts.',
                   icon: Bell,
-                  iconBg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                  iconBg: '#3b82f6'
                 };
               case 'practice_report':
               case 'learning_and_insights':
@@ -583,14 +583,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   title: 'Übe-Report & Streak',
                   subtitle: 'Wöchentliche Übezeit, Zielerreichung und fleißige Übe-Serien.',
                   icon: Clock,
-                  iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  iconBg: '#10b981'
                 };
               case 'cancellations':
                 return {
                   title: 'Unterrichtsausfälle',
                   subtitle: 'Eigene gemeldete Abwesenheiten und Chronik der Termine.',
                   icon: CalendarX,
-                  iconBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  iconBg: '#f97316'
                 };
               case 'family_profiles':
               case 'family_and_devices':
@@ -598,21 +598,21 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   title: 'Familie & Geschwister',
                   subtitle: 'Geschwisterkinder per 1-Tap wechseln, neues Kind anlegen und Geräte verwalten.',
                   icon: Users,
-                  iconBg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                  iconBg: '#0ea5e9'
                 };
               case 'skills_radar':
                 return {
                   title: draftUiLevel === 'junior' ? 'Musik-Stern (5 Säulen)' : 'Didaktisches Entwicklungsraster',
                   subtitle: 'Didaktisches Kompetenzraster in 5 musikalischen Entwicklungsdimensionen.',
                   icon: Sparkles,
-                  iconBg: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)'
+                  iconBg: '#ef4444'
                 };
               case 'modules':
                 return {
                   title: 'Module & Studio',
                   subtitle: 'Campus-Studio und GrooveLab Features im Überblick.',
                   icon: Zap,
-                  iconBg: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)'
+                  iconBg: '#facc15'
                 };
               case 'billing':
               case 'billing_and_legal': {
@@ -625,7 +625,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       ? 'Gesetzliche Vertragsbestätigung und Kassenbeleg.' 
                       : '100% Schullizenz, kommunaler Bildungsnachweis und Bereitstellungspaket.'),
                   icon: FileText,
-                  iconBg: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                  iconBg: '#0ea5e9'
                 };
               }
               case 'downloads':
@@ -634,21 +634,21 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   title: 'Datenschutz & Datentresor',
                   subtitle: 'Art. 15 DSGVO 1-Klick-Selbstauskunft und Art. 20 Datenportabilität.',
                   icon: Download,
-                  iconBg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  iconBg: '#10b981'
                 };
               case 'consents':
                 return {
                   title: 'Bildnisschutz & Medienrechte',
                   subtitle: 'KUG 22 Zero-Photo-Doktrin, Privacy-by-Design & Art. 17 DSGVO Löschrechte.',
                   icon: ShieldCheck,
-                  iconBg: 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  iconBg: '#10b981'
                 };
               default:
                 return {
                   title: 'Einstellungen',
                   subtitle: 'Persönliche Konfiguration und Sicherheitsoptionen.',
                   icon: Settings,
-                  iconBg: 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+                  iconBg: '#475569'
                 };
             }
           };
@@ -680,7 +680,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   width: '64px',
                   height: '64px',
                   borderRadius: '22px',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  background: '#0ea5e9',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -714,7 +714,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   <div style={{
                     padding: '10px 16px',
                     background: '#fee2e2',
-                    border: '1px solid #fca5a5',
+                    border: 'none',
                     borderRadius: '14px',
                     color: '#dc2626',
                     fontSize: '0.78rem',
@@ -731,7 +731,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   <div style={{
                     padding: '10px 16px',
                     background: '#fef3c7',
-                    border: '1px solid #fde68a',
+                    border: 'none',
                     borderRadius: '14px',
                     color: '#92400e',
                     fontSize: '0.82rem',
@@ -759,7 +759,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       style={{
                         width: '100%',
                         padding: '13px 20px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         border: 'none',
                         borderRadius: '18px',
                         color: '#ffffff',
@@ -775,7 +775,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       }}
                       className="hover-scale"
                     >
-                      <Fingerprint size={20} color="#16a34a" />
+                      <Fingerprint size={20} color="#ffffff" />
                       <span>Mit FaceID / TouchID entsperren</span>
                     </button>
 
@@ -1026,7 +1026,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       alignItems: 'center',
                       gap: '8px',
                       background: '#fef2f2',
-                      border: '1.5px solid #fca5a5',
+                      border: 'none',
                       color: '#b91c1c',
                       padding: '10px 18px',
                       borderRadius: '16px',
@@ -1049,8 +1049,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
               {/* 🌟 PASSIVE ACCOUNT HERO STATUS STAGE (CAMPUS ONLY) */}
               {currentPlatform === 'campus' && !studentUser?.is_campus_active && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
-                  border: '1.5px solid #10b981',
+                  background: '#d1fae5',
+                  border: 'none',
                   borderRadius: '24px',
                   padding: '24px',
                   boxShadow: 'none',
@@ -1065,7 +1065,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         width: '46px',
                         height: '46px',
                         borderRadius: '14px',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
@@ -1089,7 +1089,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       fontWeight: 800,
                       padding: '4px 12px',
                       borderRadius: '100px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: '#10b981',
                       color: '#ffffff',
                       border: 'none',
                       display: 'inline-flex',
@@ -1102,19 +1102,19 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     </span>
                   </div>
 
-                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#475569', lineHeight: 1.5 }}>
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#047857', lineHeight: 1.5 }}>
                     Stundenplan und Hausaufgabenheft sind bereits aktiv. Schalte jetzt die interaktive <strong>Audio-Loopstation</strong>, den <strong>Übe-Timer mit Streaks</strong> und die <strong>persönliche Audio-Biografie</strong> frei.
                   </p>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '4px' }}>
-                    <div style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 700 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#047857', fontWeight: 700 }}>
                       Laufender Monat 100% kostenlos • Danach nur 0,49 € / Mo. bis zum Schuljahresende (31.08.)
                     </div>
                     <button
                       type="button"
                       onClick={() => setShowParentActivationModal(true)}
                       style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '14px',
@@ -1210,7 +1210,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </div>
                           <span>{member.first_name || member.name || 'Kind'}</span>
                           {isCurrent && (
-                            <span style={{ fontSize: '0.68rem', background: '#22c55e', color: '#ffffff', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                            <span style={{ fontSize: '0.68rem', background: '#34a853', color: '#ffffff', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>
                               Aktiv
                             </span>
                           )}
@@ -1249,7 +1249,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 {isCurrentlyInInstantLock && (
                   <div style={{
                     background: '#fffbeb',
-                    border: '2px solid #fde68a',
+                    border: 'none',
                     borderRadius: '20px',
                     padding: '16px 20px',
                     display: 'flex',
@@ -1266,7 +1266,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         height: '42px',
                         borderRadius: '12px',
                         background: '#fef3c7',
-                        border: '1px solid #fde68a',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1281,7 +1281,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             1-Tap Sofortpause („Familienzeit“)
                           </h3>
                           {instantLockUntil && (
-                            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.72rem', fontWeight: 850, padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                            <span style={{ background: '#fef3c7', color: '#b45309', fontSize: '0.72rem', fontWeight: 850, padding: '2px 8px', borderRadius: '6px', border: 'none' }}>
                               Aktiv bis {new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr
                             </span>
                           )}
@@ -1345,11 +1345,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: isAdultStudent ? 'App-Design & Modus' : 'Kinderschutz & Freigaben',
                         subtitle: isAdultStudent ? 'Didaktisches UI-Level & Funktionen' : 'Altersgerechte Filter & didaktische Freigaben',
                         badge: isAdultStudent ? 'Design' : 'Altersstufe',
-                        badgeBg: '#eff6ff',
+                        badgeBg: '#dbeafe',
                         badgeColor: '#1d4ed8',
-                        badgeBorder: '#bfdbfe',
-                        gradient: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                        shadowColor: 'rgba(37, 99, 235, 0.32)',
+                        gradient: '#3b82f6',
                         icon: isAdultStudent ? Compass : ShieldCheck
                       },
                       {
@@ -1357,11 +1355,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Bildschirmzeit & Ruhe',
                         subtitle: bedtimeModeEnabled ? `Ruhezeit ab ${bedtimeStart} Uhr aktiv` : 'Nachtruhe, Fokuszeit & Sofortpause',
                         badge: bedtimeModeEnabled ? 'Aktiv' : 'Ruhefenster',
-                        badgeBg: bedtimeModeEnabled ? '#f0fdf4' : '#f5f3ff',
-                        badgeColor: bedtimeModeEnabled ? '#15803d' : '#6d28d9',
-                        badgeBorder: bedtimeModeEnabled ? '#bbf7d0' : '#ddd6fe',
-                        gradient: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                        shadowColor: 'rgba(124, 58, 237, 0.32)',
+                        badgeBg: bedtimeModeEnabled ? '#dcfce7' : '#f3e8ff',
+                        badgeColor: bedtimeModeEnabled ? '#15803d' : '#7e22ce',
+                        gradient: '#a855f7',
                         icon: Moon
                       },
                       {
@@ -1371,11 +1367,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           ? ((studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '4-stellige PIN aktiv' : 'Persönliche PIN festlegen')
                           : 'Eltern-PIN, Schüler-PIN & FaceID',
                         badge: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? 'Geschützt' : 'PIN einrichten',
-                        badgeBg: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#ecfeff' : '#fffbeb',
-                        badgeColor: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#0e7490' : '#b45309',
-                        badgeBorder: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#a5f3fc' : '#fef3c7',
-                        gradient: 'linear-gradient(135deg, #0891b2 0%, #0e7490 100%)',
-                        shadowColor: 'rgba(8, 145, 178, 0.32)',
+                        badgeBg: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#cffafe' : '#fef9c3',
+                        badgeColor: (hasConfiguredParentPin || studentUser?.has_personal_pin || studentUser?.is_pin_activated) ? '#0e7490' : '#854d0e',
+                        gradient: '#06b6d4',
                         icon: Lock
                       },
                       {
@@ -1383,11 +1377,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Mitteilungen & Alerts',
                         subtitle: pushEnabled ? 'Push-Mitteilungen aktiv' : 'Hausaufgaben, Stundenplan & Vertretungen',
                         badge: pushEnabled ? 'Aktiv' : 'Mitteilungen',
-                        badgeBg: pushEnabled ? '#f0fdf4' : '#fff7ed',
+                        badgeBg: pushEnabled ? '#dcfce7' : '#ffedd5',
                         badgeColor: pushEnabled ? '#15803d' : '#c2410c',
-                        badgeBorder: pushEnabled ? '#bbf7d0' : '#fed7aa',
-                        gradient: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-                        shadowColor: 'rgba(234, 88, 12, 0.32)',
+                        gradient: '#f97316',
                         icon: Bell
                       }
                     ].map((module) => {
@@ -1415,7 +1407,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             textAlign: 'center',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                            boxShadow: 'none',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                             position: 'relative',
                             touchAction: 'manipulation',
@@ -1432,9 +1424,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginBottom: '14px',
-                            boxShadow: `0 8px 20px -4px ${module.shadowColor}`
+                            boxShadow: 'none'
                           }}>
-                            <IconComp size={30} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+                            <IconComp size={30} color="#ffffff" />
                           </div>
                           <span style={{
                             fontSize: '0.68rem',
@@ -1443,7 +1435,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             borderRadius: '100px',
                             background: module.badgeBg,
                             color: module.badgeColor,
-                            border: `1px solid ${module.badgeBorder}`,
+                            border: 'none',
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1501,11 +1493,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Übe-Report & Streak',
                         subtitle: `${weeklyPracticeMinutes !== undefined ? weeklyPracticeMinutes : totalPracticeMinutes} Min. Übezeit diese Woche`,
                         badge: `${(studentUser?.current_streak || avatar?.streak_flame || 0) > 0 ? `${studentUser?.current_streak || avatar?.streak_flame || 0} Tage Serie` : '1 Tag Serie'}`,
-                        badgeBg: '#f0fdf4',
-                        badgeColor: '#15803d',
-                        badgeBorder: '#bbf7d0',
-                        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        shadowColor: 'rgba(16, 185, 129, 0.32)',
+                        badgeBg: '#d1fae5',
+                        badgeColor: '#047857',
+                        gradient: '#10b981',
                         icon: Clock
                       },
                       {
@@ -1515,11 +1505,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           ? `${studentCancellationsCount} eigene ${studentCancellationsCount === 1 ? 'Absage' : 'Absagen'}`
                           : 'Keine eigenen Absagen',
                         badge: studentCancellationsCount > 0 ? `${studentCancellationsCount} ${studentCancellationsCount === 1 ? 'Absage' : 'Absagen'}` : 'Regulär',
-                        badgeBg: studentCancellationsCount > 0 ? '#fef2f2' : '#f8fafc',
+                        badgeBg: studentCancellationsCount > 0 ? '#fee2e2' : '#f1f5f9',
                         badgeColor: studentCancellationsCount > 0 ? '#b91c1c' : '#475569',
-                        badgeBorder: studentCancellationsCount > 0 ? '#fecaca' : '#e2e8f0',
-                        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        shadowColor: 'rgba(245, 158, 11, 0.32)',
+                        gradient: '#f97316',
                         icon: CalendarX
                       },
                       {
@@ -1527,11 +1515,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Familie & Geschwister',
                         subtitle: familyProfiles.length > 1 ? `${familyProfiles.length} Profile verknüpft (1-Tap Wechsel)` : 'Geschwisterkinder & Geräte verwalten',
                         badge: familyProfiles.length > 1 ? `${familyProfiles.length} Kinder` : 'Multi-Profil',
-                        badgeBg: '#f0f9ff',
+                        badgeBg: '#e0f2fe',
                         badgeColor: '#0369a1',
-                        badgeBorder: '#bae6fd',
-                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                        shadowColor: 'rgba(2, 132, 199, 0.32)',
+                        gradient: '#0ea5e9',
                         icon: Users
                       },
                       {
@@ -1542,11 +1528,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         })(),
                         subtitle: 'Didaktisches Entwicklungsraster (5 Säulen)',
                         badge: '5 Säulen',
-                        badgeBg: '#fff1f2',
-                        badgeColor: '#be123c',
-                        badgeBorder: '#fecdd3',
-                        gradient: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                        shadowColor: 'rgba(225, 29, 72, 0.32)',
+                        badgeBg: '#fee2e2',
+                        badgeColor: '#b91c1c',
+                        gradient: '#ef4444',
                         icon: Sparkles
                       }
                     ].map((module) => {
@@ -1574,7 +1558,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             textAlign: 'center',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                            boxShadow: 'none',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                             position: 'relative',
                             touchAction: 'manipulation',
@@ -1591,9 +1575,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginBottom: '14px',
-                            boxShadow: `0 8px 20px -4px ${module.shadowColor}`
+                            boxShadow: 'none'
                           }}>
-                            <IconComp size={30} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+                            <IconComp size={30} color="#ffffff" />
                           </div>
                           <span style={{
                             fontSize: '0.68rem',
@@ -1602,7 +1586,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             borderRadius: '100px',
                             background: module.badgeBg,
                             color: module.badgeColor,
-                            border: `1px solid ${module.badgeBorder}`,
+                            border: 'none',
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1660,11 +1644,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Module & Studio',
                         subtitle: studentUser?.is_campus_active ? 'Campus-Studio & GrooveLab aktiv' : (currentPlatform === 'groovelab' ? 'GrooveLab aktiv' : 'Campus Studio freischalten'),
                         badge: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? 'Aktiv' : 'Schnuppern',
-                        badgeBg: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#fefce8' : '#fffbeb',
-                        badgeColor: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#854d0e' : '#b45309',
-                        badgeBorder: (studentUser?.is_campus_active || currentPlatform === 'groovelab') ? '#fef08a' : '#fde68a',
-                        gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                        shadowColor: 'rgba(234, 179, 8, 0.32)',
+                        badgeBg: '#fef9c3',
+                        badgeColor: '#854d0e',
+                        gradient: '#facc15',
                         icon: Zap
                       },
                       {
@@ -1672,11 +1654,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: isAdultStudent ? 'Vertrag & Belege' : ((studentUser as any)?.is_direct_billed ? 'Vertrag & Abrechnung' : 'Schullizenz & Bereitstellung'),
                         subtitle: (studentUser as any)?.is_direct_billed ? 'Jahresbeitrag & Zahlungsbelege' : '100% von Musikschule übernommen',
                         badge: (studentUser as any)?.is_direct_billed ? 'Direktabrechnung' : '100% Schullizenz',
-                        badgeBg: (studentUser as any)?.is_direct_billed ? '#eff6ff' : '#f0fdf4',
-                        badgeColor: (studentUser as any)?.is_direct_billed ? '#1e40af' : '#166534',
-                        badgeBorder: (studentUser as any)?.is_direct_billed ? '#bfdbfe' : '#bbf7d0',
-                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                        shadowColor: 'rgba(2, 132, 199, 0.32)',
+                        badgeBg: (studentUser as any)?.is_direct_billed ? '#dbeafe' : '#dcfce7',
+                        badgeColor: (studentUser as any)?.is_direct_billed ? '#1d4ed8' : '#15803d',
+                        gradient: '#0ea5e9',
                         icon: FileText
                       },
                       {
@@ -1684,11 +1664,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Datenschutz & Datentresor',
                         subtitle: 'Art. 15 Auskunft & Art. 20 Datenexport',
                         badge: 'DSGVO',
-                        badgeBg: '#ecfdf5',
+                        badgeBg: '#d1fae5',
                         badgeColor: '#047857',
-                        badgeBorder: '#a7f3d0',
-                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                        shadowColor: 'rgba(5, 150, 105, 0.32)',
+                        gradient: '#10b981',
                         icon: Download
                       },
                       {
@@ -1696,11 +1674,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         title: 'Bildnisschutz & Medienrechte',
                         subtitle: 'Zero-Photo-Doktrin & Art. 17 Löschrechte',
                         badge: 'KUG Schutz',
-                        badgeBg: '#ecfdf5',
+                        badgeBg: '#d1fae5',
                         badgeColor: '#047857',
-                        badgeBorder: '#a7f3d0',
-                        gradient: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                        shadowColor: 'rgba(5, 150, 105, 0.32)',
+                        gradient: '#10b981',
                         icon: ShieldCheck
                       }
                     ].map((module) => {
@@ -1728,7 +1704,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             textAlign: 'center',
                             cursor: 'pointer',
-                            boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                            boxShadow: 'none',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                             position: 'relative',
                             touchAction: 'manipulation',
@@ -1745,9 +1721,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             alignItems: 'center',
                             justifyContent: 'center',
                             marginBottom: '14px',
-                            boxShadow: `0 8px 20px -4px ${module.shadowColor}`
+                            boxShadow: 'none'
                           }}>
-                            <IconComp size={30} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+                            <IconComp size={30} color={module.id === 'modules' ? '#0f172a' : '#ffffff'} />
                           </div>
                           <span style={{
                             fontSize: '0.68rem',
@@ -1756,7 +1732,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             borderRadius: '100px',
                             background: module.badgeBg,
                             color: module.badgeColor,
-                            border: `1px solid ${module.badgeBorder}`,
+                            border: 'none',
                             marginBottom: '10px',
                             letterSpacing: '0.02em',
                             textTransform: 'uppercase'
@@ -1937,9 +1913,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                            boxShadow: 'none'
                           }}>
-                            <ModalIcon size={20} color="#ffffff" />
+                            <ModalIcon size={20} color={modalMeta.iconBg === '#facc15' ? '#0f172a' : '#ffffff'} />
                           </div>
                           <div>
                             <h3 id="student-settings-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1972,7 +1948,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                 whiteSpace: 'nowrap',
                                 flexShrink: 0,
                                 background: '#fef2f2',
-                                border: '1.5px solid #fecaca',
+                                border: 'none',
                                 borderRadius: '12px',
                                 padding: '8px 12px',
                                 minHeight: '44px',
@@ -2268,13 +2244,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             </div>
 
                             {pinFormError && (
-                              <div style={{ padding: '10px 14px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
+                              <div style={{ padding: '10px 14px', background: '#fee2e2', border: 'none', borderRadius: '12px', color: '#dc2626', fontSize: '0.8rem', fontWeight: 700 }}>
                                 {pinFormError}
                               </div>
                             )}
 
                             {pinFormSuccess && (
-                              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
+                              <div style={{ padding: '10px 14px', background: '#f0fdf4', border: 'none', borderRadius: '12px', color: '#166534', fontSize: '0.8rem', fontWeight: 700 }}>
                                 {pinFormSuccess}
                               </div>
                             )}
@@ -2718,7 +2694,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     width: '42px',
                                     height: '42px',
                                     borderRadius: '14px',
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    background: '#10b981',
                                     border: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2737,9 +2713,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                         fontWeight: 800,
                                         padding: '2px 8px',
                                         borderRadius: '100px',
-                                        background: hasDevicePasskey ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                                        background: hasDevicePasskey ? '#10b981' : '#f1f5f9',
                                         color: hasDevicePasskey ? '#ffffff' : '#64748b',
-                                        border: hasDevicePasskey ? 'none' : '1px solid #e2e8f0'
+                                        border: 'none'
                                       }}>
                                         {hasDevicePasskey ? 'Aktiv auf diesem Gerät' : 'Optional'}
                                       </span>
@@ -2757,8 +2733,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                   borderRadius: '12px',
                                   fontSize: '0.78rem',
                                   fontWeight: 700,
-                                  background: passkeyActionStatus === 'success' ? '#ecfdf5' : '#fee2e2',
-                                  border: passkeyActionStatus === 'success' ? '1px solid #10b981' : '1px solid #fca5a5',
+                                  background: passkeyActionStatus === 'success' ? '#d1fae5' : '#fee2e2',
+                                  border: 'none',
                                   color: passkeyActionStatus === 'success' ? '#047857' : '#dc2626'
                                 }}>
                                   {passkeyActionMessage}
@@ -2801,7 +2777,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     style={{
                                       padding: '10px 16px',
                                       borderRadius: '14px',
-                                      background: hasDevicePasskey ? '#f8fafc' : '#0284c7',
+                                      background: hasDevicePasskey ? '#f8fafc' : '#0ea5e9',
                                       color: hasDevicePasskey ? '#0f172a' : '#ffffff',
                                       border: hasDevicePasskey ? '1.5px solid #cbd5e1' : 'none',
                                       fontSize: '0.82rem',
@@ -2810,7 +2786,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '8px',
-                                      boxShadow: hasDevicePasskey ? 'none' : '0 2px 8px rgba(2, 132, 199, 0.25)',
+                                      boxShadow: 'none',
                                       transition: 'all 0.15s ease'
                                     }}
                                     className="hover-scale"
@@ -2849,7 +2825,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             <span>Datenschutz &amp; Datenminimierung</span>
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={750} /> folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
+                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#facc15" fontWeight={750} /> folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
                           </p>
                           <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
                             <li>Hosting zu 100 % in ISO/IEC 27001 zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Nürnberg/Falkenstein • 0 % US-Cloud).</li>
@@ -2861,7 +2837,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <FileText size={14} color="#0369a1" />
-                            <span><CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={850} /> Bereitstellung</span>
+                            <span><CampusGroovelabText campusColor="#34a853" groovelabColor="#facc15" fontWeight={850} /> Bereitstellung</span>
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
                             Die <CampusGroovelabText fontWeight={700} /> Software ist ohne gesonderte Lizenzkaufgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
@@ -2906,7 +2882,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         </div>
 
                         {/* Gesetzliche Vertragsbestätigung (§ 312f Abs. 2 BGB) */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px', padding: '16px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', border: 'none', borderRadius: '16px', padding: '16px 18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <ShieldCheck size={20} color="#15803d" style={{ flexShrink: 0 }} />
                             <div>
@@ -2961,7 +2937,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             <span>Impressum</span>
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.45, fontWeight: 550 }}>
-                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={800} /> • Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden<br />
+                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#facc15" fontWeight={800} /> • Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden<br />
                             E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (Antwort werktags &lt; 60 Min.)
                           </p>
                         </div>
@@ -3082,7 +3058,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     width: '64px',
                     height: '64px',
                     borderRadius: '22px',
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    background: '#0ea5e9',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -3103,8 +3079,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   {/* Monospace Key Display */}
                   <div style={{
                     width: '100%',
-                    background: '#ecfdf5',
-                    border: '2px dashed #10b981',
+                    background: '#d1fae5',
+                    border: 'none',
                     borderRadius: '18px',
                     padding: '16px 20px',
                     display: 'flex',
@@ -3114,7 +3090,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     boxSizing: 'border-box',
                     marginBottom: '16px'
                   }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       Master Recovery Key
                     </span>
                     <div style={{
@@ -3145,8 +3121,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       gap: '8px',
                       padding: '10px 18px',
                       borderRadius: '12px',
-                      border: '1.5px solid #cbd5e1',
-                      background: hasCopiedRecoveryKey ? '#f0fdf4' : '#ffffff',
+                      border: hasCopiedRecoveryKey ? 'none' : '1.5px solid #cbd5e1',
+                      background: hasCopiedRecoveryKey ? '#dcfce7' : '#ffffff',
                       color: hasCopiedRecoveryKey ? '#15803d' : '#334155',
                       fontSize: '0.82rem',
                       fontWeight: 800,
@@ -3194,7 +3170,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       touchAction: 'manipulation',
                       padding: '14px 20px',
                       borderRadius: '16px',
-                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                      background: '#0ea5e9',
                       color: '#ffffff',
                       border: 'none',
                       fontSize: '0.92rem',
@@ -3226,8 +3202,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 bottom: '24px',
                 right: '24px',
                 zIndex: 99999,
-                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: '#0f172a',
+                border: 'none',
                 borderRadius: '18px',
                 padding: '14px 20px',
                 boxShadow: '0 20px 40px -10px rgba(0,0,0,0.4)',

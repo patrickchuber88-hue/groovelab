@@ -90,7 +90,7 @@ export const SecretaryRoomCollisionAlertCard: React.FC<SecretaryRoomCollisionAle
           key={col.id}
           style={{
             background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-            border: '1.5px solid #fde68a',
+            border: 'none',
             borderRadius: '20px',
             padding: '12px 16px',
             display: 'flex',

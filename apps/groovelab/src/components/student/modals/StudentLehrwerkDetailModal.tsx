@@ -246,7 +246,7 @@ return (
                       </div>
 
                       <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: '#f1f5f9', overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.min(100, pctActive * 100)}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                        <div style={{ width: `${Math.min(100, pctActive * 100)}%`, height: '100%', background: '#34a853', borderRadius: '3px', transition: 'width 0.3s ease' }} />
                       </div>
 
                       <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
@@ -264,7 +264,7 @@ return (
                     }}
                     style={{
                       width: '100%',
-                      background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                      background: '#34a853',
                       color: '#ffffff',
                       border: 'none',
                       padding: '13px 18px',
@@ -372,7 +372,7 @@ return (
                                   handleTabChangeLocal('practice');
                                 }}
                                 style={{
-                                  background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                  background: '#34a853',
                                   color: '#ffffff',
                                   border: 'none',
                                   padding: '5px 12px',
@@ -397,7 +397,7 @@ return (
                           {page.notes && (
                             <div style={{
                               background: '#f0fdf4',
-                              border: '1px solid #dcfce7',
+                              border: 'none',
                               padding: '8px 12px',
                               borderRadius: '10px',
                               fontSize: '0.76rem',

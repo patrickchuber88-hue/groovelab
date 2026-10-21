@@ -33,6 +33,9 @@ export interface MicroScoreInstrumentVisualizerProps {
   clef?: 'treble' | 'bass' | 'percussion';
   onPlayPreviewPitch?: (pitch: string) => void;
   onInsertPitch?: (pitch: string, stringIndex?: number, fret?: number) => void;
+  isDrumColorGuide?: boolean;
+  onToggleDrumColorGuide?: () => void;
+  isSoloStage?: boolean;
   readOnly?: boolean;
 }
 
@@ -95,6 +98,9 @@ export const MicroScoreInstrumentVisualizer: React.FC<MicroScoreInstrumentVisual
   clef,
   onPlayPreviewPitch,
   onInsertPitch,
+  isDrumColorGuide,
+  onToggleDrumColorGuide,
+  isSoloStage = false,
   readOnly = false
 }) => {
   const normActive = useMemo(() => {
@@ -107,6 +113,7 @@ export const MicroScoreInstrumentVisualizer: React.FC<MicroScoreInstrumentVisual
       <MicroScorePianoFullWidth
         activePitches={activePitches}
         clef={clef}
+        isColorGuide={isDrumColorGuide}
         onPlayPreviewPitch={onPlayPreviewPitch}
         onInsertPitch={(p) => {
           if (!readOnly && onInsertPitch) onInsertPitch(p);
@@ -117,14 +124,15 @@ export const MicroScoreInstrumentVisualizer: React.FC<MicroScoreInstrumentVisual
   }
 
 
-  // 2. STREICH- & ZUPFINSTRUMENTE (Gitarre, E-Bass, Violine) - 0,1% Vollbreiten-Griffbrett
-  if (instrument === 'guitar' || instrument === 'bass' || instrument === 'strings') {
+  // 2. STREICH- & ZUPFINSTRUMENTE (Gitarre, E-Bass, Violine, Ukulele) - 0,1% Vollbreiten-Griffbrett
+  if (instrument === 'guitar' || instrument === 'bass' || instrument === 'strings' || instrument === 'ukulele') {
     return (
       <MicroScoreFretboardFullWidth
         instrument={instrument}
         activePitches={activePitches}
         activeNotes={activeNotes}
         clef={clef}
+        isColorGuide={isDrumColorGuide}
         onPlayPreviewPitch={onPlayPreviewPitch}
         onInsertPitch={onInsertPitch}
         readOnly={readOnly}
@@ -213,8 +221,13 @@ export const MicroScoreInstrumentVisualizer: React.FC<MicroScoreInstrumentVisual
         activePitches={activePitches}
         activeNotes={activeNotes}
         playheadPos={playheadPos}
+        isDrumColorGuide={isDrumColorGuide}
+        onToggleDrumColorGuide={onToggleDrumColorGuide}
+        isSoloStage={isSoloStage}
         onHit={(_padId, pitch) => {
-          if (onPlayPreviewPitch) {
+          if (!readOnly && onInsertPitch) {
+            onInsertPitch(pitch);
+          } else if (onPlayPreviewPitch) {
             onPlayPreviewPitch(pitch);
           }
         }}

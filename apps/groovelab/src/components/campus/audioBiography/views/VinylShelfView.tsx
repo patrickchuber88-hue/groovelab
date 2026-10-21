@@ -265,7 +265,7 @@ export const VinylShelfView: React.FC<VinylShelfViewProps> = ({
               top: '12px',
               right: '12px',
               background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: '1px solid #f59e0b',
+              border: 'none',
               borderRadius: '100px',
               padding: '3px 9px',
               display: 'flex',
@@ -349,11 +349,11 @@ export const VinylShelfView: React.FC<VinylShelfViewProps> = ({
               height: '120px',
               borderRadius: '50%',
               background: isAllMilestonesCompleted
-                ? 'radial-gradient(circle, #fef08a 0%, #eab308 40%, #ca8a04 75%, #713f12 100%)'
+                ? 'radial-gradient(circle, #fef08a 0%, #facc15 40%, #ca8a04 75%, #713f12 100%)'
                 : 'radial-gradient(circle, #1c1917 25%, #0c0a09 60%, #000000 100%)',
               border: isAllMilestonesCompleted ? '3.5px solid #ca8a04' : '3.5px solid #292524',
               boxShadow: isAllMilestonesCompleted
-                ? '0 0 28px rgba(234, 179, 8, 0.65)'
+                ? '0 0 28px rgba(250, 204, 21, 0.65)'
                 : isPlayingPlaylist || isPlayingABComparison
                 ? `0 0 28px ${currentShelfVibeObj.color}88`
                 : '0 10px 26px rgba(0, 0, 0, 0.65)',

@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { Drum } from 'lucide-react';
 import { MicroScoreInstrument } from './microScore.types';
 import { VDM_DRUM_PRESETS, VdmDrumPreset, QUICK_TITLE_CHIPS } from './vdmDrumPresets';
 
@@ -44,8 +45,15 @@ export const MicroScoreTemplateChipsBar: React.FC<MicroScoreTemplateChipsBarProp
       }}
       className="hide-scrollbar"
     >
-      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-        {isDrums ? '🥁 VdM Drum Vorlagen:' : 'Vorlagen:'}
+      <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        {isDrums ? (
+          <>
+            <Drum size={12} strokeWidth={2.2} />
+            <span>Drum-Vorlagen:</span>
+          </>
+        ) : (
+          'Vorlagen:'
+        )}
       </span>
       {isDrums ? (
         VDM_DRUM_PRESETS.map(preset => {
@@ -72,7 +80,7 @@ export const MicroScoreTemplateChipsBar: React.FC<MicroScoreTemplateChipsBarProp
                 transition: 'all 0.15s ease'
               }}
             >
-              <span>🥁</span>
+              <Drum size={11} strokeWidth={2.2} />
               <span>{preset.title.split(' (')[0]}</span>
               <span style={{ opacity: 0.65, fontSize: '0.60rem' }}>{preset.bpm} BPM</span>
             </button>

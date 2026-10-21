@@ -142,6 +142,13 @@ const proxyOptions: Options = {
   },
   onProxyReq: (proxyReq, req: any) => {
     proxyReq.setHeader('apikey', supabaseAnonKey);
+    // [P2-3] Never trust client-supplied CF-Connecting-IP (0% US-Cloud / anti-spoofing)
+    proxyReq.removeHeader('cf-connecting-ip');
+    const realIp = req.headers['x-real-ip'] || req.ip || req.socket?.remoteAddress;
+    if (realIp) {
+      proxyReq.setHeader('X-Real-IP', String(realIp));
+      proxyReq.setHeader('X-Forwarded-For', String(realIp));
+    }
     // The middleware attached the access token here
     const token = req.headers['x-bff-access-token'];
     if (token) {

@@ -164,9 +164,10 @@ async function performScrub(): Promise<ScrubResult> {
       // Non-blocking fallback
     }
 
-    // 5. Purge Ephemeral IndexedDB Stores (Audio Blobs, Vaults, Offline Notes)
+    // 5. Purge Ephemeral IndexedDB Stores (Audio Blobs, Vaults, Offline Notes, Key Wrapping Meta)
     const KNOWN_EPHEMERAL_DBS = [
       'CampusGroovelabOfflineAudioVault',
+      'CampusGroovelabVaultMeta',
       'CampusGroovelabBlobDB',
       'groovelab_audio_cache_db',
       'CampusGroovelabNotesDB',

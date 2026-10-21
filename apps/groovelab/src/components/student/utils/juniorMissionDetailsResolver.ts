@@ -12,6 +12,7 @@ export interface JuniorMissionDetails {
   carriedOverWeek?: string | null;
   books: any[];
   songs: any[];
+  microScores?: any[];
   audioTracks: any[];
 }
 
@@ -45,6 +46,7 @@ export function resolveJuniorMissionDetails({
   });
   const books = summary.formattedJuniorBooks;
   const songs = summary.otherActiveSongs;
+  const microScores = summary.microScores || [];
   const audioTracks = summary.audioTracks;
   const teacherNote = summary.specificTeacherNote || 'Spiele die ersten Takte ganz ruhig & entspannt!';
   const hasSpecificNote = Boolean(summary.specificTeacherNote);
@@ -113,6 +115,29 @@ export function resolveJuniorMissionDetails({
       carriedOverWeek,
       books: [],
       songs,
+      microScores,
+      audioTracks
+    };
+  }
+
+  if (microScores.length > 0) {
+    const ms0 = microScores[0];
+    const msTitle = ms0.title || 'Notenschnipsel';
+    const extraCount = microScores.length - 1;
+    const extraLabel = extraCount > 0 ? ` (+${extraCount})` : '';
+    return {
+      type: 'song',
+      title: `${msTitle}${extraLabel}`,
+      shortTitle: msTitle,
+      badge: `🎼 ${msTitle}${extraLabel}`,
+      teacherNote,
+      teacherNotes,
+      hasSpecificNote,
+      isCarriedOver,
+      carriedOverWeek,
+      books: [],
+      songs: [],
+      microScores,
       audioTracks
     };
   }

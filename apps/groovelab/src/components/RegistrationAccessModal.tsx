@@ -284,7 +284,7 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
                   borderRadius: '14px',
                   border: isLockedOut 
                     ? '1.5px solid #f97316' 
-                    : (error ? '1.5px solid #ef4444' : (isSuccess ? '1.5px solid #22c55e' : '1.5px solid #cbd5e1')),
+                    : (error ? '1.5px solid #ef4444' : (isSuccess ? '1.5px solid #34a853' : '1.5px solid #cbd5e1')),
                   background: isLockedOut ? '#fff7ed' : '#f8fafc',
                   fontSize: '0.95rem',
                   fontWeight: 600,
@@ -337,7 +337,7 @@ export const RegistrationAccessModal: React.FC<RegistrationAccessModalProps> = (
                 gap: '8px',
                 color: '#c2410c',
                 background: '#ffedd5',
-                border: '1px solid #fed7aa',
+                border: 'none',
                 padding: '8px 12px',
                 borderRadius: '10px',
                 fontSize: '0.78rem',

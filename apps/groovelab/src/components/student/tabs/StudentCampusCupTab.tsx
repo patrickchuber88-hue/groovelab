@@ -649,34 +649,20 @@ export const StudentCampusCupTab: React.FC<StudentCampusCupTabProps> = ({
                             let shadow = 'none';
 
                             if (minutes > 0) {
-                              if (minutes <= 15) {
-                                bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
-                                border = '1px solid #e6f4ea';
-                                labelColor = '#166534';
-                                textColor = '#166534';
-                                numColor = '#166534';
-                                shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
-                              } else if (minutes <= 60) {
-                                bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                                border = '1px solid #e6f4ea';
-                                labelColor = '#166534';
-                                textColor = '#166534';
-                                numColor = '#166534';
-                                shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
-                              } else if (minutes <= 180) {
-                                bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                                border = '1px solid #e6f4ea';
-                                labelColor = '#166534';
-                                textColor = '#166534';
-                                numColor = '#166534';
-                                shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
+                              if (minutes <= 180) {
+                                bg = '#dcfce7';
+                                border = 'none';
+                                labelColor = '#15803d';
+                                textColor = '#15803d';
+                                numColor = '#15803d';
+                                shadow = 'none';
                               } else {
-                                bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
-                                border = '1px solid #34a853';
+                                bg = '#34a853';
+                                border = 'none';
                                 labelColor = 'rgba(255, 255, 255, 0.9)';
                                 textColor = 'rgba(255, 255, 255, 0.95)';
                                 numColor = '#ffffff';
-                                shadow = '0 6px 15px rgba(52, 168, 83, 0.25)';
+                                shadow = 'none';
                               }
                             }
 
@@ -715,10 +701,10 @@ export const StudentCampusCupTab: React.FC<StudentCampusCupTabProps> = ({
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Heatmap:</span>
                           {[
                             { color: '#f8fafc', label: '0m', border: '#e2e8f0' },
-                            { color: '#e6f4ea', label: '<15m', border: '#e6f4ea' },
-                            { color: '#e6f4ea', label: '<1h', border: '#e6f4ea' },
-                            { color: '#e6f4ea', label: '<3h', border: '#e6f4ea' },
-                            { color: '#34a853', label: '3h+', border: '#34a853' }
+                            { color: '#dcfce7', label: '<15m', border: 'transparent' },
+                            { color: '#dcfce7', label: '<1h', border: 'transparent' },
+                            { color: '#dcfce7', label: '<3h', border: 'transparent' },
+                            { color: '#34a853', label: '3h+', border: 'transparent' }
                           ].map(pill => (
                             <div key={pill.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: pill.color, border: `1px solid ${pill.border}` }} />

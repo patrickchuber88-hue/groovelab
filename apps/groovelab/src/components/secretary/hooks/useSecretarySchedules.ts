@@ -241,7 +241,7 @@ export function useSecretarySchedules({
     const tId = plan.teacherId || '';
     const tName = (plan.teacherName || '').toLowerCase();
     const instr = (plan.instrument || '').toLowerCase();
-    return tId === 'groovelab' || tName.includes('groove lab') || tName.includes('groovelab') || instr.includes('plattform');
+    return tId === 'groovelab' || tName.includes('groove lab') || tName.includes('groovelab') || instr.includes('plattform') || instr.includes('bandunterricht');
   };
 
   const isGroovelabRoom = (room: any) => {
@@ -255,7 +255,11 @@ export function useSecretarySchedules({
   const runAutoRoomAllocation = () => {
     const activeRooms = rooms.filter(r => r.is_campus_active !== false);
     if (activeRooms.length === 0) {
-      alert('Keine aktiven Räume für die Autozuweisung vorhanden!');
+      setApprovalToast({
+        message: '⚠️ Keine aktiven Räume für die Autozuweisung vorhanden.',
+        type: 'error'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
       return;
     }
 
@@ -299,7 +303,11 @@ export function useSecretarySchedules({
 
     const unassignedPlans = matrixAllocations.filter(p => !p.roomId || conflictingPlanIds.has(p.id));
     if (unassignedPlans.length === 0) {
-      alert('Alle Einheiten haben bereits einen zugewiesenen Raum ohne Konflikte!');
+      setApprovalToast({
+        message: '✅ Alle Einheiten haben bereits einen zugewiesenen Raum ohne Zeitkonflikte!',
+        type: 'success'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
       return;
     }
 
@@ -514,13 +522,13 @@ export function useSecretarySchedules({
 
     const continuityPercentage = totalTeacherDaysCount > 0 ? Math.round((zeroSwitchCount / totalTeacherDaysCount) * 100) : 100;
 
-    alert(
-      `⚡ Smart Auto-Zuweisung abgeschlossen!\n\n` +
-      `• Erreichter Gesamt-Score: ${bestGlobalScore.toLocaleString()}\n` +
-      `• Zugewiesene Einheiten: ${newlyAssignedCount} von ${unassignedPlans.length}\n` +
-      `• Raumtreue (0 Raumwechsel am Tag): ${continuityPercentage}% der Lehrkräfte\n` +
-      (unassignedRemainingCount > 0 ? `⚠️ ${unassignedRemainingCount} Einheiten konnten wegen Raumkonflikten nicht platziert werden.` : `✅ Alle Einheiten optimal verteilt.`)
-    );
+    setApprovalToast({
+      message: unassignedRemainingCount > 0
+        ? `⚡ Auto-Zuweisung: ${newlyAssignedCount}/${unassignedPlans.length} verteilt (${continuityPercentage}% Raumtreue) · ⚠️ ${unassignedRemainingCount} offen wegen Zeitkonflikt`
+        : `⚡ Smart Auto-Zuweisung: ${newlyAssignedCount} Einheiten optimal verteilt (${continuityPercentage}% Raumtreue ohne Raumwechsel)`,
+      type: unassignedRemainingCount > 0 ? 'error' : 'success'
+    });
+    setTimeout(() => setApprovalToast(null), 5500);
   };
 
   // Bulk save and approve to database
@@ -1143,11 +1151,19 @@ export function useSecretarySchedules({
       }
 
       setSelectedDayPlan(null);
-      alert('Stundenplan erfolgreich zur Überarbeitung zurückgewiesen.');
+      setApprovalToast({
+        message: `↩ Stundenplan von ${plan.teacherName} zur Überarbeitung zurückgewiesen.`,
+        type: 'success'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
       fetchDashboardData();
     } catch (err: any) {
       console.error('Error rejecting plan:', err);
-      alert('Fehler: ' + err.message);
+      setApprovalToast({
+        message: '❌ Fehler: ' + err.message,
+        type: 'error'
+      });
+      setTimeout(() => setApprovalToast(null), 4000);
     }
   };
 
@@ -1215,7 +1231,11 @@ export function useSecretarySchedules({
     });
 
     setSelectedDayPlan(null);
-    alert(`Unterrichtsblock erfolgreich in 2 Teile aufgeteilt!`);
+    setApprovalToast({
+      message: '✂️ Unterrichtsblock erfolgreich an der Pause in 2 Teile aufgeteilt!',
+      type: 'success'
+    });
+    setTimeout(() => setApprovalToast(null), 4000);
   };
 
   const handleMergePlans = (splitPlan: any) => {
@@ -1278,18 +1298,25 @@ export function useSecretarySchedules({
     });
 
     setSelectedDayPlan(null);
-    alert(`Unterrichtsblöcke wieder erfolgreich zusammengefügt!`);
+    setApprovalToast({
+      message: '🔗 Unterrichtsblöcke wieder erfolgreich zusammengefügt!',
+      type: 'success'
+    });
+    setTimeout(() => setApprovalToast(null), 4000);
   };
 
   const getPlanDisplayName = (plan: any) => {
     if (!plan) return '';
+    const baseName = (plan.teacherId === 'groovelab' || (plan.teacherName || '').trim().toLowerCase() === 'groove lab')
+      ? 'GrooveLab'
+      : plan.teacherName;
     if (plan.id.includes('_split1')) {
-      return `${plan.teacherName} (Teil 1)`;
+      return `${baseName} (Teil 1)`;
     }
     if (plan.id.includes('_split2')) {
-      return `${plan.teacherName} (Teil 2)`;
+      return `${baseName} (Teil 2)`;
     }
-    return plan.teacherName;
+    return baseName;
   };
 
   const handleApproveSingleSchedule = async (scheduleId: string) => {
@@ -1415,7 +1442,11 @@ export function useSecretarySchedules({
           } catch { return []; }
         })();
         if (unsuitable.some((inst: string) => inst.toLowerCase() === plan.instrument?.toLowerCase())) {
-          alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${plan.instrument}".`);
+          setApprovalToast({
+            message: `⚠️ Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für "${plan.instrument}".`,
+            type: 'error'
+          });
+          setTimeout(() => setApprovalToast(null), 4000);
           setDraggedPlanId(null);
           setDraggedPlanDay(null);
           return;
@@ -1423,8 +1454,24 @@ export function useSecretarySchedules({
       }
     }
 
+    const glActiveRooms = rooms.filter(r => r.is_groovelab_active === true && r.is_campus_active !== false);
+    const isTargetGlRoom = targetRoomId ? glActiveRooms.some(r => r.id === targetRoomId) : false;
+
     setMatrixAllocations(prev => {
       const updated = prev.map(p => {
+        if (isGroovelab && p.teacherId === 'groovelab' && p.dayOfWeek === targetDay) {
+          if (!targetRoomId) {
+            // Unassign all coupled GrooveLab rooms for this day together
+            return { ...p, roomId: null };
+          }
+          if (isTargetGlRoom && glActiveRooms.length > 1 && p.id.startsWith(`groovelab_${targetDay}_`)) {
+            // Coupled lock: restore/lock each parallel GrooveLab room for this day
+            const embeddedRoomId = p.id.replace(`groovelab_${targetDay}_`, '');
+            if (glActiveRooms.some(r => r.id === embeddedRoomId)) {
+              return { ...p, roomId: embeddedRoomId };
+            }
+          }
+        }
         if (p.id === activePlanId) {
           return { ...p, roomId: targetRoomId };
         }

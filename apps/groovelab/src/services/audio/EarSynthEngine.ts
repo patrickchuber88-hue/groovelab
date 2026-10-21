@@ -10,8 +10,25 @@
  */
 
 import { StudioKeyboardEngine } from './StudioKeyboardEngine';
+import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
+import { MicroScoreAudioSynthesizer } from '../../components/student/meisterwerk/microscore/microScoreAudioSynthesizer';
+import { MicroScoreInstrument } from '../../components/student/meisterwerk/microscore/microScore.types';
 
-export type SoundEngineTimbre = 'rhodes' | 'grand_piano' | 'strings';
+export type SoundEngineTimbre = 
+  | 'rhodes' 
+  | 'grand_piano' 
+  | 'strings'
+  | 'guitar'
+  | 'ukulele'
+  | 'bass'
+  | 'recorder'
+  | 'flute'
+  | 'clarinet'
+  | 'altosax'
+  | 'trumpet'
+  | 'trombone'
+  | 'vocals';
+
 export type IntervalPlaybackMode = 'ascending' | 'descending' | 'harmonic';
 export type ChordPlaybackMode = 'block' | 'arpeggio_up' | 'arpeggio_down';
 
@@ -27,6 +44,7 @@ export class EarSynthEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private limiterNode: DynamicsCompressorNode | null = null;
+  private microScoreSynth: MicroScoreAudioSynthesizer | null = null;
   
   // Drone Sub-Graph
   private droneGain: GainNode | null = null;
@@ -37,19 +55,33 @@ export class EarSynthEngine {
   private currentDroneRootMidi: number = 48; // C3 default
   private cadenceTimeoutIds: any[] = [];
 
-  private activeTimbre: SoundEngineTimbre = 'rhodes';
+  private activeTimbre: SoundEngineTimbre = 'grand_piano';
 
   constructor() {
     // Lazy AudioContext initialization on first user interaction
+  }
+
+  /**
+   * 🏛️ 0,1% Goldstandard: Zugriff auf den Notenschnipsel-Synthesizer mit Master-Limiter-Routing
+   */
+  private getMicroScoreSynth(): MicroScoreAudioSynthesizer {
+    if (!this.microScoreSynth) {
+      this.microScoreSynth = new MicroScoreAudioSynthesizer();
+    }
+    const synth = this.microScoreSynth;
+    synth.init();
+    if (this.masterGain) {
+      synth.setOutputDestination(this.masterGain);
+    }
+    return synth;
   }
 
   public getContext(): AudioContext {
     if (typeof window === 'undefined') {
       throw new Error('EarSynthEngine requires a browser environment.');
     }
-    if (!this.ctx) {
-      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.ctx = new AudioCtxClass();
+    if (!this.ctx || this.ctx.state === 'closed') {
+      this.ctx = SharedAudioEngine.getContext();
       this.setupMasterChain();
     }
     if (this.ctx.state === 'suspended') {
@@ -78,6 +110,11 @@ export class EarSynthEngine {
 
     this.masterGain.connect(this.limiterNode);
     this.limiterNode.connect(this.ctx.destination);
+
+    // Bereits initialisierten Notenschnipsel-Synthesizer an Master-Limiter anbinden
+    if (this.microScoreSynth) {
+      this.microScoreSynth.setOutputDestination(this.masterGain);
+    }
   }
 
   public setTimbre(timbre: SoundEngineTimbre) {
@@ -128,51 +165,11 @@ export class EarSynthEngine {
         velocity,
         destination: this.masterGain
       });
-      // 🎻 0,1% Warme Streicher (3-stimmiges Ensemble mit Orchester-Chorus & Butterworth-Holzfilter)
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
-      const osc3 = ctx.createOscillator();
-      const filter = ctx.createBiquadFilter();
-      const voiceGain = ctx.createGain();
-
-      osc1.type = 'sawtooth';
-      osc1.frequency.setValueAtTime(freq, now);
-      osc1.detune.setValueAtTime(0, now);
-
-      osc2.type = 'sawtooth';
-      osc2.frequency.setValueAtTime(freq, now);
-      osc2.detune.setValueAtTime(3.8, now); // +3.8 Cent Schwebung (Geigen-Chorus)
-
-      osc3.type = 'triangle';
-      osc3.frequency.setValueAtTime(freq, now);
-      osc3.detune.setValueAtTime(-3.8, now); // -3.8 Cent Schwebung (Cello/Viola-Körper)
-
-      filter.type = 'lowpass';
-      const cutoff = Math.min(6500, Math.max(1800, freq * 4.2));
-      filter.frequency.setValueAtTime(cutoff, now);
-      filter.Q.setValueAtTime(0.707, now); // Butterworth Dämpfung ohne steile Synth-Resonanzspitze
-
-      const attack = 0.07; // 70ms weicher Bogenansatz
-      const release = 0.18; // 180ms samtiges Legato-Ausklingen
-      const noteEndTime = now + duration;
-
-      voiceGain.gain.setValueAtTime(0.0001, now);
-      voiceGain.gain.linearRampToValueAtTime(velocity * 0.55, now + attack);
-      voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0005, velocity * 0.42), noteEndTime);
-      voiceGain.gain.exponentialRampToValueAtTime(0.0001, noteEndTime + release);
-
-      osc1.connect(filter);
-      osc2.connect(filter);
-      osc3.connect(filter);
-      filter.connect(voiceGain);
-      voiceGain.connect(this.masterGain);
-
-      osc1.start(now);
-      osc2.start(now);
-      osc3.start(now);
-      osc1.stop(noteEndTime + release + 0.02);
-      osc2.stop(noteEndTime + release + 0.02);
-      osc3.stop(noteEndTime + release + 0.02);
+    } else {
+      // 🏛️ 0,1% Goldstandard: Instrumentensounds aus dem Mediathek-Board (MicroScoreAudioSynthesizer)
+      // Direkte Synthese auf physikalisch klingender Frequenz (Concert Pitch) für fehlerfreie Intonation
+      const synth = this.getMicroScoreSynth();
+      synth.playFrequencyAtTime(timbre as MicroScoreInstrument, freq, now, duration, velocity);
     }
   }
 
@@ -427,6 +424,7 @@ export class EarSynthEngine {
   public stopAll() {
     this.stopCadence();
     this.stopKeyCenterDrone();
+    this.microScoreSynth?.stopAll();
   }
 }
 

@@ -160,7 +160,7 @@ export const TariffBookingDetailDrawer: React.FC<TariffBookingDetailDrawerProps>
 
           {/* Reversal / Storno Information */}
           {selectedBookingForDrawer.reversal_of_receipt_number && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ background: '#fef2f2', border: 'none', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <strong style={{ fontSize: '0.78rem', color: '#991b1b' }}>GoBD-Generalumkehr:</strong>
               <span style={{ fontSize: '0.74rem', color: '#7f1d1d' }}>
                 Dieser Beleg storniert den Originalbeleg <strong>{selectedBookingForDrawer.reversal_of_receipt_number}</strong>.
@@ -169,7 +169,7 @@ export const TariffBookingDetailDrawer: React.FC<TariffBookingDetailDrawerProps>
           )}
 
           {revReceipt && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ background: '#fef2f2', border: 'none', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <strong style={{ fontSize: '0.78rem', color: '#991b1b' }}>Storniert im Journal:</strong>
               <span style={{ fontSize: '0.74rem', color: '#7f1d1d' }}>
                 Dieser Beleg wurde neutralisiert durch Stornobeleg <strong>{revReceipt.receipt_number}</strong> am {new Date(revReceipt.created_at).toLocaleDateString('de-DE')}.
@@ -212,7 +212,7 @@ export const TariffBookingDetailDrawer: React.FC<TariffBookingDetailDrawerProps>
             <button
               type="button"
               onClick={() => onStornoTrigger(selectedBookingForDrawer)}
-              style={{ padding: '9px 16px', borderRadius: '10px', background: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', fontWeight: 800, fontSize: '0.80rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: '9px 16px', borderRadius: '10px', background: '#fee2e2', border: 'none', color: '#dc2626', fontWeight: 800, fontSize: '0.80rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
               <RotateCcw size={13} />
               Stornobeleg erzeugen

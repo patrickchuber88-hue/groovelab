@@ -17,6 +17,14 @@
 import { WorldTourNote, WorldTourRepeatSection } from '../types/worldTour';
 import { acquireAudioStream } from '../services/audioPermissionService';
 
+export interface WorldTourCountInPhase {
+  phase: 1 | 2;
+  beatInPhase: number;
+  totalInPhase: number;
+  preCountBeats: number;
+  anacrusisLeadBeats: number;
+}
+
 export interface AudioNoteEvent {
   noteIndex: number;
   pitch: string;
@@ -189,6 +197,8 @@ export class WorldTourAudioEngine {
   private currentNoteIdx: number = 0;
   private countInRemaining: number = 4;
   private totalCountInBeats: number = 4;
+  private preCountBarBeats: number = 4;
+  private anacrusisLeadBeats: number = 0;
   private isCountingIn: boolean = true;
   private timeSignature: string = '4/4';
   private anacrusisBeats: number = 0;
@@ -226,7 +236,12 @@ export class WorldTourAudioEngine {
   private micStream: MediaStream | null = null;
   private analyser: AnalyserNode | null = null;
   private isListeningMic: boolean = false;
-  private onBeatUpdate?: (noteIndex: number, currentBeat?: number, totalBeats?: number) => void;
+  private onBeatUpdate?: (
+    noteIndex: number,
+    currentBeat?: number,
+    totalBeats?: number,
+    phaseInfo?: WorldTourCountInPhase
+  ) => void;
   private onNoteResult?: (event: AudioNoteEvent) => void;
   private onComplete?: () => void;
   private notes: WorldTourNote[] = [];
@@ -515,7 +530,7 @@ export class WorldTourAudioEngine {
     notes: WorldTourNote[],
     bpm: number,
     mode: 'listen' | 'practice' | 'challenge',
-    onBeatUpdate?: (noteIndex: number, currentBeat?: number, totalBeats?: number) => void,
+    onBeatUpdate?: (noteIndex: number, currentBeat?: number, totalBeats?: number, phaseInfo?: WorldTourCountInPhase) => void,
     onNoteResult?: (event: AudioNoteEvent) => void,
     onComplete?: () => void,
     options?: WorldTourPlaybackOptions
@@ -559,12 +574,17 @@ export class WorldTourAudioEngine {
     this.prevRms = 0;
     this.isCurrentNoteDrum = false;
 
-    // Dynamic count-in adapted to meter and anacrusis
+    // Dynamic count-in adapted to meter and anacrusis (2027 0,1% Goldstandard)
+    // Modell 1: Vollständiger Vorzähltakt (Phase 1) + Leerschläge des Auftakttakts (Phase 2)
     const fullBarBeats = WorldTourAudioEngine.parseBeatsPerMeasure(this.timeSignature);
-    const beatsCount = (anacrusis > 0 && anacrusis < fullBarBeats)
+    const anacrusisLead = (anacrusis > 0 && anacrusis < fullBarBeats)
       ? Math.round(fullBarBeats - anacrusis)
-      : fullBarBeats;
+      : 0;
 
+    const beatsCount = fullBarBeats + anacrusisLead;
+
+    this.preCountBarBeats = fullBarBeats;
+    this.anacrusisLeadBeats = anacrusisLead;
     this.totalCountInBeats = beatsCount;
     this.countInRemaining = beatsCount;
     this.isCountingIn = true;
@@ -598,7 +618,7 @@ export class WorldTourAudioEngine {
     notes: WorldTourNote[],
     bpm: number,
     mode: 'listen' | 'practice' | 'challenge',
-    onBeatUpdate?: (noteIndex: number, currentBeat?: number, totalBeats?: number) => void,
+    onBeatUpdate?: (noteIndex: number, currentBeat?: number, totalBeats?: number, phaseInfo?: WorldTourCountInPhase) => void,
     onNoteResult?: (event: AudioNoteEvent) => void,
     onComplete?: () => void,
     options?: WorldTourPlaybackOptions
@@ -627,19 +647,31 @@ export class WorldTourAudioEngine {
 
     while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
       if (this.isCountingIn) {
-        // Count-in beat
-        const isAccent = this.countInRemaining === this.totalCountInBeats;
+        // Count-in beat calculation
+        const countInBeat = this.totalCountInBeats - this.countInRemaining + 1;
+        
+        // High accent on beat 1 of Phase 1 (Pre-count bar) AND beat 1 of Phase 2 (Pickup bar)
+        const isAccent = (countInBeat === 1) || (this.anacrusisLeadBeats > 0 && countInBeat === this.preCountBarBeats + 1);
         this.scheduleWoodblockAtTime(this.nextNoteTime, isAccent);
         
-        const countInBeat = this.totalCountInBeats - this.countInRemaining + 1;
         const totalBeats = this.totalCountInBeats;
         const scheduledTime = this.nextNoteTime;
         
+        const phaseInfo: WorldTourCountInPhase | undefined = this.anacrusisLeadBeats > 0
+          ? {
+              phase: countInBeat <= this.preCountBarBeats ? 1 : 2,
+              beatInPhase: countInBeat <= this.preCountBarBeats ? countInBeat : (countInBeat - this.preCountBarBeats),
+              totalInPhase: countInBeat <= this.preCountBarBeats ? this.preCountBarBeats : this.anacrusisLeadBeats,
+              preCountBeats: this.preCountBarBeats,
+              anacrusisLeadBeats: this.anacrusisLeadBeats
+            }
+          : undefined;
+
         // Dispatch UI beat callback synchronized to time
         const delayMs = Math.max(0, (scheduledTime - this.ctx.currentTime) * 1000);
         this.scheduleTimeout(() => {
           if (this.isRunning && this.onBeatUpdate) {
-            this.onBeatUpdate(-1, countInBeat, totalBeats);
+            this.onBeatUpdate(-1, countInBeat, totalBeats, phaseInfo);
           }
         }, delayMs);
 

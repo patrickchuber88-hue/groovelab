@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
 import { MicroScoreStudioModal } from '../../student/meisterwerk/microscore/MicroScoreStudioModal';
-import { TeacherLibraryScoreSnippetsTab } from '../../teacher/mediathek/tabs/TeacherLibraryScoreSnippetsTab';
+import { TeacherLibraryScoreSnippetsTab, mapInstrumentToFilter } from '../../teacher/mediathek/tabs/TeacherLibraryScoreSnippetsTab';
 import { TeacherLibraryShareHomeworkModal } from '../../teacher/mediathek/TeacherLibraryShareHomeworkModal';
 import {
   fetchTeacherScoreSnippets,
@@ -28,6 +28,7 @@ export interface AdminMediathekScoreSnippetsProps {
   userId: string;
   schoolId?: string;
   students?: any[];
+  userInstrument?: string;
 }
 
 export const AdminMediathekScoreSnippets: React.FC<AdminMediathekScoreSnippetsProps> = ({
@@ -36,16 +37,26 @@ export const AdminMediathekScoreSnippets: React.FC<AdminMediathekScoreSnippetsPr
   songSearch,
   userId,
   schoolId,
-  students = []
+  students = [],
+  userInstrument
 }) => {
   const [snippets, setSnippets] = useState<MicroScoreSnippet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedInstrumentFilter, setSelectedInstrumentFilter] = useState('Alle');
+  const [selectedInstrumentFilter, setSelectedInstrumentFilter] = useState(() => mapInstrumentToFilter(userInstrument));
   const [resolvedStudents, setResolvedStudents] = useState<any[]>(students);
+
+  // Autoritativer Instrument-Fokus bei Prop-Änderung
+  useEffect(() => {
+    if (userInstrument) {
+      setSelectedInstrumentFilter(mapInstrumentToFilter(userInstrument));
+    }
+  }, [userInstrument]);
 
   // Homework Share & Studio Modal States
   const [sharingSnippet, setSharingSnippet] = useState<MicroScoreSnippet | null>(null);
   const [editingSnippet, setEditingSnippet] = useState<MicroScoreSnippet | null>(null);
+  const [editingSnippetList, setEditingSnippetList] = useState<MicroScoreSnippet[] | undefined>(undefined);
+  const [editingSnippetIndex, setEditingSnippetIndex] = useState<number | undefined>(undefined);
   const [isStudioOpen, setIsStudioOpen] = useState(false);
 
   // Hydrate students if not provided directly
@@ -96,8 +107,10 @@ export const AdminMediathekScoreSnippets: React.FC<AdminMediathekScoreSnippetsPr
     setSharingSnippet(snippet);
   };
 
-  const handleEdit = (snippet: MicroScoreSnippet) => {
+  const handleEdit = (snippet: MicroScoreSnippet, list?: MicroScoreSnippet[], idx?: number) => {
     setEditingSnippet(snippet);
+    setEditingSnippetList(list);
+    setEditingSnippetIndex(idx);
     setIsStudioOpen(true);
   };
 
@@ -136,7 +149,10 @@ export const AdminMediathekScoreSnippets: React.FC<AdminMediathekScoreSnippetsPr
         display: mediathekTab === 'notenschnipsel' ? 'flex' : 'none',
         flexDirection: 'column',
         gap: '16px',
-        width: '100%'
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflowX: 'hidden'
       }}
       className={`mediathek-col-card mediathek-col-notenschnipsel ${
         mediathekTab === 'notenschnipsel' ? 'mobile-active-card' : 'mobile-hidden-card'
@@ -173,8 +189,13 @@ export const AdminMediathekScoreSnippets: React.FC<AdminMediathekScoreSnippetsPr
           onClose={() => {
             setIsStudioOpen(false);
             setEditingSnippet(null);
+            setEditingSnippetList(undefined);
+            setEditingSnippetIndex(undefined);
           }}
           initialSnippet={editingSnippet}
+          snippetList={editingSnippetList}
+          initialSnippetIndex={editingSnippetIndex}
+          defaultInstrument={userInstrument || selectedInstrumentFilter}
           onSaveSnippet={handleStudioSave}
         />
       )}

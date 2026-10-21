@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode, Trophy, Copy, Check } from 'lucide-react';
+import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode, Trophy, Copy, Check, Printer } from 'lucide-react';
 import { formatSingleStudentAnonymized } from '../../../../utils/nameHelper';
 import { resolveUserCampusId } from '../../../../utils/campusIdHelper';
 
@@ -221,7 +221,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
                   style={{
                     background: '#e0f2fe',
                     color: '#0284c7',
-                    border: '1px solid #bae6fd',
+                    border: 'none',
                     fontSize: '0.7rem',
                     fontWeight: 800,
                     padding: '3px 9px',
@@ -341,7 +341,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
                 style={{
                   background: '#fef3c7',
                   color: '#92400e',
-                  border: '1px solid #fde68a',
+                  border: 'none',
                   padding: '3px 10px',
                   borderRadius: '100px',
                   fontSize: '0.72rem',
@@ -383,9 +383,9 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
             onClick={onOpenIDCard}
             aria-label="Schülerausweis drucken"
             style={{
-              background: '#ffffff',
+              background: 'rgba(234, 67, 53, 0.08)',
               color: '#ea4335',
-              border: '1.5px solid #ea4335',
+              border: 'none',
               borderRadius: '14px',
               padding: '8px 14px',
               fontSize: '0.78rem',
@@ -395,12 +395,12 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.15s',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+              boxShadow: 'none'
             }}
             className="hover-scale"
             title="Schülerausweis / Campus Pass drucken"
           >
-            <Award size={15} />
+            <Printer size={15} />
             <span>Ausweis drucken</span>
           </button>
         )}

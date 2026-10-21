@@ -13,6 +13,7 @@ export interface UseAdminSongsParams {
   admin: any;
   userId: string;
   activePlatform: string;
+  activeTab?: string;
   songs: any[];
   setSongs: React.Dispatch<React.SetStateAction<any[]>>;
 }
@@ -21,6 +22,7 @@ export function useAdminSongs({
   admin,
   userId,
   activePlatform,
+  activeTab,
   songs,
   setSongs
 }: UseAdminSongsParams) {
@@ -71,10 +73,13 @@ export function useAdminSongs({
   const [showTextbausteinModal, setShowTextbausteinModal] = useState(false);
   const [showTeacherToolsModal, setShowTeacherToolsModal] = useState(false);
 
+  const resolvedSchoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id) || '';
+  const hydratedLehrwerkeRef = useRef<string>('');
+
   // 📚 Autoritativer Lehrwerk-Fetch (100% DSGVO & UrhDaG § 1 Abs. 2)
   const fetchLehrwerke = useCallback(async () => {
     try {
-      const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id);
+      const schoolId = resolvedSchoolId;
       let query = supabase.from('lehrwerke').select('*');
       if (schoolId && isUUID(schoolId)) {
         query = query.or(`school_id.eq.${schoolId},school_id.is.null`);
@@ -109,14 +114,14 @@ export function useAdminSongs({
     } catch (err) {
       console.warn('[useAdminSongs] Error loading lehrwerke:', err);
     }
-  }, [admin]);
+  }, [resolvedSchoolId]);
 
   // 📝 Schnelltext / Textbausteine Hydration & Resiliente Fallback-Kette
   const isInitialTbLoad = useRef(true);
   const fetchTextbausteine = useCallback(() => {
-    const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id) || 'global';
+    const schoolId = resolvedSchoolId || 'global';
     setTextbausteine(fetchSchoolTextbausteine(schoolId));
-  }, [admin]);
+  }, [resolvedSchoolId]);
 
   // 💾 Automatischer LocalStorage-Sync bei Modifikationen (Writeback)
   useEffect(() => {
@@ -124,16 +129,21 @@ export function useAdminSongs({
       isInitialTbLoad.current = false;
       return;
     }
-    const schoolId = admin?.school_id || (Array.isArray(admin?.schools) ? admin?.schools[0]?.id : admin?.schools?.id) || 'global';
+    const schoolId = resolvedSchoolId || 'global';
     if (textbausteine && textbausteine.length > 0) {
       saveSchoolTextbausteine(schoolId, textbausteine);
     }
-  }, [textbausteine, admin]);
+  }, [textbausteine, resolvedSchoolId]);
 
   useEffect(() => {
+    const isSongsTabActive = !activeTab || activeTab === 'songs' || activeTab === 'mediathek' || activeTab === 'bands';
+    if (!isSongsTabActive) return;
+    const cacheKey = resolvedSchoolId || 'global';
+    if (hydratedLehrwerkeRef.current === cacheKey) return;
+    hydratedLehrwerkeRef.current = cacheKey;
     fetchLehrwerke();
     fetchTextbausteine();
-  }, [fetchLehrwerke, fetchTextbausteine]);
+  }, [activeTab, resolvedSchoolId, fetchLehrwerke, fetchTextbausteine]);
 
   // 🛡️ 0,1% Goldstandard Healing: Bestehende Schul-Songs ohne Campus-Aktivierung für Campus autorisieren
   const hasHealedCampusSongs = useRef(false);

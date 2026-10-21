@@ -307,6 +307,7 @@ export const AdminModalsMasterHub: React.FC<AdminModalsMasterHubProps> = ({
             uiLevel={selectedStudentForTageskompass.campus_ui_level || undefined}
             parentPermissions={selectedStudentForTageskompass.parent_permissions}
             hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
+            isTeacherTools={true}
             onProfileClick={(student) => {
               setShowTageskompassModal(false);
               setSelectedStudentForTageskompass(null);

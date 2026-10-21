@@ -12,7 +12,7 @@
 | **Verantwortliche Stelle (Schulträger)** | [NAME DER MUSIKSCHULE / STÄDTISCHER SCHULTRÄGER]<br>Anschrift: [STRASSE, PLZ, ORT]<br>Vertreten durch: [NAME SCHULLEITUNG / BÜRGERMEISTER]<br>E-Mail: [OFFIZIELLE E-MAIL-ADRESSE DER SCHULE] |
 | **Behördlicher Datenschutzbeauftragter (bDSB)** | [NAME DES BEHÖRDLICHEN DATENSCHUTZBEAUFTRAGTEN DER STADTVERWALTUNG]<br>Dienststelle: [STADTVERWALTUNG / AMT FÜR DATENSCHUTZ]<br>E-Mail: [DSB-EMAIL@STADT.DE] |
 | **Auftragsverarbeiter (Art. 28 DSGVO)** | **Patrick Huber Softwareentwicklung & Cloud-Dienstleistungen**<br>Plattform: Campus-Groovelab (https://campus-groovelab.de)<br>Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (Baden)<br>E-Mail: `kontakt@campus-groovelab.de` |
-| **Rechenzentrums-Subunternehmer** | **Hetzner Online GmbH**, Industriestr. 25, 91710 Gunzenhausen<br>Rechenzentrumsstandort: Falkenstein/Vogtland & Nürnberg (Bundesrepublik Deutschland)<br>Zertifizierung: ISO/IEC 27001 (Informationssicherheits-Managementsystem) |
+| **Rechenzentrums-Subunternehmer** | **IONOS SE**, Elgendorfer Str. 57, 56410 Montabaur (Primärer Produktionscluster `85.215.73.216`, Standorte Berlin/Frankfurt, ISO/IEC 27001)<br>**Hetzner Online GmbH**, Industriestr. 25, 91710 Gunzenhausen (Georedundantes Backup & Storage Box, Standorte Falkenstein/Vogtland & Nürnberg, ISO/IEC 27001) |
 
 ---
 

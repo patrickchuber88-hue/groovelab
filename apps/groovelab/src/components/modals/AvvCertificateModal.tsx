@@ -252,7 +252,7 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
                   display: 'inline-block',
                   background: '#ecfdf5',
                   color: '#065f46',
-                  border: '1px solid #a7f3d0',
+                  border: 'none',
                   padding: '3px 10px',
                   borderRadius: '100px',
                   fontSize: '0.70rem',
@@ -295,7 +295,7 @@ export const AvvCertificateModal: React.FC<AvvCertificateModalProps> = ({
             {/* Seal Box */}
             <div style={{
               background: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              border: 'none',
               borderRadius: '12px',
               padding: '14px',
               display: 'flex',

@@ -106,7 +106,7 @@ export const CURATED_ICONS = [
 export const CURATED_COLORS = [
   { id: '#15803d', name: 'Campus-Grün', border: '#166534' },
   { id: '#2563eb', name: 'Studio-Blau', border: '#1d4ed8' },
-  { id: '#eab308', name: 'Groove-Gold', border: '#ca8a04' },
+  { id: '#facc15', name: 'Groove-Gold', border: 'none' },
   { id: '#ea580c', name: 'Sunset-Orange', border: '#c2410c' },
   { id: '#7c3aed', name: 'Jazz-Violett', border: '#6d28d9' },
   { id: '#e11d48', name: 'Crimson-Rose', border: '#be123c' },
@@ -427,7 +427,7 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
           {errorMessage && (
             <div style={{
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               color: '#dc2626',
               borderRadius: '12px',
               padding: '12px 16px',
@@ -462,7 +462,7 @@ export const CampusCreateGroupModal: React.FC<CampusCreateGroupModalProps> = ({
                           alignItems: 'center',
                           gap: '6px',
                           background: '#e6f4ea',
-                          border: '1px solid #bbf7d0',
+                          border: 'none',
                           borderRadius: '100px',
                           padding: '4px 10px 4px 6px',
                           flexShrink: 0

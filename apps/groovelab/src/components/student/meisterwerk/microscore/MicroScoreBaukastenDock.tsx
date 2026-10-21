@@ -14,7 +14,7 @@
  */
 
 import React, { useState } from 'react';
-import { Undo2, Delete, ArrowRight, Music, Layers, Sparkles } from 'lucide-react';
+import { Undo2, Delete, Music, Layers, RotateCcw } from 'lucide-react';
 import { MicroScoreDuration, MicroScoreInstrument } from './microScore.types';
 import { NoteDurationIcon } from './NoteDurationIcon';
 import { getInstrumentTheme } from './MicroScorePlayerBar';
@@ -32,12 +32,16 @@ export interface MicroScoreBaukastenDockProps {
   onInsertRest: () => void;
   onUndo: () => void;
   canUndo: boolean;
+  onClearAll?: () => void;
+  hasNotes?: boolean;
   onDeleteNote: () => void;
   onAdvanceCursor?: () => void;
+  activeStepBadge?: string;
 
   // 2. Tonhöhen (C D E F G A H) & Akkorde
   onInsertPitch: (pitch: string) => void;
   onInsertPitchStack?: (pitch: string) => void;
+  onInsertDrumCombo?: (pitches: string[]) => void;
   defaultOctave?: number;
 
   // Vorzeichen
@@ -75,15 +79,22 @@ const CADENCE_STUFEN = [
 ];
 
 const DRUM_DOCK_PADS = [
-  { id: 'kick', name: 'Bass Drum', key: 'Space', pitch: 'F4', color: '#8b5cf6', icon: '🥁' },
-  { id: 'snare', name: 'Snare', key: 'F / J', pitch: 'C5', color: '#ec4899', icon: '🎯' },
-  { id: 'hihat', name: 'Hi-Hat', key: 'D', pitch: 'G5', color: '#3b82f6', icon: '🔔' },
-  { id: 'hihat_open', name: 'Hi-Hat Offen', key: 'K', pitch: 'G#5', color: '#06b6d4', icon: '✨' },
-  { id: 'crash', name: 'Crash', key: 'E', pitch: 'A5', color: '#f59e0b', icon: '💥' },
-  { id: 'ride', name: 'Ride', key: 'I', pitch: 'F5', color: '#10b981', icon: '💫' },
-  { id: 'tom_hi', name: 'High Tom', key: 'G', pitch: 'E5', color: '#6366f1', icon: '🪘' },
-  { id: 'tom_mid', name: 'Mid Tom', key: 'H', pitch: 'D5', color: '#8b5cf6', icon: '🪘' },
-  { id: 'tom_floor', name: 'Floor Tom', key: 'B', pitch: 'A4', color: '#a855f7', icon: '🪘' }
+  { id: 'kick', name: 'Bass Drum', shortLabel: 'Kick', key: 'V / N', pitch: 'F4', color: '#7c3aed', voice: '↓ Fuß' },
+  { id: 'hh_foot', name: 'Pedal Hi-Hat', shortLabel: 'HH-Fuß', key: 'C', pitch: 'D3', color: '#0891b2', voice: '↓ Fuß' },
+  { id: 'hihat', name: 'Hi-Hat (Geschlossen)', shortLabel: 'HH zu', key: 'D', pitch: 'G5', color: '#0891b2', voice: '↑ Hand' },
+  { id: 'hihat_open', name: 'Hi-Hat (Offen)', shortLabel: 'HH auf', key: 'K', pitch: 'G#5', color: '#0891b2', voice: '↑ Hand' },
+  { id: 'snare', name: 'Snare Drum', shortLabel: 'Snare', key: 'F / J', pitch: 'C5', color: '#dc2626', voice: '↑ Hand' },
+  { id: 'tom_hi', name: 'High Tom', shortLabel: 'High Tom', key: 'G', pitch: 'E5', color: '#16a34a', voice: '↑ Hand' },
+  { id: 'tom_mid', name: 'Mid Tom', shortLabel: 'Mid Tom', key: 'H', pitch: 'D5', color: '#d97706', voice: '↑ Hand' },
+  { id: 'tom_floor', name: 'Standtom (Floor Tom)', shortLabel: 'Standtom', key: 'B', pitch: 'A4', color: '#2563eb', voice: '↑ Hand' },
+  { id: 'crash', name: 'Crash-Becken', shortLabel: 'Crash', key: 'E', pitch: 'A5', color: '#ea580c', voice: '↑ Hand' },
+  { id: 'ride', name: 'Ride-Becken', shortLabel: 'Ride', key: 'I', pitch: 'F5', color: '#c026d3', voice: '↑ Hand' }
+];
+
+const DRUM_COMBO_PADS = [
+  { id: 'kick_hh', label: 'Kick + HH', title: 'Simultan: Bass Drum (F4 ↓) + geschlossene Hi-Hat (G5 ↑)', pitches: ['F4', 'G5'] },
+  { id: 'snare_hh', label: 'Snare + HH', title: 'Simultan: Snare Backbeat (C5 ↑) + geschlossene Hi-Hat (G5 ↑)', pitches: ['C5', 'G5'] },
+  { id: 'kick_crash', label: 'Kick + Crash', title: 'Simultan: Bass Drum (F4 ↓) + Crash-Akzent (A5 ↑)', pitches: ['F4', 'A5'] }
 ];
 
 export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = ({
@@ -96,10 +107,13 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
   onInsertRest,
   onUndo,
   canUndo,
+  onClearAll,
+  hasNotes = false,
   onDeleteNote,
-  onAdvanceCursor,
+  activeStepBadge,
   onInsertPitch,
   onInsertPitchStack,
+  onInsertDrumCombo,
   defaultOctave = 4,
   activeAccidental = null,
   onToggleAccidental,
@@ -114,6 +128,13 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
   const [octave, setOctave] = useState<number>(defaultOctave);
   const [isSharp, setIsSharp] = useState(false);
   const [chordSubMode, setChordSubMode] = useState<'cadence' | 'stack'>('cadence');
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  React.useEffect(() => {
+    if (!confirmClear) return;
+    const t = setTimeout(() => setConfirmClear(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirmClear]);
 
   const durationItems: Array<{ dur: MicroScoreDuration; title: string; beats: string; dottedBeats: string }> = [
     { dur: '1', title: 'Ganze', beats: '4 Schl.', dottedBeats: '6 Schl.' },
@@ -206,20 +227,21 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                   style={{
                     border: 'none',
                     background: isSelected ? theme.primary : 'transparent',
-                    color: isSelected ? '#ffffff' : '#475569',
-                    borderRadius: '6px',
-                    padding: '4px 8px',
+                    color: isSelected ? '#ffffff' : '#334155',
+                    borderRadius: '7px',
+                    padding: '5px 11px',
+                    height: '32px',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '5px',
                     cursor: readOnly ? 'default' : 'pointer',
                     transition: 'all 0.1s ease',
                     boxShadow: isSelected ? `0 2px 8px ${theme.glow}` : 'none'
                   }}
                   className="hover-scale-mini"
                 >
-                  <NoteDurationIcon duration={item.dur} size={14} color={isSelected ? '#ffffff' : '#475569'} />
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800 }}>
+                  <NoteDurationIcon duration={item.dur} size={15} color={isSelected ? '#ffffff' : '#334155'} />
+                  <span style={{ fontSize: '0.74rem', fontWeight: isSelected ? 900 : 800 }}>
                     {item.title}{isSelected && isDotted ? ' •' : ''}
                   </span>
                 </button>
@@ -285,16 +307,40 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
               </button>
             )}
           </div>
+
+          {/* 🧲 Live-Anzeige des aktiven magnetischen Raster-Platzhalters */}
+          {activeStepBadge && (
+            <span
+              style={{
+                marginLeft: '4px',
+                padding: '3px 9px',
+                borderRadius: '99px',
+                background: '#eef2ff',
+                border: '1px solid #c7d2fe',
+                color: '#4338ca',
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Aktiver Raster-Platzhalter für die nächste Note"
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', display: 'inline-block' }} />
+              <span>{activeStepBadge}</span>
+            </span>
+          )}
         </div>
 
-        {/* Rechte Seite: Pause, Undo, Löschen, Weiter */}
+        {/* Rechte Seite: Pause, Löschen (Smart-Backspace), Undo & Leeren */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Prominenter 1-Tap Pausen-Button passend zum Notenwert */}
           <button
             type="button"
             onClick={onInsertRest}
             disabled={readOnly}
-            title={`Pause passend zur gewählten Dauer (${activeBeatLabel}) einfügen (Taste R oder Leertaste)`}
+            title={`Pause passend zur gewählten Dauer (${activeBeatLabel}) einfügen (Taste R)`}
             aria-label={`Pause einfügen (${activeBeatLabel})`}
             style={{
               border: '1px solid #cbd5e1',
@@ -317,40 +363,12 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
             <span>Pause{isDotted ? ' •' : ''}</span>
           </button>
 
-          {/* Undo Button */}
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={!canUndo || readOnly}
-            title="Rückgängig (Backspace)"
-            aria-label="Letzten Schritt rückgängig machen"
-            style={{
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: canUndo ? '#0f172a' : '#94a3b8',
-              borderRadius: '8px',
-              padding: '4px 9px',
-              height: '30px',
-              fontSize: '0.74rem',
-              fontWeight: 800,
-              cursor: canUndo && !readOnly ? 'pointer' : 'default',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-            }}
-            className="hover-scale-mini"
-          >
-            <Undo2 size={13} color={canUndo ? '#0f172a' : '#94a3b8'} />
-            <span>Undo</span>
-          </button>
-
-          {/* Löschen Button */}
+          {/* Löschen Button (Smart-Backspace: löscht rückwärts die letzte Note) */}
           <button
             type="button"
             onClick={onDeleteNote}
             disabled={readOnly}
-            title="Note an Cursor-Position löschen (Taste ⌫ oder Entf)"
+            title="Letzte Note löschen (Taste ⌫ Backspace)"
             aria-label="Note löschen"
             style={{
               border: '1px solid #cbd5e1',
@@ -373,34 +391,73 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
             <span>Löschen</span>
           </button>
 
-          {/* Weiter Button */}
-          {onAdvanceCursor && (
-            <button
-              type="button"
-              onClick={onAdvanceCursor}
-              disabled={readOnly}
-              title={`Cursor zur nächsten Zählzeit weiterrücken (+${activeBeatLabel}, Pfeiltaste →)`}
-              aria-label="Cursor weiterrücken"
-              style={{
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                borderRadius: '8px',
-                padding: '4px 9px',
-                height: '30px',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                cursor: readOnly ? 'default' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}
-              className="hover-scale-mini"
-            >
-              <span>Weiter</span>
-              <ArrowRight size={13} color="#0f172a" />
-            </button>
+          {/* Undo Button */}
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo || readOnly}
+            title="Rückgängig"
+            aria-label="Letzten Schritt rückgängig machen"
+            style={{
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: canUndo ? '#0f172a' : '#94a3b8',
+              borderRadius: '8px',
+              padding: '4px 9px',
+              height: '30px',
+              fontSize: '0.74rem',
+              fontWeight: 800,
+              cursor: canUndo && !readOnly ? 'pointer' : 'default',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            }}
+            className="hover-scale-mini"
+          >
+            <Undo2 size={13} color={canUndo ? '#0f172a' : '#94a3b8'} />
+            <span>Undo</span>
+          </button>
+
+          {/* Alles leeren (2-Stufen Sicherheits-Reset gegen versehentliches Löschen) */}
+          {onClearAll && (
+            <>
+              <span style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 2px' }} />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!hasNotes || readOnly) return;
+                  if (confirmClear) {
+                    setConfirmClear(false);
+                    onClearAll();
+                  } else {
+                    setConfirmClear(true);
+                  }
+                }}
+                disabled={!hasNotes || readOnly}
+                title={confirmClear ? 'Jetzt nochmals klicken, um wirklich alle Noten zu löschen' : 'Alle Noten löschen (2-Klick-Schutz)'}
+                aria-label={confirmClear ? 'Alle Noten unwiderruflich leeren bestätigen' : 'Alle Noten leeren'}
+                style={{
+                  border: confirmClear ? '1px solid #dc2626' : '1px solid #e2e8f0',
+                  background: confirmClear ? '#dc2626' : 'transparent',
+                  color: confirmClear ? '#ffffff' : hasNotes ? '#64748b' : '#cbd5e1',
+                  borderRadius: '8px',
+                  padding: confirmClear ? '4px 10px' : '4px 8px',
+                  height: '30px',
+                  fontSize: '0.70rem',
+                  fontWeight: 800,
+                  cursor: hasNotes && !readOnly ? 'pointer' : 'default',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+              >
+                <RotateCcw size={12} color={confirmClear ? '#ffffff' : hasNotes ? '#64748b' : '#cbd5e1'} />
+                <span>{confirmClear ? 'Wirklich leeren?' : 'Leeren'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -426,7 +483,7 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
           </span>
 
           {instrument === 'drums' ? (
-            /* 🥁 Schlagzeug-Pads (PAS Standard: F4 Kick, C5 Snare, G5 Hi-Hat, etc.) */
+            /* 🥁 Schlagzeug-Pads (PAS Standard: Füße ↓ & Hände ↑ klar getrennt, 0% Emoji-Clutter) */
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, overflowX: 'auto' }}>
               {DRUM_DOCK_PADS.map(pad => (
                 <button
@@ -441,12 +498,12 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                     }
                   }}
                   disabled={readOnly}
-                  title={`${pad.name} (PAS: ${pad.pitch}, Taste: ${pad.key})`}
+                  title={`${pad.name} (${pad.voice} • PAS: ${pad.pitch} • Taste: ${pad.key})`}
                   aria-label={`${pad.name} ${pad.key}`}
                   style={{
                     flex: 1,
-                    height: '38px',
-                    minWidth: '42px',
+                    height: '40px',
+                    minWidth: '54px',
                     border: '1px solid #cbd5e1',
                     borderBottom: `3.5px solid ${pad.color}`,
                     background: '#ffffff',
@@ -459,15 +516,21 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                     cursor: readOnly ? 'default' : 'pointer',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                     transition: 'transform 0.08s ease, background 0.08s ease',
-                    padding: '2px 4px'
+                    padding: '2px 5px',
+                    gap: '1px'
                   }}
                   className="hover-scale-mini active-press"
                 >
-                  <span style={{ fontSize: '0.60rem', fontWeight: 800, color: '#64748b', lineHeight: 1 }}>
-                    {pad.key}
-                  </span>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.1, whiteSpace: 'nowrap' }}>
-                    {pad.icon} {pad.name.split(' ')[0]}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1 }}>
+                    <span style={{ fontSize: '0.56rem', fontWeight: 900, color: pad.color }}>
+                      {pad.voice}
+                    </span>
+                    <span style={{ fontSize: '0.56rem', fontWeight: 800, color: '#64748b' }}>
+                      [{pad.key}]
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.73rem', fontWeight: 900, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+                    {pad.shortLabel}
                   </span>
                 </button>
               ))}
@@ -562,57 +625,91 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
         {/* Rechter Bereich: Vorzeichen, Akkord-Umschalter & Oktave (Drums: Einzeln vs Simultan) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {instrument === 'drums' ? (
-            <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (isChordMode && onToggleChordMode) onToggleChordMode();
-                  setChordSubMode('cadence');
-                }}
-                title="Einzelnoten mit Auto-Advance"
-                aria-pressed={!isChordMode && chordSubMode !== 'stack'}
-                style={{
-                  border: 'none',
-                  background: (!isChordMode && chordSubMode !== 'stack') ? theme.primary : 'transparent',
-                  color: (!isChordMode && chordSubMode !== 'stack') ? '#ffffff' : '#475569',
-                  borderRadius: '5px',
-                  padding: '3px 8px',
-                  fontSize: '0.70rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                Einzeln
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isChordMode && onToggleChordMode) onToggleChordMode();
-                  setChordSubMode('stack');
-                }}
-                title="Simultananschlag: Töne schichten (z. B. Kick + Hi-Hat gleichzeitig)"
-                aria-pressed={isChordMode || chordSubMode === 'stack'}
-                style={{
-                  border: 'none',
-                  background: (isChordMode || chordSubMode === 'stack') ? theme.primary : 'transparent',
-                  color: (isChordMode || chordSubMode === 'stack') ? '#ffffff' : '#475569',
-                  borderRadius: '5px',
-                  padding: '3px 8px',
-                  fontSize: '0.70rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <Layers size={11} />
-                <span>Simultan</span>
-              </button>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              {/* 1-Tap Groove-Kombis (Füße + Hände simultan setzen) */}
+              {onInsertDrumCombo && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: '#f1f5f9', padding: '2px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {DRUM_COMBO_PADS.map(combo => (
+                    <button
+                      key={combo.id}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => onInsertDrumCombo(combo.pitches)}
+                      title={combo.title}
+                      style={{
+                        border: 'none',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        borderRadius: '6px',
+                        padding: '4px 7px',
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        cursor: readOnly ? 'default' : 'pointer',
+                        boxShadow: '0 1px 2px rgba(15,23,42,0.06)',
+                        whiteSpace: 'nowrap'
+                      }}
+                      className="hover-scale-mini active-press"
+                    >
+                      {combo.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isChordMode && onToggleChordMode) onToggleChordMode();
+                    setChordSubMode('cadence');
+                  }}
+                  title="Einzelnoten mit Auto-Advance"
+                  aria-pressed={!isChordMode && chordSubMode !== 'stack'}
+                  style={{
+                    border: 'none',
+                    background: (!isChordMode && chordSubMode !== 'stack') ? '#ffffff' : 'transparent',
+                    color: (!isChordMode && chordSubMode !== 'stack') ? '#0f172a' : '#475569',
+                    borderRadius: '5px',
+                    padding: '3px 8px',
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    boxShadow: (!isChordMode && chordSubMode !== 'stack') ? '0 1px 3px rgba(15,23,42,0.12)' : 'none'
+                  }}
+                >
+                  Einzeln
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isChordMode && onToggleChordMode) onToggleChordMode();
+                    setChordSubMode('stack');
+                  }}
+                  title="Simultananschlag: Töne frei schichten (z. B. Kick + Hi-Hat gleichzeitig)"
+                  aria-pressed={isChordMode || chordSubMode === 'stack'}
+                  style={{
+                    border: 'none',
+                    background: (isChordMode || chordSubMode === 'stack') ? '#ffffff' : 'transparent',
+                    color: (isChordMode || chordSubMode === 'stack') ? '#0f172a' : '#475569',
+                    borderRadius: '5px',
+                    padding: '3px 8px',
+                    fontSize: '0.70rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: (isChordMode || chordSubMode === 'stack') ? '0 1px 3px rgba(15,23,42,0.12)' : 'none'
+                  }}
+                >
+                  <Layers size={11} color={(isChordMode || chordSubMode === 'stack') ? theme.primary : 'currentColor'} />
+                  <span>Simultan</span>
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              {/* Vorzeichen Segment (# Kreuz / ♭ Be) */}
+              {/* Vorzeichen Segment (♯ / ♭) */}
           <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: '7px', padding: '2px', gap: '2px' }}>
             <button
               type="button"
@@ -624,22 +721,23 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                 }
               }}
               disabled={readOnly}
-              title="Kreuz-Vorzeichen (#)"
+              title="Kreuz-Vorzeichen (♯): Erhöht den Ton um einen Halbton"
+              aria-label="Kreuz-Vorzeichen"
               aria-pressed={activeAccidental === '#' || (!onToggleAccidental && isSharp)}
               style={{
                 border: 'none',
                 background: (activeAccidental === '#' || (!onToggleAccidental && isSharp)) ? theme.primary : 'transparent',
                 color: (activeAccidental === '#' || (!onToggleAccidental && isSharp)) ? '#ffffff' : '#475569',
                 borderRadius: '5px',
-                padding: '2px 7px',
-                fontSize: '0.72rem',
+                padding: '2px 9px',
+                fontSize: '0.82rem',
                 fontWeight: 900,
                 cursor: readOnly ? 'default' : 'pointer',
                 transition: 'all 0.1s ease',
                 boxShadow: (activeAccidental === '#' || (!onToggleAccidental && isSharp)) ? `0 1px 4px ${theme.glow}` : 'none'
               }}
             >
-              # Kreuz
+              ♯
             </button>
             <button
               type="button"
@@ -649,22 +747,23 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                 }
               }}
               disabled={readOnly}
-              title="Be-Vorzeichen (♭)"
+              title="Be-Vorzeichen (♭): Erniedrigt den Ton um einen Halbton"
+              aria-label="Be-Vorzeichen"
               aria-pressed={activeAccidental === 'b'}
               style={{
                 border: 'none',
                 background: activeAccidental === 'b' ? theme.primary : 'transparent',
                 color: activeAccidental === 'b' ? '#ffffff' : '#475569',
                 borderRadius: '5px',
-                padding: '2px 7px',
-                fontSize: '0.72rem',
+                padding: '2px 9px',
+                fontSize: '0.82rem',
                 fontWeight: 900,
                 cursor: readOnly ? 'default' : 'pointer',
                 transition: 'all 0.1s ease',
                 boxShadow: activeAccidental === 'b' ? `0 1px 4px ${theme.glow}` : 'none'
               }}
             >
-              ♭ Be
+              ♭
             </button>
           </div>
 
@@ -791,7 +890,7 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                 type="button"
                 onClick={() => setOctave(oct)}
                 disabled={readOnly}
-                title={`Oktave ${oct}`}
+                title={`Oktave ${oct} (${oct === 3 ? 'Tief' : oct === 4 ? 'Mittel' : 'Hoch'})`}
                 style={{
                   border: 'none',
                   background: octave === oct ? theme.primary : 'transparent',
@@ -805,7 +904,7 @@ export const MicroScoreBaukastenDock: React.FC<MicroScoreBaukastenDockProps> = (
                   boxShadow: octave === oct ? `0 1px 4px ${theme.glow}` : 'none'
                 }}
               >
-                {oct === 3 ? '3 Tief' : oct === 4 ? '4 Mittel' : '5 Hoch'}
+                {oct === 3 ? 'Tief' : oct === 4 ? 'Mittel' : 'Hoch'}
               </button>
             ))}
           </div>

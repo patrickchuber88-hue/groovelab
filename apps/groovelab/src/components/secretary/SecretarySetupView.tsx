@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
   Eye, FileCheck, FileText, Fingerprint, HeartHandshake, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
-  ShieldCheck, Sparkles, Trash2, Upload, X, Zap
+  ShieldCheck, Sparkles, Tablet, Trash2, Upload, X, Zap
 } from 'lucide-react';
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
 import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
@@ -316,26 +316,26 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   title: 'Schul-Stammdaten',
                   subtitle: schoolName || 'Name, Adresse & Logo',
                   badge: 'Stammdaten',
-                  gradient: 'linear-gradient(135deg, #ea4335 0%, #b91c1c 100%)',
-                  shadowColor: 'rgba(234, 67, 53, 0.40)',
+                  gradient: '#ef4444',
+                  shadowColor: 'transparent',
                   icon: School
                 },
                 {
                   id: 'links',
-                  title: 'Anmeldung & Passkeys',
-                  subtitle: 'Touch ID, Face ID, PINs & Kiosk',
-                  badge: isCurrentDevicePasskeyActive ? 'Passkey Aktiv' : 'Kiosk & PIN',
-                  gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  shadowColor: 'rgba(2, 132, 199, 0.40)',
-                  icon: Fingerprint
+                  title: 'Kiosk-Flotte & Raum-Terminals',
+                  subtitle: 'QR-Kiosk-Modus, Raum-Tablets & PINs',
+                  badge: kioskToken ? 'Kiosk Aktiv' : 'Kiosk & PIN',
+                  gradient: '#0ea5e9',
+                  shadowColor: 'transparent',
+                  icon: Tablet
                 },
                 {
                   id: 'sync',
                   title: 'Kalender & Sync',
                   subtitle: `${calendarUrls.length} Kalender abonniert`,
                   badge: syncInterval === 'realtime' ? 'Echtzeit' : syncInterval === 'hourly' ? 'Stündlich' : 'Täglich',
-                  gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                  shadowColor: 'rgba(6, 182, 212, 0.40)',
+                  gradient: '#06b6d4',
+                  shadowColor: 'transparent',
                   icon: Zap
                 },
                 {
@@ -343,8 +343,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   title: 'Datenschutz & AVV',
                   subtitle: 'AV-Vertrag, DSB-Ausweis & Audit',
                   badge: isAvvSigned ? 'AVV Gezeichnet' : 'AVV Ausstehend',
-                  gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  shadowColor: 'rgba(16, 185, 129, 0.40)',
+                  gradient: '#10b981',
+                  shadowColor: 'transparent',
                   icon: ShieldCheck
                 },
                 {
@@ -352,8 +352,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   title: 'Lokale Datensicherung',
                   subtitle: lastBackupDate ? 'Sicherung vorhanden' : 'JSON-Backup Tresor',
                   badge: 'Backup Tresor',
-                  gradient: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  shadowColor: 'rgba(99, 102, 241, 0.40)',
+                  gradient: '#6366f1',
+                  shadowColor: 'transparent',
                   icon: Database
                 },
                 {
@@ -361,8 +361,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   title: 'Schuljahr & Auto-Clean',
                   subtitle: `Start: ${schoolYearStartDay}. ${['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][(schoolYearStartMonth || 9) - 1] || 'September'}`,
                   badge: autoDeleteExpiredUsers ? 'Auto-Clean An' : 'Manuell',
-                  gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  shadowColor: 'rgba(245, 158, 11, 0.40)',
+                  gradient: '#f97316',
+                  shadowColor: 'transparent',
                   icon: Clock
                 },
                 {
@@ -370,18 +370,18 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   title: 'Werkseinstellungen',
                   subtitle: 'Musikschule zurücksetzen',
                   badge: 'Gefahr',
-                  gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-                  shadowColor: 'rgba(239, 68, 68, 0.40)',
+                  gradient: '#ef4444',
+                  shadowColor: 'transparent',
                   icon: ShieldAlert
                 },
-                { id: 'sponsors', title: 'Sponsoren & Partner', subtitle: 'Bildungsförderung & Toasts', badge: 'Patenschaften', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', shadowColor: 'rgba(245, 158, 11, 0.40)', icon: HeartHandshake },
+                { id: 'sponsors', title: 'Sponsoren & Partner', subtitle: 'Bildungsförderung & Toasts', badge: 'Patenschaften', gradient: '#facc15', shadowColor: 'transparent', icon: HeartHandshake },
                 {
                   id: 'feedback',
                   title: 'Ideenschmiede',
                   subtitle: 'Wünsche & Fehler melden',
                   badge: 'Mitgestalten',
-                  gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-                  shadowColor: 'rgba(236, 72, 153, 0.40)',
+                  gradient: '#a855f7',
+                  shadowColor: 'transparent',
                   icon: Lightbulb
                 }
               ].map((module) => {
@@ -421,15 +421,15 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                       height: '64px',
                       borderRadius: '16px',
                       background: module.gradient,
-                      boxShadow: `0 8px 18px -3px ${module.shadowColor}`,
+                      boxShadow: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       position: 'relative',
                       overflow: 'hidden',
-                      border: '1px solid rgba(255, 255, 255, 0.25)'
+                      border: 'none'
                     }}>
-                      <IconComp size={30} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                      <IconComp size={30} color={module.id === 'sponsors' ? '#0f172a' : '#ffffff'} strokeWidth={2.3} />
                     </div>
                     <div style={{ marginTop: '14px', padding: '0 4px', width: '100%' }}>
                       <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
@@ -464,7 +464,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '16px 32px',
-                border: '1px solid #fecaca',
+                border: 'none',
                 background: '#fef2f2',
                 borderRadius: '20px',
                 boxShadow: 'none',
@@ -554,25 +554,25 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         height: '42px',
                         borderRadius: '12px',
                         background: activeSecretarySettingsModal === 'general'
-                          ? 'linear-gradient(135deg, #ea4335 0%, #b91c1c 100%)'
+                          ? '#ef4444'
                           : activeSecretarySettingsModal === 'links'
-                          ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
+                          ? '#0ea5e9'
                           : activeSecretarySettingsModal === 'sync'
-                          ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
+                          ? '#06b6d4'
                           : activeSecretarySettingsModal === 'security_privacy'
-                          ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                          ? '#10b981'
                           : activeSecretarySettingsModal === 'backup'
-                          ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                          ? '#6366f1'
                           : activeSecretarySettingsModal === 'school_year'
-                          ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                          : 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                          ? '#f97316'
+                          : '#ef4444',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
                       }}>
                         {activeSecretarySettingsModal === 'general' && <School size={22} color="#ffffff" />}
-                        {activeSecretarySettingsModal === 'links' && <Fingerprint size={22} color="#ffffff" />}
+                        {activeSecretarySettingsModal === 'links' && <Tablet size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'sync' && <Zap size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'security_privacy' && <ShieldCheck size={22} color="#ffffff" />}
                         {activeSecretarySettingsModal === 'backup' && <Database size={22} color="#ffffff" />}
@@ -582,7 +582,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                       <div>
                         <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                           {activeSecretarySettingsModal === 'general' && 'Schul-Stammdaten & Branding'}
-                          {activeSecretarySettingsModal === 'links' && 'Anmeldung, Passkeys & Kiosk'}
+                          {activeSecretarySettingsModal === 'links' && 'Kiosk-Flotte & Raum-Terminals'}
                           {activeSecretarySettingsModal === 'sync' && 'Kalender & Synchronisation'}
                           {activeSecretarySettingsModal === 'security_privacy' && 'Datenschutz, AVV & DSB-Audit'}
                           {activeSecretarySettingsModal === 'backup' && 'Lokale Datensicherung'}
@@ -591,7 +591,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         </h3>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                           {activeSecretarySettingsModal === 'general' && 'Stammdaten, Anschrift und Schullogo deines Campus.'}
-                          {activeSecretarySettingsModal === 'links' && 'Touch ID, Face ID, Master-Ausweise, PIN-Richtlinien & Schul-Links.'}
+                          {activeSecretarySettingsModal === 'links' && 'QR-Kiosk-Kopplung für Raum-Tablets, Kiosk-PIN-Richtlinien & Schul-Links.'}
                           {activeSecretarySettingsModal === 'sync' && 'Datenabgleich, Live-Sync und externe iCal-Abonnements.'}
                           {activeSecretarySettingsModal === 'security_privacy' && 'Auftragsverarbeitungsvertrag (Art. 28 DSGVO), DSB-Prüfportal & TOMs.'}
                           {activeSecretarySettingsModal === 'backup' && 'JSON-Export und Wiederherstellung der Schuldatenbank.'}
@@ -628,7 +628,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Stammdaten der Musikschule</strong>
                           
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
                             <div>
                               <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Name der Musikschule *</label>
                               <input
@@ -649,7 +649,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: (typeof window !== 'undefined' && window.innerWidth <= 1024) ? '1fr' : '2fr 1fr', gap: '16px' }}>
                             <div>
                               <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Straße *</label>
                               <input
@@ -670,7 +670,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: (typeof window !== 'undefined' && window.innerWidth <= 1024) ? '1fr' : '1fr 2fr', gap: '16px' }}>
                             <div>
                               <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>PLZ *</label>
                               <input
@@ -691,7 +691,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
                             <div>
                               <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Telefonnummer *</label>
                               <input
@@ -749,7 +749,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               Festlegung der standardmäßigen Pufferzeiten vor und nach dem Unterricht (z.&nbsp;B. für Raumwechsel, Instrumentenaufbau und Vorbereitung).
                             </span>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
                               <div>
                                 <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
                                   Puffer vor Unterricht (Minuten)
@@ -806,7 +806,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               Die Abrechnung für Cloud-Hosting und Bereitstellung erfolgt transparent per Sammelrechnung (30 Tage Zahlungsziel). Es fallen keine gesonderten Lizenzkaufgebühren an.
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: '1px solid #fca5a5', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#ea4335', background: '#fce8e6', border: 'none', padding: '6px 14px', borderRadius: '100px', letterSpacing: '0.04em', whiteSpace: 'nowrap', marginLeft: '12px' }}>
                             RECHNUNG (30 TAGE)
                           </div>
                         </div>
@@ -816,244 +816,41 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     {activeSecretarySettingsModal === 'links' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                        {/* SÄULE 1: BIOMETRIE & PASSKEYS AUF DIESEM GERÄT */}
+                        {/* HINWEIS: PERSÖNLICHE ZUGANGSDATEN & PASSKEYS IM USER-DOCK */}
                         <div style={{
-                          background: isCurrentDevicePasskeyActive 
-                            ? 'linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%)' 
-                            : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                          border: isCurrentDevicePasskeyActive ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
-                          borderRadius: '20px',
-                          padding: '20px',
+                          background: '#f8fafc',
+                          border: '1.5px dashed #cbd5e1',
+                          borderRadius: '16px',
+                          padding: '14px 18px',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '14px',
-                          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'
+                          alignItems: 'center',
+                          gap: '14px'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                              <div style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '12px',
-                                background: isCurrentDevicePasskeyActive ? '#ecfdf5' : '#f1f5f9',
-                                color: isCurrentDevicePasskeyActive ? '#10b981' : '#64748b',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: 'none'
-                              }}>
-                                <Fingerprint size={24} />
-                              </div>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
-                                    Touch ID / Face ID auf diesem Gerät
-                                  </h4>
-                                  <span style={{
-                                    background: isCurrentDevicePasskeyActive ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
-                                    color: isCurrentDevicePasskeyActive ? '#ffffff' : '#64748b',
-                                    border: isCurrentDevicePasskeyActive ? 'none' : '1px solid #cbd5e1',
-                                    padding: '2px 8px',
-                                    borderRadius: '100px',
-                                    fontSize: '0.65rem',
-                                    fontWeight: 800
-                                  }}>
-                                    {isCurrentDevicePasskeyActive ? 'Passkey Aktiv' : 'Nicht eingerichtet'}
-                                  </span>
-                                </div>
-                                <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#475569', fontWeight: 500 }}>
-                                  {isCurrentDevicePasskeyActive
-                                    ? `${currentUserProfile?.first_name} ${currentUserProfile?.last_name || ''} (${schoolName || 'Musikschule'} • Schulleitung)`
-                                    : 'Passwortloser 1-Tap-Login über den Fingerabdrucksensor oder Face ID dieses Geräts.'}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              {isCurrentDevicePasskeyActive ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={handleTestBiometrics}
-                                    disabled={biometricsStatus === 'verifying'}
-                                    style={{
-                                      background: '#ffffff',
-                                      border: '1.5px solid #10b981',
-                                      color: '#059669',
-                                      padding: '8px 14px',
-                                      borderRadius: '10px',
-                                      fontWeight: 800,
-                                      fontSize: '0.78rem',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      transition: 'all 0.15s'
-                                    }}
-                                    className="hover-scale"
-                                  >
-                                    <Sparkles size={14} /> {biometricsStatus === 'verifying' ? 'Verifiziere...' : 'Passkey testen'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={handleRemoveBiometrics}
-                                    style={{
-                                      background: '#fff1f2',
-                                      border: '1px solid #fecdd3',
-                                      color: '#e11d48',
-                                      padding: '8px 12px',
-                                      borderRadius: '10px',
-                                      fontWeight: 750,
-                                      fontSize: '0.76rem',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                  >
-                                    <Trash2 size={13} /> Entfernen
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={handleEnrollBiometrics}
-                                  disabled={biometricsStatus === 'registering'}
-                                  style={{
-                                    background: '#0284c7',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    padding: '9px 18px',
-                                    borderRadius: '10px',
-                                    fontWeight: 800,
-                                    fontSize: '0.8rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    boxShadow: 'none'
-                                  }}
-                                  className="hover-scale"
-                                >
-                                  <Fingerprint size={16} />
-                                  {biometricsStatus === 'registering' ? 'Warte auf Gerät...' : 'Touch ID / Face ID einrichten'}
-                                </button>
-                              )}
-                            </div>
+                          <div style={{
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '10px',
+                            background: '#e0f2fe',
+                            color: '#0284c7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <KeyRound size={20} />
                           </div>
-
-                          {biometricsMessage && (
-                            <div style={{
-                              padding: '10px 14px',
-                              borderRadius: '10px',
-                              background: biometricsStatus === 'error' ? '#fef2f2' : '#ecfdf5',
-                              border: biometricsStatus === 'error' ? '1px solid #fca5a5' : '1px solid #10b981',
-                              color: biometricsStatus === 'error' ? '#991b1b' : '#065f46',
-                              fontSize: '0.74rem',
-                              fontWeight: 700,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px'
-                            }}>
-                              {biometricsStatus === 'error' ? <AlertCircle size={14} /> : <CheckCircle size={14} />}
-                              <span>{biometricsMessage}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* SÄULE 2: MEIN DIGITALER MASTER-AUSWEIS & ZUGANGSDATEN */}
-                        <div style={{
-                          background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '20px',
-                          padding: '20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '16px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <KeyRound size={20} />
-                              </div>
-                              <div>
-                                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                                  Mein Digitaler Master-Ausweis &amp; Login-PINs
-                                </h4>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                                  Zugangsdaten für Schulleitung &amp; Notfall-Gerätekopplung
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setQrModalUser(currentUserProfile);
-                                setShowOwnQrModal(true);
-                              }}
-                              style={{
-                                background: '#f1f5f9',
-                                border: '1px solid #cbd5e1',
-                                color: '#334155',
-                                padding: '6px 14px',
-                                borderRadius: '8px',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}
-                            >
-                              <QrCode size={14} /> Großen Ausweis öffnen
-                            </button>
-                          </div>
-
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Persönliche Ausweis-PIN</span>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                                <span style={{ fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', color: '#0f172a', letterSpacing: '0.1em' }}>
-                                  {currentUserProfile?.parent_pin || currentUserProfile?.pin || '855992'}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(currentUserProfile?.parent_pin || currentUserProfile?.pin || '855992');
-                                    setCopiedSettingsPin(true);
-                                    setTimeout(() => setCopiedSettingsPin(false), 2000);
-                                  }}
-                                  style={{ background: 'none', border: 'none', color: copiedSettingsPin ? '#16a34a' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}
-                                >
-                                  {copiedSettingsPin ? <Check size={14} /> : <Copy size={14} />} {copiedSettingsPin ? 'Kopiert' : 'Kopieren'}
-                                </button>
-                              </div>
-                            </div>
-
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 14px' }}>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Direkt-Login URL</span>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
-                                  {getCanonicalQrLandingUrl(currentUserProfile?.qr_token || currentUserProfile?.teacher_qr_token)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(getCanonicalQrLandingUrl(currentUserProfile?.qr_token || currentUserProfile?.teacher_qr_token));
-                                    setCopiedSettingsLink(true);
-                                    setTimeout(() => setCopiedSettingsLink(false), 2000);
-                                  }}
-                                  style={{ background: 'none', border: 'none', color: copiedSettingsLink ? '#16a34a' : '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}
-                                >
-                                  {copiedSettingsLink ? <Check size={14} /> : <Copy size={14} />} {copiedSettingsLink ? 'Kopiert' : 'Kopieren'}
-                                </button>
-                              </div>
-                            </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ fontSize: '0.84rem', color: '#0f172a', display: 'block' }}>
+                              Persönliche Zugangsdaten, Passkeys &amp; Login-PINs
+                            </strong>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>
+                              Eigene Geräte-Passkeys (Touch ID / Face ID), Master-Passwörter und persönliche 4-stellige Schnell-PINs gehören zur individuellen Sicherheit deines Benutzer-Accounts und werden im <strong>Profil-Dock unten links</strong> verwaltet.
+                            </p>
                           </div>
                         </div>
 
                         {/* SÄULE 3: KIOSK-RICHTLINIEN & PIN-LÄNGE */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px' }}>
                           <div>
                             <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b' }}>Kiosk PIN-Länge</strong>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
@@ -1209,7 +1006,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             onClick={() => alert('Die manuelle Synchronisation wurde erfolgreich durchgeführt!')}
                             style={{ 
                               width: '100%', padding: '10px', fontSize: '0.78rem', fontWeight: 800, borderRadius: '10px', 
-                              border: '1px solid #ea4335', background: '#fce8e6', color: '#ea4335', cursor: 'pointer', transition: 'all 0.15s' 
+                              border: 'none', background: '#fce8e6', color: '#ea4335', cursor: 'pointer', transition: 'all 0.15s' 
                             }}
                             className="hover-scale"
                           >
@@ -1355,8 +1152,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
                         {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
                         <div style={{
-                          background: 'linear-gradient(135deg, #ffffff 0%, #f4fbf7 100%)',
-                          border: '1.5px solid #a7f3d0',
+                          background: '#dcfce7',
+                          border: 'none',
                           borderRadius: '20px',
                           padding: '20px',
                           color: '#0f172a',
@@ -1373,7 +1170,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               height: '44px',
                               borderRadius: '12px',
                               background: '#34a853',
-                              border: '1.5px solid #34a853',
+                              border: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1387,7 +1184,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
                                   🪪 DSB-Prüfausweis (Art. 38 DSGVO)
                                 </h4>
-                                <span style={{ background: '#e6f4ea', color: '#047857', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
+                                <span style={{ background: '#d1fae5', color: '#047857', border: 'none', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
                                   E-Mail-Frei
                                 </span>
                               </div>
@@ -1402,7 +1199,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               type="button"
                               onClick={() => window.dispatchEvent(new CustomEvent('open_admin_security_suite'))}
                               style={{
-                                background: '#ea4335',
+                                background: '#ef4444',
                                 color: '#ffffff',
                                 border: 'none',
                                 padding: '8px 16px',
@@ -1469,7 +1266,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 schoolId
                               })}
                               style={{
-                                background: 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)',
+                                background: '#34a853',
                                 color: '#ffffff',
                                 border: 'none',
                                 padding: '8px 16px',
@@ -1496,7 +1293,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 }
                               }}
                               style={{
-                                background: copiedClause ? '#16a34a' : '#0f172a',
+                                background: copiedClause ? '#34a853' : '#0f172a',
                                 color: '#ffffff',
                                 border: 'none',
                                 padding: '8px 16px',
@@ -1521,28 +1318,28 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         {/* AV-Vertrag Statusbereich */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                           <div style={{ 
-                            background: isAvvSigned ? '#e6f4ea' : '#fef2f2', 
-                            border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fca5a5', 
+                            background: isAvvSigned ? '#e6f4ea' : '#fee2e2', 
+                            border: 'none', 
                             borderRadius: '16px', 
                             padding: '16px', 
                             display: 'flex', 
                             alignItems: 'flex-start', 
                             gap: '12px',
                             fontSize: '0.76rem',
-                            color: isAvvSigned ? '#34a853' : '#dc2626',
+                            color: isAvvSigned ? '#137333' : '#b91c1c',
                             lineHeight: '1.45'
                           }}>
-                            <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                            <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#ef4444', flexShrink: 0, marginTop: '2px' }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#34a853' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
+                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#137333' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                   <span style={{ 
                                     fontSize: '0.62rem', 
                                     fontWeight: 900, 
                                     background: isAvvSigned ? '#d1fae5' : '#fee2e2', 
-                                    border: isAvvSigned ? '1px solid #a7f3d0' : '1px solid #fecaca', 
-                                    color: isAvvSigned ? '#065f46' : '#dc2626', 
+                                    border: 'none', 
+                                    color: isAvvSigned ? '#047857' : '#b91c1c', 
                                     padding: '3px 8px', 
                                     borderRadius: '100px', 
                                     textTransform: 'uppercase' 
@@ -1557,7 +1354,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                           fontSize: '0.62rem', 
                                           fontWeight: 800, 
                                           background: '#ffffff', 
-                                          border: '1px solid #a7f3d0', 
+                                          border: 'none', 
                                           color: '#065f46', 
                                           padding: '3.5px 10px', 
                                           borderRadius: '100px', 
@@ -1622,7 +1419,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           {/* Eltern-Infoblatt Vorlage */}
                           <div style={{ 
                             background: '#fefce8', 
-                            border: '1px solid #fef08a', 
+                            border: 'none', 
                             borderRadius: '16px', 
                             padding: '16px', 
                             display: 'flex', 
@@ -1674,7 +1471,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                     fontSize: '0.62rem', 
                                     fontWeight: 900, 
                                     background: '#fef08a', 
-                                    border: '1px solid #ca8a04', 
+                                    border: 'none', 
                                     color: '#854d0e', 
                                     padding: '3px 8px', 
                                     borderRadius: '100px', 
@@ -1818,7 +1615,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               </span>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '14px', borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
                               <div>
                                 <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>Tag des Schuljahresstarts</label>
                                 <select
@@ -1849,9 +1646,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                           {/* CARD 2: AUTO-CLEAN APPLE SWITCH HERO */}
                           <div style={{
                             background: autoDeleteExpiredUsers
-                              ? 'linear-gradient(135deg, #ffffff 0%, #ecfdf5 100%)'
-                              : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                            border: autoDeleteExpiredUsers ? '1.5px solid #10b981' : '1.5px solid #cbd5e1',
+                              ? '#dcfce7'
+                              : '#f8fafc',
+                            border: 'none',
                             borderRadius: '20px',
                             padding: '20px',
                             display: 'flex',
@@ -1866,7 +1663,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   width: '42px',
                                   height: '42px',
                                   borderRadius: '12px',
-                                  background: autoDeleteExpiredUsers ? '#ecfdf5' : '#f1f5f9',
+                                  background: autoDeleteExpiredUsers ? '#d1fae5' : '#f1f5f9',
                                   color: autoDeleteExpiredUsers ? '#10b981' : '#64748b',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1881,9 +1678,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                       Automatische DSGVO-Bereinigung (Auto-Clean)
                                     </h4>
                                     <span style={{
-                                      background: autoDeleteExpiredUsers ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                                      background: autoDeleteExpiredUsers ? '#10b981' : '#f1f5f9',
                                       color: autoDeleteExpiredUsers ? '#ffffff' : '#64748b',
-                                      border: autoDeleteExpiredUsers ? 'none' : '1px solid #cbd5e1',
+                                      border: 'none',
                                       padding: '2px 8px',
                                       borderRadius: '100px',
                                       fontSize: '0.64rem',
@@ -1908,7 +1705,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                   width: '50px',
                                   height: '28px',
                                   borderRadius: '100px',
-                                  background: autoDeleteExpiredUsers ? '#22c55e' : '#cbd5e1',
+                                  background: autoDeleteExpiredUsers ? '#34a853' : '#cbd5e1',
                                   padding: '2px',
                                   cursor: 'pointer',
                                   transition: 'background 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1953,7 +1750,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                 style={{
                                   padding: '9px 18px',
                                   borderRadius: '10px',
-                                  background: '#ea4335',
+                                  background: '#ef4444',
                                   color: '#ffffff',
                                   border: 'none',
                                   fontWeight: 800,
@@ -1974,8 +1771,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
                           {/* CARD 3: DATABASE AUDIT STATUS (MANUELLE BEREINIGUNG) */}
                           <div style={{
-                            background: expiredStudents.length === 0 ? '#f0fdf4' : '#fef2f2',
-                            border: expiredStudents.length === 0 ? '1.5px solid #bbf7d0' : '1.5px solid #fca5a5',
+                            background: expiredStudents.length === 0 ? '#dcfce7' : '#fee2e2',
+                            border: 'none',
                             borderRadius: '16px',
                             padding: '16px 18px',
                             display: 'flex',
@@ -2034,7 +1831,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     {activeSecretarySettingsModal === 'danger_zone' && (
                       <div style={{ 
                         background: '#fff5f5', 
-                        border: '1.5px solid #feb2b2', 
+                        border: 'none', 
                         borderRadius: '16px', 
                         padding: '24px', 
                         display: 'flex', 
@@ -2054,7 +1851,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
                         <div style={{
                           background: 'rgba(255, 255, 255, 0.75)',
-                          border: '1px solid #fed7d7',
+                          border: 'none',
                           borderRadius: '10px',
                           padding: '12px 14px',
                           fontSize: '0.75rem',

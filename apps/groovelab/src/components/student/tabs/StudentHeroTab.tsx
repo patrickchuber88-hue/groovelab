@@ -63,7 +63,7 @@ export function StudentHeroTab({
           alignItems: 'center',
           gap: '6px',
           background: '#e0f2fe',
-          border: '1px solid #bae6fd',
+          border: 'none',
           color: '#0369a1',
           fontWeight: 800,
           fontSize: '0.72rem',
@@ -146,7 +146,7 @@ export function StudentHeroTab({
               {hasMasteryCrown && (
                 <span style={{
                   background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  border: '1px solid #f59e0b',
+                  border: 'none',
                   color: '#92400e',
                   fontWeight: 900,
                   fontSize: '0.74rem',

@@ -60,6 +60,7 @@ import {
 } from '../../services/audio/loopstationStudioService';
 import { AudioSettingsSheet } from '../student/meisterwerk/AudioSettingsSheet';
 import { audioLatencyService } from '../../services/audioLatencyService';
+import { LoopstationMasterclassGuide } from './audio/LoopstationMasterclassGuide';
 
 export interface Track {
   id: number;
@@ -174,9 +175,9 @@ export const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disable
         width: '36px',
         height: '36px',
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
+        background: '#cbd5e1',
         border: '1.5px solid #475569',
-        boxShadow: '0 3px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4)',
+        boxShadow: 'none',
         position: 'relative',
         cursor: disabled ? 'not-allowed' : 'ns-resize',
         display: 'flex',
@@ -202,8 +203,8 @@ export const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disable
         width: '18px',
         height: '18px',
         borderRadius: '50%',
-        background: 'radial-gradient(circle, #f1f5f9 0%, #cbd5e1 100%)',
-        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+        background: '#f1f5f9',
+        boxShadow: 'none'
       }} />
     </div>
   );
@@ -349,6 +350,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
     });
     const unsubService = audioLatencyService.subscribe((info) => {
       setSyncOffsetMs(info.effectiveLatencyMs);
+      setIsDeviceCalibrated(info.isCalibrated);
     });
     const handleOpenSettings = () => setShowAudioSettingsModal(true);
     window.addEventListener('campus_open_audio_settings', handleOpenSettings);
@@ -402,32 +404,14 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
   const updateLatencyInDb = async (offsetVal: number) => {
     try {
-      await UniversalLatencyEngine.saveLatencyMs(offsetVal);
+      audioLatencyService.setManualLatencyMs(offsetVal, 'manual_slider');
       setIsDeviceCalibrated(true);
     } catch (e) {}
-
-    if (student?.id) {
-      try {
-        await supabase
-          .from('students')
-          .update({
-            device_calibration: {
-              device_hash: activeDeviceHash,
-              device_name: activeDeviceName,
-              latency_ms: offsetVal,
-              calibrated_at: new Date().toISOString()
-            }
-          })
-          .eq('id', student.id);
-      } catch (err) {
-        console.warn("Supabase student device calibration save:", err);
-      }
-    }
   };
 
   const [activeDeviceName, setActiveDeviceName] = useState<string>('Standard Audio');
   const [activeDeviceHash, setActiveDeviceHash] = useState<string>('default');
-  const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(true);
+  const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(() => audioLatencyService.isCurrentRouteCalibrated());
 
   const getAudioDeviceFingerprint = async (): Promise<{ hash: string, name: string }> => {
     let deviceName = 'Audio-Gerät';
@@ -463,18 +447,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
     setActiveDeviceHash(hash);
     setActiveDeviceName(name);
 
-    const routeInfo = await audioLatencyService.detectCurrentAudioRoute();
-    const savedDeviceOffset = localStorage.getItem(`groovelab_latency_${hash}`);
-    if (routeInfo.calibratedLatencyMs !== null) {
-      setSyncOffsetMs(routeInfo.calibratedLatencyMs);
-      setIsDeviceCalibrated(true);
-    } else if (savedDeviceOffset !== null && !isNaN(Number(savedDeviceOffset))) {
-      setSyncOffsetMs(Number(savedDeviceOffset));
-      setIsDeviceCalibrated(true);
-    } else {
-      setSyncOffsetMs(routeInfo.baselineLatencyMs);
-      setIsDeviceCalibrated(true);
-    }
+    const routeInfo = await audioLatencyService.hydrateFromUserLogin(student as any);
+    setSyncOffsetMs(routeInfo.effectiveLatencyMs);
+    setIsDeviceCalibrated(routeInfo.isCalibrated);
   };
 
   useEffect(() => {
@@ -485,7 +460,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         navigator.mediaDevices.removeEventListener('devicechange', checkDeviceCalibrationStatus);
       };
     }
-  }, []);
+  }, [student?.id]);
 
   const [calibrationWaveform, setCalibrationWaveform] = useState<number[] | null>(null);
   const [isPermissionPending, setIsPermissionPending] = useState(false);
@@ -1258,30 +1233,12 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       if (hasExternalAudio) {
         setUseHeadphones(true);
         if (!isManualLatencyAdjustmentRef.current && !isDeviceCalibrated && !isAutoSequenceActiveRef.current) {
-          const ctx = audioContextRef.current;
-          const hasNativeLatency = !!(ctx && ctx.outputLatency && ctx.outputLatency > 0.05);
-          const outLatency = hasNativeLatency
-            ? ctx.outputLatency!
-            : (isBluetooth ? 0.220 : 0.010);
-          const estimatedRoundtrip = outLatency + 0.015;
-          const defaultOffsetMs = hasNativeLatency
-            ? 0
-            : Math.round((estimatedRoundtrip - 0.025) * 1000);
-          setSyncOffsetMs(defaultOffsetMs);
+          setSyncOffsetMs(audioLatencyService.getEffectiveLatencyMs());
         }
       } else {
         setUseHeadphones(false);
         if (!isManualLatencyAdjustmentRef.current && !isDeviceCalibrated && !isAutoSequenceActiveRef.current) {
-          const ctx = audioContextRef.current;
-          const hasNativeLatency = !!(ctx && ctx.outputLatency && ctx.outputLatency > 0.05);
-          const outLatency = hasNativeLatency
-            ? ctx.outputLatency!
-            : 0.020;
-          const estimatedRoundtrip = outLatency + 0.015;
-          const defaultOffsetMs = hasNativeLatency
-            ? 0
-            : Math.round((estimatedRoundtrip - 0.025) * 1000);
-          setSyncOffsetMs(defaultOffsetMs);
+          setSyncOffsetMs(audioLatencyService.getEffectiveLatencyMs());
         }
       }
     } catch (e) {
@@ -1310,17 +1267,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
     }
 
     if (ctx && !isManualLatencyAdjustmentRef.current && !isDeviceCalibrated && !isAutoSequenceActiveRef.current) {
-      const isBluetooth = syncOffsetMs === 210;
-      const hasExternalAudio = useHeadphones;
-      const hasNativeLatency = !!(ctx.outputLatency && ctx.outputLatency > 0.05);
-      const outLatency = hasNativeLatency
-        ? ctx.outputLatency
-        : (isBluetooth ? 0.220 : (hasExternalAudio ? 0.010 : 0.020));
-      const estimatedRoundtrip = outLatency + 0.015;
-      const defaultOffsetMs = hasNativeLatency
-        ? 0
-        : Math.round((estimatedRoundtrip - 0.025) * 1000);
-      setSyncOffsetMs(defaultOffsetMs);
+      setSyncOffsetMs(audioLatencyService.getEffectiveLatencyMs());
     }
 
     if (!masterCompressorRef.current) {
@@ -1815,7 +1762,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
     }
-    // 🎯 Reibungsloser Start: Standardmäßig mit optimiertem Latenz-Preset fortfahren (kein Zwangs-Blocker)
+    if (audioLatencyService.requestCalibrationPromptIfNeeded('Loopstation-Aufnahme', () => { startAutoSequence(); })) {
+      return;
+    }
     const isOverdubMode = useHeadphones && !!audioBuffersRef.current[1] && !tracks.slice(1).some(t => t.url);
     if (!isOverdubMode) {
       handleReset();
@@ -2718,29 +2667,41 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       return;
     }
 
-    // 🎯 Reibungsloser Aufnahme-Start: Klick auf REC nimmt direkt auf (kein Abbruch durch Zwangs-Kalibrierung)
+    if (!isPlayingRef.current && audioLatencyService.requestCalibrationPromptIfNeeded('Loopstation-Aufnahme', () => { startRecording(trackId); })) {
+      return;
+    }
 
     const existingTrack = tracksRef.current.find(t => t.id === trackId);
+    if (existingTrack?.isWaiting) {
+      setTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, isWaiting: false } : t))
+      );
+      return;
+    }
+
     const hasExistingAudio = !!audioBuffersRef.current[trackId] || !!existingTrack?.url;
 
-    if (hasExistingAudio) {
+    // 🎯 Live-Punch-In: Während laufendem Playback kein blockierendes window.confirm, damit der Web-Audio-Clock nicht driftet
+    if (hasExistingAudio && !isPlayingRef.current) {
       const confirmOverwrite = window.confirm(`Auf Spur ${trackId} befindet sich bereits eine Aufnahme. Möchtest du diese wirklich überschreiben?`);
       if (!confirmOverwrite) return;
     }
 
-    if (activeSourcesRef.current[trackId]) {
-      try { activeSourcesRef.current[trackId].stop(); } catch (e) {}
-      delete activeSourcesRef.current[trackId];
-    }
+    if (!isPlayingRef.current) {
+      if (activeSourcesRef.current[trackId]) {
+        try { activeSourcesRef.current[trackId].stop(); } catch (e) {}
+        delete activeSourcesRef.current[trackId];
+      }
 
-    if (existingTrack?.url) {
-      URL.revokeObjectURL(existingTrack.url);
-    }
+      if (existingTrack?.url) {
+        URL.revokeObjectURL(existingTrack.url);
+      }
 
-    delete audioBuffersRef.current[trackId];
-    setTracks((prev) =>
-      prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null } : t))
-    );
+      delete audioBuffersRef.current[trackId];
+      setTracks((prev) =>
+        prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null } : t))
+      );
+    }
 
     await initAudio();
     isPermissionPendingRef.current = true;
@@ -2857,7 +2818,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
       mediaRecordersRef.current[trackId] = mediaRecorder;
 
-      if (trackId === 1) {
+      if (trackId === 1 && !isPlayingRef.current) {
         const beatsPerBar = timeSignatureRef.current === '3/4' ? 3 : 4;
         const barsToRecord = barLengthRef.current || 4;
         const intervalMs = (60 / bpm) * 1000;
@@ -2904,10 +2865,20 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         const totalDelay = Math.max(0, msToNextCycle);
 
         setTimeout(() => {
+          // 🎯 Altes Audio stoppt exakt auf Takt 1 des neuen Zyklus (kein vorzeitiges Muting)
+          if (activeSourcesRef.current[trackId]) {
+            try { activeSourcesRef.current[trackId].stop(); } catch (e) {}
+            delete activeSourcesRef.current[trackId];
+          }
+          if (existingTrack?.url) {
+            URL.revokeObjectURL(existingTrack.url);
+          }
+          delete audioBuffersRef.current[trackId];
+
           recordStartTimesRef.current[trackId] = Date.now();
           mediaRecorder.start();
           setTracks((prev) =>
-            prev.map((t) => (t.id === trackId ? { ...t, isRecording: true, isWaiting: false } : t))
+            prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null, isRecording: true, isWaiting: false } : t))
           );
 
           setTimeout(() => {
@@ -2999,7 +2970,11 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       prev.map((t) => (t.id === trackId ? { ...t, url: null, blob: null, isRecording: false, isWaiting: false, isSoloed: false } : t))
     );
 
-    if (trackId === 1) {
+    // 🎯 Unterbrechungsfreier Flow: Nur stoppen, wenn gar keine Spuren mehr Audio enthalten
+    const hasRemainingAudio = Object.keys(audioBuffersRef.current).some(
+      (k) => parseInt(k, 10) !== trackId && !!audioBuffersRef.current[parseInt(k, 10)]
+    );
+    if (!hasRemainingAudio) {
       stopAll();
       setMasterLoopDuration(null);
     }
@@ -3502,7 +3477,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
   const ringColor = activeSubTab === 'saved'
     ? (isSavedLoopPlaying ? '#34a853' : '#e5e5e7')
     : (isPause
-      ? '#eab308'
+      ? '#facc15'
       : (isAutoSequenceActive || isAnyTrackRecording)
         ? '#ea4335'
         : isPlaying
@@ -3514,14 +3489,14 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       display: 'flex',
       flexDirection: 'column',
       flex: 1,
-      background: 'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+      background: '#f8fafc',
       borderTop: '1px solid #e2e8f0',
       borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
       minHeight: isMobileView ? 'auto' : '520px',
       color: '#1d1d1f',
       padding: isMobileView ? '16px 16px calc(240px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 28px',
       gap: '20px',
-      boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
+      boxShadow: 'none',
       boxSizing: 'border-box',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       position: 'relative'
@@ -3552,9 +3527,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         .glow-record { animation: glow-record 2s infinite ease-in-out; }
         .glow-play { animation: glow-play 2s infinite ease-in-out; }
         .glow-pause { animation: glow-pause 2s infinite ease-in-out; }
-        @keyframes central-pulse-play { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
-        @keyframes central-pulse-rec { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
-        @keyframes central-pulse-pause { 0% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: inset 0 1.5px 3px rgba(255,255,255,0.8), 0 8px 24px rgba(0,0,0,0.03); } }
+        @keyframes central-pulse-play { 0% { transform: scale(1); box-shadow: none; } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: none; } }
+        @keyframes central-pulse-rec { 0% { transform: scale(1); box-shadow: none; } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: none; } }
+        @keyframes central-pulse-pause { 0% { transform: scale(1); box-shadow: none; } 50% { transform: scale(1.04); box-shadow: none; } 100% { transform: scale(1); box-shadow: none; } }
         .central-pulse-play { animation: central-pulse-play 2s infinite ease-in-out; }
         .central-pulse-rec { animation: central-pulse-rec 2s infinite ease-in-out; }
         .central-pulse-pause { animation: central-pulse-pause 2s infinite ease-in-out; }
@@ -3563,9 +3538,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           100% { background-position: -200% 0; }
         }
         .shimmer-active {
-          background: linear-gradient(90deg, #34a853 30%, #a7f3d0 50%, #34a853 70%) !important;
-          background-size: 200% 100% !important;
-          animation: shimmer 1.5s infinite linear !important;
+          background: #34a853 !important;
         }
         .tactile-btn:hover:not(:disabled) {
           transform: translateY(-1.5px);
@@ -3604,7 +3577,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           width: 16px;
           height: 22px;
           border-radius: 6px;
-          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+          background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.16);
           box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff;
           margin-top: -8px;
@@ -3634,7 +3607,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           width: 16px;
           height: 22px;
           border-radius: 6px;
-          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #e2e8f0 100%);
+          background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.16);
           box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.18), 0 1px 2px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff;
           cursor: grab;
@@ -3767,8 +3740,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               width: "100%",
               padding: "10px 16px",
               borderRadius: "14px",
-              background: "rgba(236, 253, 245, 0.95)",
-              border: "1.5px solid #10b981",
+              background: "#d1fae5",
+              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -3777,11 +3750,11 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               marginBottom: "14px",
               boxShadow: "none"
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#065f46", fontWeight: 850 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#047857", fontWeight: 850 }}>
                 <span style={{ fontSize: "1.05rem" }}>✨</span>
                 <span>Audio-Tresor aktiv: Unbegrenzte Loop-Speicherung in deiner persönlichen Loop-Mediathek</span>
               </div>
-              <span style={{ fontSize: '0.70rem', color: '#059669', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #10b981' }}>
+              <span style={{ fontSize: '0.70rem', color: '#047857', fontWeight: 800, background: '#ffffff', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                 💎 Lossless Studio-Qualität (Kein Kontingent)
               </span>
             </div>
@@ -3807,8 +3780,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             width: "100%",
             padding: "8px 14px",
             borderRadius: "12px",
-            background: isFull ? "rgba(239, 68, 68, 0.08)" : "rgba(52, 168, 83, 0.08)",
-            border: `1px solid ${isFull ? "rgba(239, 68, 68, 0.25)" : "rgba(52, 168, 83, 0.25)"}`,
+            background: isFull ? "#fee2e2" : "#dcfce7",
+            border: "none",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -3828,202 +3801,11 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       })()}
 
       {activeSubTab === 'guide' ? (
-        <div style={{
-          width: '100%',
-          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRadius: '28px',
-          border: '1.5px solid rgba(0, 0, 0, 0.08)',
-          padding: '32px',
-          boxShadow: '0 12px 35px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '28px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-            paddingBottom: '20px',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                color: '#d97706',
-                width: '54px',
-                height: '54px',
-                borderRadius: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: 'none'
-              }}>
-                <Zap size={28} color="#d97706" />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 950, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
-                  Loopstation Masterclass: Anleitung & Pro-Tipps
-                </h2>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '4px 0 0 0', fontWeight: 600 }}>
-                  Maximale Sound-Qualität & tanzbare Perfektion für deinen Musikunterricht & zu Hause
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleFinishOnboarding}
-              className="tactile-btn"
-              style={{
-                background: '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '14px',
-                padding: '12px 22px',
-                fontSize: '0.86rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                boxShadow: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>Verstanden & Studio starten! 🚀</span>
-            </button>
-          </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '20px',
-            width: '100%'
-          }}>
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1.5px solid rgba(0, 0, 0, 0.05)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Headphones size={22} color="#4f46e5" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>1. Kopfhörer-Modus verwenden</span>
-                  <span style={{ fontSize: '0.70rem', color: '#4f46e5', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Keine Übersprechungen</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
-                Verwende vorzugsweise <strong>kabelgebundene Kopfhörer</strong>. Dadurch hörst du das Metronom und deine bereits aufgenommenen Spuren in voller Lautstärke, ohne dass der Lautsprecher-Sound erneut vom Mikrofon mit aufgenommen wird.
-              </p>
-              <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '12px', border: '1px dashed #cbd5e1', fontSize: '0.74rem', color: '#475569', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Headphones size={16} color="#4f46e5" />
-                <span>Ergebnis: Glasklares Mehrspur-Recording ohne störendes Hallen oder Dopplungen.</span>
-              </div>
-            </div>
-
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1.5px solid rgba(0, 0, 0, 0.05)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#fef3c7', color: '#d97706', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Clock size={22} color="#d97706" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>2. Die 4-Takte-Zwischenpause</span>
-                  <span style={{ fontSize: '0.70rem', color: '#d97706', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>100% Sample-Accurate Sync</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
-                Zwischen jeder Aufnahmespur schaltet die Loopstation automatisch eine <strong>4-Takte-Pause</strong> ein. Nutze diese Pause, um dich entspannt auf die nächste Instrumentenspur vorzubereiten und im Groove zu bleiben.
-              </p>
-              <div style={{ background: '#fffbeb', borderRadius: '14px', padding: '12px', border: '1px dashed #fde68a', fontSize: '0.74rem', color: '#b45309', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clock size={16} color="#d97706" />
-                <span>Zero Swallowed Attack: Die erste Note deiner neuen Spur klingt exakt zum Taktstrich aus.</span>
-              </div>
-            </div>
-
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1.5px solid rgba(0, 0, 0, 0.05)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#e6f4ea', color: '#34a853', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <RotateCcw size={22} color="#34a853" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>3. Spur im laufenden Loop ersetzen</span>
-                  <span style={{ fontSize: '0.70rem', color: '#34a853', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Punktgenauer Takt-Snap</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
-                Gefällt dir eine Spur nicht? Klicke bei laufendem Loop einfach erneut auf das Mikrofon der Spur (<code>⏳ WARTET</code>). Die alte Aufnahme wird am Taktende gestoppt und die neue startet automatisch exakt zu Takt 1 des nächsten Zyklus!
-              </p>
-              <div style={{ background: '#f0fdf4', borderRadius: '14px', padding: '12px', border: '1px dashed #bbf7d0', fontSize: '0.74rem', color: '#15803d', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <RotateCcw size={16} color="#34a853" />
-                <span>Nahtloser Workflow: Ersetze einzelne Spuren beliebig oft, ohne den Gesamtmix anzuhalten.</span>
-              </div>
-            </div>
-
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              padding: '24px',
-              border: '1.5px solid rgba(0, 0, 0, 0.05)',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: '#fce8e6', color: '#ea4335', width: '44px', height: '44px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Trash2 size={22} color="#ea4335" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>4. Unterbrechungsfreies Spur-Löschen</span>
-                  <span style={{ fontSize: '0.70rem', color: '#ea4335', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Doppelte Bestätigung</span>
-                </div>
-              </div>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.5, margin: 0 }}>
-                Klicke auf das Mülleimer-Icon am Ende einer Spur. Nach doppelter Sicherheitsbestätigung wird die Spur gelöscht. Alle anderen Spuren spielen ohne Unterbrechung weiter, und du kannst die freie Spur sofort neu einspielen.
-              </p>
-              <div style={{ background: '#fef2f2', borderRadius: '14px', padding: '12px', border: '1px dashed #fecaca', fontSize: '0.74rem', color: '#b91c1c', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Trash2 size={16} color="#ea4335" />
-                <span>Maximale Sicherheit: Verhindert versehentliches Löschen und hält deine Band im Takt.</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <LoopstationMasterclassGuide
+          didacticLevel={didacticLevel}
+          onStartStudio={handleFinishOnboarding}
+          isMobile={isMobileView}
+        />
       ) : (
 
       <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', gap: '20px', flex: 1, width: '100%', alignItems: isMobileView ? 'center' : 'flex-start' }}>
@@ -4040,10 +3822,10 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         <div style={{
           width: '300px',
           height: '460px',
-          background: 'linear-gradient(135deg, #3c3c3e 0%, #1c1c1e 100%)',
+          background: '#0f172a',
           borderRadius: '38px',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.15), inset 0 -2px 5px rgba(0,0,0,0.5)',
+          border: 'none',
+          boxShadow: 'none',
           padding: '20px 16px',
           display: 'flex',
           flexDirection: 'column',
@@ -4056,17 +3838,17 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             position: 'absolute',
             inset: '1px',
             borderRadius: '37px',
-            border: '1px solid rgba(255, 255, 255, 0.04)',
+            border: 'none',
             pointerEvents: 'none'
           }} />
 
           <div style={{
             width: '266px',
             height: '180px',
-            background: 'linear-gradient(180deg, #18202c 0%, #0d1218 100%)',
+            background: '#0f172a',
             borderRadius: '20px',
-            border: '2.5px solid #111112',
-            boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08)',
+            border: 'none',
+            boxShadow: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -4079,7 +3861,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               left: 0,
               width: '100%',
               height: '100%',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0) 41%, rgba(255,255,255,0) 100%)',
+              background: 'transparent',
               pointerEvents: 'none',
               zIndex: 10
             }} />
@@ -4102,9 +3884,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   bottom: '-8px',
                   borderRadius: '50%',
                   border: activeBeatPulse === 'downbeat' ? '3.5px solid #ea4335' : '2.5px solid #34a853',
-                  boxShadow: activeBeatPulse === 'downbeat'
-                    ? '0 0 16px #ea4335, inset 0 0 10px #ea4335'
-                    : '0 0 12px #34a853, inset 0 0 8px #34a853',
+                  boxShadow: 'none',
                   opacity: 0.95,
                   pointerEvents: 'none',
                   zIndex: 25,
@@ -4156,18 +3936,12 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   width: '124px',
                   height: '124px',
                   borderRadius: '50%',
-                  background: activeSubTab === 'saved'
-                    ? (isSavedLoopPlaying ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)')
-                    : (isAutoSequenceActive
-                      ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)'
-                      : isPlaying
-                        ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)'
-                        : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)'),
+                  background: '#0f172a',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.08)',
+                  boxShadow: 'none',
                   transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
                 }}
               >
@@ -4240,7 +4014,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 fontSize: '0.44rem',
                 fontWeight: 800,
                 letterSpacing: '0.04em',
-                color: isPause ? '#eab308' : '#ef4444',
+                color: isPause ? '#facc15' : '#ef4444',
                 textTransform: 'uppercase',
                 animation: 'pulse 1s infinite alternate'
               }}>
@@ -4270,8 +4044,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             width: '210px',
             height: '210px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2d2d30 0%, #1e1e20 100%)',
-            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 -1.5px 3px rgba(0,0,0,0.4)',
+            background: '#0f172a',
+            boxShadow: 'none',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
@@ -4422,36 +4196,34 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 borderRadius: '50%',
                 background: (() => {
                   if (activeSubTab === 'saved') {
-                    return isSavedLoopPlaying ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)' : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)';
+                    return isSavedLoopPlaying ? '#34a853' : '#e2e8f0';
                   }
-                  if (isPause) return 'linear-gradient(135deg, #facc15 0%, #eab308 100%)';
+                  if (isPause) return '#facc15';
                   if (isAutoSequenceActive || tracks.some(t => t.isRecording || t.isWaiting)) {
-                    return 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
+                    return '#ef4444';
                   }
-                  if (isPlaying) return 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
+                  if (isPlaying) return '#ef4444';
 
                   const hasBouncedOverdubAvailable = useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url);
                   if (hasBouncedOverdubAvailable) {
-                    return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                    return '#ef4444';
                   }
 
                   const hasRecordedTracks = tracks.some(t => t.url);
                   if (hasRecordedTracks) {
-                    return 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)';
+                    return '#34a853';
                   }
-                  return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                  return '#ef4444';
                 })(),
-                border: '1.5px solid rgba(0, 0, 0, 0.15)',
-                boxShadow: (activeSubTab === 'studio' && (isAutoSequenceActive || (useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url))))
-                  ? '0 0 16px rgba(239, 68, 68, 0.45)'
-                  : 'inset 0 1.5px 2px rgba(255,255,255,0.6), 0 4px 8px rgba(0,0,0,0.25)',
+                border: 'none',
+                boxShadow: 'none',
                 cursor: (activeSubTab === 'studio' && isAutoSequenceActive) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '0.72rem',
                 fontWeight: 900,
-                color: (activeSubTab === 'saved' ? isSavedLoopPlaying : (isAutoSequenceActive || isPause || isPlaying || (useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url)))) ? '#ffffff' : '#3a3a3c',
+                color: (activeSubTab === 'saved' ? !isSavedLoopPlaying : isPause) ? '#0f172a' : '#ffffff',
                 textTransform: 'uppercase',
                 transition: 'all 0.25s ease'
               }}
@@ -4704,14 +4476,14 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           <>
         <div style={{
           width: '100%',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f4f5f8 100%)',
+          background: '#f8fafc',
           border: '1.5px solid rgba(0, 0, 0, 0.08)',
           borderRadius: '20px',
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.03)',
+          boxShadow: 'none',
           marginBottom: '8px'
         }}>
           <style>{`
@@ -4837,8 +4609,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 flex: isMobileView ? '1 1 calc(50% - 4px)' : 1.3,
                 minWidth: isMobileView ? '130px' : 'auto',
                 boxSizing: 'border-box',
-                background: useHeadphones ? 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)' : '#ffffff',
-                border: useHeadphones ? '1.5px solid #34a853' : '1.5px solid rgba(0, 0, 0, 0.08)',
+                background: useHeadphones ? '#dcfce7' : '#ffffff',
+                border: useHeadphones ? 'none' : '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '12px',
                 padding: '8px 10px',
                 cursor: isAutoSequenceActive ? 'not-allowed' : 'pointer',
@@ -4851,9 +4623,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Headphones size={13} style={{ color: useHeadphones ? '#2e7d32' : '#86868b' }} />
+                <Headphones size={13} style={{ color: useHeadphones ? '#15803d' : '#86868b' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#2e7d32' : '#1d1d1f' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: useHeadphones ? '#15803d' : '#1d1d1f' }}>
                     Kopfhörer-Modus
                   </span>
                   <span style={{ fontSize: '0.50rem', color: '#616161', fontWeight: 500 }}>
@@ -4929,8 +4701,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 flex: isMobileView ? '1 1 100%' : 1.5,
                 width: isMobileView ? '100%' : 'auto',
                 boxSizing: 'border-box',
-                background: isMetronomeActive ? 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)' : '#ffffff',
-                border: isMetronomeActive ? '1.5px solid #facc15' : (showAdvancedSettings ? '1.5px solid #1976d2' : '1.5px solid rgba(0, 0, 0, 0.08)'),
+                background: isMetronomeActive ? '#fef9c3' : '#ffffff',
+                border: isMetronomeActive ? 'none' : '1.5px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '12px',
                 padding: '6px 10px',
                 display: 'flex',
@@ -4938,7 +4710,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 justifyContent: 'space-between',
                 gap: '8px',
                 transition: 'all 0.25s ease',
-                boxShadow: isMetronomeActive ? '0 2px 8px rgba(234, 179, 8, 0.15)' : 'none'
+                boxShadow: 'none'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -4947,15 +4719,15 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   onClick={togglePlaybackBeatSync}
                   className="tactile-btn hover-scale-mini"
                   style={{
-                    background: isMetronomeActive ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : 'rgba(0, 0, 0, 0.05)',
-                    border: isMetronomeActive ? '1.5px solid #ca8a04' : '1px solid rgba(0, 0, 0, 0.08)',
+                    background: isMetronomeActive ? '#facc15' : 'rgba(0, 0, 0, 0.05)',
+                    border: 'none',
                     borderRadius: '8px',
                     padding: '4px 8px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '5px',
                     cursor: 'pointer',
-                    boxShadow: isMetronomeActive ? '0 2px 6px rgba(234, 179, 8, 0.25)' : 'none',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                   title={isMetronomeActive ? 'Playback-Beat stummschalten (Taste M)' : 'Playback-Beat synchron zuschalten (Taste M)'}
@@ -4963,10 +4735,10 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 >
                   <span style={{ fontSize: '0.85rem' }}>{metronomeSound.includes('beat') ? '🥁' : '🔔'}</span>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isMetronomeActive ? '#854d0e' : '#1d1d1f' }}>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0f172a' }}>
                       {metronomeSound.includes('beat') ? 'Beat' : 'Metronom'}
                     </span>
-                    <span style={{ fontSize: '0.48rem', fontWeight: 700, color: isMetronomeActive ? '#713f12' : '#64748b' }}>
+                    <span style={{ fontSize: '0.48rem', fontWeight: 700, color: isMetronomeActive ? '#0f172a' : '#64748b' }}>
                       {isMetronomeActive ? 'SYNC AN' : 'AUS'}
                     </span>
                   </div>
@@ -4978,7 +4750,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   className="tactile-btn hover-scale-mini"
                   style={{
                     background: showAdvancedSettings ? '#e0f2fe' : 'transparent',
-                    border: showAdvancedSettings ? '1px solid #0284c7' : '1px solid transparent',
+                    border: 'none',
                     borderRadius: '6px',
                     padding: '5px',
                     display: 'flex',
@@ -5098,8 +4870,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               }}
               style={{
                 flex: 1.2,
-                background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
-                border: '1.5px solid #a7f3d0',
+                background: '#d1fae5',
+                border: 'none',
                 borderRadius: '12px',
                 padding: '8px 12px',
                 cursor: 'pointer',
@@ -5115,17 +4887,17 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               aria-label={`Latenz-Ausgleich synchronisiert mit ${syncOffsetMs} Millisekunden`}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={13} style={{ color: '#34a853' }} />
+                <Zap size={13} style={{ color: '#047857' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1b5e20' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857' }}>
                     Latenz-Ausgleich
                   </span>
-                  <span style={{ fontSize: '0.50rem', color: '#2e7d32', fontWeight: 700 }}>
+                  <span style={{ fontSize: '0.50rem', color: '#047857', fontWeight: 700 }}>
                     🎯 Synchronisiert
                   </span>
                 </div>
               </div>
-              <span style={{ fontSize: '0.64rem', color: '#34a853', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
+              <span style={{ fontSize: '0.64rem', color: '#047857', fontWeight: 900, fontFamily: 'SF Mono, monospace' }}>
                 {syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs}ms
               </span>
             </div>
@@ -5135,8 +4907,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           {(tracks.filter(t => !!t.url).length >= 2 || bounceBackupState !== null) && (
             <div style={{
               width: '100%',
-              background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-              border: '1.5px solid #fde047',
+              background: '#fef9c3',
+              border: 'none',
               borderRadius: '12px',
               padding: '8px 14px',
               display: 'flex',
@@ -5147,12 +4919,12 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               marginTop: '4px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Layers size={14} style={{ color: '#ca8a04' }} />
+                <Layers size={14} style={{ color: '#854d0e' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                   <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#854d0e' }}>
                     Analoger Bandmaschinen Bounce (Ping-Pong Recording)
                   </span>
-                  <span style={{ fontSize: '0.52rem', color: '#a16207', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.52rem', color: '#854d0e', fontWeight: 600 }}>
                     Mixe alle Spuren (1-4) auf Spur 1 zusammen & schalte Spur 2-4 für neue Aufnahmen frei!
                   </span>
                 </div>
@@ -5191,8 +4963,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                     title={!useHeadphones ? "Bitte aktiviere den Kopfhörer-Modus für Bandmaschinen-Bounce" : "Mixe Spuren 1-4 auf Spur 1 zusammen"}
                     className="tactile-btn"
                     style={{
-                      background: useHeadphones ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : '#cbd5e1',
-                      color: '#ffffff',
+                      background: useHeadphones ? '#facc15' : '#cbd5e1',
+                      color: '#0f172a',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '5px 12px',
@@ -5203,7 +4975,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: useHeadphones ? '0 2px 6px rgba(202, 138, 4, 0.3)' : 'none'
+                      boxShadow: 'none'
                     }}
                   >
                     <Layers size={12} />
@@ -5239,7 +5011,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                     padding: '4px 8px',
                     background: '#fce8e6',
                     borderRadius: '6px',
-                    border: '1px solid rgba(234, 67, 53, 0.15)',
+                    border: 'none',
                     width: 'fit-content'
                   }}>
                     ⚠️ Tipp: Metronom stummschalten oder Kopfhörer nutzen, damit das Klicken nicht mit aufgenommen wird!
@@ -5251,9 +5023,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                     onClick={togglePlaybackBeatSync}
                     className="tactile-btn"
                     style={{
-                      background: isMetronomeActive ? '#eab308' : '#e5e5ea',
+                      background: isMetronomeActive ? '#facc15' : '#e5e5ea',
                       border: 'none',
-                      color: isMetronomeActive ? '#ffffff' : '#1d1d1f',
+                      color: '#0f172a',
                       fontSize: '0.62rem',
                       fontWeight: 800,
                       borderRadius: '8px',
@@ -5387,8 +5159,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                         type="button"
                         onClick={() => togglePreviewMetronomeSound()}
                         style={{
-                          background: isPreviewingSound ? 'linear-gradient(135deg, #fef08a 0%, #fde047 100%)' : '#f1f5f9',
-                          border: isPreviewingSound ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
+                          background: isPreviewingSound ? '#fef9c3' : '#f1f5f9',
+                          border: 'none',
                           color: isPreviewingSound ? '#854d0e' : '#334155',
                           borderRadius: '8px',
                           height: '32px',
@@ -5399,7 +5171,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px',
-                          boxShadow: isPreviewingSound ? '0 2px 10px rgba(234, 179, 8, 0.35)' : 'none',
+                          boxShadow: 'none',
                           transition: 'all 0.15s ease',
                           whiteSpace: 'nowrap'
                         }}
@@ -5445,7 +5217,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                       top: 0,
                       bottom: 0,
                       width: `${loopstationMetronomeVolume}%`,
-                      background: 'linear-gradient(90deg, #eab308 0%, #ca8a04 100%)',
+                      background: '#facc15',
                       borderRadius: '999px',
                       transition: 'width 0.05s ease-out'
                     }} />
@@ -5526,7 +5298,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
-                          border: '1.5px solid #a7f3d0',
+                          border: 'none',
                           boxShadow: '0 1.5px 4px rgba(0,0,0,0.03)',
                           transition: 'all 0.15s ease',
                           minHeight: '24px',
@@ -5561,7 +5333,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                       top: 0,
                       bottom: 0,
                       width: `${((syncOffsetMs + 150) / 500) * 100}%`,
-                      background: 'linear-gradient(90deg, #64748b 0%, #475569 100%)',
+                      background: '#475569',
                       borderRadius: '999px',
                       transition: 'width 0.05s ease-out'
                     }} />
@@ -5857,8 +5629,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                     <button
                       type="button"
                       onClick={() => startRecording(track.id)}
-                      disabled={isPlaying || isAutoSequenceActive}
+                      disabled={isAutoSequenceActive || isPermissionPending}
                       className="tactile-btn"
+                      title={track.isWaiting ? 'Wartet auf nächsten Takt (Klick zum Abbrechen)' : 'Aufnahme starten (im Takt)'}
                       style={{
                         background: track.isWaiting ? '#fef3c7' : '#e6f4ea',
                         color: track.isWaiting ? '#d97706' : '#34a853',
@@ -5866,11 +5639,11 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                         borderRadius: '50%',
                         width: isCompact ? '26px' : '32px',
                         height: isCompact ? '26px' : '32px',
-                        cursor: isPlaying || isAutoSequenceActive ? 'not-allowed' : 'pointer',
+                        cursor: isAutoSequenceActive || isPermissionPending ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        opacity: isPlaying || isAutoSequenceActive ? 0.4 : 1,
+                        opacity: isAutoSequenceActive || isPermissionPending ? 0.4 : 1,
                         flexShrink: 0
                       }}
                     >
@@ -5928,9 +5701,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                         top: 0,
                         bottom: 0,
                         width: `${track.volume}%`,
-                        background: track.isMuted 
-                          ? '#94a3b8' 
-                          : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
+                        background: track.isMuted ? '#94a3b8' : '#34a853',
                         borderRadius: '999px',
                         transition: 'width 0.05s ease-out'
                       }} />
@@ -6020,9 +5791,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                       onClick={() => handleSoloToggle(track.id)}
                       disabled={!hasAudio}
                       style={{
-                        background: track.isSoloed ? '#fef08a' : '#f1f5f9',
+                        background: track.isSoloed ? '#fef9c3' : '#f1f5f9',
                         color: track.isSoloed ? '#854d0e' : '#64748b',
-                        border: track.isSoloed ? '1px solid #fde047' : '1px solid transparent',
+                        border: 'none',
                         borderRadius: '6px',
                         padding: isCompact ? '2px 5px' : '3px 7px',
                         fontWeight: 800,
@@ -6039,9 +5810,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                       onClick={() => handleMuteToggle(track.id)}
                       disabled={!hasAudio}
                       style={{
-                        background: track.isMuted ? '#fce8e6' : '#f1f5f9',
-                        color: track.isMuted ? '#ea4335' : '#64748b',
-                        border: track.isMuted ? '1px solid #f87171' : '1px solid transparent',
+                        background: track.isMuted ? '#fee2e2' : '#f1f5f9',
+                        color: track.isMuted ? '#b91c1c' : '#64748b',
+                        border: 'none',
                         borderRadius: '6px',
                         padding: isCompact ? '2px 5px' : '3px 7px',
                         fontWeight: 800,
@@ -6115,9 +5886,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                                 fontWeight: 800,
                                 letterSpacing: '0.05em',
                                 fontFamily: 'SF Mono, monospace',
-                                background: isBarActive ? 'rgba(234, 179, 8, 0.18)' : 'rgba(0, 0, 0, 0.04)',
-                                color: isBarActive ? '#d97706' : '#64748b',
-                                border: isBarActive ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid rgba(0, 0, 0, 0.05)',
+                                background: isBarActive ? '#fef9c3' : 'rgba(0, 0, 0, 0.04)',
+                                color: isBarActive ? '#854d0e' : '#64748b',
+                                border: 'none',
                                 padding: isCompact ? '0.5px 4px' : '1px 5px',
                                 borderRadius: '3px',
                                 transition: 'all 0.15s ease'
@@ -6172,7 +5943,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                                   blockColor = isCurrentStep ? '#ef4444' : 'rgba(239, 68, 68, 0.45)';
                                 } else if (hasAudio) {
                                   if (isCurrentStep) {
-                                    blockColor = '#eab308';
+                                    blockColor = '#facc15';
                                   } else if (isPassed) {
                                     blockColor = 'rgba(52, 168, 83, 0.65)';
                                   } else {
@@ -6180,7 +5951,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                                   }
                                 } else {
                                   if (isCurrentStep) {
-                                    blockColor = '#eab308';
+                                    blockColor = '#facc15';
                                   } else {
                                     blockColor = isDownbeat ? '#94a3b8' : '#cbd5e1';
                                   }
@@ -6208,7 +5979,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                                       background: blockColor,
                                       transition: 'all 0.06s ease',
                                       opacity: isCurrentStep ? 1 : ((hasAudio || track.isRecording) ? (isDownbeat ? 1.0 : 0.85) : (isDownbeat ? 0.9 : 0.6)),
-                                      boxShadow: isCurrentStep ? '0 0 10px rgba(234, 179, 8, 0.9)' : 'none',
+                                      boxShadow: 'none',
                                       cursor: 'pointer'
                                     }}
                                   />
@@ -6274,9 +6045,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '12px 16px',
-                        background: isSelected ? 'rgba(52, 168, 83, 0.05)' : '#f5f5f7',
+                        background: isSelected ? '#dcfce7' : '#f5f5f7',
                         borderRadius: '12px',
-                        border: isSelected ? '1.5px solid #34a853' : '1.5px solid transparent',
+                        border: 'none',
                         cursor: 'pointer',
                         transition: 'all 0.2s ease'
                       }}
@@ -6290,7 +6061,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                             <span style={{
                               fontSize: '0.66rem',
                               fontWeight: 800,
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              background: '#10b981',
                               color: '#ffffff',
                               padding: '2px 8px',
                               borderRadius: '100px',
@@ -6304,8 +6075,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                             <span style={{
                               fontSize: '0.66rem',
                               fontWeight: 800,
-                              background: '#ede9fe',
-                              color: '#6d28d9',
+                              background: '#f3e8ff',
+                              color: '#7e22ce',
                               padding: '2px 8px',
                               borderRadius: '100px',
                               display: 'inline-flex',
@@ -6319,9 +6090,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                               type="button"
                               onClick={(e) => handleToggleLoopVisibility(loop, e)}
                               style={{
-                                background: loop.visibility === 'shared_with_teacher' ? '#ede9fe' : '#f1f5f9',
-                                color: loop.visibility === 'shared_with_teacher' ? '#6d28d9' : '#475569',
-                                border: loop.visibility === 'shared_with_teacher' ? '1px solid #c4b5fd' : '1px solid #cbd5e1',
+                                background: loop.visibility === 'shared_with_teacher' ? '#f3e8ff' : '#f1f5f9',
+                                color: loop.visibility === 'shared_with_teacher' ? '#7e22ce' : '#475569',
+                                border: 'none',
                                 padding: '2px 8px',
                                 borderRadius: '100px',
                                 fontSize: '0.66rem',

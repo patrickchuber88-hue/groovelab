@@ -1,76 +1,70 @@
-# Implementation Plan: 0,1% Goldstandard – Avatar Gallery Performance & Ladezeit-Optimierung
+# Implementierungsplan: 0,1% Goldstandard Campus-Grün Konsistenz (Übe-Pfad)
 
-## 1. Ausgangsbefund & Performance-Analyse
-
-Die Avatar-Auswahlmaske ([ProfileBandModalsHub.tsx](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/apps/groovelab/src/components/modals/ProfileBandModalsHub.tsx#L780)) ist visuell hochwertig, weist jedoch signifikante Performance-Flaschenhälse auf:
-1. **Hohe Netzwerklast:** In der Kategorie *„Alle“* werden 85 unkomprimierte PNG-Bilder geladen. Bei einer durchschnittlichen Dateigröße von ca. 270 KB bis 350 KB entspricht dies einer initialen Download-Last von **ca. 25 Megabyte**.
-2. **Fehlende Next-Gen Bildkompression (WebP):** PNGs sind für fotorealistische 3D-Bilder ineffizient. Eine verlustfreie/hochwertige WebP-Kompression (Qualität 85%) reduziert die Dateigröße um **88 %** (von 266 KB auf 32 KB pro Bild).
-3. **GPU- & Layout-Last:** Alle 85 DOM-Elemente werden ohne Virtualisierung oder `content-visibility: auto` im Render-Tree berechnet.
-4. **Fehlende Bilddimensionen:** Dem `<img>`-Tag fehlen explizite HTML-Attribute (`width`, `height`), was zu unruhigem Layout-Shift (CLS) während des Ladens führen kann.
+## 🎯 Kontext & Problemstellung
+Auf der dargestellten Campus **Übe-Pfad**-Seite (`StudentPracticeTab.tsx` & Satellit `PracticeHomeworkCard.tsx`) weicht ein Großteil der grünen UI-Elemente vom autoritativen Campus-Grün ab. Anstelle des CI/CD-Standards wurden uneinheitliche Tailwind-Emerald- (`#10b981`, `#059669`, `#047857`, `#d1fae5`) und Tailwind-Green-Werte (`#16a34a`, `#15803d`, `#dcfce7`) verwendet, während der Primär-Button bereits das autoritative Campus-Grün `#34a853` besitzt.
 
 ---
 
-## 2. Zielsetzung nach dem 0,1% Enterprise Goldstandard
+## 🏛️ 0,1% Goldstandard Evaluation (Axiome & Farb-Harmonie)
 
-- **90 % Payload-Reduktion:** Reduktion des gesamten Bilder-Payloads von ~25 MB auf **~2,5 MB**.
-- **Dual-Format Parität (Zero-Risk):** Bestehende PNG-Dateien bleiben als 100%ige Fallbacks vollständig erhalten; WebP-Dateien werden daneben bereitgestellt.
-- **Modern Web Standard (`<picture>`):** WebP wird über `<picture><source type="image/webp" ... /><img ... /></picture>` serviert.
-- **Butterweiches 120-Hz-Scrolling:** Durch `contentVisibility: 'auto'` und `containIntrinsicSize: '220px 220px'` werden Off-Screen-Kacheln von teuren Paint-Zyklen befreit.
-- **Zero Layout Shift (CLS = 0):** Explizite Breiten- und Höhenattribute verhindern Nachrutschen beim Scrollen.
+Gemäß **`theme/tokens.ts`** und dem **Enterprise Monolith Goldstandard (`AGENTS.md`)** gilt für den Campus-Kontext:
+* **Primary / Solid Fill**: `#34a853` (Autoritatives Campus-Grün)
+* **Surface / Light Background**: `#e6f4ea` (Helle Tonal-Variante von Campus-Grün)
+* **High-Contrast Text / Labels (BFSG & WCAG 2.2 AA $\ge 4.5:1$)**: `#137333` (Verhindert Kontrastmängel von `#34a853` auf hellem Grund)
+* **Borders / Dividers**: `rgba(52, 168, 83, 0.25)` bzw. `#34a853`
 
----
+### 🔍 Detaillierte Bestandsaufnahme auf der Übe-Pfad-Seite:
 
-## 3. Geplante Schritte im Detail
-
-### Schritt 1: Batch-Kompression der Avatar-Assets nach WebP
-- Ausführen eines einmaligen verlustarmen Konvertierungsskripts (`scripts/optimize_avatars_to_webp.py` via PIL/Pillow):
-  - Konvertiert alle 176 Avatar-PNGs in `apps/groovelab/public/avatars/` nach `.webp` (Qualität: 85 %, method: 6).
-  - Die Original-`.png`-Dateien bleiben für bestehende Datenbank-Referenzen und ältere Browser unberührt erhalten.
-  - Erwartete Speicherersparnis: von ~50 MB auf unter 6 MB.
-
-### Schritt 2: Veredelung der Bilder-Pipeline in `ProfileBandModalsHub.tsx`
-- In `apps/groovelab/src/components/modals/ProfileBandModalsHub.tsx` (Zeilen 994–1025):
-  - Kachel-Styling erweitern um `contentVisibility: 'auto'`, `containIntrinsicSize: '220px 220px'` und dezenten Dark-Shimmer-Hintergrund `rgba(255,255,255,0.05)`.
-  - Bild-Tag auf modernes `<picture>` mit WebP-First-Strategie umstellen:
-    ```tsx
-    <picture>
-      <source srcSet={av.url.replace(/\.png$/i, '.webp')} type="image/webp" />
-      <img
-        src={av.url}
-        loading="lazy"
-        decoding="async"
-        width={220}
-        height={220}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        alt=""
-      />
-    </picture>
-    ```
-
----
-
-## 4. Betroffene Dateien & Bounded Contexts
-
-| Datei / Pfad | Bounded Context | Art der Änderung |
+| UI-Element | Aktueller Farbwert (Ist) | Autoritativer Goldstandard (Soll) |
 | :--- | :--- | :--- |
-| `apps/groovelab/public/avatars/*.webp` | Static Assets / Avatare | **NEU:** WebP-Dateien der bestehenden 3D-Avatare |
-| `apps/groovelab/src/components/modals/ProfileBandModalsHub.tsx` | Profile & Band Modals | Veredelung mit `<picture>`, WebP-Support & `content-visibility: auto` |
+| **Header Icon-Badge** („Übe-Pfad“) | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **XP-Pill** („1453 XP“) | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **Tages-Fokus Pill** („TAGES-FOKUS: 3 MIN.“) | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **Activity Ring** (Fortschritts-Kreis) | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **Fokuszeit Pill** (unter Timer 03:00) | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **Session-Button** („▶ Fokus-Session starten“) | `#34a853` | `#34a853` *(bereits korrekt)* |
+| **Ergonomie-Tips** (Icons & Text) | `#16a34a` / `#15803d` | `#34a853` (Icon) / `#137333` (Text) |
+| **Wochen-Konsistenz Icon-Badge** | `#10b981` (Emerald-500) | `#34a853` (Campus-Grün) |
+| **Wochentag „Erledigt“ Kapsel** | `#d1fae5` / `#047857` | `#e6f4ea` (Bg) / `#137333` (Text) / `#34a853` (Icon) |
+| **Wochen-Fokus Header-Icon** | Gradient `#10b981` $\to$ `#059669` | `#34a853` (Solid Campus-Grün) |
+| **Badges „3 Aufgaben“ & „S. 2“** | `#dcfce7` / `#15803d` | `#e6f4ea` (Bg) / `#137333` (Text) |
+| **Links „Aufgabenheft >“ & „Öffnen >“** | `#16a34a` | `#34a853` (Campus-Grün) |
+| **Aufgaben-Karten Akzente & Icons** | `#10b981` / `#16a34a` | `#34a853` (Campus-Grün) |
+| **Übe-Chronik & Archiv Header-Icon** | `#10b981` | `#34a853` (Campus-Grün) |
+| **Archiv Monats-Badges** (z.B. „0 Übetage“) | `#d1fae5` / `#047857` | `#e6f4ea` (Bg) / `#137333` (Text) |
+| **Archiv Mastered Sessions** (Balken & Icons) | `#10b981` / `#16a34a` / `#15803d` | `#34a853` (Akzent) / `#137333` (Text) |
+| **Zen-Timer Fokus-Zeit Badge** | `#10b981` | `#34a853` (Campus-Grün) |
 
 ---
 
-## 5. Verifikation & Qualitätskriterien
+## 🛠️ Geplante chirurgische Modifikationen
 
-- [ ] **Visuelle Parität:** Alle Avatare sehen im Modal gestochen scharf aus, ohne Artefakte oder Farbverschiebungen.
-- [ ] **Netzwerk-Payload:** Der Download pro Avatar sinkt von ca. 270 KB auf ca. 30 KB.
-- [ ] **Fallback-Sicherheit:** Falls ein WebP-Bild fehlen sollte, greift der Browser automatisch nahtlos auf die `.png`-Version zurück.
-- [ ] **Desktop & Mobile Scrolling:** Konstante 60/120 fps beim Durchscrollen aller 85 Avatare.
-- [ ] **Desktop Layout Immunity:** Keine visuellen Verschiebungen im Grid.
-- [ ] **Strict Invariants:** Keine eigenständigen `npm run`-Befehle außerhalb des Codeworts „commit“.
+### 1. `apps/groovelab/src/components/student/tabs/StudentPracticeTab.tsx`
+* Bereinigung aller Hardcoded Emerald/Green-Werte in der Hauptansicht:
+  - Header-Iconbox: `background: '#34a853'`
+  - XP-Pill: `background: '#34a853'`
+  - Tages-Fokus Badge: `background: '#34a853'`
+  - Activity-Ring Arc: `stroke="#34a853"`
+  - Fokuszeit-Pill: `background: '#34a853'`
+  - Vorbereitungs-Labels & Icons: `#34a853` (Icons), `#137333` (Text)
+  - Activity-Iconbox (Wochen-Konsistenz): `background: '#34a853'`
+  - Wochentag `isMastered`: `cardBg = '#e6f4ea'`, `dayNameColor = '#137333'`, `iconEl = <CheckCircle size={14} color="#34a853" />`, `subTextColor = '#137333'`
+  - Archiv-Iconbox: `iconBadgeBg = '#34a853'` (für non-teen)
+  - Archiv Monats-Pills: `background: '#e6f4ea'`, `color: '#137333'`
+  - Archiv Session-List: Farbakzente vereinheitlicht auf `#34a853` / `#137333`
+  - Zen-Session-Badge & Progress-Arc: `#34a853`
+
+### 2. `apps/groovelab/src/components/student/practice/PracticeHomeworkCard.tsx`
+* Bereinigung der Wochen-Fokus-Karte:
+  - Header-Iconbox: `background: '#34a853'`
+  - Zähler-Badges (`3 Aufgaben`, `S. 2`): `background: '#e6f4ea'`, `color: '#137333'`
+  - Links & Chevrons (`Aufgabenheft >`, `Öffnen >`): `color: '#34a853'`
+  - Karten-Indikatoren: `borderLeft: '3px solid #34a853'`
+  - Audio-Preview-Buttons: `background: '#34a853'`
 
 ---
 
-## 6. Zwingender Stopp-Punkt (User Approval Required)
-
-> [!IMPORTANT]
-> **Genehmigungsvorbehalt gemäß Projekt-Governance:**  
-> Vor der Durchführung der Code- und Asset-Änderungen ist die ausdrückliche Freigabe des Entwicklers erforderlich. Erst nach deiner schriftlichen Freigabe (z. B. „Freigabe erteilt“ oder „Plan ausführen“) werde ich mit der Umsetzung beginnen.
+## 🛑 Zwingender Stopp-Punkt (Genehmigungsvorbehalt)
+Nach den Projektregeln (`.agents/AGENTS.md`) gilt ein strikter Genehmigungsvorbehalt (Zero Auto-Execute):
+* **Keine Codeänderungen ohne deine ausdrückliche Bestätigung.**
+* Bitte bestätige kurz mit **„Freigabe“**, **„Genehmigt“** oder **„Plan ausführen“**, damit ich die Anpassung chirurgisch und typ-sicher umsetze.

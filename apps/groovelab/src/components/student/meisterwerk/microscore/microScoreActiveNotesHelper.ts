@@ -2,11 +2,14 @@
  * 🏛️ Campus-Groovelab Micro-Score Studio (0,1% Goldstandard)
  * microScoreActiveNotesHelper.ts
  * 
- * Lückenlose Visual Sustain & Legato-Engine (Halten bis zum nächsten Ton).
- * Berechnet aktiv klingende Noten und Polyphonie-Ereignisse für Instrumenten-Visualizer.
+ * 100% Audio-Synchrone Visual-Sustain & Polyphonie-Engine:
+ * Berechnet für jeden Zeitpunkt exakt die Noten, deren musikalisches Kling-Intervall
+ * [noteStart, noteStart + durationSixteenths) aktiv ist — inklusive mehrstimmiger Haltenoten (Polyphonie)
+ * und exakter Triolen-Attack-Erkennung.
  */
 
 import { MicroScoreSnippet, MicroScoreNote } from './microScore.types';
+import { durationToSixteenthCount, getTimeSignatureFractions } from './microScoreGridEngine';
 
 export function calculateActiveMicroScoreNotes(
   snippet: MicroScoreSnippet,
@@ -15,59 +18,26 @@ export function calculateActiveMicroScoreNotes(
   activeBar: number,
   activeFraction: number
 ): MicroScoreNote[] {
-  const fractionsPerBar = snippet.timeSignature === '3/4' || snippet.timeSignature === '6/8' ? 12 : snippet.timeSignature === '2/4' ? 8 : 16;
+  if (!snippet.notes || snippet.notes.length === 0) return [];
+
+  const fractionsPerBar = getTimeSignatureFractions(snippet.timeSignature);
   const targetBar = isPlaying && playheadPos ? playheadPos.bar : activeBar;
   const targetFrac = isPlaying && playheadPos ? playheadPos.fraction : activeFraction;
   const currentAbsFraction = targetBar * fractionsPerBar + targetFrac;
-  const totalSnippetFractions = snippet.barsCount * fractionsPerBar;
 
-  if (!snippet.notes || snippet.notes.length === 0) return [];
+  // Filtere alle gepitchten Noten (keine Pausen), die zum aktuellen Zeitpunkt (oder am Cursor) aktiv klingen
+  return snippet.notes.filter(n => {
+    if (!n.pitch || n.pitch === 'REST') return false;
 
-  // Sortiere alle Noten chronologisch nach absolutem Startzeitpunkt
-  const sortedNotes = [...snippet.notes].sort((a, b) => {
-    const aAbs = a.barIndex * fractionsPerBar + a.beatFraction;
-    const bAbs = b.barIndex * fractionsPerBar + b.beatFraction;
-    return aAbs - bAbs;
+    const noteStart = n.barIndex * fractionsPerBar + n.beatFraction;
+    const noteLen = durationToSixteenthCount(n.duration, n.isDotted, n.isTriplet);
+    const noteEnd = noteStart + noteLen;
+
+    // 1. Exakter Attack-Treffer (inkl. Triolen-Brüche wie 1.33 / 2.66 auf dem 16tel-Scheduler-Grid)
+    const isAtAttack = n.barIndex === targetBar && Math.abs(n.beatFraction - targetFrac) < 0.5;
+    if (isAtAttack) return true;
+
+    // 2. Mehrstimmiges Sustain-Fenster: Note wurde früher angeschlagen und klingt über diesen Schlag hinweg weiter
+    return currentAbsFraction >= noteStart && currentAbsFraction < noteEnd - 0.1;
   });
-
-  // Gruppiere nach eindeutigen Startzeitpunkten (für simultane Akkorde)
-  const events: Array<{ absTime: number; notes: MicroScoreNote[] }> = [];
-  sortedNotes.forEach(n => {
-    const absTime = n.barIndex * fractionsPerBar + n.beatFraction;
-    const last = events[events.length - 1];
-    if (last && Math.abs(last.absTime - absTime) < 0.25) {
-      last.notes.push(n);
-    } else {
-      events.push({ absTime, notes: [n] });
-    }
-  });
-
-  if (events.length === 0) return [];
-
-  // Vor dem allerersten Ton
-  if (currentAbsFraction < events[0].absTime) {
-    return [];
-  }
-
-  // Finde das aktive Intervall [T_k, T_k+1)
-  let activeEventIndex = -1;
-  for (let i = 0; i < events.length; i++) {
-    const eventStart = events[i].absTime;
-    const nextEventStart = i + 1 < events.length ? events[i + 1].absTime : totalSnippetFractions;
-
-    if (currentAbsFraction >= eventStart && currentAbsFraction < nextEventStart) {
-      activeEventIndex = i;
-      break;
-    }
-  }
-
-  // Falls am/hinter dem letzten Event, aber noch innerhalb des Schnipsels
-  if (activeEventIndex === -1 && currentAbsFraction >= events[events.length - 1].absTime && currentAbsFraction < totalSnippetFractions) {
-    activeEventIndex = events.length - 1;
-  }
-
-  if (activeEventIndex === -1) return [];
-
-  const activeNotes = events[activeEventIndex].notes;
-  return activeNotes.filter(n => n.pitch && n.pitch !== 'REST');
 }

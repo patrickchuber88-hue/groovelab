@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert, Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown, ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2, HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet } from 'lucide-react';
 import { SecretaryRoomCollisionAlertCard } from './widgets/SecretaryRoomCollisionAlertCard';
+import { SecretaryRoomKpiRow } from './widgets/SecretaryRoomKpiRow';
+import { SecretaryRoomLocationTree } from './widgets/SecretaryRoomLocationTree';
+import { SecretaryRoomCardItem } from './widgets/SecretaryRoomCardItem';
 import { useModalA11y } from '../../hooks/useModalA11y';
 
 export interface SecretaryRoomsViewProps {
@@ -62,7 +65,7 @@ export function SecretaryRoomsView({
 }: SecretaryRoomsViewProps) {
   // Room state
   const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
-  const [roomFilterStatus, setRoomFilterStatus] = useState<string>('All');
+  const [roomFilterStatus, setRoomFilterStatus] = useState<string>('all');
   const [addedFloors, setAddedFloors] = useState<string[]>([]);
   const [dragHoveredFloor, setDragHoveredFloor] = useState<string | null>(null);
   const [isRoomCsvExpanded, setIsRoomCsvExpanded] = useState<boolean>(false);
@@ -507,7 +510,7 @@ export function SecretaryRoomsView({
           const INSTRUMENT_COLOR: Record<string, string> = {
             Schlagzeug: '#ef4444', Piano: '#3b82f6', Gitarre: '#34a853',
             Gesang: '#8b5cf6', Geige: '#f59e0b', Querflöte: '#06b6d4',
-            Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#eab308',
+            Saxophon: '#f97316', Bass: '#64748b', Keyboard: '#ec4899', Trompete: '#facc15',
           };
 
           // Reference all rooms directly without deduplicating by name, so rooms with same names in different buildings are not hidden
@@ -709,7 +712,7 @@ export function SecretaryRoomsView({
                       {((roomFilterFloor && roomFilterFloor !== 'All') || (selectedBuildingId && selectedBuildingId !== 'All')) && (
                         <div style={{
                           background: 'rgba(52, 168, 83, 0.03)',
-                          border: '1.5px solid rgba(52, 168, 83, 0.12)',
+                          border: 'none',
                           borderRadius: '16px',
                           padding: '12px 16px',
                           display: 'flex',
@@ -787,7 +790,7 @@ export function SecretaryRoomsView({
                             type="submit"
                             aria-label="Räume importieren"
                             disabled={roomCsvSaving || !roomCsvText.trim()}
-                            style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%)', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', opacity: roomCsvSaving || !roomCsvText.trim() ? 0.6 : 1 }}
+                            style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', background: '#3b82f6', color: '#ffffff', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', opacity: roomCsvSaving || !roomCsvText.trim() ? 0.6 : 1 }}
                           >
                             {roomCsvSaving ? 'Wird importiert...' : 'Importieren'}
                           </button>
@@ -796,118 +799,15 @@ export function SecretaryRoomsView({
                     </div>
                   )}
 
-                  {/* KPI ROW */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-                    {/* Gebäude/Standorte */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white',
-                      borderRadius: '16px', padding: '12px 16px',
-                      display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: 'none',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'all 0.2s ease'
-                    }} className="hover-scale">
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Gebäude/Standorte</span>
-                      <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{buildings.length}</strong>
-                    </div>
-
-                    {/* Räume Gesamt */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                      borderRadius: '16px', padding: '12px 16px',
-                      display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: 'none',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'all 0.2s ease'
-                    }} className="hover-scale">
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Räume Gesamt</span>
-                      <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{rooms.length}</strong>
-                    </div>
-
-                    {/* Campus Aktiv */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
-                      borderRadius: '16px', padding: '12px 16px',
-                      display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: 'none',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'all 0.2s ease'
-                    }} className="hover-scale">
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>Campus Aktiv</span>
-                      <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{rooms.filter(r => r.is_campus_active !== false).length}</strong>
-                    </div>
-
-                    {/* GrooveLab Aktiv */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
-                      borderRadius: '16px', padding: '12px 16px',
-                      display: 'flex', flexDirection: 'column', gap: '4px',
-                      boxShadow: 'none',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      transition: 'all 0.2s ease'
-                    }} className="hover-scale">
-                      <span style={{ fontSize: '0.65rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>GrooveLab Aktiv</span>
-                      <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{rooms.filter(r => r.is_groovelab_active).length}</strong>
-                    </div>
-                  </div>
-
-                  {/* COMPACT 1-LINE ROOM UTILIZATION TICKER (DESKTOP-ONLY, HIDDEN ON SMARTPHONES <= 768px) */}
-                  <div 
-                    className="hidden md:flex" 
-                    style={{
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '8px 14px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      fontSize: '0.74rem',
-                      color: '#475569',
-                      fontWeight: 700,
-                      overflowX: 'auto',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      <Activity size={13} style={{ color: '#475569' }} /> Auslastung:
-                    </span>
-                    {(() => {
-                      const roomEntries = (rooms || []).slice(0, 5).map((rm) => {
-                        const roomAllocs = matrixAllocations.filter(p => p.roomId === rm.id);
-                        const bookedMinutes = roomAllocs.reduce((sum: number, p: any) => {
-                          if (Array.isArray(p.slots) && p.slots.length > 0) {
-                            return sum + p.slots.reduce((slotSum: number, s: any) => slotSum + (s.duration || 30), 0);
-                          }
-                          if (p.startTime && p.endTime) {
-                            const [sh, sm] = p.startTime.split(':').map(Number);
-                            const [eh, em] = p.endTime.split(':').map(Number);
-                            const diff = (eh * 60 + em) - (sh * 60 + sm);
-                            return sum + (diff > 0 ? diff : 45);
-                          }
-                          return sum + 45;
-                        }, 0);
-                        const weeklyCap = rm.weekly_capacity_minutes || 2400;
-                        const pct = Math.min(100, Math.round((bookedMinutes / weeklyCap) * 100));
-                        return { name: rm.name, pct };
-                      });
-                      const avgPct = roomEntries.length > 0 ? Math.round(roomEntries.reduce((a, b) => a + b.pct, 0) / roomEntries.length) : 0;
-
-                      return (
-                        <>
-                          {roomEntries.map((re, idx) => (
-                            <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '6px' }}>
-                              <span>{re.name}:</span>
-                              <strong style={{ color: re.pct > 75 ? '#dc2626' : re.pct > 40 ? '#16a34a' : '#2563eb' }}>{re.pct}%</strong>
-                            </span>
-                          ))}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', border: '1px solid #7dd3fc', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
-                            <span>Gesamt:</span>
-                            <strong>{roomEntries.length > 0 ? avgPct : 0}%</strong>
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
+                  {/* 0,1% APPLE HIG KPI ROW & HARMONIZED TICKER */}
+                  <SecretaryRoomKpiRow
+                    buildingsCount={buildings.length}
+                    roomsCount={uniqueRooms.length}
+                    campusActiveCount={uniqueRooms.filter(r => r.is_campus_active !== false).length}
+                    groovelabActiveCount={uniqueRooms.filter(r => r.is_groovelab_active).length}
+                    rooms={uniqueRooms}
+                    matrixAllocations={matrixAllocations}
+                  />
                 </div>
 
                 {roomsSubView === 'plan' ? (
@@ -1015,7 +915,7 @@ export function SecretaryRoomsView({
                             <p className="no-pdf" style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
                           </div>
                           {roomSearchQuery && (
-                            <div className="no-pdf" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fee2e2', border: '1px solid #fca5a5', padding: '4px 10px', borderRadius: '100px' }}>
+                            <div className="no-pdf" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fee2e2', border: 'none', padding: '4px 10px', borderRadius: '100px' }}>
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#991b1b' }}>
                                 Gefiltert nach: <strong>„{roomSearchQuery}“</strong>
                               </span>
@@ -1053,7 +953,7 @@ export function SecretaryRoomsView({
                             fontWeight: 800,
                             background: '#fce8e6',
                             color: '#ea4335',
-                            border: '1px solid #f9d2ce',
+                            border: 'none',
                             cursor: 'pointer',
                             fontFamily: 'Urbanist',
                             transition: 'all 0.2s'
@@ -1123,7 +1023,7 @@ export function SecretaryRoomsView({
                                                   display: 'flex', 
                                                   flexDirection: 'column', 
                                                   gap: '2px',
-                                                  boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.15)' : 'none',
+                                                  boxShadow: 'none',
                                                   animation: hasConflict ? 'pulse 2s infinite' : 'none'
                                                 }}
                                                 title={hasConflict ? 'Zeitliche Überschneidung in diesem Raum!' : undefined}
@@ -1158,7 +1058,7 @@ export function SecretaryRoomsView({
                                                   display: 'flex',
                                                   flexDirection: 'column',
                                                   gap: '3px',
-                                                  boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.2)' : '0 2px 6px rgba(245, 158, 11, 0.12)',
+                                                  boxShadow: 'none',
                                                   animation: hasConflict ? 'pulse 2s infinite' : 'none'
                                                 }}
                                                 title={hasConflict ? 'Zeitliche Überschneidung mit einem regulären Stundenplan!' : 'Vorläufige Raumbuchung (Freigabe erforderlich)'}
@@ -1216,7 +1116,7 @@ export function SecretaryRoomsView({
                                                         style={{
                                                           background: 'rgba(239, 68, 68, 0.1)',
                                                           color: '#ef4444',
-                                                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                                                          border: 'none',
                                                           borderRadius: '5px',
                                                           padding: '3px 6px',
                                                           fontSize: '0.62rem',
@@ -1250,264 +1150,102 @@ export function SecretaryRoomsView({
                     </div>
                   </div>
                 ) : (
-                  /* ── OVERVIEW VIEW (3 COLUMNS: Buildings, Center list, Floor Sidebar) ── */
-                  <div style={{ display: 'flex', gap: '24px', width: '100%', alignItems: 'start' }}>
+                  /* ── 0,1% GOLDSTANDARD OVERVIEW: LOCATION TREE + EXPANSIVE ROOM WORKSPACE ── */
+                  <div style={{ display: 'flex', gap: '20px', width: '100%', alignItems: 'start' }}>
                     
-                    {/* COLUMN 1: BUILDINGS SIDEBAR */}
-                    <div className="google-card" style={{
-                      width: '340px',
-                      flexShrink: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '20px',
-                      padding: '24px',
-                      borderRadius: '24px',
-                      border: '1.5px solid #cbd5e1',
-                      background: '#ffffff',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <School size={20} style={{ color: '#0f172a' }} />
-                          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                            Gebäude
-                          </h3>
-                        </div>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
-                        Gebäude verwalten und Räume per Drag & Drop zuweisen.
-                      </p>
+                    {/* HIERARCHICAL 270px LOCATION & FLOORS NAVIGATION */}
+                    <SecretaryRoomLocationTree
+                      buildings={buildings}
+                      rooms={uniqueRooms}
+                      selectedBuildingId={selectedBuildingId}
+                      onSelectBuilding={(id) => setSelectedBuildingId(id)}
+                      selectedFloor={roomFilterFloor}
+                      onSelectFloor={(fl) => setRoomFilterFloor(fl)}
+                      onOpenBuildingEditor={openBuildingEditor}
+                      onDeleteBuilding={handleDeleteBuilding}
+                      onAddFloor={() => {
+                        let maxOG = 0;
+                        let maxUG = 0;
+                        allFloorsList.forEach(f => {
+                          const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
+                          if (ogMatch) {
+                            const num = parseInt(ogMatch[1]);
+                            if (num > maxOG) maxOG = num;
+                          }
+                          const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
+                          if (ugMatch) {
+                            const num = parseInt(ugMatch[1]);
+                            if (num > maxUG) maxUG = num;
+                          }
+                        });
+                        const nextOG = `${maxOG + 1}. OG`;
+                        const nextUG = `${maxUG + 1}. UG`;
+                        const choice = window.prompt(`Neues Stockwerk anlegen:
+1 für „${nextOG}“
+2 für „${nextUG}“
+Oder Freitext eingeben:`, nextOG);
+                        if (choice) {
+                          let finalFloor = choice.trim();
+                          if (finalFloor === '1') finalFloor = nextOG;
+                          if (finalFloor === '2') finalFloor = nextUG;
+                          if (finalFloor && !allFloorsList.includes(finalFloor)) {
+                            setAddedFloors(prev => [...prev, finalFloor]);
+                          }
+                        }
+                      }}
+                      onDeleteFloor={(flName) => {
+                        if (window.confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
+                          supabase.from('rooms').update({ floor: 'EG' }).eq('floor', flName).then(() => {
+                            setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
+                            const updated = addedFloors.filter(f => f !== flName);
+                            setAddedFloors(updated);
+                            if (roomFilterFloor === flName) setRoomFilterFloor('All');
+                          });
+                        }
+                      }}
+                      dragHoveredBuildingId={dragHoveredBuildingId}
+                      setDragHoveredBuildingId={setDragHoveredBuildingId}
+                      dragHoveredFloor={dragHoveredFloor}
+                      setDragHoveredFloor={setDragHoveredFloor}
+                      onDropRoomToBuilding={async (roomId, buildingId) => {
+                        const previousRooms = rooms;
+                        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: buildingId } : r));
+                        const { error } = await supabase.from('rooms').update({ building_id: buildingId }).eq('id', roomId);
+                        if (error) {
+                          setRooms(previousRooms);
+                          alert("Fehler beim Zuweisen des Gebäudes: " + error.message);
+                        }
+                      }}
+                      onDropRoomToFloor={async (roomId, floor) => {
+                        const previousRooms = rooms;
+                        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: floor } : r));
+                        const { error } = await supabase.from('rooms').update({ floor: floor }).eq('id', roomId);
+                        if (error) {
+                          setRooms(previousRooms);
+                          alert("Fehler beim Zuweisen des Stockwerks: " + error.message);
+                        }
+                      }}
+                      allFloorsList={allFloorsList}
+                      addedFloors={addedFloors}
+                      getFloorColor={getFloorColor}
+                    />
 
-                      <button
-                        onClick={() => openBuildingEditor()}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          borderRadius: '12px',
-                          padding: '8px 16px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          background: '#fce8e6',
-                          color: '#ea4335',
-                          border: '1px solid #f9d2ce',
-                          cursor: 'pointer',
-                          fontFamily: 'Urbanist',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Plus size={14} style={{ color: '#ea4335' }} />
-                        <span>Gebäude anlegen</span>
-                      </button>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-                        {/* Alle Gebäude card */}
-                        <div
-                          onClick={() => { setSelectedBuildingId('All'); }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '12px 16px',
-                            borderRadius: '16px',
-                            border: selectedBuildingId === 'All' ? '1.5px solid #ea4335' : '1.5px solid #f1f5f9',
-                            background: selectedBuildingId === 'All' ? '#fce8e6' : '#ffffff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <Building2 size={18} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Alle Gebäude</span>
-                              <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Standortübersicht</span>
-                            </div>
-                          </div>
-                          <span style={{ padding: '4px 10px', borderRadius: '10px', background: selectedBuildingId === 'All' ? '#fce8e6' : '#f1f5f9', color: selectedBuildingId === 'All' ? '#ea4335' : '#64748b', fontSize: '0.68rem', fontWeight: 800 }}>
-                            {uniqueRooms.length}
-                          </span>
-                        </div>
-
-                        {/* Ohne Zuordnung card */}
-                        {(() => {
-                          const isNoBuildingHovered = dragHoveredBuildingId === 'None';
-                          return (
-                            <div
-                              onClick={() => { setSelectedBuildingId(''); }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = "move";
-                                setDragHoveredBuildingId('None');
-                              }}
-                              onDragLeave={() => setDragHoveredBuildingId(null)}
-                              onDrop={async (e) => {
-                                const roomId = e.dataTransfer.getData("roomId");
-                                if (roomId) {
-                                  const previousRooms = rooms;
-                                  setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: null } : r));
-                                  const { error } = await supabase.from('rooms').update({ building_id: null }).eq('id', roomId);
-                                  if (error) {
-                                    setRooms(previousRooms);
-                                    alert("Fehler beim Entfernen des Gebäudes: " + error.message);
-                                  }
-                                }
-                                setDragHoveredBuildingId(null);
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                border: isNoBuildingHovered
-                                  ? '2px dashed #ea4335'
-                                  : selectedBuildingId === ''
-                                    ? '1.5px solid #ea4335'
-                                    : '1.5px solid #f1f5f9',
-                                background: isNoBuildingHovered
-                                  ? '#fce8e6'
-                                  : selectedBuildingId === ''
-                                    ? '#fce8e6'
-                                    : '#ffffff',
-                                cursor: 'pointer',
-                                transform: isNoBuildingHovered ? 'scale(1.02)' : 'scale(1)',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <HelpCircle size={18} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Ohne Zuordnung</span>
-                                  <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Kein Gebäude</span>
-                                </div>
-                              </div>
-                              <span style={{ padding: '4px 10px', borderRadius: '10px', background: selectedBuildingId === '' ? '#fce8e6' : '#f1f5f9', color: selectedBuildingId === '' ? '#ea4335' : '#475569', fontSize: '0.68rem', fontWeight: 800 }}>
-                                {uniqueRooms.filter(r => !r.building_id).length}
-                              </span>
-                            </div>
-                          );
-                        })()}
-
-                        {/* List of user buildings */}
-                        {buildings.map(b => {
-                          const isActive = selectedBuildingId === b.id;
-                          const isHovered = dragHoveredBuildingId === b.id;
-                          const roomCount = uniqueRooms.filter(r => r.building_id === b.id).length;
-                          return (
-                            <div
-                              key={b.id}
-                              onClick={() => { setSelectedBuildingId(b.id); }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = "move";
-                                setDragHoveredBuildingId(b.id);
-                              }}
-                              onDragLeave={() => setDragHoveredBuildingId(null)}
-                              onDrop={async (e) => {
-                                const roomId = e.dataTransfer.getData("roomId");
-                                if (roomId) {
-                                  const previousRooms = rooms;
-                                  setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: b.id } : r));
-                                  const { error } = await supabase.from('rooms').update({ building_id: b.id }).eq('id', roomId);
-                                  if (error) {
-                                    setRooms(previousRooms);
-                                    alert("Fehler beim Zuweisen des Gebäudes: " + error.message);
-                                  }
-                                }
-                                setDragHoveredBuildingId(null);
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                border: isHovered
-                                  ? '2px dashed #ea4335'
-                                  : isActive
-                                    ? '1.5px solid #ea4335'
-                                    : '1.5px solid #f1f5f9',
-                                background: isHovered
-                                  ? '#fce8e6'
-                                  : isActive
-                                    ? '#fce8e6'
-                                    : '#ffffff',
-                                cursor: 'pointer',
-                                transform: isHovered ? 'scale(1.02)' : 'scale(1)',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`Gebäude ${b.name} auswählen`}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setSelectedBuildingId(b.id);
-                                }
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <Building size={18} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {b.name}
-                                  </span>
-                                  {b.address && (
-                                    <span style={{ fontSize: '0.65rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                      <MapPin size={11} style={{ color: '#64748b' }} /> {b.address}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                <span style={{ padding: '4px 10px', borderRadius: '10px', background: isActive ? '#fce8e6' : '#f1f5f9', color: isActive ? '#ea4335' : '#64748b', fontSize: '0.68rem', fontWeight: 800 }}>
-                                  {roomCount}
-                                </span>
-                                <button
-                                  type="button"
-                                  aria-label={`Gebäude ${b.name} bearbeiten`}
-                                  onClick={(e) => { e.stopPropagation(); openBuildingEditor(b); }}
-                                  style={{ background: 'transparent', border: 'none', color: '#475569', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                >
-                                  <Edit2 size={13} style={{ color: '#475569' }} />
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`Gebäude ${b.name} löschen`}
-                                  onClick={(e) => { e.stopPropagation(); handleDeleteBuilding(b.id); }}
-                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                >
-                                  <Trash2 size={13} style={{ color: '#ef4444' }} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* COLUMN 2: CENTER ROOMS LIST OVERVIEW */}
-                    <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
+                    {/* EXPANSIVE 2-COLUMN ROOM WORKSPACE */}
+                    <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+                      
                       {/* FILTER & SEARCH */}
                       <div style={{ 
                         display: 'flex', 
-                        gap: '12px', 
-                        background: '#f8fafc', 
-                        padding: '8px', 
+                        gap: '10px', 
+                        background: '#ffffff', 
+                        padding: '10px 12px', 
                         borderRadius: '16px',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.02)',
                         flexWrap: 'wrap',
                         alignItems: 'center'
                       }}>
-                        <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
+                        <div style={{ flex: 1.5, minWidth: '180px', position: 'relative' }}>
                           <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                           <input 
                             type="text" 
@@ -1518,12 +1256,12 @@ export function SecretaryRoomsView({
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
-                              padding: roomSearchQuery ? '8px 32px 8px 34px' : '8px 12px 8px 34px',
-                              borderRadius: '8px',
+                              padding: roomSearchQuery ? '8px 30px 8px 34px' : '8px 12px 8px 34px',
+                              borderRadius: '10px',
                               border: '1px solid #cbd5e1',
                               fontSize: '0.78rem',
                               outline: 'none',
-                              background: 'white',
+                              background: '#ffffff',
                               fontWeight: 700
                             }}
                           />
@@ -1540,8 +1278,8 @@ export function SecretaryRoomsView({
                                 background: '#e2e8f0',
                                 border: 'none',
                                 borderRadius: '50%',
-                                width: '20px',
-                                height: '20px',
+                                width: '18px',
+                                height: '18px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1550,17 +1288,17 @@ export function SecretaryRoomsView({
                                 padding: 0
                               }}
                             >
-                              <X size={12} />
+                              <X size={11} />
                             </button>
                           )}
                         </div>
 
-                        <div style={{ flex: 1, minWidth: '130px' }}>
+                        <div style={{ minWidth: '140px' }}>
                           <select 
                             value={roomFilterFloor}
                             aria-label="Nach Stockwerk filtern"
                             onChange={(e) => setRoomFilterFloor(e.target.value)}
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: '#ffffff', fontWeight: 700 }}
                           >
                             <option value="All">Alle Stockwerke</option>
                             {allFloorsList.map(fl => (
@@ -1569,12 +1307,12 @@ export function SecretaryRoomsView({
                           </select>
                         </div>
 
-                        <div style={{ flex: 1, minWidth: '130px' }}>
+                        <div style={{ minWidth: '130px' }}>
                           <select 
                             value={roomFilterStatus}
                             aria-label="Nach Raumstatus oder Modul filtern"
                             onChange={(e) => setRoomFilterStatus(e.target.value as any)}
-                            style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: 'white', fontWeight: 700 }}
+                            style={{ width: '100%', padding: '8px 10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.78rem', outline: 'none', background: '#ffffff', fontWeight: 700 }}
                           >
                             <option value="all">Alle Räume</option>
                             <option value="campus">Campus</option>
@@ -1591,7 +1329,7 @@ export function SecretaryRoomsView({
                             style={{
                               background: '#ffffff',
                               border: '1px solid #cbd5e1',
-                              borderRadius: '8px',
+                              borderRadius: '10px',
                               padding: '8px 12px',
                               fontSize: '0.78rem',
                               fontWeight: 750,
@@ -1609,38 +1347,38 @@ export function SecretaryRoomsView({
                         )}
                       </div>
 
-                      {/* ACTIVE FILTER NOTICE BANNER */}
+                      {/* ACTIVE FILTER NOTICE BANNER (ONLY SHOWN WHEN AN ACTUAL FILTER IS ACTIVE) */}
                       {(roomSearchQuery || roomFilterFloor !== 'All' || roomFilterStatus !== 'all') && (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           padding: '10px 14px',
-                          background: '#eff6ff',
-                          border: '1.5px solid #bfdbfe',
-                          borderRadius: '14px',
+                          background: 'rgba(59, 130, 246, 0.08)',
+                          border: 'none',
+                          borderRadius: '12px',
                           fontSize: '0.76rem',
-                          color: '#1e40af',
+                          color: '#1d4ed8',
                           flexWrap: 'wrap',
                           gap: '8px'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 800 }}>
-                              {filteredRooms.length} von {buildingRooms.length} Räumen angezeigt
+                              {filteredRooms.length} von {buildingRooms.length} Räumen gefiltert
                             </span>
                             {roomSearchQuery && (
-                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                              <span style={{ background: '#ffffff', border: 'none', color: '#1e40af', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
                                 Suche: „{roomSearchQuery}“
                               </span>
                             )}
                             {roomFilterFloor !== 'All' && (
-                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                                Stockwerk: {roomFilterFloor}
+                              <span style={{ background: '#ffffff', border: 'none', color: '#1e40af', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                Ebene: {roomFilterFloor}
                               </span>
                             )}
                             {roomFilterStatus !== 'all' && (
-                              <span style={{ background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e3a8a', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                                Status: {roomFilterStatus}
+                              <span style={{ background: '#ffffff', border: 'none', color: '#1e40af', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                                Modul: {roomFilterStatus}
                               </span>
                             )}
                           </div>
@@ -1654,644 +1392,167 @@ export function SecretaryRoomsView({
                             aria-label="Alle Filter zurücksetzen und alle Räume anzeigen"
                             style={{
                               background: '#ffffff',
-                              border: '1.5px solid #93c5fd',
+                              border: '1px solid #93c5fd',
                               color: '#1d4ed8',
                               borderRadius: '8px',
-                              padding: '4px 12px',
-                              fontSize: '0.74rem',
+                              padding: '3px 10px',
+                              fontSize: '0.72rem',
                               fontWeight: 800,
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: 'none'
+                              gap: '4px'
                             }}
                           >
-                            <X size={12} />
-                            <span>Alle Räume anzeigen</span>
+                            <X size={11} />
+                            <span>Filter zurücksetzen</span>
                           </button>
                         </div>
                       )}
 
-                      {/* Rooms List Board */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', maxHeight: '550px', width: '100%' }}>
-                        {filteredRooms.length === 0 ? (
+                      {/* 2-COLUMN RESPONSIVE ROOM CARD GRID (APPLE SQUIRCLE SURFACE) */}
+                      {filteredRooms.length === 0 ? (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '48px 24px',
+                          background: '#ffffff',
+                          borderRadius: '20px',
+                          border: '1.5px dashed #cbd5e1',
+                          textAlign: 'center',
+                          gap: '14px',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}>
+                          <DoorOpen size={44} style={{ color: '#94a3b8' }} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                              Keine Räume gefunden
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', maxWidth: '300px', lineHeight: 1.4 }}>
+                              Passe deine Filter an oder lege einen neuen Raum an.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openRoomEditor()}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              borderRadius: '10px',
+                              padding: '8px 16px',
+                              fontSize: '0.76rem',
+                              fontWeight: 800,
+                              background: '#ea4335',
+                              color: '#ffffff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontFamily: 'Urbanist'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Plus size={14} />
+                            <span>Raum anlegen</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                          {/* SUBTLE LIST COLUMN HEADER BAR */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '16px',
+                            padding: '8px 20px',
+                            fontSize: '0.66rem',
+                            fontWeight: 900,
+                            color: '#94a3b8',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            fontFamily: 'Urbanist',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            borderBottom: '1px solid #f1f5f9'
+                          }}>
+                            <span style={{ width: '260px', minWidth: '220px', flexShrink: 0 }}>Raum & Standort</span>
+                            <span style={{ width: '135px', flexShrink: 0 }}>Kapazität & Größe</span>
+                            <span style={{ width: '165px', flexShrink: 0 }}>Module</span>
+                            <span style={{ flex: 1, minWidth: '160px' }}>Ausstattung & Akustik</span>
+                            <span style={{ width: '70px', flexShrink: 0, textAlign: 'right' }}>Aktionen</span>
+                          </div>
+
+                          {/* SCROLLABLE VERTICAL LIST OF ROOM ROWS */}
                           <div style={{
                             display: 'flex',
                             flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '48px 24px',
-                            background: '#ffffff',
-                            borderRadius: '24px',
-                            border: '1.5px dashed #cbd5e1',
-                            textAlign: 'center',
-                            gap: '14px',
-                            marginTop: '10px'
+                            gap: '10px',
+                            width: '100%',
+                            maxHeight: '680px',
+                            overflowY: 'auto',
+                            paddingRight: '4px'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                              <DoorOpen size={48} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                                Keine Räume gefunden
-                              </h4>
-                              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', maxWidth: '280px', lineHeight: 1.4 }}>
-                                Erstelle einen neuen Raum oder passe deine Filter an.
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => openRoomEditor()}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                borderRadius: '10px',
-                                padding: '8px 16px',
-                                fontSize: '0.76rem',
-                                fontWeight: 800,
-                                background: '#ea4335',
-                                color: '#ffffff',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontFamily: 'Urbanist',
-                                transition: 'all 0.2s',
-                                boxShadow: 'none'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Plus size={14} style={{ color: '#ffffff' }} />
-                              <span>Raum anlegen</span>
-                            </button>
-                          </div>
-                        ) : (
-                          filteredRooms.map((room: any) => {
-                            const initials = (room.name || 'RM').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
-                            const rColor = getAlphabeticalColor(room.name || 'R');
-                            const equipment: string[] = Array.isArray(room.equipment) ? room.equipment : [];
-                            const unsuitableInsts: string[] = Array.isArray(room.unsuitable_instruments) 
-                              ? room.unsuitable_instruments 
-                              : [];
-
-                            return (
-                              <div 
-                                key={room.id} 
-                                draggable={true}
-                                onDragStart={(e) => {
-                                  e.dataTransfer.setData("roomId", room.id);
-                                  e.dataTransfer.effectAllowed = "move";
-                                }}
-                                style={{ 
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '12px',
-                                  padding: '16px',
-                                  borderRadius: '16px',
-                                  background: '#ffffff',
-                                  border: '1px solid #e2e8f0',
-                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-                                  transition: 'all 0.25s ease',
-                                  cursor: 'grab',
-                                  width: '100%',
-                                  boxSizing: 'border-box'
-                                }}
-                                className="hover-scale"
-                              >
-                                {/* Top Row: Avatar, Room Info, Specs, Delete */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
-                                  <div 
-                                    onClick={() => openRoomEditor(room)}
-                                    style={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '12px', 
-                                      cursor: 'pointer',
-                                      minWidth: 0,
-                                      flex: 1
-                                    }}
-                                  >
-                                    <div style={{
-                                      width: '38px',
-                                      height: '38px',
-                                      borderRadius: '50%',
-                                      background: rColor.avatarBg,
-                                      color: rColor.avatarColor,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '0.8rem',
-                                      fontWeight: 900,
-                                      fontFamily: 'Urbanist',
-                                      flexShrink: 0
-                                    }}>
-                                      {initials}
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
-                                        {(() => {
-                                          const roomOpenIssues = roomIssues.filter((i: any) => (!i.is_completed && !i.is_acknowledged) && (i.room_id === room.id || i.room_id === room.name || (room.name && i.room_id && room.name.toLowerCase().includes(i.room_id.toLowerCase()))));
-                                          if (roomOpenIssues.length === 0) return null;
-                                          return (
-                                            <span 
-                                              role={onOpenFacilityLogModal ? 'button' : undefined}
-                                              tabIndex={onOpenFacilityLogModal ? 0 : undefined}
-                                              onClick={onOpenFacilityLogModal ? (e) => { e.stopPropagation(); onOpenFacilityLogModal(); } : undefined}
-                                              onKeyDown={onOpenFacilityLogModal ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onOpenFacilityLogModal(); } } : undefined}
-                                              title={onOpenFacilityLogModal ? "Klicken, um Mängel im Logbuch zu öffnen" : undefined}
-                                              style={{ 
-                                                fontSize: '0.62rem', 
-                                                color: '#dc2626', 
-                                                background: '#fee2e2', 
-                                                border: '1px solid #fca5a5', 
-                                                borderRadius: '6px', 
-                                                padding: '1px 6px', 
-                                                fontWeight: 800, 
-                                                display: 'inline-flex', 
-                                                alignItems: 'center', 
-                                                gap: '3px',
-                                                cursor: onOpenFacilityLogModal ? 'pointer' : 'default'
-                                              }}>
-                                              <Wrench size={9} />
-                                              {roomOpenIssues.length === 1 ? '1 Mangel' : `${roomOpenIssues.length} Mängel`}
-                                            </span>
-                                          );
-                                        })()}
-                                        {(() => {
-                                          const roomPending = (pendingBookings || []).filter((b: any) => b.room_id === room.id || (b.rooms && b.rooms.name === room.name));
-                                          if (roomPending.length === 0) return null;
-                                          return (
-                                            <span
-                                              role="button"
-                                              tabIndex={0}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setRoomSearchQuery(room.name);
-                                                setRoomsSubView('plan');
-                                              }}
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                  e.stopPropagation();
-                                                  setRoomSearchQuery(room.name);
-                                                  setRoomsSubView('plan');
-                                                }
-                                              }}
-                                              style={{ 
-                                                fontSize: '0.62rem', 
-                                                color: '#b45309', 
-                                                background: '#fef3c7', 
-                                                border: '1px solid #fde68a', 
-                                                borderRadius: '6px', 
-                                                padding: '1px 6px', 
-                                                fontWeight: 800, 
-                                                display: 'inline-flex', 
-                                                alignItems: 'center', 
-                                                gap: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                              title="Klicken, um die vorläufigen Buchungen im Belegungsplan zu prüfen"
-                                            >
-                                              <Clock size={10} style={{ color: '#b45309' }} />
-                                              <span>{roomPending.length === 1 ? '1 vorläufige Buchung' : `${roomPending.length} vorläufige Buchungen`}</span>
-                                            </span>
-                                          );
-                                        })()}
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>
-                                          {room.floor || 'EG'}
-                                        </span>
-                                        {room.building_id && (
-                                          <span style={{ fontSize: '0.65rem', color: '#ea4335', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                            <Building size={11} style={{ color: '#ea4335' }} /> {buildingMap[room.building_id]?.name || 'Gebäude'}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Capacity and size in a compact style */}
-                                  <div style={{ display: 'flex', gap: '16px', flexShrink: 0, alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace' }}>{room.max_students}</span>
-                                      <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700 }}>Schüler</span>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', fontFamily: 'monospace' }}>{room.qm || 0} m²</span>
-                                      <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700 }}>Größe</span>
-                                    </div>
-                                    
-                                    <button
-                                      type="button"
-                                      aria-label={`Raum ${room.name} löschen`}
-                                      onClick={() => handleDeleteRoom(room.id)}
-                                      style={{ background: 'transparent', border: 'none', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '10px', width: '44px', height: '44px', minWidth: '44px', minHeight: '44px', touchAction: 'manipulation', flexShrink: 0 }}
-                                      className="hover-scale-mini"
-                                      title="Löschen"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Bottom Row: Micro Status Toggles & Equipment */}
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '8px', flexWrap: 'wrap' }}>
-                                  {/* Active Status Toggles */}
-                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
-                                    <button
-                                      type="button"
-                                      aria-label={`Campus-Modul für Raum ${room.name} ${room.is_campus_active !== false ? 'deaktivieren' : 'aktivieren'}`}
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          const newVal = room.is_campus_active === false ? true : false;
-                                          const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', room.id);
-                                          if (error) alert(error.message);
-                                          else {
-                                            setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_campus_active: newVal } : r));
-                                          }
-                                        } catch (err: any) {
-                                          console.error("Fehler beim Umschalten des Campus-Status:", err);
-                                        }
-                                      }}
-                                      style={{
-                                        padding: '4px 10px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        background: room.is_campus_active !== false ? '#e6f4ea' : '#f1f5f9',
-                                        color: room.is_campus_active !== false ? '#34a853' : '#475569',
-                                        transition: 'all 0.15s ease',
-                                        fontFamily: 'Urbanist'
-                                      }}
-                                      className="hover-scale-mini"
-                                    >
-                                      Campus
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      aria-label={`GrooveLab-Modul für Raum ${room.name} ${room.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          const newVal = !room.is_groovelab_active;
-                                          const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', room.id);
-                                          if (error) alert(error.message);
-                                          else {
-                                            setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_groovelab_active: newVal } : r));
-                                          }
-                                        } catch (err: any) {
-                                          console.error("Fehler beim Umschalten des GrooveLab-Status:", err);
-                                        }
-                                      }}
-                                      style={{
-                                        padding: '4px 10px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        fontSize: '0.68rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        background: room.is_groovelab_active ? '#fefce8' : '#f1f5f9',
-                                        color: room.is_groovelab_active ? '#a16207' : '#64748b',
-                                        transition: 'all 0.15s ease',
-                                        fontFamily: 'Urbanist'
-                                      }}
-                                      className="hover-scale-mini"
-                                    >
-                                      Groovelab
-                                    </button>
-                                  </div>
-
-                                  {/* Equipment & Unsuitable Tags */}
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'flex-end', flex: 1, minWidth: 0 }}>
-                                    {equipment.map((inst, idx) => (
-                                      <span 
-                                        key={idx}
-                                        style={{ 
-                                          fontSize: '0.6rem', 
-                                          fontWeight: 800, 
-                                          background: '#f1f5f9', 
-                                          color: '#475569', 
-                                          padding: '3px 8px', 
-                                          borderRadius: '6px', 
-                                          display: 'inline-flex', 
-                                          alignItems: 'center', 
-                                          gap: '3px',
-                                          fontFamily: 'Urbanist'
-                                        }}
-                                      >
-                                        <Music size={10} style={{ color: '#475569' }} />
-                                        <span>{formatInstrumentName(inst)}</span>
-                                      </span>
-                                    ))}
-
-                                    {unsuitableInsts.map((inst: string, idx: number) => (
-                                      <span 
-                                        key={`unsuitable-${idx}`}
-                                        style={{ 
-                                          fontSize: '0.6rem', 
-                                          fontWeight: 800, 
-                                          background: '#fef2f2', 
-                                          color: '#ef4444', 
-                                          padding: '3px 8px', 
-                                          borderRadius: '6px',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '3px',
-                                          fontFamily: 'Urbanist',
-                                          border: '1px solid #fecaca'
-                                        }}
-                                        title={`Akustisch ungeeignet für ${formatInstrumentName(inst)}`}
-                                      >
-                                        <AlertCircle size={8} color="#ef4444" />
-                                        {formatInstrumentName(inst)}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            );                          })
-                        )}
-                      </div>
-                    </div>
-
-                    {/* COLUMN 3: RIGHT SIDEBAR PANEL: STOCKWERKE */}
-                    <div className="google-card" style={{
-                      width: '340px',
-                      flexShrink: 0,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '20px',
-                      padding: '24px',
-                      borderRadius: '24px',
-                      border: '1.5px solid #cbd5e1',
-                      background: '#ffffff',
-                      boxShadow: '0 10px 25px -5px rgba(0,0,0,0.01)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <School size={20} style={{ color: '#0f172a' }} />
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                          Stockwerke
-                        </h3>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.45, fontFamily: 'Inter' }}>
-                        Klicke auf ein Stockwerk, um die Ansicht zu filtern, oder ziehe einen Raum per Drag & Drop hierhin.
-                      </p>
-
-                      <button
-                        onClick={() => {
-                          let maxOG = 0;
-                          let maxUG = 0;
-                          allFloorsList.forEach(f => {
-                            const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
-                            if (ogMatch) {
-                              const num = parseInt(ogMatch[1]);
-                              if (num > maxOG) maxOG = num;
-                            }
-                            const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
-                            if (ugMatch) {
-                              const num = parseInt(ugMatch[1]);
-                              if (num > maxUG) maxUG = num;
-                            }
-                          });
-                          const nextOG = maxOG + 1;
-                          const nextUG = maxUG + 1;
-
-                          const input = prompt(
-                            `Neues Stockwerk anlegen:
-
-` +
-                            `• Schreibe „OG“ für das nächste Obergeschoss: ${nextOG}. OG (+${nextOG})
-` +
-                            `• Schreibe „UG“ für das nächste Untergeschoss: ${nextUG}. UG (-${nextUG})
-` +
-                            `• Oder gib einen individuellen Namen ein:`
-                          );
-
-                          if (input && input.trim()) {
-                            const val = input.trim().toLowerCase();
-                            let finalName = input.trim();
-                            if (val === 'og' || val === 'o') {
-                              finalName = `${nextOG}. OG`;
-                            } else if (val === 'ug' || val === 'u') {
-                              finalName = `${nextUG}. UG`;
-                            }
-
-                            if (allFloorsList.includes(finalName)) {
-                              alert(`Das Stockwerk „${finalName}“ existiert bereits.`);
-                              return;
-                            }
-
-                            const updated = [...addedFloors, finalName];
-                            setAddedFloors(updated);
-                          }
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          borderRadius: '12px',
-                          padding: '8px 16px',
-                          fontSize: '0.78rem',
-                          fontWeight: 800,
-                          background: '#fce8e6',
-                          color: '#ea4335',
-                          border: '1px solid #f9d2ce',
-                          cursor: 'pointer',
-                          fontFamily: 'Urbanist',
-                          transition: 'all 0.2s'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Plus size={14} style={{ color: '#ea4335' }} />
-                        <span>Stockwerk anlegen</span>
-                      </button>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
-                        {/* "Alle Stockwerke anzeigen" */}
-                        {(() => {
-                          const isActive = roomFilterFloor === 'All';
-                          return (
-                            <div
-                              onClick={() => setRoomFilterFloor('All')}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                border: isActive ? '1.5px solid #ea4335' : '1.5px solid #f1f5f9',
-                                background: isActive ? '#fce8e6' : '#ffffff',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  <Layers size={18} />
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Alle Stockwerke</span>
-                                  <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Gesamtübersicht</span>
-                                </div>
-                              </div>
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '10px',
-                                background: isActive ? '#fce8e6' : '#f1f5f9',
-                                color: isActive ? '#ea4335' : '#64748b',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                fontFamily: 'Urbanist',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {uniqueRooms.length} Räume
-                              </span>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Floor Cards list */}
-                        {allFloorsList.map((flName: string) => {
-                          const isActive = roomFilterFloor === flName;
-                          const isHovered = dragHoveredFloor === flName;
-                          const floorRoomCount = uniqueRooms.filter(r => {
-                            const fRaw = r.floor;
-                            const fName = (!fRaw || fRaw === 'Allgemein') ? 'EG' : fRaw;
-                            return fName === flName;
-                          }).length;
-                          const avatarInitials = flName.substring(0, 2).toUpperCase();
-                          const colorSet = getFloorColor(flName);
-
-                          return (
-                            <div
-                              key={flName}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.dataTransfer.dropEffect = "move";
-                                setDragHoveredFloor(flName);
-                              }}
-                              onDragLeave={() => setDragHoveredFloor(null)}
-                              onDrop={async (e) => {
-                                const roomId = e.dataTransfer.getData("roomId");
-                                if (roomId) {
-                                  // Update local state instantly so UI responds immediately
+                            {filteredRooms.map((room: any) => (
+                              <SecretaryRoomCardItem
+                                key={room.id}
+                                room={room}
+                                buildingMap={buildingMap}
+                                allFloorsList={allFloorsList}
+                                roomIssues={roomIssues}
+                                pendingBookings={pendingBookings}
+                                showBuildingTag={selectedBuildingId === 'All' && Object.keys(buildingMap).length > 1}
+                                onOpenEditor={openRoomEditor}
+                                onDeleteRoom={handleDeleteRoom}
+                                onChangeRoomFloor={async (roomId, newFloor) => {
                                   const previousRooms = rooms;
-                                  setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: flName } : r));
-
-                                  // Update in database as primary storage
-                                  const { error } = await supabase.from('rooms').update({ floor: flName }).eq('id', roomId);
+                                  setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: newFloor } : r));
+                                  const { error } = await supabase.from('rooms').update({ floor: newFloor }).eq('id', roomId);
                                   if (error) {
                                     setRooms(previousRooms);
                                     alert("Fehler beim Zuweisen des Stockwerks: " + error.message);
                                   }
-                                }
-                                setDragHoveredFloor(null);
-                              }}
-                              onClick={() => setRoomFilterFloor(flName)}
-                              role="button"
-                              tabIndex={0}
-                              aria-label={`Stockwerk ${flName} filtern`}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setRoomFilterFloor(flName);
-                                }
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                border: isHovered
-                                  ? '2px dashed #ea4335'
-                                  : isActive
-                                    ? '1.5px solid #ea4335'
-                                    : '1.5px solid #f1f5f9',
-                                background: isHovered
-                                  ? '#fce8e6'
-                                  : isActive
-                                    ? '#fce8e6'
-                                    : '#ffffff',
-                                cursor: 'pointer',
-                                transform: isHovered ? 'scale(1.02)' : 'scale(1)',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                boxShadow: isActive ? '0 4px 12px rgba(234,67,53,0.06)' : 'none'
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                                <div style={{
-                                  width: '36px',
-                                  height: '36px',
-                                  borderRadius: '50%',
-                                  background: colorSet.avatarBg,
-                                  color: colorSet.avatarColor,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 900,
-                                  fontFamily: 'Urbanist',
-                                  flexShrink: 0
-                                }}>
-                                  {avatarInitials}
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {flName}
-                                    {flName !== 'EG' && addedFloors.includes(flName) && (
-                                      <button
-                                        type="button"
-                                        aria-label={`Stockwerk ${flName} löschen`}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
-                                            // Reset rooms on this floor to EG
-                                            supabase.from('rooms').update({ floor: 'EG' }).eq('floor', flName).then(() => {
-                                              setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
-                                              const updated = addedFloors.filter(f => f !== flName);
-                                              setAddedFloors(updated);
-                                              if (roomFilterFloor === flName) setRoomFilterFloor('All');
-                                            });
-                                          }
-                                        }}
-                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }}
-                                        title="Stockwerk löschen"
-                                      >
-                                        <Trash2 size={13} style={{ color: '#ef4444' }} />
-                                      </button>
-                                    )}
-                                  </span>
-                                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'Inter' }}>
-                                    {flName === 'EG' ? 'Erdgeschoss / Standard' : 'Stockwerk'}
-                                  </span>
-                                </div>
-                              </div>
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '10px',
-                                background: isActive ? '#fce8e6' : '#f1f5f9',
-                                color: isActive ? '#ea4335' : '#64748b',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                fontFamily: 'Urbanist',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {floorRoomCount} {floorRoomCount === 1 ? 'Raum' : 'Räume'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                                }}
+                                onToggleCampus={async (roomId, currentActive) => {
+                                  try {
+                                    const newVal = !currentActive;
+                                    const { error } = await supabase.from('rooms').update({ is_campus_active: newVal }).eq('id', roomId);
+                                    if (error) alert(error.message);
+                                    else {
+                                      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, is_campus_active: newVal } : r));
+                                    }
+                                  } catch (err: any) {
+                                    console.error("Fehler beim Umschalten des Campus-Status:", err);
+                                  }
+                                }}
+                                onToggleGroovelab={async (roomId, currentActive) => {
+                                  try {
+                                    const newVal = !currentActive;
+                                    const { error } = await supabase.from('rooms').update({ is_groovelab_active: newVal }).eq('id', roomId);
+                                    if (error) alert(error.message);
+                                    else {
+                                      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, is_groovelab_active: newVal } : r));
+                                    }
+                                  } catch (err: any) {
+                                    console.error("Fehler beim Umschalten des GrooveLab-Status:", err);
+                                  }
+                                }}
+                                onOpenFacilityLogModal={onOpenFacilityLogModal}
+                                onInspectPendingBookings={(roomName) => {
+                                  setRoomSearchQuery(roomName);
+                                  setRoomsSubView('plan');
+                                }}
+                                formatInstrumentName={formatInstrumentName}
+                                getAlphabeticalColor={getAlphabeticalColor}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-
                   </div>
-                )}
+                                )}
               </div>
             )}              {/* ── VIEW 3: Einstellungen / Editor ── */}
               {roomsSubView === 'settings' && (
@@ -2461,8 +1722,8 @@ export function SecretaryRoomsView({
                                 flex: 1,
                                 padding: '12px',
                                 borderRadius: '12px',
-                                border: roomFormIsCampusActive !== false ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
-                                background: roomFormIsCampusActive !== false ? '#e6f4ea' : '#ffffff',
+                                border: roomFormIsCampusActive !== false ? 'none' : '1.5px solid #cbd5e1',
+                                background: roomFormIsCampusActive !== false ? '#dcfce7' : '#ffffff',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
@@ -2499,8 +1760,8 @@ export function SecretaryRoomsView({
                                 flex: 1,
                                 padding: '12px',
                                 borderRadius: '12px',
-                                border: roomFormIsGroovelabActive ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
-                                background: roomFormIsGroovelabActive ? '#fefce8' : '#ffffff',
+                                border: roomFormIsGroovelabActive ? 'none' : '1.5px solid #cbd5e1',
+                                background: roomFormIsGroovelabActive ? '#fef9c3' : '#ffffff',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '10px',
@@ -2514,7 +1775,7 @@ export function SecretaryRoomsView({
                                 aria-label="GrooveLab Modul aktiv"
                                 checked={!!roomFormIsGroovelabActive}
                                 readOnly
-                                style={{ width: '16px', height: '16px', accentColor: '#eab308', cursor: 'pointer' }}
+                                style={{ width: '16px', height: '16px', accentColor: '#facc15', cursor: 'pointer' }}
                               />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontSize: '0.78rem', fontWeight: 800, color: roomFormIsGroovelabActive ? '#854d0e' : '#0f172a', fontFamily: 'Urbanist' }}>GrooveLab</span>
@@ -2547,9 +1808,9 @@ export function SecretaryRoomsView({
                                   style={{
                                     padding: '6px 12px',
                                     borderRadius: '8px',
-                                    border: isUnsuitable ? '1.5px solid #ea4335' : '1.5px solid #cbd5e1',
-                                    background: isUnsuitable ? '#fce8e6' : 'white',
-                                    color: isUnsuitable ? '#ea4335' : '#475569',
+                                    border: isUnsuitable ? 'none' : '1.5px solid #cbd5e1',
+                                    background: isUnsuitable ? '#fee2e2' : 'white',
+                                    color: isUnsuitable ? '#b91c1c' : '#475569',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
@@ -2647,7 +1908,7 @@ export function SecretaryRoomsView({
                         disabled={roomSaving || !roomFormName.trim()}
                         style={{
                           flex: 1,
-                          background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)',
+                          background: '#ef4444',
                           color: 'white',
                           border: 'none',
                           padding: '8px',
@@ -2777,7 +2038,7 @@ export function SecretaryRoomsView({
                         <button
                           type="submit"
                           aria-label="Gebäude speichern"
-                          style={{ padding: '10px 20px', border: 'none', background: 'linear-gradient(135deg, #ea4335 0%, #c5221f 100%)', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: 'none' }}
+                          style={{ padding: '10px 20px', border: 'none', background: '#ef4444', color: 'white', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 750, cursor: 'pointer', boxShadow: 'none' }}
                         >
                           Speichern
                         </button>

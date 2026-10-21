@@ -524,7 +524,7 @@ export const TeacherUrgentCancellationsModal: React.FC<TeacherUrgentCancellation
                         minHeight: '38px',
                         background: '#eff6ff',
                         color: '#1d4ed8',
-                        border: '1.5px solid #bfdbfe',
+                        border: 'none',
                         borderRadius: '12px',
                         padding: '8px 14px',
                         fontSize: '0.82rem',

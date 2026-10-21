@@ -64,7 +64,7 @@ export const DetailProfilesModalsHub: React.FC<DetailProfilesModalsHubProps> = (
   showConfetti = false,
   confettiWidth = typeof window !== 'undefined' ? window.innerWidth : 1200,
   confettiHeight = typeof window !== 'undefined' ? window.innerHeight : 800,
-  confettiBrandColor = '#eab308',
+  confettiBrandColor = '#facc15',
   onClearConfetti,
 }) => {
   return (

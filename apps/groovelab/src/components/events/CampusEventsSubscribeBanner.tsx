@@ -90,21 +90,22 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
         style={{
           display: 'flex',
           flexDirection: 'row',
+          flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: isMobilePortrait ? '10px' : '16px',
+          gap: isMobilePortrait ? '10px' : '14px',
           position: 'relative',
           zIndex: 1
         }}
       >
-        {/* Linke Seite: Icon + Gestochen scharfer Zweizeiler */}
+        {/* Linke Seite: Icon + Gestochen scharfer Zweizeiler mit Container-Immunität */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: isMobilePortrait ? '10px' : '14px',
-            minWidth: 0,
-            flex: 1
+            gap: isMobilePortrait ? '10px' : '12px',
+            minWidth: '190px',
+            flex: '1 1 190px'
           }}
         >
           {/* 38x38 Squircle Icon mit hoher Sichtbarkeit */}
@@ -125,9 +126,9 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
             <CalendarPlus size={isMobilePortrait ? 20 : 22} strokeWidth={2.4} />
           </div>
 
-          {/* Der barrierefreie, 100% lesbare Zweizeiler */}
+          {/* Der barrierefreie, 100% lesbare Zweizeiler ohne Buchstaben-Splitting */}
           <div style={{ minWidth: 0, flex: 1 }}>
-            {/* Zeile 1: Headline - fett, groß, ohne Abschneiden */}
+            {/* Zeile 1: Headline - ganzheitliche Wörter ohne Mid-Word-Split */}
             <h3
               style={{
                 margin: 0,
@@ -136,13 +137,15 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
                 color: '#ffffff',
                 letterSpacing: '-0.01em',
                 lineHeight: 1.25,
-                wordBreak: 'break-word'
+                wordBreak: 'normal',
+                overflowWrap: 'break-word',
+                hyphens: 'none'
               }}
             >
               Termine abonnieren
             </h3>
 
-            {/* Zeile 2: Subline - Mindestens 12.5px, hoher Kontrast (#f0fdf4) */}
+            {/* Zeile 2: Subline - Ganzwort-Integrität, kein Silbentrennungs-Chaos */}
             <p
               style={{
                 margin: '2px 0 0 0',
@@ -150,7 +153,9 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
                 fontWeight: 600,
                 color: '#f0fdf4',
                 lineHeight: 1.3,
-                wordBreak: 'break-word'
+                wordBreak: 'normal',
+                overflowWrap: 'break-word',
+                hyphens: 'none'
               }}
             >
               Live in Apple- &amp; Google-Kalender
@@ -172,7 +177,7 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            minHeight: '40px',
+            minHeight: '38px',
             padding: isMobilePortrait ? '8px 14px' : '9px 18px',
             borderRadius: '12px',
             background: isHovered ? '#f0fdf4' : '#ffffff',
@@ -188,7 +193,8 @@ export const CampusEventsSubscribeBanner: React.FC<CampusEventsSubscribeBannerPr
             flexShrink: 0,
             whiteSpace: 'nowrap',
             outline: 'none',
-            transform: isHovered ? 'scale(1.02)' : 'none'
+            transform: isHovered ? 'scale(1.02)' : 'none',
+            alignSelf: 'center'
           }}
         >
           <span>Abonnieren</span>

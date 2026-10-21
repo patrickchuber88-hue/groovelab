@@ -65,7 +65,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
   setMemberSearch,
   fetchData
 }) => {
-    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
     const isRealBand = (b: any) => b && b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_');
@@ -170,7 +170,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
             <form onSubmit={handleCreateBandManually} className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: 'white', borderRadius: '24px', border: `1px solid ${brandColor}20`, boxShadow: '0 20px 50px rgba(0,0,0,0.05)' }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Neue Band manuell zusammenstellen</h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Band Name</label>
                   <input required aria-label="Band Name" placeholder="z.B. The Rockstars" value={newBand.name} onChange={e => setNewBand({...newBand, name: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600 }} />
@@ -188,7 +188,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Coach / Leitung</label>
                   <select aria-label="Coach / Leitung" value={newBand.coach_id} onChange={e => setNewBand({...newBand, coach_id: e.target.value})} style={{ padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
@@ -499,7 +499,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                       }
                     }}
                     aria-label={`Band ${band.name} auflösen`}
-                    style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
+                    style={{ background: '#fef2f2', border: 'none', color: '#ef4444', padding: '10px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
                     title="Band auflösen"
                   >
                     <Trash2 size={18} />
@@ -579,11 +579,11 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{band.name}</div>
                         {vocalists.length === 0 ? (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '8px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '8px', border: 'none', whiteSpace: 'nowrap' }}>
                             0/2 Gesang
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '8px', border: '1px solid #bae6fd', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '8px', border: 'none', whiteSpace: 'nowrap' }}>
                             1/2 Gesang
                           </span>
                         )}

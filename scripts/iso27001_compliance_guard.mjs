@@ -121,15 +121,48 @@ recordCheck(
 // CHECK 6: Control A.7 & A.5.23 (Physical Security & Zero-Cloud-Act Sovereign Tier-1)
 // -----------------------------------------------------------------------------
 const underwritingDoc = path.join(DOCS_DIR, 'UNDERWRITING_DOSSIER_EXALI_HISCOX.md');
-let sovereignHosting = false;
+const soaDoc = path.join(AUDITS_DIR, 'STATEMENT_OF_APPLICABILITY_ISO27001.md');
+const legalContentFile = path.join(SRC_DIR, 'legal', 'legalContent.ts');
+const avvModalFile = path.join(SRC_DIR, 'components', 'AVVModal.tsx');
+const dpoFile = path.join(SRC_DIR, 'components', 'DpoAuditPortal.tsx');
+
+let hasUnderwritingIonos = false;
+let hasSoaIonos = false;
+let hasLegalIonos = false;
+let hasAvvIonos = false;
+let hasDpoIonos = false;
+let zeroUsCloud = false;
+
 if (fs.existsSync(underwritingDoc)) {
   const content = fs.readFileSync(underwritingDoc, 'utf-8');
-  sovereignHosting = content.includes('Hetzner Online GmbH') && !content.includes('AWS') && !content.includes('Azure');
+  hasUnderwritingIonos = content.includes('IONOS SE') && content.includes('Hetzner Online GmbH');
+  zeroUsCloud = !content.includes('AWS') && !content.includes('Azure') && !content.includes('Google Cloud');
 }
+if (fs.existsSync(soaDoc)) {
+  const content = fs.readFileSync(soaDoc, 'utf-8');
+  hasSoaIonos = content.includes('IONOS SE') && content.includes('Hetzner Online GmbH');
+}
+if (fs.existsSync(legalContentFile)) {
+  const content = fs.readFileSync(legalContentFile, 'utf-8');
+  hasLegalIonos = content.includes('IONOS SE') && content.includes('Hetzner Online GmbH');
+}
+if (fs.existsSync(avvModalFile)) {
+  const content = fs.readFileSync(avvModalFile, 'utf-8');
+  hasAvvIonos = content.includes('IONOS SE') && content.includes('Hetzner Online GmbH');
+}
+if (fs.existsSync(dpoFile)) {
+  const content = fs.readFileSync(dpoFile, 'utf-8');
+  hasDpoIonos = content.includes('IONOS SE') && content.includes('Hetzner');
+}
+
+const dualProviderSovereignty = hasUnderwritingIonos && hasSoaIonos && hasLegalIonos && hasAvvIonos && hasDpoIonos && zeroUsCloud;
+
 recordCheck(
-  'ISO 27001 Control A.7.1–A.7.14 / A.5.23: 100% Hetzner DE Souveränität (0% US-Cloud-Act)',
-  sovereignHosting,
-  'Infrastruktur zu 100% in ISO 27001 zertifizierten deutschen Rechenzentren (Falkenstein/Nürnberg).'
+  'ISO 27001 Control A.7.1–A.7.14 / A.5.23: 100% Souveräne Dual-Provider-Infrastruktur (IONOS SE Primär & Hetzner DR, 0% US-Cloud)',
+  dualProviderSovereignty,
+  dualProviderSovereignty
+    ? 'Infrastruktur zu 100% in ISO 27001 zertifizierten deutschen Rechenzentren (IONOS SE Montabaur/Berlin 85.215.73.216 & Hetzner Falkenstein/Nürnberg).'
+    : `Fehlender Server-Ausweis: underwriting=${hasUnderwritingIonos}, soa=${hasSoaIonos}, legal=${hasLegalIonos}, avv=${hasAvvIonos}, dpo=${hasDpoIonos}, zeroUs=${zeroUsCloud}`
 );
 
 // -----------------------------------------------------------------------------

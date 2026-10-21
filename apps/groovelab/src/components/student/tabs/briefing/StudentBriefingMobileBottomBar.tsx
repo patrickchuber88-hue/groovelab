@@ -155,8 +155,8 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
                 top: '-5px',
                 right: '-6px',
                 background: hasSidebarAppointmentAlerts 
-                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
-                  : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  ? '#f97316' 
+                  : '#ef4444',
                 color: '#ffffff',
                 fontSize: '0.62rem',
                 fontWeight: 950,
@@ -253,7 +253,7 @@ export const StudentBriefingMobileBottomBar: React.FC<StudentBriefingMobileBotto
                 position: 'absolute',
                 top: '-5px',
                 right: '-6px',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                background: '#3b82f6',
                 color: '#ffffff',
                 fontSize: '0.62rem',
                 fontWeight: 950,

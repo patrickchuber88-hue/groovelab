@@ -447,14 +447,14 @@ export const SongInstrumentPedagogyView: React.FC<SongInstrumentPedagogyViewProp
             gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
             gap: '8px'
           }}>
-            <div style={{ background: '#fefce8', border: '1px solid #fef08a', padding: '10px 12px', borderRadius: '12px' }}>
+            <div style={{ background: '#fefce8', border: 'none', padding: '10px 12px', borderRadius: '12px' }}>
               <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase' }}>Beat & Feel</div>
               <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#713f12', marginTop: '2px' }}>
                 {safeSection.drumFeel || '8tel Rock Beat'}
               </div>
             </div>
 
-            <div style={{ background: '#eff6ff', border: '1px solid #dbeafe', padding: '10px 12px', borderRadius: '12px' }}>
+            <div style={{ background: '#eff6ff', border: 'none', padding: '10px 12px', borderRadius: '12px' }}>
               <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase' }}>Führungshand</div>
               <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#1e3a8a', marginTop: '2px' }}>
                 {safeSection.drumSurface || 'Offene Hi-Hat'}
@@ -475,7 +475,7 @@ export const SongInstrumentPedagogyView: React.FC<SongInstrumentPedagogyViewProp
               alignItems: 'center',
               gap: '6px',
               background: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               color: '#991b1b',
               padding: '6px 10px',
               borderRadius: '10px',
@@ -531,7 +531,7 @@ export const SongInstrumentPedagogyView: React.FC<SongInstrumentPedagogyViewProp
       {/* Didactic Scaffolding "AHA!" Explanation Box */}
       <div style={{
         background: '#f0fdf4',
-        border: '1px solid #bbf7d0',
+        border: 'none',
         borderRadius: '12px',
         padding: '10px 14px',
         display: 'flex',

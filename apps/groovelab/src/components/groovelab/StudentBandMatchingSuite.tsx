@@ -258,7 +258,7 @@ export function StudentBandMatchingSuite({
                                   {activeBandForSong && (
                                     <div style={{
                                       background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
-                                      border: '1px solid #e6f4ea',
+                                      border: 'none',
                                       padding: '20px 24px',
                                       borderRadius: '24px',
                                       display: 'flex',
@@ -327,9 +327,9 @@ export function StudentBandMatchingSuite({
                                     return (
                                       <div key={form.id} style={{ 
                                         background: isProposal ? 'linear-gradient(135deg, #1e1b4b, #0f0728)' : (isGuestSearch ? '#0f172a' : (isMySlot ? 'linear-gradient(135deg, rgba(254, 252, 232, 0.95), rgba(255, 251, 235, 0.95))' : '#f8fafc')), 
-                                        border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #eab308' : '1px solid #e2e8f0')),
+                                        border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #facc15' : '1px solid #e2e8f0')),
                                         borderRadius: '28px', padding: '24px',
-                                        boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : (isMySlot ? '0 20px 40px rgba(234, 179, 8, 0.12)' : 'none'),
+                                        boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : (isMySlot ? '0 20px 40px rgba(250, 204, 21, 0.15)' : 'none'),
                                         backdropFilter: isMySlot ? 'blur(10px)' : 'none',
                                         WebkitBackdropFilter: isMySlot ? 'blur(10px)' : 'none'
                                       }}>
@@ -390,7 +390,7 @@ export function StudentBandMatchingSuite({
                                                   console.error('[StudentBandMatchingSuite] Fehler beim Slot-Update:', err);
                                                 }
                                               }}
-                                              style={{ background: form.originBand ? '#8b5cf6' : '#eab308', color: form.originBand ? 'white' : '#1e293b', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', minHeight: '44px', touchAction: 'manipulation' }}
+                                              style={{ background: form.originBand ? '#8b5cf6' : '#facc15', color: form.originBand ? 'white' : '#0f172a', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', minHeight: '44px', touchAction: 'manipulation' }}
                                             >
                                               BEITRETEN
                                             </button>
@@ -446,9 +446,9 @@ export function StudentBandMatchingSuite({
                                                   <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '88px', position: 'relative' }}>
                                                     <div style={{ 
                                                       width: '72px', height: '72px', borderRadius: '50%', 
-                                                      background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(234, 179, 8, 0.03)'), 
-                                                      border: (isMe || member?.isMastered) ? `3.5px solid #eab308` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed rgba(234, 179, 8, 0.25)'),
-                                                      boxShadow: (isMe || member?.isMastered) ? '0 0 16px rgba(234, 179, 8, 0.4)' : 'none',
+                                                      background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(250, 204, 21, 0.08)'), 
+                                                      border: (isMe || member?.isMastered) ? `3.5px solid #facc15` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed rgba(250, 204, 21, 0.35)'),
+                                                      boxShadow: (isMe || member?.isMastered) ? '0 0 16px rgba(250, 204, 21, 0.4)' : 'none',
                                                       display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
                                                       opacity: member && !member.isMastered ? 0.75 : 1
                                                     }}>
@@ -501,7 +501,7 @@ export function StudentBandMatchingSuite({
                                               width: '100%', padding: '18px', 
                                               background: 'linear-gradient(135deg, #fef08a, #fde047)', 
                                               color: '#854d0e', borderRadius: '20px', fontWeight: 900, textAlign: 'center',
-                                              border: '1px solid #eab308',
+                                              border: 'none',
                                               boxShadow: 'none',
                                               fontSize: '1rem',
                                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
@@ -533,7 +533,7 @@ export function StudentBandMatchingSuite({
                                                   fontSize: '1.1rem', 
                                                   width: '100%', 
                                                   cursor: 'pointer',
-                                                  background: 'linear-gradient(135deg, #ca8a04, #eab308)', 
+                                                  background: '#facc15', 
                                                   color: '#0f172a',
                                                   fontWeight: 900,
                                                   border: 'none',

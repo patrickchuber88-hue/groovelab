@@ -41,7 +41,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
   setSelectedQRUser,
   windowWidth
 }) => {
-  const brandColor = activePlatform === "campus" ? "#34a853" : (activePlatform === "groovelab" ? "#eab308" : "#ea4335");
+  const brandColor = activePlatform === "campus" ? "#34a853" : (activePlatform === "groovelab" ? "#facc15" : "#ea4335");
 
   return (
     <div style={{ marginTop: '0px' }}>
@@ -479,7 +479,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                           minWidth: '36px',
                           minHeight: '36px',
                           background: '#fff1f2',
-                          border: '1px solid #ffe4e6',
+                          border: 'none',
                           borderRadius: '10px',
                           cursor: 'pointer',
                           color: '#e11d48',

@@ -1,7 +1,7 @@
 import express, { Router, Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { decryptSession } from '../lib/session/crypto';
-import { validateMagicBytes, scrubMediaMetadata } from '../lib/mediaValidator';
+import { validateMagicBytes, scrubMediaMetadata, stripJpegMetadata } from '../lib/mediaValidator';
 import { validateBody } from '../middleware/validateIngress';
 import { idempotencyBarrier } from '../middleware/idempotencyMiddleware';
 import { presignUploadSchema, presignStreamSchema, deleteAssetsSchema } from '../schemas/ingressSchemas';
@@ -79,6 +79,69 @@ export async function resolveAuthUser(req: Request): Promise<AuthUserData | null
     const parts = req.headers.authorization.split(' ');
     if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
       accessToken = parts[1];
+    }
+  }
+
+  // [P1-3] Authoritative Session-Lease Token Resolution (x-session-token or x-client-info ;session_token=)
+  let leaseToken: string | null = null;
+  const rawSessionHeader = req.headers['x-session-token'];
+  if (typeof rawSessionHeader === 'string' && rawSessionHeader.trim()) {
+    leaseToken = rawSessionHeader.trim();
+  } else if (typeof req.headers['x-client-info'] === 'string') {
+    const match = req.headers['x-client-info'].match(/;session_token=([0-9a-fA-F-]{36})/);
+    if (match && match[1]) {
+      leaseToken = match[1].trim();
+    }
+  } else if (accessToken && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accessToken)) {
+    leaseToken = accessToken;
+  }
+
+  if (leaseToken && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leaseToken)) {
+    try {
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
+      const leaseClient = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false },
+        global: {
+          headers: { 'x-session-token': leaseToken }
+        }
+      });
+
+      const { data: leaseRow } = await leaseClient
+        .from('session_leases')
+        .select('id, user_id, school_id, role, is_revoked, last_active_at')
+        .eq('id', leaseToken)
+        .eq('is_revoked', false)
+        .maybeSingle();
+
+      if (leaseRow && leaseRow.user_id) {
+        const { data: dbUser } = await leaseClient
+          .from('users_raw')
+          .select('id, school_id, role, is_master_admin, is_active')
+          .eq('id', leaseRow.user_id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (dbUser) {
+          const resolvedRole = dbUser.is_master_admin ? 'master_admin' : (dbUser.role || leaseRow.role || 'student');
+          const resolvedSchoolId = dbUser.school_id || leaseRow.school_id || null;
+          // [O-02] Enforce server-side rolling lease TTL (15m for master_admin, 30d for standard sessions)
+          if (leaseRow.last_active_at) {
+            const lastActiveMs = new Date(leaseRow.last_active_at).getTime();
+            const maxAgeMs = dbUser.is_master_admin ? 15 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+            if (!Number.isNaN(lastActiveMs) && Date.now() - lastActiveMs > maxAgeMs) {
+              return null;
+            }
+          }
+          return {
+            accessToken: serviceKey,
+            user: { id: dbUser.id, role: resolvedRole, school_id: resolvedSchoolId },
+            role: resolvedRole,
+            schoolId: resolvedSchoolId
+          };
+        }
+      }
+    } catch (leaseErr) {
+      console.warn('[BFF Storage Auth] Session lease lookup notice:', leaseErr);
     }
   }
 
@@ -281,9 +344,12 @@ export function validatePathAccess(
     }
   }
 
-  // Students are NEVER allowed to delete school-wide shared media
+  // Students are NEVER allowed to delete or write school-wide shared media (Vector 4 BOLA Seal)
   if (action === 'delete' && authData.role === 'student') {
     return { allowed: false, reason: 'STUDENT_DELETE_SCHOOL_ASSET_DENIED' };
+  }
+  if (action === 'write' && authData.role === 'student') {
+    return { allowed: false, reason: 'STUDENT_WRITE_SCHOOL_ASSET_DENIED' };
   }
 
   return { allowed: true };
@@ -498,20 +564,23 @@ router.post('/presign-upload', validateBody(presignUploadSchema), idempotencyBar
       });
     }
 
-    // 🛡️ BOLA / IDOR Protection: Non-staff users cannot write into another user's folder
+    // 🛡️ BOLA / IDOR Protection: Non-staff users cannot write into another user's folder or school-wide namespace
     const userRole = authData.role || authUser.user_metadata?.role || authUser.app_metadata?.role || 'student';
-    if (cleanStudentId && userRole === 'student' && authUser.id !== cleanStudentId) {
+    if (cleanStudentId && (userRole === 'student' || authUser.role === 'student') && authUser.id !== cleanStudentId) {
       return res.status(403).json({
         error: 'FORBIDDEN',
         message: 'Zugriff verweigert: Sie können nur Dateien in Ihr eigenes Verzeichnis hochladen.'
       });
     }
+    const effectiveStudentId = (userRole === 'student' || authUser.role === 'student')
+      ? sanitizePathSegment(authUser.id, '')
+      : cleanStudentId;
 
     // Canonical Campus-Groovelab storage path:
     // schools/<schoolId>/students/<studentId>/<context>/<uniqueId>.<ext> or schools/<schoolId>/<context>/<uniqueId>.<ext>
     let storagePath: string;
-    if (cleanSchoolId && cleanStudentId) {
-      storagePath = `schools/${cleanSchoolId}/students/${cleanStudentId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    if (cleanSchoolId && effectiveStudentId) {
+      storagePath = `schools/${cleanSchoolId}/students/${effectiveStudentId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
     } else if (cleanSchoolId) {
       storagePath = `schools/${cleanSchoolId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
     } else {
@@ -605,14 +674,17 @@ router.post(
       });
     }
 
-    const { scrubbedItemsCount } = scrubMediaMetadata(buffer);
+    const preStripped = validation.detectedFormat === 'JPEG' ? stripJpegMetadata(buffer).buffer : buffer;
+    const { cleanedBuffer, scrubbedItemsCount } = scrubMediaMetadata(preStripped);
 
     return res.status(200).json({
       success: true,
       detectedFormat: validation.detectedFormat,
       mimeType: validation.mimeType,
-      metadataScrubbed: scrubbedItemsCount > 0,
-      scrubbedItemsCount
+      metadataScrubbed: scrubbedItemsCount > 0 || cleanedBuffer.length !== buffer.length,
+      scrubbedItemsCount,
+      cleanedSizeBytes: cleanedBuffer.length,
+      cleanedBufferBase64: cleanedBuffer.toString('base64')
     });
   }
 );

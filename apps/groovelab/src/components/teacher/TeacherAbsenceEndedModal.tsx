@@ -53,7 +53,7 @@ export const TeacherAbsenceEndedModal: React.FC<TeacherAbsenceEndedModalProps> =
           height: '64px',
           borderRadius: '20px',
           background: '#e6f4ea',
-          border: '1.5px solid #bbf7d0',
+          border: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

@@ -77,7 +77,7 @@ export function useCampusRealtimeSync({
       if (user && (user.role === 'admin' || user.role === 'secretary')) {
         targetThemeColor = '#ea4335';
       } else if (activePlatform === 'groovelab') {
-        targetThemeColor = '#eab308';
+        targetThemeColor = '#facc15';
       } else if (activePlatform === 'ensembles') {
         targetThemeColor = '#3b82f6';
       }
@@ -97,21 +97,28 @@ export function useCampusRealtimeSync({
     }
     previousPlatform.current = activePlatform;
     
-    // 🎵 0,1% Goldstandard: Beim Wechsel auf GrooveLab MUSS das Live Lab autoritativ als Startseite geladen werden
+    // 🎵 0,1% Goldstandard: Nur bei echter Inkonsistenz nachsteuern (verhindert Doppel-Render nach atomarer startTransition)
     if (activePlatform === 'groovelab') {
-      setActiveStudentTab('live');
+      if (activeStudentTab !== 'live') {
+        setActiveStudentTab('live');
+      }
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
         localStorage.setItem('groovelab_active_tab', 'live');
       }
+    } else if (activePlatform === 'campus') {
+      if (activeStudentTab === 'live') {
+        setActiveStudentTab('briefing');
+      }
     } else {
-      const storageKey = activePlatform === 'campus' ? 'campus_active_tab' : 'ensembles_active_tab';
+      const storageKey = 'ensembles_active_tab';
       const savedTab = typeof window !== 'undefined' ? (sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)) : null;
-      const fallbackTab = activePlatform === 'campus' ? 'briefing' : 'overview';
-      const targetTab = (savedTab && savedTab !== 'live') ? savedTab : fallbackTab;
-      setActiveStudentTab(targetTab);
+      const targetTab = (savedTab && savedTab !== 'live') ? savedTab : 'overview';
+      if (activeStudentTab !== targetTab) {
+        setActiveStudentTab(targetTab);
+      }
     }
-  }, [activePlatform, user?.role]);
+  }, [activePlatform, activeStudentTab, user?.role, setActiveStudentTab]);
 
   // Safety Hook 1: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
   useEffect(() => {

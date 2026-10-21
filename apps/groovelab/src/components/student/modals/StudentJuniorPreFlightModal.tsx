@@ -147,7 +147,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
               fontWeight: 900,
               padding: '6px 12px',
               borderRadius: '100px',
-              border: '1px solid #fde68a',
+              border: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '5px'
@@ -197,7 +197,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                       <span key={`p-pill-${pNum}`} style={{
                         background: '#dcfce7',
                         color: '#15803d',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         fontSize: '0.76rem',
                         fontWeight: 850,
                         padding: '2px 8px',
@@ -289,7 +289,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
               background: '#ecfdf5',
               borderRadius: '20px',
               padding: '12px 14px',
-              border: '1.5px solid #10b981',
+              border: 'none',
               display: 'flex',
               flexDirection: 'column',
               gap: '10px'

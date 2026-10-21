@@ -100,7 +100,7 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
           border: '1px solid rgba(255,255,255,0.1)',
           boxShadow: '0 12px 30px rgba(0,0,0,0.2)'
         }}>
-          <div style={{ fontWeight: 900, marginBottom: '12px', color: '#eab308', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.04em' }}>
+          <div style={{ fontWeight: 900, marginBottom: '12px', color: '#facc15', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.04em' }}>
             <span>DIAGNOSE: GEOFENCING</span>
             <span style={{ color: geoDebug.isWithinAnyRoom ? '#34a853' : '#ef4444' }}>{geoDebug.isWithinAnyRoom ? 'ERFOLGREICH' : 'FEHLGESCHLAGEN'}</span>
           </div>
@@ -115,7 +115,7 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px' }}>
               <span>Berechnete Distanz:</span>
-              <span style={{ fontWeight: 900, color: '#eab308' }}>{geoDebug.distToSchool !== null ? `${geoDebug.distToSchool}m` : '?'}</span>
+              <span style={{ fontWeight: 900, color: '#facc15' }}>{geoDebug.distToSchool !== null ? `${geoDebug.distToSchool}m` : '?'}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px' }}>
               <span>Status Öffnungszeiten:</span>
@@ -150,7 +150,7 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               style={{ 
                 width: '100%', 
                 padding: '10px', 
-                background: '#eab308', 
+                background: '#facc15', 
                 color: '#0f172a', 
                 border: 'none', 
                 borderRadius: '12px', 

@@ -64,7 +64,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #bae6fd',
+              border: 'none',
               flexShrink: 0
             }}>
               <ShieldCheck size={20} strokeWidth={2.5} />
@@ -274,8 +274,8 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
               width: '46px',
               height: '46px',
               borderRadius: '14px',
-              background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-              color: '#ffffff',
+              background: '#facc15',
+              color: '#0f172a',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -301,7 +301,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
             borderRadius: '100px',
             background: '#fefce8',
             color: '#854d0e',
-            border: '1.5px solid #fde047',
+            border: 'none',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px'
@@ -329,7 +329,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
                 fontWeight: 750,
                 color: '#1e293b',
                 background: '#fefce8',
-                border: '1px solid #fef08a',
+                border: 'none',
                 padding: '5px 11px',
                 borderRadius: '10px',
                 display: 'inline-flex',
@@ -367,7 +367,7 @@ export const ParentModulesSettingsView: React.FC<ParentModulesSettingsViewProps>
               borderRadius: '10px',
               background: '#fefce8',
               color: '#854d0e',
-              border: '1px solid #fef08a',
+              border: 'none',
               fontSize: '0.76rem',
               fontWeight: 850
             }}

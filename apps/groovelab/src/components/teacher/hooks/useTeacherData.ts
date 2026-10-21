@@ -203,7 +203,40 @@ export function useTeacherData({
     selectedRoomIdRef.current = selectedRoomId;
   }, [selectedRoomId]);
 
+  const activePlatformRef = useRef(activePlatform);
+  activePlatformRef.current = activePlatform;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const rawRoomsRef = useRef<any[]>([]);
+  const hasLoadedStage2Ref = useRef(false);
+
   const isFetchingRef = useRef<Promise<void> | null>(null);
+
+  // 🚀 0ms In-Memory Room Projection on Platform Switch (Zero Network Queries)
+  useEffect(() => {
+    const allSchoolRooms = rawRoomsRef.current;
+    if (!allSchoolRooms || allSchoolRooms.length === 0) return;
+    let effectiveRooms = allSchoolRooms.filter((r: any) => {
+      if (activePlatform === 'groovelab') return r.is_groovelab_active !== false;
+      if (activePlatform === 'campus') return r.is_campus_active !== false;
+      return true;
+    });
+    if (effectiveRooms.length === 0) {
+      effectiveRooms = allSchoolRooms;
+    }
+    setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
+
+    if (effectiveRooms.length > 0 && !effectiveRooms.some((r: any) => r.id === selectedRoomIdRef.current)) {
+      const savedRoomId = typeof window !== 'undefined'
+        ? (localStorage.getItem(`groovelab_teacher_selected_room_id_${activePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id'))
+        : null;
+      if (savedRoomId && effectiveRooms.some((r: any) => r.id === savedRoomId)) {
+        setSelectedRoomId(savedRoomId);
+      } else {
+        setSelectedRoomId(effectiveRooms[0].id);
+      }
+    }
+  }, [activePlatform]);
 
   const fetchData = useCallback(async () => {
     if (!userId) return;
@@ -226,7 +259,7 @@ export function useTeacherData({
       // 🚀 Stage 1 Pipeline (Fast Path ~50ms): Core Layout, Stations, Sessions & Staff
       // Säule 1: SWR Cache-First (force=false auf fetchActiveSessions)
       const stage1Query = (targetSchoolId: string) => Promise.all([
-        fetchRoomsBySchool(targetSchoolId, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+        fetchRoomsBySchool(targetSchoolId, false).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
         fetchActiveSessions(targetSchoolId, false).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
         fetchSchoolStaff(targetSchoolId).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
         fetchStationsBySchool(targetSchoolId, false).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
@@ -378,8 +411,11 @@ export function useTeacherData({
             ? await earlyStage1Promise
             : await stage1Query(tData.school_id);
 
-          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Skipped for students or live lab)
-          const shouldLoadStage2 = !isStudent && activeTab !== 'live';
+          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Loaded once for staff)
+          const shouldLoadStage2 = !isStudent;
+          if (shouldLoadStage2) {
+            hasLoadedStage2Ref.current = true;
+          }
           Promise.all([
             shouldLoadStage2
               ? supabase
@@ -404,9 +440,13 @@ export function useTeacherData({
             console.warn('[TeacherData] Background data load warning:', err);
           });
 
+          if (rRes.data && rRes.data.length > 0) {
+            rawRoomsRef.current = rRes.data;
+          }
+          const curPlatform = activePlatformRef.current;
           let effectiveRooms = (rRes.data || []).filter((r: any) => {
-            if (activePlatform === 'groovelab') return r.is_groovelab_active !== false;
-            if (activePlatform === 'campus') return r.is_campus_active !== false;
+            if (curPlatform === 'groovelab') return r.is_groovelab_active !== false;
+            if (curPlatform === 'campus') return r.is_campus_active !== false;
             return true;
           });
 
@@ -506,7 +546,7 @@ export function useTeacherData({
 
     isFetchingRef.current = runFetch();
     return isFetchingRef.current;
-  }, [userId, initialTeacher, activePlatform, activeTab, viewMode]);
+  }, [userId, viewMode]);
 
   useEffect(() => {
     fetchData();

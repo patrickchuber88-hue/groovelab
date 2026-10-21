@@ -209,7 +209,7 @@ export const CampusMobileScheduleCard: React.FC<CampusMobileScheduleCardProps> =
               background: '#fef08a',
               padding: '1px 5px',
               borderRadius: '4px',
-              border: '1px solid #fde047',
+              border: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '2px'
@@ -227,7 +227,7 @@ export const CampusMobileScheduleCard: React.FC<CampusMobileScheduleCardProps> =
               background: '#fef08a',
               padding: '1px 4px',
               borderRadius: '4px',
-              border: '1px solid #fde047',
+              border: 'none',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '2px'
@@ -248,7 +248,7 @@ export const CampusMobileScheduleCard: React.FC<CampusMobileScheduleCardProps> =
               display: 'inline-flex',
               alignItems: 'center',
               gap: '2px',
-              border: '1px solid rgba(239,68,68,0.25)',
+              border: 'none',
               whiteSpace: 'nowrap'
             }} title="Kollision mit parallelem Termin">
               <AlertCircle size={9} strokeWidth={2.8} />
@@ -257,25 +257,25 @@ export const CampusMobileScheduleCard: React.FC<CampusMobileScheduleCardProps> =
           )}
 
           {isAbsentSlot && (
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
               Entfällt
             </span>
           )}
 
           {isExcused && (
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(245,158,11,0.15)' }}>
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
               Entschuldigt
             </span>
           )}
 
           {isUnexcused && (
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none' }}>
               Fehlt
             </span>
           )}
 
           {isCancelled && !isExcused && !isUnexcused && (
-            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
               Abgesagt
               {isCancelledAck && (
                 <span title="Gelesen & Bestätigt" style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />

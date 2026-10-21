@@ -201,7 +201,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSim = isInsideSimMobile || isInsideSimTablet;
   const isMobileView = (windowWidth < 768 && !isInsideSimTablet) || isInsideSimMobile;
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const isMobileOrSim = isFullscreen || isMobileView;
+  const isMobileOrSim = isMobileView;
   const [useNotebookLayout] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -2795,6 +2795,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
       if (e.key === 'Escape') {
         e.preventDefault();
+        if (isFullscreen) {
+          setIsFullscreen(false);
+          return;
+        }
         handleSafeClose();
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
@@ -2805,38 +2809,92 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen, isEmbed, handleSafeClose]);
 
-  const renderFullscreenButton = () => (
-    <button
-      type="button"
-      onClick={() => setIsFullscreen(prev => !prev)}
-      aria-label={isFullscreen ? "Vollbild beenden" : "Vollbildmodus aktivieren"}
-      title={isFullscreen ? "Vollbild beenden" : "Vollbildmodus aktivieren"}
-      style={{
-        background: 'rgba(255, 255, 255, 0.18)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.28)',
-        borderRadius: '50%',
-        width: '32px',
-        height: '32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        color: '#ffffff',
-        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
-        transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-        flexShrink: 0
-      }}
-      className="hover-scale"
-    >
-      {isFullscreen ? (
-        <Minimize2 size={15} strokeWidth={2.4} color="#ffffff" />
-      ) : (
+  const renderFullscreenButton = () => {
+    if (isFullscreen) {
+      return (
+        <button
+          type="button"
+          onClick={() => setIsFullscreen(false)}
+          aria-label="Vollbild beenden"
+          title="Vollbild beenden (Esc oder F)"
+          style={{
+            background: 'rgba(255, 255, 255, 0.28)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.45)',
+            borderRadius: '10px',
+            minHeight: '34px',
+            height: '34px',
+            padding: isMobileView ? '0 10px' : '0 12px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            color: '#ffffff',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)',
+            transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+            flexShrink: 0
+          }}
+          className="hover-scale"
+        >
+          <Minimize2 size={15} strokeWidth={2.4} color="#ffffff" />
+          <span style={{
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            color: '#ffffff',
+            letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap'
+          }}>
+            {isMobileView ? 'Beenden' : 'Vollbild beenden'}
+          </span>
+          {!isMobileView && (
+            <span style={{
+              fontSize: '0.62rem',
+              fontWeight: 750,
+              padding: '1px 5px',
+              background: 'rgba(0, 0, 0, 0.25)',
+              borderRadius: '4px',
+              color: 'rgba(255, 255, 255, 0.92)',
+              marginLeft: '2px',
+              lineHeight: 1.2
+            }}>
+              Esc
+            </span>
+          )}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => setIsFullscreen(true)}
+        aria-label="Vollbildmodus aktivieren"
+        title="Vollbildmodus aktivieren (F)"
+        style={{
+          background: 'rgba(255, 255, 255, 0.18)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(255, 255, 255, 0.28)',
+          borderRadius: '10px',
+          width: '34px',
+          height: '34px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: '#ffffff',
+          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.12)',
+          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+          flexShrink: 0
+        }}
+        className="hover-scale"
+      >
         <Maximize2 size={15} strokeWidth={2.4} color="#ffffff" />
-      )}
-    </button>
-  );
+      </button>
+    );
+  };
 
   const renderCloseButton = () => {
     if (isEmbed) return null;
@@ -2851,9 +2909,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255, 255, 255, 0.28)',
-          borderRadius: '50%',
-          width: '32px',
-          height: '32px',
+          borderRadius: '10px',
+          width: '34px',
+          height: '34px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2882,14 +2940,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       className={isEmbed ? "mobile-modal-embed-shell" : (isMobileOrSim ? "mobile-modal-shell" : "animation-slide-up")}
       style={{
         background: activeModalTab === 'stickeralbum' ? '#0f172a' : '#ffffff',
-        border: isMobileOrSim ? 'none' : '1px solid #e2e8f0',
-        borderRadius: isMobileOrSim ? '0' : '20px',
-        boxShadow: isMobileOrSim
+        border: (isFullscreen || isMobileOrSim) ? 'none' : '1px solid #e2e8f0',
+        borderRadius: (isFullscreen || isMobileOrSim) ? '0' : '20px',
+        boxShadow: (isFullscreen || isMobileOrSim)
           ? 'none'
           : '0 12px 36px -8px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.04)',
         width: '100%',
         maxWidth: '100%',
-        height: isEmbed ? '100%' : (isMobileOrSim ? '100%' : '92vh'),
+        height: isEmbed ? '100%' : ((isFullscreen || isMobileOrSim) ? '100%' : '92vh'),
         display: 'flex',
         flexDirection: 'column',
         overflow: isMobileOrSim ? 'visible' : 'hidden',

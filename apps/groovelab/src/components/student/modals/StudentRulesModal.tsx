@@ -61,7 +61,7 @@ export const StudentRulesModal: React.FC<StudentRulesModalProps> = ({
         
         {/* Start-Funke */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
-          <div style={{ color: '#eab308', display: 'flex', alignItems: 'center' }}>
+          <div style={{ color: '#facc15', display: 'flex', alignItems: 'center' }}>
             <Flame size={20} fill="currentColor" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -100,7 +100,7 @@ export const StudentRulesModal: React.FC<StudentRulesModalProps> = ({
       </div>
 
       {/* 3 Schutzschilde & Ferien Info */}
-      <div style={{ background: '#e6f4ea', border: '1px solid #d1fae5', borderRadius: '16px', padding: '16px' }}>
+      <div style={{ background: '#e6f4ea', border: 'none', borderRadius: '16px', padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803d', fontWeight: 850, fontSize: '0.85rem', marginBottom: '6px' }}>
           🛡️ 3 wöchentliche Schutzschilde & Ferienpause
         </div>

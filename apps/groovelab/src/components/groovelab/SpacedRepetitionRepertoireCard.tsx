@@ -96,8 +96,8 @@ export const SpacedRepetitionRepertoireCard: React.FC<SpacedRepetitionRepertoire
           right: 0,
           height: '4px',
           background: hasDueSongs 
-            ? 'linear-gradient(90deg, #f59e0b, #eab308)' 
-            : 'linear-gradient(90deg, #10b981, #16a34a)'
+            ? '#facc15' 
+            : '#34a853'
         }}
       />
 
@@ -271,7 +271,7 @@ export const SpacedRepetitionRepertoireCard: React.FC<SpacedRepetitionRepertoire
                       padding: '8px 12px',
                       borderRadius: '12px',
                       background: '#fef2f2',
-                      border: '1px solid #fecaca',
+                      border: 'none',
                       color: '#b91c1c',
                       fontWeight: 700,
                       fontSize: '0.78rem',

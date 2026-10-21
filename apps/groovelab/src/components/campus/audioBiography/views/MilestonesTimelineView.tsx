@@ -109,7 +109,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                 height: '36px',
                 borderRadius: '12px',
                 background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                border: '1.5px solid #f59e0b',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -199,7 +199,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
               borderRadius: '100px',
               background:
                 completedCount === milestones.length
-                  ? 'linear-gradient(90deg, #f59e0b 0%, #eab308 50%, #fde047 100%)'
+                  ? 'linear-gradient(90deg, #f59e0b 0%, #facc15 50%, #fde047 100%)'
                   : 'linear-gradient(90deg, #10b981 0%, #059669 60%, #f59e0b 100%)',
               boxShadow: 'none',
               transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -325,7 +325,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                 height: '46px',
                 borderRadius: '50%',
                 background: isAllMilestonesCompleted
-                  ? 'radial-gradient(circle, #fef08a 0%, #eab308 40%, #ca8a04 75%, #713f12 100%)'
+                  ? 'radial-gradient(circle, #fef08a 0%, #facc15 40%, #ca8a04 75%, #713f12 100%)'
                   : 'radial-gradient(circle, #1c1917 25%, #0c0a09 60%, #000000 100%)',
                 border: isAllMilestonesCompleted ? '2.5px solid #ca8a04' : '2.5px solid #292524',
                 display: 'flex',
@@ -523,7 +523,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 fontWeight: 900,
                                 color: '#b45309',
                                 background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                                border: '1px solid #f59e0b',
+                                border: 'none',
                                 padding: '2px 8px',
                                 borderRadius: '100px',
                                 boxShadow: 'none'
@@ -729,7 +729,7 @@ export const MilestonesTimelineView: React.FC<MilestonesTimelineViewProps> = ({
                                 style={{
                                   padding: '11px 16px',
                                   borderRadius: '100px',
-                                  border: '1.5px solid #f59e0b',
+                                  border: 'none',
                                   background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                                   color: '#b45309',
                                   fontWeight: 900,

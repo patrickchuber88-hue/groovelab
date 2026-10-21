@@ -134,15 +134,17 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
   onOpenNoteAtTime,
   currentPlayTime
 }) => {
+  const nextMarkerColor = getMarkerColor(notes.length);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* 📝 New Note / Marker Creation Drawer (Instagram Creator Style) */}
       {isAddingNote && (
         <div
           style={{
-            background: 'linear-gradient(180deg, #ffffff 0%, #fef2f2 100%)',
+            background: '#ffffff',
             borderRadius: '20px',
-            border: '2px solid #ef4444',
+            border: 'none',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
@@ -163,26 +165,28 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                   gap: '6px'
                 }}
               >
-                <Bookmark size={15} strokeWidth={2.4} color="#ef4444" fill="#ef4444" />
-                <span>Neuer Marker bei <strong style={{ color: '#ef4444' }}>{formatTime(newNoteTime)}</strong></span>
+                <Bookmark size={15} strokeWidth={2.4} color={nextMarkerColor.bg} fill={nextMarkerColor.bg} />
+                <span>Neuer Marker bei <strong style={{ color: nextMarkerColor.bg }}>{formatTime(newNoteTime)}</strong></span>
               </span>
 
-              {/* 1,5s Pre-Roll Vorhören Button */}
+              {/* 1,5s Pre-Roll Vorhören Button in Markerfarbe */}
               <button
                 type="button"
                 onClick={() => onPlayNotePreRoll(newNoteTime)}
                 style={{
-                  background: '#f1f5f9',
-                  border: 'none',
+                  background: nextMarkerColor.bg,
+                  color: nextMarkerColor.iconColor,
+                  border: `1.5px solid ${nextMarkerColor.border}`,
                   borderRadius: '8px',
-                  padding: '4px 10px',
+                  padding: '4px 11px',
                   fontSize: '0.70rem',
-                  fontWeight: 800,
-                  color: '#0f172a',
+                  fontWeight: 900,
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  boxShadow: `0 2px 8px ${nextMarkerColor.border}55`,
+                  transition: 'all 0.15s ease'
                 }}
                 className="hover-scale-mini"
                 title="1,5 Sekunden vor dieser Stelle abspielen"
@@ -225,8 +229,17 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
             </div>
           </div>
 
-          {/* ⚡ 1-Tap Quick-Feedback Chips */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {/* ⚡ 1-Tap Quick-Feedback Chips (0,1% Goldstandard Pill-Carousel) */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              overflowX: 'auto',
+              paddingBottom: '2px',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none'
+            }}
+          >
             {QUICK_FEEDBACK_CHIPS.map((chip, idx) => (
               <button
                 key={idx}
@@ -238,15 +251,17 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                 style={{
                   background: '#ffffff',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '10px',
-                  padding: '5px 9px',
-                  fontSize: '0.72rem',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                  fontSize: '0.70rem',
                   fontWeight: 750,
                   color: '#334155',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '4px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                   transition: 'all 0.12s ease'
                 }}
@@ -327,7 +342,7 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                 disabled={!newNoteText.trim()}
                 onClick={onSaveNewNote}
                 style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: '#ef4444',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '10px',
@@ -608,12 +623,12 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                 background: isPracticed ? '#f0fdf4' : '#ffffff',
                 border: `1.5px solid ${isPracticed ? '#bbf7d0' : '#f1f5f9'}`,
                 borderLeft: `4px solid ${rainbowColor.bg}`,
-                borderRadius: '16px',
-                padding: '12px 14px',
+                borderRadius: '14px',
+                padding: isMobile ? '8px 10px' : '9px 12px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                gap: '6px',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
                 transition: 'all 0.15s ease'
               }}
               className="hover-scale-mini"
@@ -777,80 +792,89 @@ export const StudioMarkerFeed: React.FC<StudioMarkerFeedProps> = ({
                 )}
               </div>
 
-              {/* 📝 Zeile 2: Notizentext */}
-              <div
-                style={{
-                  fontSize: isMobile ? '0.84rem' : '0.88rem',
-                  color: '#0f172a',
-                  fontWeight: 650,
-                  lineHeight: 1.45,
-                  wordBreak: 'break-word',
-                  paddingLeft: isMobile ? '0px' : '26px'
-                }}
-              >
-                {n.text}
-              </div>
-
-              {/* 🎬 Zeile 3: Vorhören & 1-Tap 4s-Loop Button */}
+              {/* 📝 Zeile 2: Notizentext & Audio-Quick-Actions in harmonischer Fluchtlinie */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
+                  justifyContent: 'space-between',
+                  gap: '10px',
                   paddingLeft: isMobile ? '0px' : '26px',
-                  marginTop: '2px',
-                  flexWrap: 'wrap'
+                  flexWrap: isMobile ? 'wrap' : 'nowrap'
                 }}
               >
-                {/* Pre-Roll Play */}
-                <button
-                  type="button"
-                  onClick={() => onPlayNotePreRoll(n.time)}
+                <div
                   style={{
-                    background: '#0f172a',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '5px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 850,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.15)'
+                    fontSize: isMobile ? '0.82rem' : '0.85rem',
+                    color: '#0f172a',
+                    fontWeight: 650,
+                    lineHeight: 1.4,
+                    wordBreak: 'break-word',
+                    flex: 1
                   }}
-                  className="hover-scale-mini"
-                  title="1,5s vor dieser Stelle abspielen"
                 >
-                  <Play size={11} fill="currentColor" />
-                  <span>Vorhören (-1,5s)</span>
-                </button>
+                  {n.text}
+                </div>
 
-                {/* 1-Tap Übe-Schleife (YouTube/DAW Style) */}
-                <button
-                  type="button"
-                  onClick={() => onToggleSpotLoop(n)}
+                <div
                   style={{
-                    background: isSpotLoopActive ? '#ef4444' : '#f8fafc',
-                    color: isSpotLoopActive ? '#ffffff' : '#0f172a',
-                    border: isSpotLoopActive ? 'none' : '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '5px 12px',
-                    fontSize: '0.72rem',
-                    fontWeight: 850,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
+                    display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    boxShadow: isSpotLoopActive ? '0 2px 8px rgba(239, 68, 68, 0.3)' : 'none'
+                    gap: '6px',
+                    flexShrink: 0
                   }}
-                  className="hover-scale-mini"
-                  title={`${getNoteLoopDuration(n)}s Übeschleife`}
                 >
-                  <Repeat size={12} strokeWidth={isSpotLoopActive ? 2.8 : 2.0} />
-                  <span>{isSpotLoopActive ? `Loop aktiv (${getNoteLoopDuration(n).toFixed(1)}s)` : `${getNoteLoopDuration(n).toFixed(1)}s Loop`}</span>
-                </button>
+                  {/* Pre-Roll Play in Marker-Farbe */}
+                  <button
+                    type="button"
+                    onClick={() => onPlayNotePreRoll(n.time)}
+                    style={{
+                      background: rainbowColor.bg,
+                      color: rainbowColor.iconColor,
+                      border: `1.5px solid ${rainbowColor.border}`,
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.70rem',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: `0 2px 6px ${rainbowColor.border}44`,
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                    title="1,5s vor dieser Stelle abspielen"
+                  >
+                    <Play size={10} fill="currentColor" />
+                    <span>Vorhören (-1,5s)</span>
+                  </button>
+
+                  {/* 1-Tap Übe-Schleife (YouTube/DAW Style) */}
+                  <button
+                    type="button"
+                    onClick={() => onToggleSpotLoop(n)}
+                    style={{
+                      background: isSpotLoopActive ? '#ef4444' : '#f8fafc',
+                      color: isSpotLoopActive ? '#ffffff' : '#0f172a',
+                      border: isSpotLoopActive ? 'none' : '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.70rem',
+                      fontWeight: 850,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: isSpotLoopActive ? '0 2px 6px rgba(239, 68, 68, 0.3)' : 'none'
+                    }}
+                    className="hover-scale-mini"
+                    title={`${getNoteLoopDuration(n)}s Übeschleife`}
+                  >
+                    <Repeat size={11} strokeWidth={isSpotLoopActive ? 2.8 : 2.0} />
+                    <span>{isSpotLoopActive ? `Loop aktiv (${getNoteLoopDuration(n).toFixed(1)}s)` : `${getNoteLoopDuration(n).toFixed(1)}s Loop`}</span>
+                  </button>
+                </div>
               </div>
 
               {/* 🎚️ Stufenloser Loop-Slider Expander bei aktivem Loop */}

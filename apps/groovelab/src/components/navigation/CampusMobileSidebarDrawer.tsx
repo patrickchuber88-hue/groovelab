@@ -178,23 +178,15 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
   // Handle platform switch
   const handleSwitchPlatform = useCallback((platform: 'campus' | 'groovelab') => {
     if (activePlatform !== platform) {
-      setActivePlatform(platform);
-      if (platform === 'campus') {
-        const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-        const startTab = rawCampusTab && rawCampusTab !== 'live' ? rawCampusTab : 'briefing';
-        setActiveTab(startTab);
-        sessionStorage.setItem('campus_active_tab', startTab);
-      } else {
+      if (platform === 'groovelab') {
         if (isTeacher) {
           sessionStorage.setItem('groovelab_active_workspace', 'teacher');
         }
         if (isStaff || isTeacher) {
           sessionStorage.setItem('groovelab_location_mode', 'lab');
         }
-        setActiveTab('live');
-        sessionStorage.setItem('groovelab_active_tab', 'live');
-        localStorage.setItem('groovelab_active_tab', 'live');
       }
+      setActivePlatform(platform);
     } else if (platform === 'groovelab') {
       setActiveTab('live');
       sessionStorage.setItem('groovelab_active_tab', 'live');
@@ -255,16 +247,16 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
           top: 0,
           left: 0,
           bottom: 0,
-          width: 'min(320px, 86vw)',
+          width: 'min(320px, 86%)',
           maxWidth: '340px',
-          height: '100dvh',
+          height: '100%',
           background: '#ffffff',
           zIndex: 11001,
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '4px 0 28px rgba(0, 0, 0, 0.16)',
           animation: 'campusDrawerSlideInLeft 0.24s cubic-bezier(0.16, 1, 0.3, 1)',
-          paddingTop: 'max(12px, var(--safe-area-inset-top, env(safe-area-inset-top, 12px)))',
+          paddingTop: 'max(14px, var(--safe-area-inset-top, env(safe-area-inset-top, 14px)))',
           paddingBottom: 'max(14px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 14px)))',
           paddingLeft: '14px',
           paddingRight: '14px',
@@ -590,9 +582,12 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                   isActive={activeTab === 'homework_book'}
                   isCollapsed={false}
                   platform={activePlatform}
-                  onClick={() => handleSelectTab('homework_book')}
+                  onClick={() => {
+                    handleSelectTab('homework_book');
+                    window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
+                  }}
                 />
-                {(parentUnlocked || campusStudentUiLevel !== 'junior') && (
+                {(parentUnlocked || (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_practice_board') !== 'false' : true)) && (
                   <CampusSidebarRailItem
                     icon={<Zap size={20} />}
                     label="Übe-Pfad"
@@ -602,23 +597,27 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                     onClick={() => handleSelectTab('practice_board')}
                   />
                 )}
-                <CampusSidebarRailItem
-                  icon={<Calendar size={20} />}
-                  label="Termine"
-                  isActive={activeTab === 'events'}
-                  isCollapsed={false}
-                  platform={activePlatform}
-                  onClick={() => handleSelectTab('events')}
-                />
-                <CampusSidebarRailItem
-                  icon={<Mail size={20} />}
-                  label="Nachrichten"
-                  isActive={activeTab === 'messages'}
-                  isCollapsed={false}
-                  platform={activePlatform}
-                  badgeCount={unreadCount}
-                  onClick={() => handleSelectTab('messages')}
-                />
+                {(parentUnlocked || (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_events') !== 'false' : true)) && (
+                  <CampusSidebarRailItem
+                    icon={<Calendar size={20} />}
+                    label="Termine"
+                    isActive={activeTab === 'events'}
+                    isCollapsed={false}
+                    platform={activePlatform}
+                    onClick={() => handleSelectTab('events')}
+                  />
+                )}
+                {(parentUnlocked || (typeof window !== 'undefined' ? (localStorage.getItem('campus_board_override_messages') !== 'false' && localStorage.getItem('campus_allow_chat') !== 'false') : true)) && (
+                  <CampusSidebarRailItem
+                    icon={<Mail size={20} />}
+                    label="Nachrichten"
+                    isActive={activeTab === 'messages'}
+                    isCollapsed={false}
+                    platform={activePlatform}
+                    badgeCount={unreadCount}
+                    onClick={() => handleSelectTab('messages')}
+                  />
+                )}
                 <CampusSidebarRailItem
                   icon={!parentUnlocked ? <ShieldCheck size={20} /> : <Settings size={20} />}
                   label={!parentUnlocked ? 'Elternbereich' : 'Einstellungen'}

@@ -87,7 +87,7 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
           <div
             style={{
               background: '#ecfdf5',
-              border: '1px solid #10b981',
+              border: 'none',
               padding: '14px 16px',
               borderRadius: '16px',
               display: 'flex',
@@ -127,32 +127,32 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
               🔒 Elterliche Rechte-Konfiguration (DSGVO Art. 8 - Campus-Modul):
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
-              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: '1px solid #10b981' }}>
+              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: 'none' }}>
                 <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
                 <span>Direktnachrichten &amp; Lehrer-Chat <strong>(Inklusive)</strong></span>
               </div>
 
-              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: '1px solid #10b981' }}>
-                <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
+              <div style={{ fontSize: '0.72rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', padding: '4px 8px', borderRadius: '8px', border: 'none' }}>
+                <span style={{ color: '#34a853', fontWeight: 800 }}>✓</span>
                 <span>Digitales Hausaufgabenheft <strong>(Inklusive)</strong></span>
               </div>
 
               <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ color: student.parent_allow_leaderboard !== false ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                <span style={{ color: student.parent_allow_leaderboard !== false ? '#34a853' : '#ef4444', fontWeight: 800 }}>
                   {student.parent_allow_leaderboard !== false ? '✓' : '✕'}
                 </span>
                 <span>Klassen-Highlights &amp; Team-Power</span>
               </div>
 
               <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ color: (student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                <span style={{ color: (student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '#34a853' : '#ef4444', fontWeight: 800 }}>
                   {(student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '✓' : '✕'}
                 </span>
                 <span>Eigene Aufnahmen Schüler (Didaktik-Freigabe)</span>
               </div>
 
               <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <span style={{ color: ((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
+                <span style={{ color: ((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '#34a853' : '#ef4444', fontWeight: 800 }}>
                   {((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '✓' : '✕'}
                 </span>
                 <span>Lehrer-Aufnahmen Schüler (Vertraulichkeit)</span>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { CampusUiLevel } from '../components/campus/CampusLevelSwitcher';
 import { LegalModalsHub } from '../components/modals/LegalModalsHub';
 import { useInactivityTimeout, HARD_LOCK_TIMEOUT_MS } from './useInactivityTimeout';
+import { useAdaptiveScheduleLock } from './useAdaptiveScheduleLock';
 import { executeSessionZeroize } from '../utils/sessionZeroize';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { safeReplaceState } from '../utils/historyUtils';
@@ -68,6 +69,8 @@ export interface UseCampusDeviceAndParentControlsReturn {
   isScreenLockedByInactivity: boolean;
   setIsScreenLockedByInactivity: React.Dispatch<React.SetStateAction<boolean>>;
   effectiveInactivityTimeoutMs: number;
+  lockNow?: () => void;
+  isLessonZone?: boolean;
 }
 
 /**
@@ -466,6 +469,18 @@ export function useCampusDeviceAndParentControls({
     });
   }, []);
 
+  // 🛡️ Adaptive Schedule-Aware Inactivity Citadel für Lehrkräfte
+  const adaptiveSchedule = useAdaptiveScheduleLock({
+    userId: user?.id,
+    userRole: user?.role,
+    schoolId: user?.school_id,
+    enabled: Boolean((user?.role || '').toLowerCase() === 'teacher' && currentView === 'dashboard'),
+    isScreenLocked: isScreenLockedByInactivity,
+    onLock: () => {
+      setIsScreenLockedByInactivity(true);
+    }
+  });
+
   const effectiveInactivityTimeoutMs = useMemo(() => {
     const isSharedKiosk = Boolean(kioskRoomIdParam || stationIdFromStorage || kioskDetails);
     const activeRole = (user?.role || '').toLowerCase();
@@ -481,10 +496,10 @@ export function useCampusDeviceAndParentControls({
       return 45 * 60 * 1000; // 45 Minuten für Verwaltung
     }
     if (activeRole === 'teacher') {
-      return 60 * 60 * 1000; // 60 Minuten für Lehrkräfte
+      return adaptiveSchedule.currentTimeoutMs; // 60 Min im Unterricht, 10 Min nach Feierabend
     }
     return 45 * 60 * 1000; // Fallback 45 Minuten
-  }, [user?.role, kioskRoomIdParam, stationIdFromStorage, kioskDetails]);
+  }, [user?.role, kioskRoomIdParam, stationIdFromStorage, kioskDetails, adaptiveSchedule.currentTimeoutMs]);
 
   useInactivityTimeout({
     timeoutMs: effectiveInactivityTimeoutMs,
@@ -583,6 +598,8 @@ export function useCampusDeviceAndParentControls({
     renderLegalModals,
     isScreenLockedByInactivity,
     setIsScreenLockedByInactivity,
-    effectiveInactivityTimeoutMs
+    effectiveInactivityTimeoutMs,
+    lockNow: adaptiveSchedule.lockNow,
+    isLessonZone: adaptiveSchedule.isLessonZone
   };
 }

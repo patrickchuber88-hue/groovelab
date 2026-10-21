@@ -31,7 +31,7 @@ export interface BandFoundingModalsHubProps {
  */
 export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
   user,
-  brandColor = '#eab308',
+  brandColor = '#facc15',
   suggestingSkill,
   setSuggestingSkill,
   foundingName,
@@ -104,7 +104,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                 height: '100px',
                 borderRadius: '35px',
                 background: '#fefce8',
-                color: '#eab308',
+                color: '#854d0e',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -189,7 +189,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                             borderRadius: '6px',
                             border: 'none',
                             cursor: 'pointer',
-                            background: foundingLanguage === 'de' ? '#eab308' : 'transparent',
+                            background: foundingLanguage === 'de' ? '#facc15' : 'transparent',
                             color: foundingLanguage === 'de' ? '#0f172a' : '#64748b',
                             transition: 'all 0.15s',
                           }}
@@ -210,7 +210,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                             borderRadius: '6px',
                             border: 'none',
                             cursor: 'pointer',
-                            background: foundingLanguage === 'en' ? '#eab308' : 'transparent',
+                            background: foundingLanguage === 'en' ? '#facc15' : 'transparent',
                             color: foundingLanguage === 'en' ? '#0f172a' : '#64748b',
                             transition: 'all 0.15s',
                           }}
@@ -237,7 +237,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                           outline: 'none',
                           transition: 'all 0.2s',
                         }}
-                        onFocus={(e) => (e.currentTarget.style.borderColor = '#eab308')}
+                        onFocus={(e) => (e.currentTarget.style.borderColor = '#facc15')}
                         onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
                       />
                       <button
@@ -253,7 +253,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                           transform: 'translateY(-50%)',
                           background: '#f8fafc',
                           border: '1px solid #cbd5e1',
-                          color: '#eab308',
+                          color: '#854d0e',
                           width: '36px',
                           height: '36px',
                           borderRadius: '10px',
@@ -320,15 +320,15 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                   gap: '8px',
                                   padding: '16px 10px',
                                   background: isSelected
-                                    ? 'linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.04))'
+                                    ? 'linear-gradient(135deg, rgba(250, 204, 21, 0.15), rgba(250, 204, 21, 0.05))'
                                     : 'white',
-                                  border: isSelected ? '2.5px solid #eab308' : '2px solid #e2e8f0',
+                                  border: isSelected ? '2.5px solid #facc15' : '2px solid #e2e8f0',
                                   borderRadius: '18px',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                                   transform: isSelected ? 'scale(1.04)' : 'scale(1)',
                                   boxShadow: isSelected
-                                    ? '0 8px 24px rgba(234, 179, 8, 0.2)'
+                                    ? '0 8px 24px rgba(250, 204, 21, 0.25)'
                                     : '0 2px 8px rgba(0,0,0,0.06)',
                                   position: 'relative',
                                   minWidth: 0,
@@ -342,7 +342,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                       right: '8px',
                                       width: '18px',
                                       height: '18px',
-                                      background: '#eab308',
+                                      background: '#facc15',
                                       borderRadius: '50%',
                                       display: 'flex',
                                       alignItems: 'center',
@@ -367,7 +367,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                       height: '52px',
                                       borderRadius: '50%',
                                       objectFit: 'cover',
-                                      border: isSelected ? '3px solid #eab308' : '3px solid #e2e8f0',
+                                      border: isSelected ? '3px solid #facc15' : '3px solid #e2e8f0',
                                       transition: 'border 0.2s',
                                     }}
                                   />
@@ -378,7 +378,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                       height: '52px',
                                       borderRadius: '50%',
                                       background: isSelected
-                                        ? 'linear-gradient(135deg, #eab308, #ca8a04)'
+                                        ? '#facc15'
                                         : 'linear-gradient(135deg, #94a3b8, #64748b)',
                                       display: 'flex',
                                       alignItems: 'center',
@@ -398,7 +398,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                     style={{
                                       fontWeight: 800,
                                       fontSize: '0.82rem',
-                                      color: isSelected ? '#eab308' : '#1e293b',
+                                      color: isSelected ? '#854d0e' : '#1e293b',
                                       transition: 'color 0.2s',
                                     }}
                                   >
@@ -441,7 +441,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                   className="hero-cta-artistic"
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #ca8a04, #eab308)',
+                    background: '#facc15',
                     border: 'none',
                     padding: '20px',
                     borderRadius: '18px',

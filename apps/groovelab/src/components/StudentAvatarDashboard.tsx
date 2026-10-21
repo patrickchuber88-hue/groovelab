@@ -336,8 +336,13 @@ export function StudentAvatarDashboard({
         maxWidth: '100%', 
         margin: '0 auto', 
         width: '100%', 
+        height: profile.activeTab === 'homework_book' ? '100%' : undefined,
+        display: profile.activeTab === 'homework_book' ? 'flex' : undefined,
+        flexDirection: profile.activeTab === 'homework_book' ? 'column' : undefined,
+        flex: profile.activeTab === 'homework_book' ? 1 : undefined,
+        minHeight: profile.activeTab === 'homework_book' ? 0 : undefined,
         overflowX: 'clip',
-        padding: profile.isMobile ? '0' : '0 0 40px 0', 
+        padding: (profile.isMobile || profile.activeTab === 'homework_book') ? '0' : '0 0 40px 0', 
         boxSizing: 'border-box'
       }}
     >

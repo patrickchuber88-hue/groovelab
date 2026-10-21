@@ -247,7 +247,7 @@ export const CampusMyBookingsList: React.FC<CampusMyBookingsListProps> = ({
                 style={{
                   background: 'rgba(34, 197, 94, 0.12)',
                   color: '#15803d',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  border: 'none',
                   borderRadius: '8px',
                   padding: '4px 8px',
                   height: '28px',

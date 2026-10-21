@@ -108,7 +108,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
   parseBulkInput,
   resolveUserAvatar
 }) => {
-    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
     const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-iphone14, [class*="sim-viewport-mobile"]'));
     const isMobileLayout = windowWidth < 768 || isSimMobile;
 
@@ -172,7 +172,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
         >
           <div className="schueler-header-wrap" style={{ display: 'flex', flexDirection: isMobileLayout ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobileLayout ? 'stretch' : 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '4px', width: '100%' }}>
             <h2 style={{ fontSize: isMobileLayout ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#eab308', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.15)' : 'rgba(234, 179, 8, 0.15)', color: activePlatform === 'campus' ? '#34a853' : '#facc15', padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                 <Users size={16} />
               </div>
               Schülerverwaltung ({activeStudentsCount})
@@ -377,11 +377,15 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       transition: 'transform 0.2s, box-shadow 0.2s', 
                       cursor: 'default',
                       minHeight: isMobileLayout ? 'auto' : '88px',
+                      minWidth: 0,
+                      maxWidth: '100%',
+                      overflow: 'hidden',
                       boxSizing: 'border-box'
                     }} 
                   >
                     <div 
                       role="button"
+                      className="btn-allow-wrap"
                       tabIndex={0}
                       aria-label={`Details für Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
                       onClick={() => fetchStudentProfile(s)}
@@ -391,7 +395,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           fetchStudentProfile(s);
                         }
                       }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', flex: 1, minWidth: 0, outline: 'none', borderRadius: '16px' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', flex: '1 1 0%', minWidth: 0, overflow: 'hidden', outline: 'none', borderRadius: '16px' }}
                     >
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <div style={{ 
@@ -415,7 +419,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                         <div 
                           title={s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
                           style={{ 
@@ -445,7 +449,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                               ⏳ PROBE
                             </div>
                           ) : (activePlatform === 'campus' ? s.is_campus_active : s.is_groovelab_active) ? (
-                            <div style={{ padding: '2px 6px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#eab308', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
+                            <div style={{ padding: '2px 6px', background: activePlatform === 'campus' ? '#e6f4ea' : '#fefce8', color: activePlatform === 'campus' ? '#34a853' : '#facc15', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
                               Aktiv
                             </div>
                           ) : (
@@ -467,12 +471,14 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       marginLeft: isMobileLayout ? '0px' : '8px',
                       width: isMobileLayout ? '100%' : 'auto',
                       marginTop: isMobileLayout ? '6px' : '0px',
-                      flexShrink: 0
+                      flexShrink: 0,
+                      alignItems: 'center'
                     }}
                   >
                     {/* Hausaufgabenheft / Schüler-Protokoll Button (ONLY FOR CAMPUS MODULE) */}
                     {activePlatform === 'campus' && (
                       <button 
+                        type="button"
                         onClick={(e) => { 
                           e.stopPropagation(); 
                           setSelectedStudentForTageskompass(s);
@@ -481,16 +487,20 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         aria-label={`Hausaufgabenheft und Schüler-Protokoll für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
                         style={{ 
                           background: '#e6f4ea', 
-                          border: '1px solid #a7f3d0', 
+                          border: 'none', 
                           padding: "10px", 
-                          minHeight: '44px',
+                          width: isMobileLayout ? '100%' : '40px',
+                          height: isMobileLayout ? '44px' : '40px',
+                          minHeight: isMobileLayout ? '44px' : '40px',
+                          minWidth: isMobileLayout ? 'auto' : '40px',
                           borderRadius: "12px", 
                           cursor: "pointer", 
                           transition: 'all 0.2s',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: '100%'
+                          flexShrink: 0,
+                          boxSizing: 'border-box'
                         }} 
                         className="hover-scale-mini"
                         title="Hausaufgabenheft & Schüler-Protokoll öffnen"
@@ -504,6 +514,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     {/* Stundenplan-Onboarding Status Icon (ONLY FOR CAMPUS MODULE) */}
                     {activePlatform === 'campus' && (
                       <button 
+                        type="button"
                         onClick={(e) => { 
                           e.stopPropagation(); 
                           setSelectedTimetableStudent(s); 
@@ -511,18 +522,22 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         aria-label={hasTimetableOnboarding(s) ? `Stundenplan-Slot für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} ansehen` : `Stundenplan für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} einrichten`}
                         style={{ 
                           background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
-                          border: hasTimetableOnboarding(s) ? '1px solid #a7f3d0' : '1px solid #fef08a', 
+                          border: 'none', 
                           padding: "10px", 
-                          minHeight: '44px',
+                          width: isMobileLayout ? '100%' : '40px',
+                          height: isMobileLayout ? '44px' : '40px',
+                          minHeight: isMobileLayout ? '44px' : '40px',
+                          minWidth: isMobileLayout ? 'auto' : '40px',
                           borderRadius: "12px", 
                           cursor: "pointer", 
-                          color: hasTimetableOnboarding(s) ? '#34a853' : '#d97706', 
+                          color: hasTimetableOnboarding(s) ? '#16a34a' : '#d97706', 
                           transition: 'all 0.2s',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           position: 'relative',
-                          width: '100%'
+                          flexShrink: 0,
+                          boxSizing: 'border-box'
                         }} 
                         className="hover-scale-mini"
                         title={hasTimetableOnboarding(s) ? "Stundenplan-Onboarding: Abgeschlossen (Klicken für Slot-Details)" : "Stundenplan-Onboarding: Ausstehend (Klicken für Manuelles Eintragen)"}
@@ -530,24 +545,28 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         <Calendar size={18} />
                         <div style={{
                           position: 'absolute',
-                          top: '-3px',
-                          right: '-3px',
-                          width: '10px',
-                          height: '10px',
+                          top: '-2px',
+                          right: '-2px',
+                          width: '9px',
+                          height: '9px',
                           borderRadius: '50%',
-                          background: hasTimetableOnboarding(s) ? '#34a853' : '#eab308',
+                          background: hasTimetableOnboarding(s) ? '#34a853' : '#facc15',
                           border: '2px solid white'
                         }} />
                       </button>
                     )}
                     <button 
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
                       aria-label={`QR-Zugangskarte und Login-Token für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} anzeigen`}
                       style={{ 
                         background: "#ffffff", 
                         border: "1px solid #cbd5e1", 
                         padding: "10px", 
-                        minHeight: '44px',
+                        width: isMobileLayout ? '100%' : '40px',
+                        height: isMobileLayout ? '44px' : '40px',
+                        minHeight: isMobileLayout ? '44px' : '40px',
+                        minWidth: isMobileLayout ? 'auto' : '40px',
                         borderRadius: "12px", 
                         cursor: "pointer", 
                         color: "#475569", 
@@ -555,7 +574,8 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        width: '100%'
+                        flexShrink: 0,
+                        boxSizing: 'border-box'
                       }} 
                       className="hover-scale-mini"
                       title="QR Code & Ausweis"

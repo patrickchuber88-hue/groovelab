@@ -174,7 +174,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
           {isAbsent ? (
             <div style={{
               background: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              border: 'none',
               borderRadius: '12px',
               padding: '8px 12px',
               display: 'flex',
@@ -195,7 +195,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
           ) : (
             <div style={{
               background: '#fff5f5',
-              border: '1px solid #fecaca',
+              border: 'none',
               borderRadius: '12px',
               padding: '7px 11px',
               display: 'flex',
@@ -580,7 +580,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                 padding: '6px 10px',
                 borderRadius: '10px',
                 background: '#fff1f2',
-                border: '1px solid #fecdd3',
+                border: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',

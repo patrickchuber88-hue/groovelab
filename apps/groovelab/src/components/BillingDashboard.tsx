@@ -597,7 +597,7 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
           gap: '12px',
           color: '#ea4335',
           backgroundColor: '#fce8e6',
-          border: '1px solid rgba(234, 67, 53, 0.2)',
+          border: 'none',
           padding: '14px',
           borderRadius: '12px',
           fontSize: '0.85rem',

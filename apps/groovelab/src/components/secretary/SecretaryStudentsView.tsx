@@ -18,6 +18,7 @@ export interface SecretaryStudentsViewProps {
   coaches: any[];
   currentSchoolProfile: any;
   schoolId: string;
+  userId?: string;
   schoolName: string;
   windowWidth: number;
   hasCampusSub: boolean;
@@ -104,6 +105,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
   coaches,
   currentSchoolProfile,
   schoolId,
+  userId,
   schoolName,
   windowWidth,
   hasCampusSub,
@@ -257,8 +259,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 {/* Inline Compact Stat Badges */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px' }}>
                   <span style={{ 
-                    background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', 
-                    color: '#3730a3', 
+                    background: '#e0e7ff', 
+                    color: '#4338ca', 
                     padding: '2px 8px', 
                     borderRadius: '100px', 
                     fontSize: '0.68rem', 
@@ -273,8 +275,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   </span>
 
                   <span style={{ 
-                    background: 'linear-gradient(135deg, #e6f4ea 0%, #ceebd6 100%)', 
-                    color: '#137333', 
+                    background: '#dcfce7', 
+                    color: '#15803d', 
                     padding: '2px 8px', 
                     borderRadius: '100px', 
                     fontSize: '0.68rem', 
@@ -289,8 +291,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   </span>
 
                   <span style={{ 
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', 
-                    color: '#b45309', 
+                    background: '#fef9c3', 
+                    color: '#854d0e', 
                     padding: '2px 8px', 
                     borderRadius: '100px', 
                     fontSize: '0.68rem', 
@@ -305,8 +307,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   </span>
 
                   <span style={{ 
-                    background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', 
-                    color: '#6b21a8', 
+                    background: '#f3e8ff', 
+                    color: '#7e22ce', 
                     padding: '2px 8px', 
                     borderRadius: '100px', 
                     fontSize: '0.68rem', 
@@ -343,9 +345,9 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     padding: '4px 10px', 
                     fontSize: '0.72rem', 
                     fontWeight: 800, 
-                    background: copiedStudentId === 'general-onboarding' ? '#e6f4ea' : '#ffffff',
-                    border: copiedStudentId === 'general-onboarding' ? '1px solid #e6f4ea' : '1px solid #cbd5e1',
-                    color: copiedStudentId === 'general-onboarding' ? '#34a853' : '#0f172a',
+                    background: copiedStudentId === 'general-onboarding' ? '#dcfce7' : '#ffffff',
+                    border: copiedStudentId === 'general-onboarding' ? 'none' : '1px solid #cbd5e1',
+                    color: copiedStudentId === 'general-onboarding' ? '#15803d' : '#0f172a',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
                     transition: 'all 0.2s'
@@ -369,7 +371,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     fontSize: '0.72rem', 
                     fontWeight: 800,
                     background: '#ffffff',
-                    border: '1.5px solid #a7f3d0',
+                    border: '1.5px solid #cbd5e1',
                     color: '#065f46',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
@@ -423,9 +425,9 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     padding: '4px 10px', 
                     fontSize: '0.72rem', 
                     fontWeight: 800,
-                    background: isStudentCsvExpanded ? '#e6f4ea' : '#ffffff',
-                    border: isStudentCsvExpanded ? '1.5px solid #34a853' : '1px solid #cbd5e1',
-                    color: isStudentCsvExpanded ? '#34a853' : '#334155',
+                    background: isStudentCsvExpanded ? '#dcfce7' : '#ffffff',
+                    border: isStudentCsvExpanded ? 'none' : '1px solid #cbd5e1',
+                    color: isStudentCsvExpanded ? '#15803d' : '#334155',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist',
                     transition: 'all 0.2s'
@@ -530,7 +532,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         </span>
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: '1px solid #a7f3d0' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: 'none' }}>
                       DSGVO-Anonymisiert
                     </span>
                   </div>
@@ -539,7 +541,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                   {selectedTeacherObj && (
                     <div style={{
                       background: 'rgba(52, 168, 83, 0.04)',
-                      border: '1.5px solid rgba(52, 168, 83, 0.18)',
+                      border: 'none',
                       borderRadius: '14px',
                       padding: '10px 14px',
                       display: 'flex',
@@ -831,9 +833,9 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     padding: '0 10px',
                     fontSize: '0.76rem',
                     fontWeight: 700,
-                    background: showRealNames ? '#ffffff' : '#fef3c7',
-                    border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fcd34d',
-                    color: showRealNames ? '#475569' : '#b45309',
+                    background: showRealNames ? '#ffffff' : '#fef9c3',
+                    border: showRealNames ? '1px solid #cbd5e1' : 'none',
+                    color: showRealNames ? '#475569' : '#854d0e',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist, -apple-system, sans-serif',
                     height: '30px',
@@ -924,7 +926,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         fontWeight: 800,
                         background: '#e6f4ea',
                         color: '#137333',
-                        border: '1.5px solid #34a853',
+                        border: 'none',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist, -apple-system, sans-serif',
                         height: '30px',
@@ -1010,7 +1012,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         fontWeight: 800,
                         background: '#fef3c7',
                         color: '#b45309',
-                        border: '1.5px solid #eab308',
+                        border: 'none',
                         cursor: 'pointer',
                         fontFamily: 'Urbanist, -apple-system, sans-serif',
                         height: '30px',
@@ -1040,7 +1042,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         padding: '0 12px',
                         fontSize: '0.76rem',
                         fontWeight: 800,
-                        background: 'linear-gradient(135deg, #ff3b30 0%, #dc2626 100%)',
+                        background: '#ef4444',
                         color: '#ffffff',
                         border: 'none',
                         cursor: 'pointer',
@@ -1122,8 +1124,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         gap: '12px',
                         padding: '8px 12px',
                         borderRadius: '12px',
-                        background: isSelected ? '#fef2f2' : '#ffffff',
-                        border: isSelected ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                        background: isSelected ? '#fee2e2' : '#ffffff',
+                        border: isSelected ? 'none' : '1px solid #e2e8f0',
                         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                         width: '100%',
                         boxSizing: 'border-box',
@@ -1244,7 +1246,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               fontWeight: 800, 
                               color: '#6b21a8', 
                               background: '#f3e8ff', 
-                              border: '1px solid #c084fc', 
+                              border: 'none', 
                               padding: '1px 6px', 
                               borderRadius: '100px', 
                               whiteSpace: 'nowrap',
@@ -1404,16 +1406,16 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                             height: '32px',
                             borderRadius: '8px',
                             border: student.is_campus_active 
-                              ? (student.exempt_from_direct_billing ? '1px solid #c084fc' : (student.isPendingOnboarding ? '1.5px dashed #34a853' : '1px solid #34a853')) 
+                              ? 'none' 
                               : '1px solid #e2e8f0',
                             fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasCampusSub) ? 'pointer' : 'not-allowed',
                             background: student.is_campus_active 
-                              ? (student.exempt_from_direct_billing ? 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)' : (student.isPendingOnboarding ? '#e6f4ea' : '#34a853')) 
+                              ? (student.exempt_from_direct_billing ? '#f3e8ff' : (student.isPendingOnboarding ? '#e6f4ea' : '#34a853')) 
                               : '#f8fafc',
                             color: student.is_campus_active 
-                              ? (student.exempt_from_direct_billing ? '#6b21a8' : (student.isPendingOnboarding ? '#137333' : '#ffffff')) 
+                              ? (student.exempt_from_direct_billing ? '#7e22ce' : (student.isPendingOnboarding ? '#137333' : '#ffffff')) 
                               : '#64748b',
                             opacity: (!isBillingBooked || hasCampusSub) ? 1 : 0.45,
                             whiteSpace: 'nowrap',
@@ -1438,7 +1440,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                           <span>
                             {student.is_campus_active 
                               ? (student.exempt_from_direct_billing 
-                                  ? <HeartHandshake size={13} style={{ color: '#6b21a8' }} /> 
+                                  ? <HeartHandshake size={13} style={{ color: '#7e22ce' }} /> 
                                   : (student.isPendingOnboarding 
                                       ? <span className="pulse-open-circle">○</span> 
                                       : '●')) 
@@ -1462,17 +1464,17 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                             height: '32px',
                             borderRadius: '8px',
                             border: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '1.5px dashed #eab308' : '1px solid #eab308') 
+                              ? 'none' 
                               : '1px solid #e2e8f0',
                             fontSize: '0.78rem',
                             fontWeight: 800,
                             cursor: (!isBillingBooked || hasGroovelabSub) ? 'pointer' : 'not-allowed',
                             whiteSpace: 'nowrap',
                             background: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '#fefce8' : '#eab308') 
+                              ? (student.isPendingOnboarding ? '#fef9c3' : '#facc15') 
                               : '#f8fafc',
                             color: student.is_groovelab_active 
-                              ? (student.isPendingOnboarding ? '#a16207' : '#0f172a') 
+                              ? (student.isPendingOnboarding ? '#854d0e' : '#0f172a') 
                               : '#64748b',
                             opacity: (!isBillingBooked || hasGroovelabSub) ? 1 : 0.45,
                             display: 'flex',
@@ -1519,7 +1521,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                           }}
                           style={{
                             background: '#fef2f2',
-                            border: '1px solid #fca5a5',
+                            border: 'none',
                             borderRadius: '8px',
                             width: '32px',
                             height: '32px',
@@ -1547,9 +1549,11 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               setActiveContextMenu(null);
                             } else {
                               const rect = e.currentTarget.getBoundingClientRect();
+                              const spaceBelow = window.innerHeight - rect.bottom;
+                              const top = spaceBelow < 220 && rect.top > 220 ? Math.max(12, rect.top - 210) : rect.bottom + 6;
                               setActiveContextMenu({
                                 student: student,
-                                top: rect.bottom + 6,
+                                top,
                                 right: Math.max(12, window.innerWidth - rect.right)
                               });
                             }
@@ -1724,7 +1728,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               <form onSubmit={handleCreateStudentCampus} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', maxHeight: '75vh' }}>
                 
                 {/* Form fields */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Vorname *</label>
                     <input 
@@ -1763,7 +1767,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>Instrumente *</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', maxHeight: '180px', overflowY: 'auto', padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
                       {INSTRUMENT_TAGS.map((tag) => {
                         const checked = newStudentInstrument.split(',').map(s => s.trim()).includes(tag);
                         return (
@@ -1890,7 +1894,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
           </div>
         )}
         {showLostInstrumentModal && (
-          <SecretaryLostInstrumentModal isOpen={showLostInstrumentModal} onClose={() => setShowLostInstrumentModal(false)} students={students} campusTeachers={campusTeachers} schoolId={schoolId} />
+          <SecretaryLostInstrumentModal isOpen={showLostInstrumentModal} onClose={() => setShowLostInstrumentModal(false)} students={students} campusTeachers={allUniqueTeachers} schoolId={schoolId} userId={userId} />
         )}
       </>
     );

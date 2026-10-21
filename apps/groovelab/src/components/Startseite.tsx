@@ -51,7 +51,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
   }, []);
 
   const triggerProtectedRegistration = (targetEmail?: string) => {
-    setShowAccessModal(true);
+    onRegister(targetEmail);
   };
 
   // Hardened Master Admin Auth State (100% Zero Password: FIDO2 Passkey / Google Authenticator / Break-Glass)
@@ -483,7 +483,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
             padding: '8px 18px',
             borderRadius: '100px',
             background: 'rgba(52, 168, 83, 0.15)',
-            border: '1px solid rgba(52, 168, 83, 0.4)',
+            border: 'none',
             color: '#4ade80',
             fontSize: '0.85rem',
             fontWeight: 700,
@@ -867,7 +867,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               fontWeight: 800,
               color: '#10b981',
               background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.22)',
+              border: 'none',
               padding: '8px 20px',
               borderRadius: '100px',
               textTransform: 'uppercase',
@@ -969,7 +969,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               className={`filter-chip ${selectedModuleFilter === 'groovelab' ? 'active-groovelab' : ''}`}
               onClick={() => setSelectedModuleFilter('groovelab')}
             >
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#eab308' }} />
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#facc15' }} />
               GrooveLab
             </button>
           </div>
@@ -1024,7 +1024,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                             fontWeight: 800,
                             color: '#34a853',
                             background: 'rgba(52, 168, 83, 0.12)',
-                            border: '1px solid rgba(52, 168, 83, 0.25)',
+                            border: 'none',
                             padding: '2px 6px',
                             borderRadius: '4px',
                             textTransform: 'uppercase',
@@ -1037,9 +1037,9 @@ export const Startseite: React.FC<StartseiteProps> = ({
                           <span style={{
                             fontSize: '0.65rem',
                             fontWeight: 800,
-                            color: '#eab308',
+                            color: '#facc15',
                             background: 'rgba(234, 179, 8, 0.12)',
-                            border: '1px solid rgba(234, 179, 8, 0.25)',
+                            border: 'none',
                             padding: '2px 6px',
                             borderRadius: '4px',
                             textTransform: 'uppercase',
@@ -1153,7 +1153,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                           fontWeight: 800,
                           color: '#34a853',
                           background: 'rgba(52, 168, 83, 0.12)',
-                          border: '1px solid rgba(52, 168, 83, 0.25)',
+                          border: 'none',
                           padding: '2px 6px',
                           borderRadius: '4px',
                           textTransform: 'uppercase',
@@ -1166,9 +1166,9 @@ export const Startseite: React.FC<StartseiteProps> = ({
                         <span style={{
                           fontSize: '0.65rem',
                           fontWeight: 800,
-                          color: '#eab308',
+                          color: '#facc15',
                           background: 'rgba(234, 179, 8, 0.12)',
-                          border: '1px solid rgba(234, 179, 8, 0.25)',
+                          border: 'none',
                           padding: '2px 6px',
                           borderRadius: '4px',
                           textTransform: 'uppercase',
@@ -1193,7 +1193,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                       height: '36px',
                       borderRadius: '50%',
                       background: 'rgba(16, 185, 129, 0.1)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1405,7 +1405,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
               height: '60px',
               borderRadius: '18px',
               background: 'rgba(234, 179, 8, 0.12)',
-              border: '1px solid rgba(234, 179, 8, 0.35)',
+              border: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1485,7 +1485,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                 {masterAuthError && (
                   <div style={{
                     background: 'rgba(239, 68, 68, 0.12)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    border: 'none',
                     color: '#fca5a5',
                     padding: '10px 14px',
                     borderRadius: '12px',
@@ -1545,7 +1545,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                       width: '100%',
                       padding: '12px 16px',
                       background: 'rgba(239, 68, 68, 0.08)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      border: 'none',
                       borderRadius: '14px',
                       color: '#f87171',
                       fontSize: '0.86rem',
@@ -1602,7 +1602,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                       width: '100%',
                       boxSizing: 'border-box',
                       background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1.5px solid #22c55e',
+                      border: '1.5px solid #34a853',
                       borderRadius: '14px',
                       padding: '14px',
                       color: '#ffffff',
@@ -1619,7 +1619,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                 {masterAuthError && (
                   <div style={{
                     background: 'rgba(239, 68, 68, 0.12)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    border: 'none',
                     color: '#fca5a5',
                     padding: '10px 14px',
                     borderRadius: '12px',
@@ -1641,7 +1641,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                   style={{
                     width: '100%',
                     padding: '14px 20px',
-                    background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                    background: '#34a853',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '16px',
@@ -1742,7 +1742,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                       width: '100%',
                       boxSizing: 'border-box',
                       background: 'rgba(239, 68, 68, 0.05)',
-                      border: '1.5px solid #ef4444',
+                      border: 'none',
                       borderRadius: '14px',
                       padding: '14px',
                       color: '#ffffff',
@@ -1759,7 +1759,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
                 {masterAuthError && (
                   <div style={{
                     background: 'rgba(239, 68, 68, 0.12)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    border: 'none',
                     color: '#fca5a5',
                     padding: '10px 14px',
                     borderRadius: '12px',

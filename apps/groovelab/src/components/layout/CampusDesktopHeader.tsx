@@ -122,14 +122,9 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
                   setActivePlatform('campus');
-                  const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-                  const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
-                  setActiveStudentTab(startTab);
-                  sessionStorage.setItem('campus_active_tab', startTab);
                 }
               }}
               onClick={() => {
-                const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
                 const isStudent = user?.role === 'student';
                 if (isStudent && locationMode === 'lab' && isKioskMode && !isCampusUnlocked) {
                   setShowCampusPinPrompt(true);
@@ -139,10 +134,6 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                 }
                 setActivePlatform('campus');
-                const rawCampusTab = sessionStorage.getItem('campus_active_tab');
-                const startTab = (rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing';
-                setActiveStudentTab(startTab);
-                sessionStorage.setItem('campus_active_tab', startTab);
               }}
               style={{
                 display: 'flex',
@@ -191,30 +182,24 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                   if (user?.role === 'teacher') {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                   }
-                  setActivePlatform('groovelab');
                   const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
-                  if (isStaff) {
+                  if (isStaff && locationMode !== 'lab') {
                     setLocationMode('lab');
                     sessionStorage.setItem('groovelab_location_mode', 'lab');
                   }
-                  setActiveStudentTab('live');
-                  sessionStorage.setItem('groovelab_active_tab', 'live');
-                  localStorage.setItem('groovelab_active_tab', 'live');
+                  setActivePlatform('groovelab');
                 }
               }}
               onClick={() => {
                 if (user?.role === 'teacher') {
                   sessionStorage.setItem('groovelab_active_workspace', 'teacher');
                 }
-                setActivePlatform('groovelab');
                 const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
-                if (isStaff) {
+                if (isStaff && locationMode !== 'lab') {
                   setLocationMode('lab');
                   sessionStorage.setItem('groovelab_location_mode', 'lab');
                 }
-                setActiveStudentTab('live');
-                sessionStorage.setItem('groovelab_active_tab', 'live');
-                localStorage.setItem('groovelab_active_tab', 'live');
+                setActivePlatform('groovelab');
               }}
               style={{
                 display: 'flex',
@@ -223,7 +208,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 padding: windowWidth <= 640 ? '6px 10px 4px' : (windowWidth <= 1024 ? '10px 14px 8px' : '12px 22px 10px'),
                 borderRadius: '12px 12px 0 0',
                 background: activePlatform === 'groovelab' ? '#facc15' : 'rgba(250, 204, 21, 0.05)',
-                color: activePlatform === 'groovelab' ? '#09090b' : '#eab308',
+                color: activePlatform === 'groovelab' ? '#09090b' : '#facc15',
                 border: activePlatform === 'groovelab' ? '1px solid #facc15' : '1px solid rgba(250, 204, 21, 0.18)',
                 borderBottom: 'none',
                 fontWeight: 750,
@@ -241,7 +226,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 outline: 'none'
               }}
             >
-              <CampusRibbonNoteIcon size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#eab308'} />
+              <CampusRibbonNoteIcon size={15} color={activePlatform === 'groovelab' ? '#09090b' : '#facc15'} />
               {windowWidth > 640 && <span>GrooveLab</span>}
             </div>
           )}
@@ -308,7 +293,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 justifyContent: 'center',
                 background: activePlatform === 'campus' ? 'rgba(52, 168, 83, 0.08)' : (activePlatform === 'ensembles' ? 'rgba(59, 130, 246, 0.08)' : 'rgba(250, 204, 21, 0.08)'),
                 border: `1px solid ${activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#facc15')}30`,
-                color: activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
+                color: activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#facc15'),
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
@@ -580,7 +565,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
 
               {/* Lab Count Pill */}
               {activePlatform === 'groovelab' && (() => {
-                const themeColor = (activePlatform as string) === 'campus' ? '#34a853' : '#eab308';
+                const themeColor = (activePlatform as string) === 'campus' ? '#34a853' : '#facc15';
                 const displayBg = `${themeColor}12`;
                 const displayBorder = `1px solid ${themeColor}25`;
                 const displayColor = themeColor;

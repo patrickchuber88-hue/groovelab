@@ -11,15 +11,19 @@ export interface UseCampusStaffBandSyncParams {
 
 export const useCampusStaffBandSync = ({
   user,
-  activePlatform,
-  activeStudentTab,
   setAllBands,
   setUserBands
 }: UseCampusStaffBandSyncParams): void => {
+  const hydratedKeyRef = React.useRef<string>('');
+
   useEffect(() => {
     if (user?.id && (user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary')) {
       const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
       if (!schoolId) return;
+
+      const cacheKey = `${user.id}_${schoolId}`;
+      if (hydratedKeyRef.current === cacheKey) return;
+      hydratedKeyRef.current = cacheKey;
 
       supabase
         .from('bands')
@@ -42,8 +46,10 @@ export const useCampusStaffBandSync = ({
             });
 
             setUserBands(teacherCoachedBands);
+          } else {
+            hydratedKeyRef.current = '';
           }
         });
     }
-  }, [user?.id, user?.role, user?.school_id, user?.schools, activePlatform, activeStudentTab, setAllBands, setUserBands]);
+  }, [user?.id, user?.role, user?.school_id, user?.schools, setAllBands, setUserBands]);
 };

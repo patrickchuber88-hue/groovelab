@@ -246,7 +246,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
   setStudentSearchTerm,
   setSuccessAnimationRoomId,
 }) => {
-    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
+    const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
     const { isRightSidebarOpen, setIsRightSidebarOpen, toggleSidebar } = useRoomSidebarState();
     const { isTopCatalogCollapsed, toggleTopCatalog } = useRoomTopCatalogState();
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
@@ -2639,8 +2639,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                             width: 7,
                             height: 7,
                             borderRadius: '50%',
-                            background: isSelected ? '#ffffff' : (occupiedNow ? '#ef4444' : '#22c55e'),
-                            boxShadow: isSelected ? 'none' : (occupiedNow ? '0 0 6px rgba(239,68,68,0.5)' : '0 0 6px rgba(34,197,94,0.5)'),
+                            background: isSelected ? '#ffffff' : (occupiedNow ? '#ef4444' : '#34a853'),
+                            boxShadow: isSelected ? 'none' : (occupiedNow ? '0 0 6px rgba(239,68,68,0.5)' : 'none'),
                             flexShrink: 0
                           }} />
                         </div>
@@ -2788,7 +2788,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           {dayNumber}
                         </span>
                         {isToday ? (
-                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#ffffff' : '#22c55e', marginTop: '1px' }} />
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#ffffff' : '#34a853', marginTop: '1px' }} />
                         ) : dayHasBookings ? (
                           <span style={{ width: 4, height: 4, borderRadius: '50%', background: isSelected ? '#ffffff' : '#94a3b8', marginTop: '1px', opacity: isSelected ? 0.8 : 0.6 }} />
                         ) : (
@@ -2943,7 +2943,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#34a853', flexShrink: 0 }} />
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
                                     {seg.startTime} – {seg.endTime} Uhr
@@ -3010,7 +3010,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           badgeBg = '#ede9fe';
                           badgeTextColor = '#7c3aed';
                         } else if (isGroovelabBlock) {
-                          accentColor = '#eab308';
+                          accentColor = '#facc15';
                           badgeBg = '#fef9c3';
                           badgeTextColor = '#854d0e';
                         } else if (!isSchedule) {
@@ -3371,7 +3371,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           gap: '4px',
                           background: '#dcfce7',
                           color: '#15803d',
-                          border: '1.5px solid #86efac',
+                          border: 'none',
                           borderRadius: '11px',
                           padding: '5px 9px',
                           fontSize: '0.70rem',
@@ -3768,7 +3768,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                         { label: 'Regulärer Unterricht', bg: '#34a853', border: 'none' },
                         { label: 'Buchung bestätigt (unifarben)', bg: '#8b5cf6', border: 'none' },
                         { label: 'Unter Vorbehalt (lila gestrichelt)', bg: 'repeating-linear-gradient(-45deg, #ede9fe 0px, #ede9fe 2px, #f5f3ff 2px, #f5f3ff 4px)', border: '1.5px dashed #8b5cf6' },
-                        { label: 'GrooveLab', bg: '#eab308', border: 'none' },
+                        { label: 'GrooveLab', bg: '#facc15', border: 'none' },
                       ].map(leg => (
                         <span key={leg.label} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <span style={{ width: 9, height: 9, borderRadius: '3px', background: leg.bg, border: leg.border }} />
@@ -4006,7 +4006,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                       headerTimeColor = '#7c3aed';
                                       bodyTextColor = '#6d28d9';
                                     } else if (isGroovelabBlock) {
-                                      cardBg = '#eab308';
+                                      cardBg = '#facc15';
                                       cardBorder = '1px solid rgba(0, 0, 0, 0.1)';
                                       headerTimeColor = '#854d0e';
                                       bodyTextColor = '#1e293b';
@@ -4417,7 +4417,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.02em' }}>Von</label>
                     <select
@@ -4879,7 +4879,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 </div>
 
                 {/* Grid stats: Size and Max Students */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>
                   {/* Size */}
                   <div style={{ 
                     background: '#f8fafc', 
@@ -4968,7 +4968,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                         padding: '4px 10px',
                                         borderRadius: '8px',
                                         fontWeight: 700,
-                                        border: '1.5px solid #bfdbfe',
+                                        border: 'none',
                                         cursor: 'pointer',
                                         textDecoration: 'none',
                                         transition: 'all 0.15s ease'
@@ -5055,7 +5055,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                   padding: '4px 8px', 
                                   borderRadius: '8px', 
                                   fontWeight: 750,
-                                  border: '1px solid #fee2e2',
+                                  border: 'none',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px'
@@ -5338,7 +5338,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       </div>
 
                       {/* Time Pickers */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
                         <div>
                           <label style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>Von:</label>
                           <input 

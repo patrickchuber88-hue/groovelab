@@ -430,7 +430,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
                 {Array.from({ length: 12 }).map((_, idx) => {
                   const threshold = (idx + 1) / 12;
                   const isActive = audioLevel >= threshold;
-                  const segColor = idx >= 10 ? '#ef4444' : idx >= 8 ? '#eab308' : '#22c55e';
+                  const segColor = idx >= 10 ? '#ef4444' : idx >= 8 ? '#facc15' : '#34a853';
                   return (
                     <div
                       key={idx}

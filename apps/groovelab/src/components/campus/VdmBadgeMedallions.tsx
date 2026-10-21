@@ -101,26 +101,56 @@ export const VdmMedallionSvg: React.FC<{
   const idPrefix = `vdm-grad-${level}-${Math.random().toString(36).substring(2, 7)}`;
 
   if (isLocked) {
+    const toneMap = {
+      junior: { bg: '#fef3c7', stroke: '#f59e0b', ring: '#fde68a', icon: '#d97706', label: 'Junior' },
+      d1: { bg: '#ffedd5', stroke: '#ea580c', ring: '#fed7aa', icon: '#c2410c', label: 'D1' },
+      d2: { bg: '#f1f5f9', stroke: '#64748b', ring: '#cbd5e1', icon: '#475569', label: 'D2' },
+      d3: { bg: '#fefce8', stroke: '#eab308', ring: '#fef08a', icon: '#ca8a04', label: 'D3' }
+    }[level];
+
     return (
       <svg
         width={size}
         height={size}
         viewBox="0 0 64 64"
-        style={{ display: 'block', opacity: 0.32, filter: 'grayscale(1)' }}
+        style={{ display: 'block' }}
         aria-hidden="true"
       >
-        <circle cx="32" cy="32" r="28" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 3" />
-        <circle cx="32" cy="32" r="22" fill="#e2e8f0" />
-        <g transform="translate(24, 22) scale(0.68)">
+        <defs>
+          <filter id={`${idPrefix}-locked-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.06" />
+          </filter>
+        </defs>
+        {/* Äußerer dezenter Prägerand */}
+        <circle cx="32" cy="32" r="28" fill="#ffffff" stroke={toneMap.ring} strokeWidth="1.8" filter={`url(#${idPrefix}-locked-shadow)`} />
+        {/* Innenspiegel mit feinem Farbton */}
+        <circle cx="32" cy="32" r="23" fill={toneMap.bg} opacity="0.6" />
+        <circle cx="32" cy="32" r="23" fill="none" stroke={toneMap.stroke} strokeWidth="0.8" opacity="0.3" />
+        {/* Feines, elegantes Schloss-Symbol mit Stufen-Akzent */}
+        <g transform="translate(24, 17) scale(0.68)">
           <path
             d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4"
             fill="none"
-            stroke="#475569"
-            strokeWidth="2.5"
+            stroke={toneMap.icon}
+            strokeWidth="2.2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </g>
+        {/* Stufen-Signet unten */}
+        <text
+          x="32"
+          y="47"
+          textAnchor="middle"
+          fill={toneMap.icon}
+          fontSize="7"
+          fontWeight="900"
+          fontFamily="system-ui, -apple-system, sans-serif"
+          letterSpacing="0.03em"
+          opacity="0.9"
+        >
+          {toneMap.label}
+        </text>
       </svg>
     );
   }
@@ -591,11 +621,11 @@ export const VdmShowcaseVitrine: React.FC<{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                padding: layout === 'grid2x2' ? '12px 6px' : (isMobile ? '8px 4px' : '12px 8px'),
+                padding: layout === 'grid2x2' ? '12px 8px' : (isMobile ? '8px 4px' : '12px 8px'),
                 borderRadius: '14px',
-                background: isMastered ? '#ffffff' : '#f8fafc',
-                border: isMastered ? '1.5px solid #cbd5e1' : '1px dashed #cbd5e1',
-                boxShadow: isMastered ? '0 4px 12px rgba(0, 0, 0, 0.05)' : 'none',
+                background: isMastered ? '#ffffff' : '#ffffff',
+                border: isMastered ? '1.5px solid #a7f3d0' : '1px solid #e2e8f0',
+                boxShadow: isMastered ? '0 4px 12px rgba(16, 185, 129, 0.08)' : '0 1px 3px rgba(0, 0, 0, 0.02)',
                 cursor: isMastered ? 'pointer' : 'default',
                 transition: 'all 0.18s ease',
                 textAlign: 'center',

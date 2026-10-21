@@ -166,7 +166,7 @@ export const ParentNotificationSettingsView: React.FC<ParentNotificationSettings
           style={{
             padding: '12px 16px',
             background: '#fef2f2',
-            border: '1.5px solid #fecaca',
+            border: 'none',
             borderRadius: '14px',
             display: 'flex',
             alignItems: 'center',
@@ -311,7 +311,7 @@ export const ParentNotificationSettingsView: React.FC<ParentNotificationSettings
                   borderRadius: '100px',
                   background: '#eff6ff',
                   color: '#1d4ed8',
-                  border: '1px solid #bfdbfe'
+                  border: 'none'
                 }}
               >
                 ⏳ Ausstehend
@@ -329,7 +329,7 @@ export const ParentNotificationSettingsView: React.FC<ParentNotificationSettings
             style={{
               padding: '14px 18px',
               background: '#fffbeb',
-              border: '1.5px solid #fef3c7',
+              border: 'none',
               borderRadius: '16px',
               fontSize: '0.76rem',
               color: '#92400e',

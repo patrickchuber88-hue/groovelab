@@ -56,9 +56,9 @@ export function getPitchStaffY(
 const BOOMWHACKERS_COLORS: Record<string, string> = {
   'C': '#ef4444', // Red
   'D': '#f97316', // Orange
-  'E': '#eab308', // Yellow
+  'E': '#facc15', // Yellow
   'F': '#84cc16', // Light Green
-  'G': '#22c55e', // Dark Green
+  'G': '#34a853', // Dark Green
   'A': '#3b82f6', // Blue
   'B': '#a855f7'  // Purple
 };
@@ -708,9 +708,9 @@ export const WorldTourStaffNotation: React.FC<WorldTourStaffNotationProps> = ({
 
                         // Dynamic Color by Tier and Hit Status
                         const noteheadColor = isHit
-                          ? '#22c55e'
+                          ? '#34a853'
                           : isNear
-                          ? '#eab308'
+                          ? '#facc15'
                           : isMiss
                           ? '#ef4444'
                           : uiLevel === 'junior'

@@ -441,12 +441,89 @@ process.stdout.write(
   `Scanned ${filesScanned} source file(s).\n\n`
 );
 
+// 1b. SCAN BFF PERIMETER & ZERO-TRUST MIDDLEWARES (Generation 2 Guard Evolution)
+process.stdout.write('  📂 [1b/7] BFF Perimeter & Zero-Trust Middleware Invariants (packages/bff-server/src)...\n');
+const BFF_SRC_DIR = path.join(ROOT_DIR, 'packages', 'bff-server', 'src');
+const bffFiles = fs.existsSync(BFF_SRC_DIR) ? walkDir(BFF_SRC_DIR, ['.ts', '.js']) : [];
+
+const FORBIDDEN_BFF_PATTERNS = [
+  {
+    id: 'BFF-01',
+    name: 'Unverified Cookie Existence Check in BFF Route/Middleware',
+    regex: /Boolean\(\s*req\.cookies\?\.\s*\[['"](?:__Host-session|__Host-cg_site_pass|cg_site_pass)['"]\]/g,
+    severity: 'CRITICAL',
+    description: 'BFF middlewares must never accept cookie presence (Boolean(req.cookies[...])) as proof of authentication. Always verify via decryptSession() or verifySiteGateToken().',
+    isViolation: (content) => !content.includes('decryptSession') || !content.includes('verifySiteGateToken')
+  },
+  {
+    id: 'BFF-02',
+    name: 'Unverified Session-Lease Header Check (UUID Regex Only)',
+    regex: /req\.headers\[['"]x-session-token['"]\]/g,
+    severity: 'CRITICAL',
+    description: 'Any BFF route authenticating via x-session-token must verify the lease against public.session_leases (is_revoked = false) or forward it to an authoritative DB RPC.',
+    allowedFiles: ['middleware/idempotencyMiddleware.ts', 'routes/proxy.ts'],
+    isViolation: (content) => !content.includes("from('session_leases')") && !content.includes('rpc(')
+  },
+  {
+    id: 'BFF-03',
+    name: 'Unscoped Idempotency-Key Header (Cross-User Replay Risk)',
+    regex: /req\.headers\[['"]idempotency-key['"]\]/g,
+    severity: 'HIGH',
+    description: 'Explicit Idempotency-Key headers must be cryptographically bound to the caller scope (computeCallerScopeHash) to prevent cross-user response replay.',
+    isViolation: (content) => !content.includes('computeCallerScopeHash')
+  },
+  {
+    id: 'BFF-04',
+    name: 'Asymmetric Student Storage Write/Delete BOLA Guard',
+    regex: /STUDENT_DELETE_SCHOOL_ASSET_DENIED/g,
+    severity: 'CRITICAL',
+    description: 'Storage path validation must block both student DELETE and student WRITE (STUDENT_WRITE_SCHOOL_ASSET_DENIED) on school-wide paths and enforce effectiveStudentId.',
+    isViolation: (content) => !content.includes('STUDENT_WRITE_SCHOOL_ASSET_DENIED') || !content.includes('effectiveStudentId')
+  },
+  {
+    id: 'BFF-05',
+    name: 'Unpinned WebAuthn Public Key in BFF Signature Verifier',
+    regex: /router\.post\(\s*['"]\/webauthn\/verify['"]/g,
+    severity: 'CRITICAL',
+    description: 'WebAuthn verification in BFF must resolve the server-pinned SPKI public key via get_webauthn_credential_public_key before calling crypto.verify.',
+    isViolation: (content) => !content.includes('get_webauthn_credential_public_key') || !content.includes('cryptoMod.verify')
+  }
+];
+
+for (const bffFile of bffFiles) {
+  const rawBff = fs.readFileSync(bffFile, 'utf-8');
+  const relBff = path.relative(ROOT_DIR, bffFile);
+  const cleanBff = rawBff.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  for (const rule of FORBIDDEN_BFF_PATTERNS) {
+    if (rule.allowedFiles && rule.allowedFiles.some((af) => relBff.includes(af))) continue;
+    rule.regex.lastIndex = 0;
+    const match = rule.regex.exec(cleanBff);
+    if (match) {
+      if (typeof rule.isViolation === 'function' && !rule.isViolation(cleanBff, relBff)) {
+        continue;
+      }
+      process.stderr.write(`\n  🔴 [FAIL] [${rule.severity}] ${rule.id}: ${rule.name}\n`);
+      process.stderr.write(`       File: ${relBff}\n`);
+      process.stderr.write(`       Details: ${rule.description}\n`);
+      violationsCount++;
+    }
+  }
+}
+
+process.stdout.write(
+  `     ${violationsCount === 0 ? '✅' : `❌ (${violationsCount} violation(s) so far)`} ` +
+  `Scanned ${bffFiles.length} BFF server file(s).\n\n`
+);
+
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
 process.stdout.write('  📂 [2/7] SQL Migration Invariants (supabase/migrations)...\n');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
 let highestDmlMigrationNum = -1;
+let latestAuthCredMigration = null;
+let highestAuthCredMigrationNum = -1;
 
 for (const filePath of migrationFiles) {
   migrationsScanned++;
@@ -467,6 +544,18 @@ for (const filePath of migrationFiles) {
       if (num > highestDmlMigrationNum) {
         highestDmlMigrationNum = num;
         latestDmlMigration = { file: relPath, content, baseName };
+      }
+    }
+  }
+
+  // Track latest authenticate_by_credential SSOT definition
+  if (/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?authenticate_by_credential\b/i.test(content)) {
+    const match = baseName.match(/^(\d+)_/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > highestAuthCredMigrationNum) {
+        highestAuthCredMigrationNum = num;
+        latestAuthCredMigration = { file: relPath, content, baseName, num };
       }
     }
   }
@@ -577,10 +666,15 @@ for (const filePath of migrationFiles) {
         // Exempt authoritative login/challenge functions, public landing/theme metadata, public contract verification and public biography PIN functions
         const isLoginOrChallengeExempt = [
           'authenticate_by_credential',
+          'authenticate_student_by_credential',
+          'authenticate_student_by_id_and_day',
           'authenticate_webauthn_credential',
           'generate_webauthn_challenge',
           'get_public_school_theme',
+          'build_safe_school_context',
           'verify_personal_pin',
+          'verify_parent_pin',
+          'login_master_admin',
           'register_school_and_admin',
           'search_public_schools',
           'verify_shared_biography_pin',
@@ -591,6 +685,15 @@ for (const filePath of migrationFiles) {
 
         if (isLoginOrChallengeExempt) continue;
 
+        // 1% Invariant SQL-11 (Migrations >= 591): Forbid current_user IN ('postgres', ...) inside SECURITY DEFINER
+        if (migNum >= 591 && /\bcurrent_user\s+IN\s*\([^)]*'postgres'/i.test(funcBody)) {
+          process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Forbidden current_user Check inside SECURITY DEFINER in Migration ${baseName}\n`);
+          process.stderr.write(`       Function: ${funcName}\n`);
+          process.stderr.write(`       File: ${relPath}\n`);
+          process.stderr.write(`       Details: Inside a postgres-owned SECURITY DEFINER function, current_user is ALWAYS 'postgres'. Use current_setting('role', true) = 'service_role' instead.\n`);
+          violationsCount++;
+        }
+
         // Verify authoritative caller validation in function body
         const hasCallerAuth = 
           funcBody.includes('is_master_admin()') ||
@@ -598,14 +701,15 @@ for (const filePath of migrationFiles) {
           funcBody.includes('get_current_authenticated_user_id()') ||
           funcBody.includes('auth.uid()') ||
           funcBody.includes('session_leases') ||
-          /\bcurrent_user\s+(?:IN\s*\([^)]*\)|=)/i.test(funcBody) ||
+          funcBody.includes("current_setting('role'") ||
+          (migNum < 591 && /\bcurrent_user\s+(?:IN\s*\([^)]*\)|=)/i.test(funcBody)) ||
           funcBody.includes('get_current_user_role()');
 
         if (!hasCallerAuth) {
           process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Unchecked SECURITY DEFINER Function in Migration ${baseName}\n`);
           process.stderr.write(`       Function: ${funcName}\n`);
           process.stderr.write(`       File: ${relPath}\n`);
-          process.stderr.write(`       Details: SECURITY DEFINER functions exposed to 'authenticated' or 'anon' must validate the caller identity (e.g. is_master_admin(), get_current_user_school_id(), auth.uid(), session_leases, or current_user IN ('postgres', ...)).\n`);
+          process.stderr.write(`       Details: SECURITY DEFINER functions exposed to 'authenticated' or 'anon' must validate the caller identity (e.g. is_master_admin(), get_current_user_school_id(), get_current_authenticated_user_id(), session_leases, or current_setting('role', true) = 'service_role').\n`);
           violationsCount++;
         }
       }
@@ -624,8 +728,8 @@ for (const filePath of migrationFiles) {
       }
     }
 
-    // 1% Invariant SQL-09: Forbidden Primary-Key Match in Credential-Lookup RPCs (Migrations >= 555)
-    if (migNum >= 555 && content.includes('authenticate_by_credential')) {
+    // 1% Invariant SQL-09: Forbidden Primary-Key Match & Two-Stage Lease Minting in Credential-Lookup RPCs (Migrations == 555 or >= 591)
+    if ((migNum === 555 || migNum >= 591) && content.includes('authenticate_by_credential')) {
       const pkMatchRegex = /\b(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\s*=\s*(?:v_clean|p_credential)(?:::uuid|::text)?\b|\b(?:v_clean|p_credential)(?:::uuid|::text)?\s*=\s*(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\b/i;
       
       const funcRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?authenticate_by_credential\b[\s\S]*?AS\s+(\$([a-zA-Z0-9_]*)\$)([\s\S]*?)\1\s*(?:[a-zA-Z0-9_\s=,']*);/gi;
@@ -716,6 +820,30 @@ if (latestDmlMigration) {
     violationsCount++;
   } else {
     process.stdout.write(`     ✅ Latest DML Migration (${latestDmlMigration.baseName}) contains full Privilege Escalation & Student Parental Shields.\n`);
+  }
+}
+
+// Verify that the LATEST authenticate_by_credential SSOT enforces Two-Stage Lease Minting & Zero Primary-Key Matching!
+if (latestAuthCredMigration) {
+  const pkMatchRegex = /\b(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\s*=\s*(?:v_clean|p_credential)(?:::uuid|::text)?\b|\b(?:v_clean|p_credential)(?:::uuid|::text)?\s*=\s*(?:[a-zA-Z0-9_]+\.)?id(?:::uuid|::text)?\b/i;
+  const authFuncRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?authenticate_by_credential\b[\s\S]*?AS\s+(\$([a-zA-Z0-9_]*)\$)([\s\S]*?)\1/i;
+  const authFuncMatch = latestAuthCredMigration.content.match(authFuncRegex);
+  const authFuncBody = authFuncMatch ? authFuncMatch[3] : latestAuthCredMigration.content;
+
+  const hasForbiddenPkMatch = pkMatchRegex.test(authFuncBody);
+  const hasForbiddenCrossTenantFallback = authFuncBody.includes('Fallback: if school_id was provided') ||
+    (authFuncBody.match(/FROM\s+public\.users_raw\s+u/gi) || []).length > 2;
+  const hasTwoStageLeaseGate = authFuncBody.includes('v_requires_pin') && /IF\s+NOT\s+v_requires_pin\s+THEN/i.test(authFuncBody);
+  const hasMasterAdminBlock = authFuncBody.includes('is_master_admin');
+  const hasSafeSchoolProjection = authFuncBody.includes('build_safe_school_context');
+
+  if (hasForbiddenPkMatch || hasForbiddenCrossTenantFallback || !hasTwoStageLeaseGate || !hasMasterAdminBlock || !hasSafeSchoolProjection) {
+    process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Insecure authenticate_by_credential SSOT in latest migration\n`);
+    process.stderr.write(`       File: ${latestAuthCredMigration.file}\n`);
+    process.stderr.write(`       Details: The latest authenticate_by_credential definition must forbid primary-key matching, forbid cross-tenant fallback queries, block is_master_admin, use build_safe_school_context, and enforce Two-Stage Lease Minting (IF NOT v_requires_pin THEN).\n`);
+    violationsCount++;
+  } else {
+    process.stdout.write(`     ✅ Latest Auth RPC Migration (${latestAuthCredMigration.baseName}) enforces Two-Stage Lease Minting, Strict Tenant-Binding & Zero-UUID-Guessing.\n`);
   }
 }
 

@@ -96,7 +96,7 @@ export const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
 
 export const INSTRUMENT_COLORS: Record<string, string> = { 
   Guitar: '#ef4444', 
-  Bass: '#eab308', 
+  Bass: '#facc15', 
   Drums: '#3b82f6', 
   Keys: '#a855f7',
   Vocals: '#34a853'

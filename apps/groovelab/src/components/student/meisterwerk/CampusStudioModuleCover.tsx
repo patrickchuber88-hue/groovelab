@@ -110,14 +110,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'practice':
         return {
           title: 'Üben',
-          gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+          gradient: '#facc15',
           boxShadow: 'none',
           renderIcon: () => (
             <Clock
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -129,14 +129,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
             : uiLevel === 'teen'
               ? 'Songs & Noten'
               : 'Repertoire & Noten',
-          gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+          gradient: '#34a853',
           boxShadow: 'none',
           renderIcon: () => (
             <BookOpen
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -144,14 +144,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'recordings':
         return {
           title: 'Aufnahmen',
-          gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+          gradient: '#6366f1',
           boxShadow: 'none',
           renderIcon: () => (
             <Mic
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -159,14 +159,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'groovetrainer':
         return {
           title: 'Groove-Trainer',
-          gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+          gradient: '#f97316',
           boxShadow: 'none',
           renderIcon: () => (
             <Radio
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -174,14 +174,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'tuner':
         return {
           title: 'Stimmgerät',
-          gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+          gradient: '#06b6d4',
           boxShadow: 'none',
           renderIcon: () => (
             <TuningForkIcon
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -189,14 +189,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'earlab':
         return {
           title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'Gehörtraining',
-          gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+          gradient: '#a855f7',
           boxShadow: 'none',
           renderIcon: () => (
             <Headphones
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -204,14 +204,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'loopstation':
         return {
           title: 'Loopstation',
-          gradient: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
+          gradient: '#ef4444',
           boxShadow: 'none',
           renderIcon: () => (
             <Sliders
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -219,25 +219,21 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'skillradar':
         return {
           title: uiLevel === 'junior' ? 'Musik-Stern' : 'Fähigkeiten',
-          gradient: uiLevel === 'junior'
-            ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%)'
-            : 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-          boxShadow: uiLevel === 'junior'
-            ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
-            : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+          gradient: '#ec4899',
+          boxShadow: 'none',
           renderIcon: () => uiLevel === 'junior' ? (
             <Star
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           ) : (
             <Activity
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -245,14 +241,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'worldtour':
         return {
           title: 'Musik-Weltreise',
-          gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          gradient: '#007acc',
           boxShadow: 'none',
           renderIcon: () => (
             <Compass
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -260,14 +256,14 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       case 'archive':
         return {
           title: 'Aufgabenheft-Verlauf',
-          gradient: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+          gradient: '#475569',
           boxShadow: 'none',
           renderIcon: () => (
             <History
               size={dimensions.iconSize}
               color="#ffffff"
               strokeWidth={dimensions.strokeWidth}
-              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }}
+              style={{ filter: 'none' }}
             />
           )
         };
@@ -276,7 +272,7 @@ export const CampusStudioModuleCover: React.FC<CampusStudioModuleCoverProps> = (
       default:
         return {
           title: 'Modul freischalten',
-          gradient: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
+          gradient: '#e2e8f0',
           boxShadow: 'none',
           renderIcon: () => (
             <Plus

@@ -45,7 +45,7 @@ export const JUNIOR_STICKER_REWARDS = [
   { id: 'stk_note', emoji: '🎵', label: 'Zauber-Klang', gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#3b82f6' },
   { id: 'stk_star', emoji: '🌟', label: 'Goldstern', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#f59e0b' },
   { id: 'stk_lion', emoji: '🦁', label: 'Löwen-Groove', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#10b981' },
-  { id: 'stk_crown', emoji: '👑', label: 'Meister-Krone', gradient: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)', color: '#eab308' },
+  { id: 'stk_crown', emoji: '👑', label: 'Meister-Krone', gradient: 'linear-gradient(135deg, #facc15 0%, #ca8a04 100%)', color: '#facc15' },
   { id: 'stk_applause', emoji: '👏', label: 'Bühnen-Applaus', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', color: '#8b5cf6' },
   { id: 'stk_flame', emoji: '🔥', label: 'Feuer-Solo', gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#f97316' },
 ];
@@ -1214,7 +1214,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
                     height: '96px',
                     borderRadius: '50%',
                     background: 'rgba(239, 68, 68, 0.15)',
-                    border: '3px solid #ef4444',
+                    border: 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1297,7 +1297,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
               {/* 🌟 Campus XP Points Reward Banner */}
               <div style={{
                 background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                border: '1.5px solid #f59e0b',
+                border: 'none',
                 borderRadius: '20px',
                 padding: '12px 18px',
                 display: 'flex',

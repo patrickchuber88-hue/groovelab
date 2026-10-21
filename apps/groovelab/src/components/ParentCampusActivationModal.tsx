@@ -686,7 +686,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, rgba(240, 253, 244, 0.6) 0%, rgba(255, 255, 255, 0.9) 100%)'
+          background: '#f8fafc'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
@@ -813,7 +813,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               position: 'absolute',
               top: '-10px',
               left: '18px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: '#10b981',
               color: '#ffffff',
               fontSize: '0.68rem',
               fontWeight: 900,
@@ -857,7 +857,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           {/* 👨‍👩‍👧 Family Hub / Geschwister-Verknüpfung (Paid-First Architecture) */}
           <div style={{
             background: isThirdOrMoreChild ? '#fefce8' : '#f8fafc',
-            border: `1.5px solid ${isThirdOrMoreChild ? '#facc15' : '#e2e8f0'}`,
+            border: isThirdOrMoreChild ? 'none' : '1.5px solid #e2e8f0',
             borderRadius: '16px',
             padding: '14px 16px',
             display: 'flex',
@@ -885,13 +885,13 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {linkedSiblings.map((sib, idx) => (
                   <span key={idx} style={{ 
-                    background: sib.isCampusActive ? '#ecfdf5' : '#ffffff', 
-                    border: `1px solid ${sib.isCampusActive ? '#a7f3d0' : '#cbd5e1'}`, 
+                    background: sib.isCampusActive ? '#dcfce7' : '#ffffff', 
+                    border: sib.isCampusActive ? 'none' : '1px solid #cbd5e1', 
                     padding: '3px 8px', 
                     borderRadius: '6px', 
                     fontSize: '0.72rem', 
                     fontWeight: 700, 
-                    color: sib.isCampusActive ? '#065f46' : '#64748b', 
+                    color: sib.isCampusActive ? '#15803d' : '#64748b', 
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '4px' 
@@ -900,7 +900,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   </span>
                 ))}
                 <span style={{ 
-                  background: isThirdOrMoreChild ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9', 
+                  background: isThirdOrMoreChild ? '#10b981' : '#f1f5f9', 
                   border: isThirdOrMoreChild ? 'none' : '1px solid #cbd5e1', 
                   padding: isThirdOrMoreChild ? '4px 9px' : '3px 8px', 
                   borderRadius: '6px', 
@@ -915,7 +915,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
             {/* Status Feedback */}
             {isThirdOrMoreChild ? (
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46', background: '#ecfdf5', border: '1px solid #10b981', padding: '6px 10px', borderRadius: '8px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#065f46', background: '#ecfdf5', border: 'none', padding: '6px 10px', borderRadius: '8px' }}>
                 🎉 Glückwunsch! Als 3. aktives Kind ist der Campus-Zugang für {student.first_name || 'dieses Kind'} für das gesamte Schuljahr 100% KOSTENLOS (0,00 €)!
               </div>
             ) : activePaidSiblingsCount === 1 ? (
@@ -1048,7 +1048,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             {schoolYearCalc.isCurrentTrialPeriod && (
               <div style={{
                 background: '#ecfdf5',
-                border: '1.5px solid #a7f3d0',
+                border: 'none',
                 borderRadius: '12px',
                 padding: '10px 14px',
                 marginBottom: '14px',
@@ -1092,7 +1092,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             {/* Row 1: Verwendungszweck (Highlight!) */}
             <div style={{
               background: '#ecfdf5',
-              border: '1.5px solid #a7f3d0',
+              border: 'none',
               borderRadius: '12px',
               padding: '10px 14px',
               display: 'flex',
@@ -1111,7 +1111,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 type="button"
                 onClick={() => handleCopy(referenceCode, 'reference')}
                 style={{
-                  background: copiedField === 'reference' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#ffffff',
+                  background: copiedField === 'reference' ? '#10b981' : '#ffffff',
                   border: copiedField === 'reference' ? 'none' : '1.5px solid #10b981',
                   borderRadius: '8px',
                   padding: '6px 12px',
@@ -1179,7 +1179,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           {submittedSuccess && (
             <div style={{
               background: '#ecfdf5',
-              border: '1.5px solid #10b981',
+              border: 'none',
               borderRadius: '14px',
               padding: '14px',
               display: 'flex',
@@ -1366,7 +1366,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               aria-label="Weiter zur Einrichtung & Freigabe"
               style={{
                 width: '100%',
-                background: !agreeWithdrawalWaiver ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: !agreeWithdrawalWaiver ? '#94a3b8' : '#10b981',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '14px',
@@ -1378,7 +1378,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: agreeWithdrawalWaiver ? '0 6px 20px rgba(16, 185, 129, 0.35)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.15s'
               }}
               onMouseOver={(e) => { if (agreeWithdrawalWaiver) e.currentTarget.style.transform = 'translateY(-1px)'; }}
@@ -1446,7 +1446,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             {showHardshipConfirm && (
               <div style={{
                 background: '#fef3c7',
-                border: '1px solid #f59e0b',
+                border: 'none',
                 borderRadius: '14px',
                 padding: '14px',
                 fontSize: '0.78rem',
@@ -1502,7 +1502,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #bfdbfe',
+              border: 'none',
               boxShadow: 'none'
             }} aria-hidden="true">
               <Lock size={26} />
@@ -1574,7 +1574,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               <div style={{
                 color: '#b91c1c',
                 background: '#fef2f2',
-                border: '1px solid #fecaca',
+                border: 'none',
                 borderRadius: '10px',
                 padding: '8px 14px',
                 fontSize: '0.78rem',
@@ -1597,9 +1597,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   maxWidth: '320px',
                   padding: '12px 16px',
                   borderRadius: '16px',
-                  border: '1px solid #bae6fd',
-                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                  color: '#0284c7',
+                  border: 'none',
+                  background: '#e0f2fe',
+                  color: '#0369a1',
                   fontSize: '0.88rem',
                   fontWeight: 800,
                   cursor: isVerifyingPin ? 'not-allowed' : 'pointer',
@@ -1647,7 +1647,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               onClick={handleVerifyParentPin}
               style={{
                 flex: 1,
-                background: parentPinInput.length < 4 || isVerifyingPin ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: parentPinInput.length < 4 || isVerifyingPin ? '#94a3b8' : '#10b981',
                 border: 'none',
                 borderRadius: '14px',
                 padding: '12px 20px',
@@ -1659,7 +1659,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: parentPinInput.length >= 4 ? '0 4px 14px rgba(16, 185, 129, 0.35)' : 'none'
+                boxShadow: 'none'
               }}
             >
               {isVerifyingPin ? 'Prüfe PIN...' : 'PIN bestätigen & weiter ➔'}
@@ -1696,9 +1696,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: allowStudentAudio ? '#f0fdf4' : '#f8fafc',
-                color: allowStudentAudio ? '#16a34a' : '#94a3b8',
-                border: `1px solid ${allowStudentAudio ? '#bbf7d0' : '#e2e8f0'}`,
+                background: allowStudentAudio ? '#dcfce7' : '#f8fafc',
+                color: allowStudentAudio ? '#15803d' : '#94a3b8',
+                border: allowStudentAudio ? 'none' : '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1711,7 +1711,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   <span style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
                     Audio-Tresor &amp; Loopstation
                   </span>
-                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#ffffff', background: '#10b981', padding: '2px 6px', borderRadius: '4px' }}>
                     Geschützter Audio-Tresor
                   </span>
                 </div>
@@ -1767,9 +1767,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: allowStudentChat ? '#eff6ff' : '#f8fafc',
-                color: allowStudentChat ? '#2563eb' : '#94a3b8',
-                border: `1px solid ${allowStudentChat ? '#bfdbfe' : '#e2e8f0'}`,
+                background: allowStudentChat ? '#dbeafe' : '#f8fafc',
+                color: allowStudentChat ? '#1d4ed8' : '#94a3b8',
+                border: allowStudentChat ? 'none' : '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1838,9 +1838,9 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                background: allowStudentAbsences ? '#fef3c7' : '#f8fafc',
-                color: allowStudentAbsences ? '#d97706' : '#94a3b8',
-                border: `1px solid ${allowStudentAbsences ? '#fde68a' : '#e2e8f0'}`,
+                background: allowStudentAbsences ? '#fef9c3' : '#f8fafc',
+                color: allowStudentAbsences ? '#854d0e' : '#94a3b8',
+                border: allowStudentAbsences ? 'none' : '1px solid #e2e8f0',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1920,7 +1920,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               onClick={() => setWizardStep('ui_level')}
               style={{
                 flex: 1,
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: '#10b981',
                 border: 'none',
                 borderRadius: '14px',
                 padding: '12px 20px',
@@ -1995,7 +1995,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   onClick={() => setSelectedUiLevel(lvl.id)}
                   style={{
                     background: isSelected ? lvl.bg : '#ffffff',
-                    border: isSelected ? `2px solid ${lvl.color}` : '1px solid #e2e8f0',
+                    border: isSelected ? 'none' : '1px solid #e2e8f0',
                     borderRadius: '16px',
                     padding: '14px 16px',
                     cursor: 'pointer',
@@ -2105,7 +2105,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               aria-label={isThirdOrMoreChild ? 'Kostenlos freischalten' : 'Zahlungspflichtig bestellen'}
               style={{
                 flex: 1,
-                background: isSubmitting ? '#94a3b8' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: isSubmitting ? '#94a3b8' : '#10b981',
                 border: 'none',
                 borderRadius: '14px',
                 padding: '12px 20px',
@@ -2145,7 +2145,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '3px solid #bbf7d0',
+            border: 'none',
             boxShadow: 'none'
           }} aria-hidden="true">
             <CheckCircle2 size={38} />
@@ -2153,7 +2153,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
 
               <div>
                 <span style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: '#10b981',
                   color: '#ffffff',
                   fontSize: '0.74rem',
                   fontWeight: 900,
@@ -2209,7 +2209,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 style={{
                   width: '100%',
                   maxWidth: '440px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: '#10b981',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '16px',

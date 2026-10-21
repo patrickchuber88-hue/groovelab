@@ -257,7 +257,7 @@ export const StudentNicknameSetupModal: React.FC<StudentNicknameSetupModalProps>
               title="Zufälligen Namen würfeln"
               style={{
                 background: '#fef3c7',
-                border: '1.5px solid #fde68a',
+                border: 'none',
                 borderRadius: '12px',
                 padding: '0 14px',
                 display: 'flex',

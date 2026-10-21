@@ -14,156 +14,65 @@ import { formatTeacherFullName } from '../../utils/nameHelper';
 import { SecretaryTagesRadarBoard } from './widgets/SecretaryTagesRadarBoard';
 
 export interface SecretaryBriefingViewProps {
-  currentSchoolProfile: any;
-  setCurrentSchoolProfile: React.Dispatch<React.SetStateAction<any>>;
-  currentUserProfile: any;
-  userId?: string;
-  schoolId: string;
-  schoolNumericId: string | number;
-  activeTab: string;
-  setActiveTab: (tab: any) => void;
-  secretarySubTab: string;
-  setSecretarySubTab: (tab: any) => void;
-  campusSubTab: string;
-  setCampusSubTab: (tab: any) => void;
-  schedulesRoomsViewMode: string;
-  setSchedulesRoomsViewMode: (mode: any) => void;
-  expandedSidebarTeacherId: string | null;
-  setExpandedSidebarTeacherId: (id: any) => void;
-  selectedFilterTeacherId: string | null;
-  setSelectedFilterTeacherId: (id: any) => void;
-  pendingBookings: any[];
-  setPendingBookings?: React.Dispatch<React.SetStateAction<any[]>>;
-  roomIssues: any[];
-  setRoomIssues: React.Dispatch<React.SetStateAction<any[]>>;
-  rooms: any[];
-  buildings?: any[];
-  students: any[];
-  campusTeachers: any[];
-  bypassTeachers: any[];
-  coaches: any[];
-  matrixAllocations: any[];
-  pendingSchedules: any[];
-  userMap: Record<string, any>;
-  roomMap: Record<string, any>;
-  isAvvSigned: boolean;
-  setShowAvvModal?: (show: boolean) => void;
-  showLogbookModal: boolean;
-  setShowLogbookModal: (show: boolean) => void;
-  showStorageManagerModal: boolean;
-  setShowStorageManagerModal: (show: boolean) => void;
-  dismissedInvoiceAlert: boolean;
-  setDismissedInvoiceAlert: (dismissed: boolean) => void;
-  studentBillingOption: string;
-  isBillingBooked: boolean;
-  bookedExtraUsers: number;
-  extraBillingOption: string;
-  selectedStorageAddonGb: number;
-  setSelectedStorageAddonGb: React.Dispatch<React.SetStateAction<number>>;
-  selectedInvoice: any;
-  setSelectedInvoice: (inv: any) => void;
-  contractStartDate: string | null;
-  simulatedToday: string;
-  studentLevyMonthly_global: number;
-  extraLevyMonthly_global: number;
-  studentSharePreview_global: number;
-  schoolShareBookedExtra_global: number;
-  currentTotalB2B_global: number;
-  mixedTotal_global: number;
-  fetchLogbookBookings: () => Promise<void> | void;
-  handleConfirmBooking: (id: string) => Promise<void> | void;
-  handleRejectBooking: (id: string) => Promise<void> | void;
-  getEffectiveStorageUsedBytes: (profile: any) => number;
-  roomsSubView?: 'overview' | 'plan' | 'settings';
-  setRoomsSubView?: (view: 'overview' | 'plan' | 'settings') => void;
-  roomSearchQuery?: string;
-  setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>>;
-  onOpenFacilityLogModal?: () => void;
+  currentSchoolProfile: any; setCurrentSchoolProfile: React.Dispatch<React.SetStateAction<any>>; currentUserProfile: any;
+  userId?: string; schoolId: string; schoolNumericId: string | number; schoolName?: string; windowWidth?: number;
+  activeTab: string; setActiveTab: (tab: any) => void; secretarySubTab: string; setSecretarySubTab: (tab: any) => void;
+  campusSubTab: string; setCampusSubTab: (tab: any) => void; schedulesRoomsViewMode: string; setSchedulesRoomsViewMode: (mode: any) => void;
+  expandedSidebarTeacherId: string | null; setExpandedSidebarTeacherId: (id: any) => void;
+  selectedFilterTeacherId: string | null; setSelectedFilterTeacherId: (id: any) => void;
+  pendingBookings: any[]; setPendingBookings?: React.Dispatch<React.SetStateAction<any[]>>;
+  roomIssues: any[]; setRoomIssues: React.Dispatch<React.SetStateAction<any[]>>;
+  rooms: any[]; buildings?: any[]; students: any[]; campusTeachers: any[]; bypassTeachers: any[]; coaches: any[];
+  matrixAllocations: any[]; pendingSchedules: any[]; userMap: Record<string, any>; roomMap: Record<string, any>;
+  isAvvSigned: boolean; setShowAvvModal?: (show: boolean) => void;
+  showLogbookModal: boolean; setShowLogbookModal: (show: boolean) => void;
+  showStorageManagerModal: boolean; setShowStorageManagerModal: (show: boolean) => void;
+  dismissedInvoiceAlert: boolean; setDismissedInvoiceAlert: (dismissed: boolean) => void;
+  studentBillingOption: string; isBillingBooked: boolean; bookedExtraUsers: number; extraBillingOption: string;
+  selectedStorageAddonGb: number; setSelectedStorageAddonGb: React.Dispatch<React.SetStateAction<number>>;
+  selectedInvoice: any; setSelectedInvoice: (inv: any) => void; contractStartDate: string | null; simulatedToday: string;
+  studentLevyMonthly_global: number; extraLevyMonthly_global: number; studentSharePreview_global: number;
+  schoolShareBookedExtra_global: number; currentTotalB2B_global: number; mixedTotal_global: number;
+  fetchLogbookBookings: () => Promise<void> | void; handleConfirmBooking: (id: string) => Promise<void> | void;
+  handleRejectBooking: (id: string) => Promise<void> | void; getEffectiveStorageUsedBytes: (profile: any) => number;
+  roomsSubView?: 'overview' | 'plan' | 'settings'; setRoomsSubView?: (view: 'overview' | 'plan' | 'settings') => void;
+  roomSearchQuery?: string; setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>>; onOpenFacilityLogModal?: () => void;
 }
 
 export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
-  currentSchoolProfile,
-  setCurrentSchoolProfile,
-  currentUserProfile,
-  userId,
-  schoolId,
-  schoolNumericId,
-  activeTab,
-  setActiveTab,
-  secretarySubTab,
-  setSecretarySubTab,
-  campusSubTab,
-  setCampusSubTab,
-  schedulesRoomsViewMode,
-  setSchedulesRoomsViewMode,
-  expandedSidebarTeacherId,
-  setExpandedSidebarTeacherId,
-  selectedFilterTeacherId,
-  setSelectedFilterTeacherId,
-  pendingBookings = [],
-  setPendingBookings,
-  roomIssues = [],
-  setRoomIssues,
-  rooms = [],
-  buildings = [],
-  students = [],
-  campusTeachers = [],
-  bypassTeachers = [],
-  coaches = [],
-  matrixAllocations = [],
-  pendingSchedules = [],
-  userMap = {},
-  roomMap = {},
-  isAvvSigned,
-  setShowAvvModal,
-  showLogbookModal,
-  setShowLogbookModal,
-  showStorageManagerModal,
-  setShowStorageManagerModal,
-  dismissedInvoiceAlert,
-  setDismissedInvoiceAlert,
-  studentBillingOption,
-  isBillingBooked,
-  bookedExtraUsers,
-  extraBillingOption,
-  selectedStorageAddonGb,
-  setSelectedStorageAddonGb,
-  selectedInvoice,
-  setSelectedInvoice,
-  contractStartDate,
-  simulatedToday,
-  studentLevyMonthly_global,
-  extraLevyMonthly_global,
-  studentSharePreview_global,
-  schoolShareBookedExtra_global,
-  currentTotalB2B_global,
-  mixedTotal_global,
-  fetchLogbookBookings,
-  handleConfirmBooking,
-  handleRejectBooking,
-  getEffectiveStorageUsedBytes,
-  roomsSubView,
-  setRoomsSubView,
-  roomSearchQuery,
-  setRoomSearchQuery,
-  onOpenFacilityLogModal,
+  currentSchoolProfile, setCurrentSchoolProfile, currentUserProfile, userId, schoolId, schoolNumericId, schoolName, windowWidth,
+  activeTab, setActiveTab, secretarySubTab, setSecretarySubTab, campusSubTab, setCampusSubTab, schedulesRoomsViewMode,
+  setSchedulesRoomsViewMode, expandedSidebarTeacherId, setExpandedSidebarTeacherId, selectedFilterTeacherId, setSelectedFilterTeacherId,
+  pendingBookings = [], setPendingBookings, roomIssues = [], setRoomIssues, rooms = [], buildings = [], students = [],
+  campusTeachers = [], bypassTeachers = [], coaches = [], matrixAllocations = [], pendingSchedules = [], userMap = {}, roomMap = {},
+  isAvvSigned, setShowAvvModal, showLogbookModal, setShowLogbookModal, showStorageManagerModal, setShowStorageManagerModal,
+  dismissedInvoiceAlert, setDismissedInvoiceAlert, studentBillingOption, isBillingBooked, bookedExtraUsers, extraBillingOption,
+  selectedStorageAddonGb, setSelectedStorageAddonGb, selectedInvoice, setSelectedInvoice, contractStartDate, simulatedToday,
+  studentLevyMonthly_global, extraLevyMonthly_global, studentSharePreview_global, schoolShareBookedExtra_global,
+  currentTotalB2B_global, mixedTotal_global, fetchLogbookBookings, handleConfirmBooking, handleRejectBooking,
+  getEffectiveStorageUsedBytes, roomsSubView, setRoomsSubView, roomSearchQuery, setRoomSearchQuery, onOpenFacilityLogModal,
 }) => {
             const [showIntegrityDetails, setShowIntegrityDetails] = useState<boolean>(false);
             const [roomIssuesTab, setRoomIssuesTab] = useState<'open' | 'resolved' | 'all'>('open');
+            const effectiveWidth = useMemo(() => {
+              if (typeof windowWidth === 'number' && windowWidth > 0) return windowWidth;
+              if (typeof window === 'undefined') return 1280;
+              return window.innerWidth;
+            }, [windowWidth]);
+            const isMobileView = effectiveWidth <= 768;
+            const isTabletOrMobile = effectiveWidth <= 1180;
             const simDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
             const todayDayNum = simDate.getDay() === 0 ? 7 : simDate.getDay();
             const todayDateStr = simulatedToday || new Date().toISOString().split('T')[0];
-
             const safeRooms = rooms || [];
             const safeStudents = students || [];
             const safeAllocations = matrixAllocations || [];
 
-            // 1. Raumauslastung Heute & Storage Backup Metrics (Memoized)
             const { todayAllocations, roomOccupancyRate, todayTeachersCount } = useMemo(() => {
               const safeAllocs = matrixAllocations || [];
               const safeRms = rooms || [];
               const todayAllocs = safeAllocs.filter((p: any) => p && p.dayOfWeek === todayDayNum && p.roomId);
-              const totalSlots = safeRms.length * 8; // standard 8 slots per room per day
+              const totalSlots = safeRms.length * 8;
               const occRate = totalSlots > 0 ? Math.round((todayAllocs.length / totalSlots) * 100) : 0;
               const teacherIds = Array.from(new Set(todayAllocs.map((p: any) => p.teacherId).filter(Boolean)));
               return { todayAllocations: todayAllocs, roomOccupancyRate: occRate, todayTeachersCount: teacherIds.length };
@@ -180,178 +89,85 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
             const memoizedEffectiveUsedBytes = useMemo(() => getEffectiveStorageUsedBytes(currentSchoolProfile), [getEffectiveStorageUsedBytes, currentSchoolProfile]);
 
-            // 2. Heutige Abwesenheiten (Memoized)
             const activeAusfallTeachers = useMemo(() => {
               return [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].filter(t => {
                 const untilVal = t?.ausfall_until;
-                if (!untilVal) return false;
-                return String(untilVal).substring(0, 10) >= todayDateStr;
+                return untilVal ? String(untilVal).substring(0, 10) >= todayDateStr : false;
               }).reduce((acc: any[], current) => {
-                if (current && !acc.some(item => item.id === current.id)) {
-                  acc.push(current);
-                }
+                if (current && !acc.some(item => item.id === current.id)) acc.push(current);
                 return acc;
               }, []);
             }, [campusTeachers, bypassTeachers, coaches, todayDateStr]);
 
-            // 3. Schüler-Aktivierungsquote (Memoized)
             const { totalStudentsCount, activeStudentsCount, activationRate } = useMemo(() => {
               const safeStuds = students || [];
               const total = safeStuds.length;
               const active = safeStuds.filter((s: any) => s?.is_pin_activated).length;
-              return {
-                totalStudentsCount: total,
-                activeStudentsCount: active,
-                activationRate: total > 0 ? Math.round((active / total) * 100) : 0
-              };
+              return { totalStudentsCount: total, activeStudentsCount: active, activationRate: total > 0 ? Math.round((active / total) * 100) : 0 };
             }, [students]);
 
-            // 4. Systemische Termin-Konflikte (Memoized Overlap checkers)
             const scheduleConflicts = useMemo(() => {
-              interface ScheduleConflictItem {
-                id: string;
-                title?: string;
-                type: 'room' | 'teacher';
-                dayOfWeek: number;
-                dayLabel: string;
-                startTime: string;
-                endTime: string;
-                summarySentence: string;
-                teacherId: string;
-                teacherNameA: string;
-                teacherNameB?: string;
-                studentsA: string;
-                studentsB: string;
-                roomId?: string;
-                roomNameA?: string;
-                roomNameB?: string;
-                timeA: string;
-                timeB: string;
-              }
-
               const safeAllocs = matrixAllocations || [];
-
               const getStudentNames = (block: any) => {
-                if (!block || !Array.isArray(block.slots) || block.slots.length === 0) {
-                  return '';
-                }
-                const names = block.slots
-                  .map((s: any) => s.student_name || (s.student_id ? (userMap[s.student_id] || '') : ''))
-                  .filter((n: string) => n && n !== 'Pause');
+                if (!block || !Array.isArray(block.slots) || block.slots.length === 0) return '';
+                const names = block.slots.map((s: any) => s.student_name || (s.student_id ? (userMap[s.student_id] || '') : '')).filter((n: string) => n && n !== 'Pause');
                 return names.length > 0 ? names.join(', ') : '';
               };
-
-              const getTeacherName = (block: any) => {
-                if (!block || block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) return '';
-                return block.teacherName || (block.teacherId ? (userMap[block.teacherId] || '') : '') || '';
-              };
-
-              const isRealBlock = (block: any) => {
-                if (!block) return false;
-                if (block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) return false;
-                const studentNames = getStudentNames(block);
-                return studentNames.length > 0;
-              };
-
-              const list: ScheduleConflictItem[] = [];
-              
-              // Room conflicts
+              const getTeacherName = (block: any) => (!block || block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) ? '' : (block.teacherName || (block.teacherId ? (userMap[block.teacherId] || '') : '') || '');
+              const isRealBlock = (block: any) => Boolean(block && block.teacherId !== 'groovelab' && !block.id?.startsWith('groovelab_') && getStudentNames(block).length > 0);
+              const list: any[] = [];
+              const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
               const byRoomDay: Record<string, any[]> = {};
-              safeAllocs
-                .filter((p: any) => p.roomId && isRealBlock(p))
-                .forEach((p: any) => {
-                  const k = `${p.roomId}_${p.dayOfWeek}`;
-                  if (!byRoomDay[k]) byRoomDay[k] = [];
-                  byRoomDay[k].push(p);
-                });
-
-              Object.entries(byRoomDay).forEach(([, group]) => {
+              safeAllocs.filter((p: any) => p.roomId && isRealBlock(p)).forEach((p: any) => {
+                const k = `${p.roomId}_${p.dayOfWeek}`;
+                (byRoomDay[k] = byRoomDay[k] || []).push(p);
+              });
+              Object.values(byRoomDay).forEach(group => {
                 if (group.length > 1) {
-                  group.forEach((p, i) => {
-                    group.forEach((q, j) => {
-                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
-                        const roomName = roomMap[p.roomId] || 'Raum';
-                        const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-                        const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
-                        const teacherA = getTeacherName(p) || 'Lehrkraft A';
-                        const teacherB = getTeacherName(q) || 'Lehrkraft B';
-                        const studsA = getStudentNames(p) || 'Schüler';
-                        const studsB = getStudentNames(q) || 'Schüler';
-
-                        list.push({
-                          id: `room_${p.id}_${q.id}`,
-                          type: 'room',
-                          dayOfWeek: p.dayOfWeek,
-                          dayLabel,
-                          startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
-                          endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
-                          summarySentence: `Der Raum "${roomName}" ist am ${dayLabel} um ${p.startTime} Uhr doppelt belegt.`,
-                          teacherId: p.teacherId,
-                          teacherNameA: teacherA,
-                          teacherNameB: teacherB,
-                          studentsA: studsA,
-                          studentsB: studsB,
-                          roomId: p.roomId,
-                          roomNameA: roomName,
-                          roomNameB: roomName,
-                          timeA: `${p.startTime}-${p.endTime}`,
-                          timeB: `${q.startTime}-${q.endTime}`
-                        });
-                      }
-                    });
-                  });
+                  group.forEach((p, i) => group.forEach((q, j) => {
+                    if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
+                      const roomName = roomMap[p.roomId] || 'Raum';
+                      const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                      list.push({
+                        id: `room_${p.id}_${q.id}`, type: 'room', dayOfWeek: p.dayOfWeek, dayLabel,
+                        startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
+                        endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
+                        summarySentence: `Der Raum "${roomName}" ist am ${dayLabel} um ${p.startTime} Uhr doppelt belegt.`,
+                        teacherId: p.teacherId, teacherNameA: getTeacherName(p) || 'Lehrkraft A', teacherNameB: getTeacherName(q) || 'Lehrkraft B',
+                        studentsA: getStudentNames(p) || 'Schüler', studentsB: getStudentNames(q) || 'Schüler',
+                        roomId: p.roomId, roomNameA: roomName, roomNameB: roomName, timeA: `${p.startTime}-${p.endTime}`, timeB: `${q.startTime}-${q.endTime}`
+                      });
+                    }
+                  }));
                 }
               });
-
-              // Teacher conflicts
               const byTeacherDay: Record<string, any[]> = {};
-              safeAllocs
-                .filter((p: any) => isRealBlock(p))
-                .forEach((p: any) => {
-                  if (p.teacherId && p.teacherId !== 'groovelab') {
-                    const k = `${p.teacherId}_${p.dayOfWeek}`;
-                    if (!byTeacherDay[k]) byTeacherDay[k] = [];
-                    byTeacherDay[k].push(p);
-                  }
-                });
-
-              Object.entries(byTeacherDay).forEach(([, group]) => {
-                if (group.length > 1) {
-                  group.forEach((p, i) => {
-                    group.forEach((q, j) => {
-                      if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
-                        const teacherName = getTeacherName(p) || 'Lehrkraft';
-                        const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-                        const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
-                        const studsA = getStudentNames(p) || 'Schüler';
-                        const studsB = getStudentNames(q) || 'Schüler';
-                        const rNameA = p.roomId ? (roomMap[p.roomId] || 'Raum') : 'Ohne Raumzuweisung';
-                        const rNameB = q.roomId ? (roomMap[q.roomId] || 'Raum') : 'Ohne Raumzuweisung';
-
-                        list.push({
-                          id: `teacher_${p.id}_${q.id}`,
-                          type: 'teacher',
-                          dayOfWeek: p.dayOfWeek,
-                          dayLabel,
-                          startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
-                          endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
-                          summarySentence: `${teacherName} ist am ${dayLabel} um ${p.startTime} Uhr zeitgleich an 2 Terminen gebucht.`,
-                          teacherId: p.teacherId,
-                          teacherNameA: teacherName,
-                          studentsA: studsA,
-                          studentsB: studsB,
-                          roomId: p.roomId,
-                          roomNameA: rNameA,
-                          roomNameB: rNameB,
-                          timeA: `${p.startTime}-${p.endTime}`,
-                          timeB: `${q.startTime}-${q.endTime}`
-                        });
-                      }
-                    });
-                  });
+              safeAllocs.filter((p: any) => isRealBlock(p)).forEach((p: any) => {
+                if (p.teacherId && p.teacherId !== 'groovelab') {
+                  const k = `${p.teacherId}_${p.dayOfWeek}`;
+                  (byTeacherDay[k] = byTeacherDay[k] || []).push(p);
                 }
               });
-              
+              Object.values(byTeacherDay).forEach(group => {
+                if (group.length > 1) {
+                  group.forEach((p, i) => group.forEach((q, j) => {
+                    if (i < j && p.startTime < q.endTime && q.startTime < p.endTime) {
+                      const teacherName = getTeacherName(p) || 'Lehrkraft';
+                      const dayLabel = days[p.dayOfWeek - 1] || 'Wochentag';
+                      list.push({
+                        id: `teacher_${p.id}_${q.id}`, type: 'teacher', dayOfWeek: p.dayOfWeek, dayLabel,
+                        startTime: p.startTime < q.startTime ? p.startTime : q.startTime,
+                        endTime: p.endTime > q.endTime ? p.endTime : q.endTime,
+                        summarySentence: `${teacherName} ist am ${dayLabel} um ${p.startTime} Uhr zeitgleich an 2 Terminen gebucht.`,
+                        teacherId: p.teacherId, teacherNameA: teacherName, studentsA: getStudentNames(p) || 'Schüler', studentsB: getStudentNames(q) || 'Schüler',
+                        roomId: p.roomId, roomNameA: p.roomId ? (roomMap[p.roomId] || 'Raum') : 'Ohne Raumzuweisung',
+                        roomNameB: q.roomId ? (roomMap[q.roomId] || 'Raum') : 'Ohne Raumzuweisung',
+                        timeA: `${p.startTime}-${p.endTime}`, timeB: `${q.startTime}-${q.endTime}`
+                      });
+                    }
+                  }));
+                }
+              });
               return list;
             }, [matrixAllocations, userMap, roomMap]);
 
@@ -362,17 +178,28 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const totalPendingActionCount = (pendingBookings?.length || 0) + openIssues.length + scheduleConflicts.length + (pendingSchedules?.length || 0);
             const hasAnyActionRequired = totalPendingActionCount > 0;
 
+            const dayNamesDe = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+            const currentDayNameDe = dayNamesDe[simDate.getDay()] || 'Heute';
+            const secretaryFirstName = (currentUserProfile?.first_name || '').trim() || 'Schulleitung';
+            const displaySchoolName = schoolName || currentSchoolProfile?.name || 'Musikschule';
+
             return (
               <div 
                 role="tabpanel"
                 id="secretary-briefing-tabpanel"
                 aria-label="Sekretariat Briefing Übersicht"
                 tabIndex={0}
-                style={{ display: 'grid', gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 1024 ? '1fr' : '1fr 360px', gap: '24px', alignItems: 'start' }}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isTabletOrMobile ? '1fr' : '1fr 360px',
+                  gap: isMobileView ? '16px' : '24px',
+                  alignItems: 'start',
+                  minWidth: 0
+                }}
               >
                 
                 {/* LEFT COLUMN: MAIN CONTENT AREA */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobileView ? '16px' : '24px', minWidth: 0 }}>
                   {/* 🏛️ 0,1% Goldstandard: Offizielle Bildungsförderung im Briefing Board */}
                   <CampusSponsorIngressBanner schoolId={schoolId} sponsorSettings={currentSchoolProfile?.sponsor_settings} supabase={supabase} />
 
@@ -396,9 +223,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     const backupPct = Math.min(100, Math.round((downloadedCount / totalStudents) * 100));
 
                     return (
-                      <div style={{ background: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: '24px', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', boxShadow: 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #10b981' }}>
+                      <div style={{ background: '#ecfdf5', border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
+                          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', flexShrink: 0 }}>
                             <span style={{ fontSize: '1.5rem' }}>⏳</span>
                           </div>
                           <div>
@@ -411,7 +238,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             </span>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             aria-label="Kündigung des Audio-Tresors abbrechen"
@@ -431,7 +258,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 } catch (e) {}
                               }
                             }}
-                            style={{ background: '#ffffff', color: '#475569', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '9px 14px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}
+                            style={{ background: '#ffffff', color: '#475569', border: 'none', borderRadius: '12px', padding: '9px 14px', fontWeight: 800, fontSize: '0.78rem', cursor: 'pointer' }}
                           >
                             Kündigung abbrechen
                           </button>
@@ -483,66 +310,30 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                   {/* 🎙️ Enterprise Audio-Tresor Storage Proactive Capacity Monitor (85% & 95% Thresholds) */}
                   {(() => {
                     const activeAddonGb = Number(currentSchoolProfile?.storage_addon_gb || 0);
-                    const baseGb = 1.0;
-                    const currentTotalCapGb = baseGb + activeAddonGb;
+                    const currentTotalCapGb = 1.0 + activeAddonGb;
                     const usedBytes = memoizedEffectiveUsedBytes;
                     const usedGb = usedBytes / (1024 * 1024 * 1024);
                     const usedMb = usedBytes / (1024 * 1024);
                     const usagePct = currentTotalCapGb > 0 ? (usedGb / currentTotalCapGb) * 100 : 0;
-                    
                     if (usagePct < 80) return null;
 
                     const isFull = usagePct >= 100;
                     const isCritical = usagePct >= 95;
-                    const formattedUsed = usedBytes > 0 && usedGb < 1.0 
-                      ? `${usedMb.toFixed(1).replace('.', ',')} MB` 
-                      : `${usedGb.toFixed(2).replace('.', ',')} GB`;
+                    const formattedUsed = usedBytes > 0 && usedGb < 1.0 ? `${usedMb.toFixed(1).replace('.', ',')} MB` : `${usedGb.toFixed(2).replace('.', ',')} GB`;
                     const nextTierGb = activeAddonGb < 10 ? 10 : activeAddonGb < 25 ? 25 : activeAddonGb < 50 ? 50 : activeAddonGb < 100 ? 100 : 250;
 
                     return (
-                      <div style={{
-                        background: isFull 
-                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
-                          : isCritical 
-                            ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)' 
-                            : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                        border: isFull ? '1.5px solid #f87171' : isCritical ? '1.5px solid #fdba74' : '1.5px solid #fde68a',
-                        borderRadius: '24px',
-                        padding: '20px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '16px',
-                        boxShadow: 'none'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <div style={{
-                            background: isFull ? '#fee2e2' : isCritical ? '#ffedd5' : '#fef3c7',
-                            borderRadius: '16px',
-                            padding: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: isFull ? '1px solid #fca5a5' : isCritical ? '1px solid #fed7aa' : '1px solid #fcd34d'
-                          }}>
+                      <div style={{ background: isFull ? '#fee2e2' : isCritical ? '#ffedd5' : '#fef3c7', border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
+                          <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', flexShrink: 0 }}>
                             <HardDrive size={24} style={{ color: isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706' }} />
                           </div>
                           <div>
                             <strong style={{ display: 'block', fontSize: '1rem', color: isFull ? '#991b1b' : isCritical ? '#9a3412' : '#92400e', marginBottom: '4px' }}>
-                              {isFull
-                                ? `🚨 Audio-Tresor voll: 100% Speicher belegt (${formattedUsed} von ${currentTotalCapGb} GB)`
-                                : isCritical 
-                                  ? `⚠️ Kritische Speicherauslastung: Audio-Tresor zu ${Math.round(usagePct)}% belegt!`
-                                  : `⚠️ Speicher-Vorwarnung: Audio-Tresor zu ${Math.round(usagePct)}% belegt`
-                              }
+                              {isFull ? `🚨 Audio-Tresor voll: 100% Speicher belegt (${formattedUsed} von ${currentTotalCapGb} GB)` : isCritical ? `⚠️ Kritische Speicherauslastung: Audio-Tresor zu ${Math.round(usagePct)}% belegt!` : `⚠️ Speicher-Vorwarnung: Audio-Tresor zu ${Math.round(usagePct)}% belegt`}
                             </strong>
                             <span style={{ fontSize: '0.84rem', color: isFull ? '#7f1d1d' : isCritical ? '#7c2d12' : '#78350f', lineHeight: '1.4' }}>
-                              {formattedUsed} von {currentTotalCapGb} GB belegt. {isFull
-                                ? 'Neue Audioaufnahmen sind vorübergehend pausiert. Alle bestehenden Aufnahmen bleiben 100% geschützt und abspielbar.'
-                                : isCritical 
-                                  ? 'Der Kulanz-Puffer ist aktiv. Bitte erweitere jetzt dein Speichervolumen, um Unterbrechungen im Unterricht zu vermeiden.' 
-                                  : 'Erweitere rechtzeitig dein Speichervolumen, damit Schüler und Lehrkräfte weiterhin nahtlos in Studio-Qualität aufnehmen können.'
-                              }
+                              {formattedUsed} von {currentTotalCapGb} GB belegt. {isFull ? 'Neue Audioaufnahmen sind vorübergehend pausiert. Alle bestehenden Aufnahmen bleiben 100% geschützt und abspielbar.' : isCritical ? 'Der Kulanz-Puffer ist aktiv. Bitte erweitere jetzt dein Speichervolumen, um Unterbrechungen im Unterricht zu vermeiden.' : 'Erweitere rechtzeitig dein Speichervolumen, damit Schüler und Lehrkräfte weiterhin nahtlos in Studio-Qualität aufnehmen können.'}
                             </span>
                           </div>
                         </div>
@@ -550,23 +341,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           <button
                             type="button"
                             aria-label={`Audio-Tresor Speichervolumen auf +${nextTierGb} GB erweitern`}
-                            onClick={() => {
-                              setSelectedStorageAddonGb(nextTierGb);
-                              setShowStorageManagerModal(true);
-                            }}
-                            style={{
-                              background: isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '12px',
-                              padding: '10px 18px',
-                              fontWeight: 800,
-                              fontSize: '0.84rem',
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                              boxShadow: 'none',
-                              transition: 'transform 0.15s, background-color 0.15s'
-                            }}
+                            onClick={() => { setSelectedStorageAddonGb(nextTierGb); setShowStorageManagerModal(true); }}
+                            style={{ background: isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: 800, fontSize: '0.84rem', cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: 'none', transition: 'transform 0.15s, background-color 0.15s' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = isFull ? '#b91c1c' : isCritical ? '#c2410c' : '#b45309'}
                             onMouseLeave={(e) => e.currentTarget.style.background = isFull ? '#dc2626' : isCritical ? '#ea580c' : '#d97706'}
                           >
@@ -579,55 +355,21 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                   {/* AVV Warning Banner */}
                   {!isAvvSigned && (
-                    <div style={{
-                      background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                      border: '1px solid #fecaca',
-                      borderRadius: '24px',
-                      padding: '20px 24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '16px',
-                      boxShadow: 'none'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        <div style={{
-                          background: '#fee2e2',
-                          borderRadius: '16px',
-                          padding: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid #fca5a5'
-                        }}>
+                    <div style={{ background: '#fee2e2', border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
+                        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', flexShrink: 0 }}>
                           <ShieldAlert size={24} style={{ color: '#dc2626' }} />
                         </div>
                         <div>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: '#991b1b', marginBottom: '4px' }}>
-                            AV-Vertrag (Schul-Vereinbarung) ausstehend!
-                          </strong>
-                          <span style={{ fontSize: '0.84rem', color: '#7f1d1d', lineHeight: '1.4' }}>
-                            Dein gesetzlich vorgeschriebener Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO ist noch nicht digital unterzeichnet. Bitte hole dies umgehend nach, um den rechtssicheren Schulbetrieb zu gewährleisten.
-                          </span>
+                          <strong style={{ display: 'block', fontSize: '1rem', color: '#991b1b', marginBottom: '4px' }}>AV-Vertrag (Schul-Vereinbarung) ausstehend!</strong>
+                          <span style={{ fontSize: '0.84rem', color: '#7f1d1d', lineHeight: '1.4' }}>Dein gesetzlich vorgeschriebener Auftragsverarbeitungsvertrag (AVV) nach Art. 28 DSGVO ist noch nicht digital unterzeichnet. Bitte hole dies umgehend nach, um den rechtssicheren Schulbetrieb zu gewährleisten.</span>
                         </div>
                       </div>
                       <button
                         type="button"
                         aria-label="Auftragsverarbeitungsvertrag (AVV) jetzt unterzeichnen"
                         onClick={() => { if (setShowAvvModal) setShowAvvModal(true); }}
-                        style={{
-                          background: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '12px',
-                          padding: '10px 20px',
-                          fontSize: '0.84rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                          boxShadow: 'none',
-                          transition: 'transform 0.15s, background-color 0.15s'
-                        }}
+                        style={{ background: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: 'none', transition: 'transform 0.15s, background-color 0.15s' }}
                         onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
                         onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
                       >
@@ -638,65 +380,37 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                   {(() => {
                     if (!isBillingBooked || dismissedInvoiceAlert) return null;
-                    
                     const today = simulatedToday ? new Date(simulatedToday + 'T23:59:59') : new Date();
                     const y = today.getFullYear();
                     const m = today.getMonth() + 1;
                     const lastDay = new Date(y, m, 0).getDate();
                     const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
-                    
-                    // Show only if the current date is the last day of the month or later (invoice finalized)
-                    const isFinalized = today.getTime() >= creationTime.getTime();
-                    if (!isFinalized) return null;
+                    if (today.getTime() < creationTime.getTime()) return null;
 
                     const monthStr = m < 10 ? `0${m}` : `${m}`;
                     const yearShort = String(y).slice(-2);
                     const currentInvoiceId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
-                    
-                    const deMonths = [
-                      '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
-                      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-                    ];
+                    const deMonths = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
                     const monthName = deMonths[m];
                     const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
-                    
                     const dueDateObj = new Date(y, m - 1, lastDay);
                     dueDateObj.setDate(dueDateObj.getDate() + 30);
-                    // § 193 BGB Werktags-Klausel (Samstag/Sonntag -> Montag)
-                    if (dueDateObj.getDay() === 6) {
-                      dueDateObj.setDate(dueDateObj.getDate() + 2);
-                    } else if (dueDateObj.getDay() === 0) {
-                      dueDateObj.setDate(dueDateObj.getDate() + 1);
-                    }
-                    const dueDay = dueDateObj.getDate();
-                    const dueMonthName = deMonths[dueDateObj.getMonth() + 1];
-                    const dueYear = dueDateObj.getFullYear();
-                    const dueDateStr = `${dueDay}. ${dueMonthName} ${dueYear}`;
+                    if (dueDateObj.getDay() === 6) dueDateObj.setDate(dueDateObj.getDate() + 2);
+                    else if (dueDateObj.getDay() === 0) dueDateObj.setDate(dueDateObj.getDate() + 1);
+                    const dueDateStr = `${dueDateObj.getDate()}. ${deMonths[dueDateObj.getMonth() + 1]} ${dueDateObj.getFullYear()}`;
 
                     return (
-                      <div style={{
-                        background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '24px',
-                        padding: '20px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '16px',
-                        boxShadow: 'none'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-                          <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>📧</div>
+                      <div style={{ background: '#dbeafe', border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
+                          <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 }}>📧</div>
                           <div>
-                            <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>
-                              Monatsrechnung ${currentInvoiceId} versendet
-                            </h4>
+                            <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>Monatsrechnung ${currentInvoiceId} versendet</h4>
                             <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#1e40af', lineHeight: '1.4', fontWeight: 500 }}>
                               Die Rechnung für den Leistungszeitraum ${monthName} ${y} über <strong>{(Number(mixedTotal_global) || 0).toFixed(2).replace('.', ',')} €</strong> wurde am ${invoiceDateStr} per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
                             </p>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             aria-label={`Rechnung ${currentInvoiceId} einsehen`}
@@ -705,27 +419,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                               const isAnnualBilling = studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both';
                               const annualPricePerStudent = (studentBillingOption === 'option1' || studentBillingOption === 'debit' || studentBillingOption === 'cash' || studentBillingOption === 'both') ? getDynamicAnnualPrice(contractStartDate, false) : studentBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                               const einmalzahlungTotal = isAnnualBilling ? students.length * annualPricePerStudent : 0;
-                              
                               const isExtraAnnualBilling = extraBillingOption === 'option1' || extraBillingOption === 'option3_2';
                               const extraAnnualPrice = extraBillingOption === 'option1' ? getDynamicAnnualPrice(contractStartDate, false) : extraBillingOption === 'option3_2' ? getDynamicAnnualPrice(contractStartDate, true) : 0;
                               const extraEinmalzahlungTotal = isExtraAnnualBilling ? bookedExtraUsers * extraAnnualPrice : 0;
-
                               const totalB2BWithEinmalzahlung = currentTotalB2B_global + einmalzahlungTotal + extraEinmalzahlungTotal;
-                              setSelectedInvoice({
-                                id: currentInvoiceId,
-                                year: String(y),
-                                date: invoiceDateStr,
-                                dueDateStr: dueDateStr,
-                                isCurrentMonth: true,
-                                b2b: totalB2BWithEinmalzahlung,
-                                amount: totalB2BWithEinmalzahlung,
-                                schoolStudentCost: studentSharePreview_global,
-                                schoolStudentLevy: studentLevyMonthly_global,
-                                schoolExtraCost: schoolShareBookedExtra_global,
-                                extraLevyMonthly: extraLevyMonthly_global,
-                                extraEinmalzahlung: extraEinmalzahlungTotal,
-                                b2c: 0,
-                                einmalzahlung: einmalzahlungTotal,
+                              setSelectedInvoice({ id: currentInvoiceId, year: String(y), date: invoiceDateStr, dueDateStr, isCurrentMonth: true, b2b: totalB2BWithEinmalzahlung, amount: totalB2BWithEinmalzahlung, schoolStudentCost: studentSharePreview_global, schoolStudentLevy: studentLevyMonthly_global, schoolExtraCost: schoolShareBookedExtra_global, extraLevyMonthly: extraLevyMonthly_global, extraEinmalzahlung: extraEinmalzahlungTotal, b2c: 0, einmalzahlung: einmalzahlungTotal,
                                 status: 'Bezahlt',
                                 paid: true
                               });
@@ -733,7 +431,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             style={{
                               background: '#ffffff',
                               color: '#2563eb',
-                              border: '1px solid #bfdbfe',
+                              border: 'none',
                               borderRadius: '10px',
                               padding: '8px 16px',
                               fontSize: '0.74rem',
@@ -770,117 +468,202 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     );
                   })()}
                   
-                  {/* 4 GAMIFIED CARD METRICS ROW (KPIs - 0,1% Goldstandard 4-Spalten-Festraster) */}
-                  <div 
-                    id="tour-secretary-kpis" 
-                    style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: typeof window !== 'undefined' && window.innerWidth < 768 ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', 
-                      gap: '12px' 
+                  {/* 🏛️ 0,1% GOLDSTANDARD SPLIT HERO-DECK (Top-Left Primary Stage, 1:1 Baseline with Right Sidebar) */}
+                  <div
+                    data-testid="secretary-briefing-hero-deck"
+                    style={{
+                      display: 'flex',
+                      flexDirection: isMobileView ? 'column' : 'row',
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      border: 'none',
+                      overflow: 'hidden',
+                      boxShadow: 'none'
                     }}
                   >
-                    
-                    {/* Card 1: Raumauslastung (Blue Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
-                      padding: '14px 15px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: 'none'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Raumauslastung</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <DoorOpen size={13} color="white" />
-                        </div>
+                    {/* Left Stage: Full-Cover Blackboard Hero Artwork with Ambient Overlays */}
+                    <div style={{ width: isMobileView ? '100%' : '220px', minHeight: isMobileView ? '160px' : '190px', background: '#0f172a', position: 'relative', overflow: 'hidden', flexShrink: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '12px' }}>
+                      {/* Full-Cover Tafelbild Image */}
+                      <img src="/campus_login_hero.png" alt="Campus Tafelbild" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} loading="eager" />
+
+                      {/* Soft Ambient Vignette for Maximum Badge Legibility */}
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.40) 0%, rgba(15, 23, 42, 0.15) 40%, rgba(15, 23, 42, 0.75) 100%)', pointerEvents: 'none' }} />
+
+                      {/* Top-Left Live Status Pill */}
+                      <div style={{ position: 'relative', zIndex: 2, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '999px', background: activeAusfallTeachers.length > 0 ? '#ef4444' : '#0f172a', color: '#ffffff', fontSize: '0.62rem', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', border: 'none' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeAusfallTeachers.length > 0 ? '#fca5a5' : '#4ade80' }} />
+                        <span>{activeAusfallTeachers.length > 0 ? `${activeAusfallTeachers.length} Ausfall aktiv` : 'Verwaltung aktiv'}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{roomOccupancyRate}</span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9 }}>
-                          {todayDayNum === 7 ? '% (Sonntag)' : todayDayNum === 6 ? '% (Samstag)' : `% (${todayAllocations.length} Slots)`}
+
+                      {/* Bottom School Name Chip */}
+                      <div style={{ position: 'relative', zIndex: 2, alignSelf: 'center', maxWidth: '100%' }}>
+                        <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: '999px', background: '#0f172a', color: '#f8fafc', fontSize: '0.68rem', fontWeight: 800, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', border: 'none' }}>
+                          {displaySchoolName}
                         </span>
                       </div>
                     </div>
 
-                    {/* Card 2: Aktivierungsquote (Emerald Gradient) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
-                      borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
-                      padding: '14px 15px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: 'none'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Aktivierung</span>
-                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <UserCheck size={13} color="white" />
+                    {/* Right Content Stage: Greeting + Operational Summary + Quick Actions */}
+                    <div
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: isMobileView ? '18px 16px' : '22px 26px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '14px',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '999px',
+                              background: '#fee2e2',
+                              color: '#b91c1c',
+                              fontSize: '0.66rem',
+                              fontWeight: 900,
+                              letterSpacing: '0.05em',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            🛡️ Schulleitung &amp; Sekretariat • {currentDayNameDe}
+                          </span>
+                          {totalPendingActionCount > 0 && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                background: '#ffedd5',
+                                color: '#c2410c',
+                                fontSize: '0.66rem',
+                                fontWeight: 800
+                              }}
+                            >
+                              ⚡ {totalPendingActionCount} {totalPendingActionCount === 1 ? 'Freigabe offen' : 'Freigaben offen'}
+                            </span>
+                          )}
                         </div>
+
+                        <h2
+                          style={{
+                            margin: 0,
+                            fontSize: isMobileView ? '1.25rem' : '1.45rem',
+                            fontWeight: 900,
+                            color: '#0f172a',
+                            letterSpacing: '-0.02em',
+                            lineHeight: 1.2,
+                            fontFamily: "'Plus Jakarta Sans', sans-serif"
+                          }}
+                        >
+                          Guten Tag, {secretaryFirstName}!
+                        </h2>
+
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: '0.84rem',
+                            color: '#475569',
+                            lineHeight: 1.45,
+                            fontWeight: 600
+                          }}
+                        >
+                          Heute sind <strong style={{ color: '#0f172a' }}>{todayAllocations.length} Raumbelegungen</strong> durch{' '}
+                          <strong style={{ color: '#0f172a' }}>{todayTeachersCount} Lehrkräfte</strong> eingeplant.{' '}
+                          {hasAnyActionRequired
+                            ? `Es liegen ${totalPendingActionCount} operative Vorgänge zur Prüfung bereit.`
+                            : 'Alle Systeme, Räume und Stundenpläne laufen zu 100% synchron.'}
+                        </p>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{activationRate}</span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.9 }}>% ({activeStudentsCount}/{totalStudentsCount})</span>
+
+                      {/* 3 Tactile Quick-Action Pills */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (setRoomsSubView) setRoomsSubView('plan');
+                            setActiveTab('secretary');
+                            setSecretarySubTab('rooms');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            minHeight: '38px',
+                            padding: '8px 14px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <DoorOpen size={14} color="#ffffff" />
+                          <span>Räume-Board</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('campus');
+                            setCampusSubTab('schedules');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            minHeight: '38px',
+                            padding: '8px 14px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Calendar size={14} color="#16a34a" />
+                          <span>Stundenpläne {pendingSchedules.length > 0 ? `(${pendingSchedules.length})` : ''}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('secretary');
+                            setSecretarySubTab('employees');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            minHeight: '38px',
+                            padding: '8px 14px',
+                            borderRadius: '12px',
+                            border: 'none',
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Users size={14} color="#475569" />
+                          <span>Team &amp; Rollen</span>
+                        </button>
                       </div>
                     </div>
-
-                    {/* Card 3: Konflikte (Calm White / Warning Amber) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: scheduleConflicts.length === 0 ? '#ffffff' : 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                      color: '#0f172a',
-                      borderRadius: '20px',
-                      boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
-                      padding: '14px 15px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: scheduleConflicts.length === 0 ? '1px solid #e2e8f0' : 'none'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#64748b' : '#1e293b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Konflikte</span>
-                        <div style={{ background: scheduleConflicts.length === 0 ? '#f0fdf4' : 'rgba(0, 0, 0, 0.08)', padding: '5px', borderRadius: '8px' }}>
-                          <ShieldAlert size={13} color={scheduleConflicts.length === 0 ? '#16a34a' : '#0f172a'} />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a', lineHeight: 1 }}>
-                          {scheduleConflicts.length}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#16a34a' : '#1e293b' }}>
-                          {scheduleConflicts.length === 0 ? 'Stabil ✓' : 'Konflikt'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Card 4: Ausfälle Heute (Calm White / Alert Red) */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: activeAusfallTeachers.length === 0 ? '#ffffff' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: activeAusfallTeachers.length === 0 ? '#0f172a' : 'white',
-                      borderRadius: '20px', boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '84px',
-                      padding: '14px 15px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: activeAusfallTeachers.length === 0 ? '1px solid #e2e8f0' : 'none'
-                    }} className="hover-scale">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#64748b' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.85, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ausfälle Heute</span>
-                        <div style={{ background: activeAusfallTeachers.length === 0 ? '#f0fdf4' : 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '8px' }}>
-                          <CalendarX size={13} color={activeAusfallTeachers.length === 0 ? '#16a34a' : 'white'} />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '1.4rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: activeAusfallTeachers.length === 0 ? '#0f172a' : 'white', lineHeight: 1 }}>
-                          {activeAusfallTeachers.length}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#16a34a' : 'white', opacity: activeAusfallTeachers.length === 0 ? 1 : 0.9 }}>
-                          {activeAusfallTeachers.length === 0 ? 'Planmäßig ✓' : (activeAusfallTeachers.length === 1 ? '1 Ausfall' : `${activeAusfallTeachers.length} Ausfälle`)}
-                        </span>
-                      </div>
-                    </div>
-
                   </div>
 
                   {/* 📅 LIVE CAMPUS RADAR & HEUTE IM HAUS (Operatives Tages-Cockpit, 0,1% Goldstandard Satellit) */}
@@ -905,32 +688,32 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '20px',
-                      padding: '18px 24px',
-                      boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)',
-                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      padding: isMobileView ? '16px' : '18px 24px',
+                      boxShadow: 'none',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       flexWrap: 'wrap',
                       gap: '16px'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '280px' }}>
-                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: '1 1 240px', minWidth: 0 }}>
+                        <div style={{ background: '#dcfce7', border: 'none', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <CheckCircle size={20} color="#16a34a" />
                         </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <strong style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a' }}>
-                              System-Integrität: 100% stabil & überschneidungsfrei
+                              System-Integrität: 100% stabil &amp; überschneidungsfrei
                             </strong>
-                            <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.66rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                            <span style={{ background: '#dcfce7', color: '#15803d', fontSize: '0.66rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: 'none' }}>
                               Optimal
                             </span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                             <span>✓ 0 Terminkonflikte</span>
                             <span>&bull;</span>
-                            <span>✓ Alle Räume & Ausstattung intakt</span>
+                            <span>✓ Alle Räume &amp; Ausstattung intakt</span>
                             <span>&bull;</span>
                             <span>✓ Keine ausstehenden Raumbuchungen</span>
                             <span>&bull;</span>
@@ -944,8 +727,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         aria-label="Detaillierte System-Prüfberichte anzeigen"
                         onClick={() => setShowIntegrityDetails(true)}
                         style={{
-                          background: '#f8fafc',
-                          border: '1px solid #cbd5e1',
+                          background: '#f1f5f9',
+                          border: 'none',
                           borderRadius: '10px',
                           color: '#334155',
                           padding: '7px 14px',
@@ -957,8 +740,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           gap: '6px',
                           transition: 'all 0.15s ease'
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
                       >
                         <span>Prüfberichte anzeigen</span>
                         <ChevronDown size={14} color="#64748b" />
@@ -968,7 +751,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                   {/* Toggle Button zum Schließen der Details */}
                   {showIntegrityDetails && !hasAnyActionRequired && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', background: '#f8fafc', border: 'none', borderRadius: '14px', padding: '10px 16px' }}>
                       <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600 }}>
                         📋 Detaillierte System-Prüfberichte geöffnet (0 Anomalien gefunden)
                       </span>
@@ -978,7 +761,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         onClick={() => setShowIntegrityDetails(false)}
                         style={{
                           background: '#ffffff',
-                          border: '1px solid #cbd5e1',
+                          border: 'none',
                           borderRadius: '8px',
                           color: '#334155',
                           padding: '5px 12px',
@@ -1001,13 +784,13 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                   <div id="tour-secretary-bookings" style={{
                     background: '#ffffff',
                     borderRadius: '24px',
-                    padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                    padding: isMobileView ? '16px' : '24px',
+                    boxShadow: 'none',
+                    border: 'none'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#fff7ed', color: '#ea580c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ background: '#ffedd5', color: '#ea580c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <DoorOpen size={16} />
                         </div>
                         <div>
@@ -1019,7 +802,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           </span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           type="button"
                           aria-label="Direkt zum Räume-Board wechseln"
@@ -1030,7 +813,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             setSecretarySubTab('rooms');
                           }}
                           style={{
-                            background: '#ea4335',
+                            background: '#ef4444',
                             border: 'none',
                             color: '#ffffff',
                             padding: '6px 14px',
@@ -1047,10 +830,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             boxShadow: 'none'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#d93025';
+                            e.currentTarget.style.background = '#dc2626';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#ea4335';
+                            e.currentTarget.style.background = '#ef4444';
                           }}
                         >
                           <DoorOpen size={13} style={{ color: '#ffffff' }} />
@@ -1064,9 +847,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             setShowLogbookModal(true);
                           }}
                           style={{
-                            background: '#f2f2f7', // Apple neutral gray
+                            background: '#f1f5f9',
                             border: 'none',
-                            color: '#1c1c1e', // Apple primary dark text
+                            color: '#1c1c1e',
                             padding: '6px 14px',
                             borderRadius: '9999px',
                             fontSize: '0.78rem',
@@ -1080,10 +863,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#e5e5ea';
+                            e.currentTarget.style.background = '#e2e8f0';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f2f2f7';
+                            e.currentTarget.style.background = '#f1f5f9';
                           }}
                         >
                           <BookOpen size={13} style={{ color: '#1c1c1e' }} />
@@ -1094,16 +877,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                     {pendingBookings.length === 0 ? (
                       <div style={{
-                        background: 'rgba(52, 168, 83, 0.04)',
-                        border: '1px solid rgba(52, 168, 83, 0.1)',
-                        color: '#34a853',
+                        background: '#dcfce7',
+                        border: 'none',
+                        color: '#15803d',
                         borderRadius: '16px',
                         padding: '16px 20px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '12px'
                       }}>
-                        <CheckCircle size={20} color="#34a853" />
+                        <CheckCircle size={20} color="#16a34a" />
                         <div>
                           <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Keine ausstehenden Raumbuchungen</strong>
                           <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Aktuell gibt es keine vorläufigen Raumbuchungen von Lehrkräften, die bestätigt werden müssen.</span>
@@ -1119,17 +902,18 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                           return (
                             <div key={b.id} style={{
-                              background: '#fefefe',
-                              border: '1px solid #e2e8f0',
+                              background: '#f8fafc',
+                              border: 'none',
                               borderRadius: '16px',
                               padding: '14px 18px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              gap: '16px',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                              flexWrap: 'wrap',
+                              gap: '12px',
+                              boxShadow: 'none'
                             }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: '1 1 200px' }}>
                                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
                                   {roomName} &bull; {b.title || 'Unterricht'}
                                 </span>
@@ -1140,7 +924,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   Gebucht von: <strong style={{ color: '#475569' }}>{teacherName}</strong>
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center', flexWrap: 'wrap' }}>
                                 <button
                                   type="button"
                                   aria-label={`Buchung für ${roomName} am ${dateFormatted} im Räume-Board ansehen`}
@@ -1151,9 +935,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     setSecretarySubTab('rooms');
                                   }}
                                   style={{
-                                    background: '#f8fafc',
+                                    background: '#e2e8f0',
                                     color: '#0f172a',
-                                    border: '1px solid #cbd5e1',
+                                    border: 'none',
                                     borderRadius: '8px',
                                     padding: '6px 12px',
                                     fontSize: '0.74rem',
@@ -1163,18 +947,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     alignItems: 'center',
                                     gap: '6px',
                                     transition: 'all 0.15s ease',
-                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+                                    boxShadow: 'none'
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = '#f1f5f9';
-                                    e.currentTarget.style.borderColor = '#94a3b8';
+                                    e.currentTarget.style.background = '#cbd5e1';
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = '#f8fafc';
-                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                    e.currentTarget.style.background = '#e2e8f0';
                                   }}
                                 >
-                                  <DoorOpen size={13} style={{ color: '#ea4335' }} />
+                                  <DoorOpen size={13} style={{ color: '#ef4444' }} />
                                   <span>Im Räume-Board ansehen</span>
                                 </button>
                                 <button
@@ -1193,7 +975,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     transition: 'all 0.15s ease',
                                     boxShadow: 'none'
                                   }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#34a853'}
+                                  onMouseEnter={(e) => e.currentTarget.style.background = '#2d9247'}
                                   onMouseLeave={(e) => e.currentTarget.style.background = '#34a853'}
                                 >
                                   Bestätigen
@@ -1203,9 +985,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   aria-label={`Raumbuchung für ${roomName} am ${dateFormatted} ablehnen`}
                                   onClick={() => handleRejectBooking(b.id)}
                                   style={{
-                                    background: 'rgba(239, 68, 68, 0.08)',
-                                    color: '#ef4444',
-                                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                                    background: '#fee2e2',
+                                    color: '#dc2626',
+                                    border: 'none',
                                     borderRadius: '8px',
                                     padding: '6px 12px',
                                     fontSize: '0.74rem',
@@ -1218,8 +1000,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     e.currentTarget.style.color = '#ffffff';
                                   }}
                                   onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                                    e.currentTarget.style.color = '#ef4444';
+                                    e.currentTarget.style.background = '#fee2e2';
+                                    e.currentTarget.style.color = '#dc2626';
                                   }}
                                 >
                                   Ablehnen
@@ -1239,12 +1021,12 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         background: '#ffffff',
                         borderRadius: '24px',
                         padding: '24px',
-                        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                        border: '1px solid rgba(0, 0, 0, 0.05)'
+                        boxShadow: 'none',
+                        border: 'none'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ background: openIssues.length > 0 ? '#fef2f2' : '#f0fdf4', color: openIssues.length > 0 ? '#dc2626' : '#16a34a', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ background: openIssues.length > 0 ? '#fee2e2' : '#dcfce7', color: openIssues.length > 0 ? '#dc2626' : '#16a34a', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Wrench size={16} />
                             </div>
                             <div>
@@ -1283,7 +1065,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   fontSize: '0.74rem',
                                   fontWeight: 750,
                                   cursor: 'pointer',
-                                  boxShadow: roomIssuesTab === 'open' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                               >
@@ -1303,7 +1085,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   fontSize: '0.74rem',
                                   fontWeight: 750,
                                   cursor: 'pointer',
-                                  boxShadow: roomIssuesTab === 'resolved' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                               >
@@ -1323,7 +1105,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   fontSize: '0.74rem',
                                   fontWeight: 750,
                                   cursor: 'pointer',
-                                  boxShadow: roomIssuesTab === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  boxShadow: 'none',
                                   transition: 'all 0.15s ease'
                                 }}
                               >
@@ -1338,8 +1120,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 onClick={onOpenFacilityLogModal}
                                 aria-label="Mängel-Logbuch öffnen"
                                 style={{
-                                  background: '#ffffff',
-                                  border: '1px solid #cbd5e1',
+                                  background: '#f1f5f9',
+                                  border: 'none',
                                   borderRadius: '10px',
                                   padding: '6px 12px',
                                   fontSize: '0.76rem',
@@ -1361,16 +1143,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                         {displayedIssues.length === 0 ? (
                           <div style={{
-                            background: roomIssuesTab === 'open' ? 'rgba(52, 168, 83, 0.04)' : '#f8fafc',
-                            border: roomIssuesTab === 'open' ? '1px solid rgba(52, 168, 83, 0.1)' : '1px solid #e2e8f0',
-                            color: roomIssuesTab === 'open' ? '#34a853' : '#64748b',
+                            background: roomIssuesTab === 'open' ? '#dcfce7' : '#f8fafc',
+                            border: 'none',
+                            color: roomIssuesTab === 'open' ? '#15803d' : '#64748b',
                             borderRadius: '16px',
                             padding: '16px 20px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '12px'
                           }}>
-                            <CheckCircle size={20} color={roomIssuesTab === 'open' ? '#34a853' : '#64748b'} />
+                            <CheckCircle size={20} color={roomIssuesTab === 'open' ? '#16a34a' : '#64748b'} />
                             <div>
                               <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>
                                 {roomIssuesTab === 'open' 
@@ -1398,8 +1180,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                               return (
                                 <div key={issue.id} style={{
-                                  background: isResolved ? '#f8fafc' : '#fffbfb',
-                                  border: isResolved ? '1px solid #e2e8f0' : '1px solid #fee2e2',
+                                  background: isResolved ? '#f8fafc' : '#fef2f2',
+                                  border: 'none',
                                   borderRadius: '16px',
                                   padding: '16px',
                                   display: 'flex',
@@ -1421,7 +1203,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                                       issue.content.toLowerCase().includes('netzteil');
                                       return (
                                         <div style={{
-                                          background: isResolved ? '#f1f5f9' : '#fee2e2',
+                                          background: isResolved ? '#e2e8f0' : '#fee2e2',
                                           color: isResolved ? '#475569' : '#dc2626',
                                           borderRadius: '10px',
                                           padding: '6px 10px',
@@ -1441,9 +1223,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                                         {isResolved && (
                                           <span style={{
-                                            background: '#ecfdf5',
-                                            color: '#059669',
-                                            border: '1px solid #10b981',
+                                            background: '#dcfce7',
+                                            color: '#15803d',
+                                            border: 'none',
                                             borderRadius: '5px',
                                             padding: '1px 6px',
                                             fontSize: '0.66rem',
@@ -1506,9 +1288,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                           setRoomIssues(prev => prev.map(n => n.id === issue.id ? { ...n, is_completed: false, is_acknowledged: false, acknowledged_at: null, resolved_by: null } : n));
                                         }}
                                         style={{
-                                          background: '#ffffff',
+                                          background: '#e2e8f0',
                                           color: '#475569',
-                                          border: '1.5px solid #cbd5e1',
+                                          border: 'none',
                                           borderRadius: '10px',
                                           padding: '7px 12px',
                                           fontSize: '0.74rem',
@@ -1538,8 +1320,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     background: '#ffffff',
                     borderRadius: '24px',
                     padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: scheduleConflicts.length > 0 ? '1px solid rgba(234, 67, 53, 0.18)' : '1px solid rgba(0, 0, 0, 0.05)',
+                    boxShadow: 'none',
+                    border: 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '18px'
@@ -1548,18 +1330,18 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
-                          background: scheduleConflicts.length > 0 ? '#fff1f2' : '#e6f4ea',
-                          color: scheduleConflicts.length > 0 ? '#ea4335' : '#34a853',
+                          background: scheduleConflicts.length > 0 ? '#fee2e2' : '#e6f4ea',
+                          color: scheduleConflicts.length > 0 ? '#ef4444' : '#34a853',
                           width: '38px',
                           height: '38px',
                           borderRadius: '12px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: scheduleConflicts.length > 0 ? '0 2px 8px rgba(234, 67, 53, 0.15)' : 'none',
+                          boxShadow: 'none',
                           flexShrink: 0
                         }}>
-                          {scheduleConflicts.length > 0 ? <ShieldAlert size={20} color="#ea4335" /> : <CheckCircle size={20} color="#34a853" />}
+                          {scheduleConflicts.length > 0 ? <ShieldAlert size={20} color="#ef4444" /> : <CheckCircle size={20} color="#34a853" />}
                         </div>
                         <div>
                           <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
@@ -1573,8 +1355,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                       {scheduleConflicts.length > 0 ? (
                         <div style={{
-                          background: '#fff1f2',
-                          border: '1px solid #fecdd3',
+                          background: '#fee2e2',
+                          border: 'none',
                           color: '#be123c',
                           borderRadius: '20px',
                           padding: '5px 12px',
@@ -1588,7 +1370,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             width: '7px',
                             height: '7px',
                             borderRadius: '50%',
-                            background: '#ea4335',
+                            background: '#ef4444',
                             boxShadow: 'none',
                             display: 'inline-block'
                           }} />
@@ -1596,8 +1378,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         </div>
                       ) : (
                         <div style={{
-                          background: '#e6f4ea',
-                          border: '1px solid #a7f3d0',
+                          background: '#dcfce7',
+                          border: 'none',
                           color: '#047857',
                           borderRadius: '20px',
                           padding: '5px 12px',
@@ -1623,15 +1405,15 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     {/* Content Body */}
                     {scheduleConflicts.length === 0 ? (
                       <div style={{
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        background: '#f8fafc',
                         borderRadius: '16px',
                         padding: '16px 20px',
-                        border: '1px dashed #cbd5e1',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '14px'
                       }}>
-                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', flexShrink: 0 }}>
+                        <div style={{ background: '#ffffff', padding: '10px', borderRadius: '12px', boxShadow: 'none', flexShrink: 0 }}>
                           <CheckCircle size={22} color="#34a853" />
                         </div>
                         <div>
@@ -1647,8 +1429,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                         {scheduleConflicts.map((conflict) => (
                           <div key={conflict.id} style={{
-                            background: '#ffffff',
-                            border: '1px solid #fee2e2',
+                            background: '#f8fafc',
+                            border: 'none',
                             borderRadius: '18px',
                             padding: '16px',
                             boxShadow: 'none',
@@ -1663,9 +1445,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                 {/* Type Badge */}
                                 <span style={{
-                                  background: conflict.type === 'room' ? '#fff1f2' : '#fef3c7',
+                                  background: conflict.type === 'room' ? '#fee2e2' : '#fef3c7',
                                   color: conflict.type === 'room' ? '#b91c1c' : '#b45309',
-                                  border: conflict.type === 'room' ? '1px solid #fecdd3' : '1px solid #fde68a',
+                                  border: 'none',
                                   padding: '3px 10px',
                                   borderRadius: '8px',
                                   fontSize: '0.68rem',
@@ -1678,8 +1460,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                                 {/* Day Badge */}
                                 <span style={{
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
+                                  background: '#e2e8f0',
+                                  border: 'none',
                                   color: '#334155',
                                   padding: '3px 10px',
                                   borderRadius: '8px',
@@ -1695,8 +1477,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                                 {/* Window Time Pill */}
                                 <span style={{
-                                  background: '#f1f5f9',
-                                  border: '1px solid #cbd5e1',
+                                  background: '#e2e8f0',
+                                  border: 'none',
                                   color: '#1e293b',
                                   padding: '3px 10px',
                                   borderRadius: '8px',
@@ -1711,7 +1493,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 </span>
                               </div>
 
-                              <ShieldAlert size={16} color="#ea4335" />
+                              <ShieldAlert size={16} color="#ef4444" />
                             </div>
 
                             {/* Human Story Sentence */}
@@ -1720,10 +1502,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                             </div>
 
                             {/* Comparison Boxes */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fff5f5', borderRadius: '14px', padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#fef2f2', borderRadius: '14px', padding: '12px 14px' }}>
                               {conflict.type === 'teacher' ? (
                                 <>
-                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ background: '#ffffff', border: 'none', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
                                       <span>📍 Termin 1 ({conflict.timeA} Uhr)</span>
                                       <span style={{ color: '#64748b', fontWeight: 600 }}>Raum: {conflict.roomNameA}</span>
@@ -1733,11 +1515,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     </div>
                                   </div>
 
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ea4335', textAlign: 'center', padding: '2px 0' }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', textAlign: 'center', padding: '2px 0' }}>
                                     ⚡ kollidiert zeitgleich mit:
                                   </div>
 
-                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ background: '#ffffff', border: 'none', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
                                       <span>📍 Termin 2 ({conflict.timeB} Uhr)</span>
                                       <span style={{ color: '#64748b', fontWeight: 600 }}>Raum: {conflict.roomNameB}</span>
@@ -1749,7 +1531,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                 </>
                               ) : (
                                 <>
-                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ background: '#ffffff', border: 'none', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
                                       <span>👤 Lehrkraft 1: {conflict.teacherNameA}</span>
                                       <span style={{ color: '#64748b', fontWeight: 600 }}>⏰ {conflict.timeA} Uhr</span>
@@ -1759,11 +1541,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     </div>
                                   </div>
 
-                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ea4335', textAlign: 'center', padding: '2px 0' }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ef4444', textAlign: 'center', padding: '2px 0' }}>
                                     ⚡ belegt im selben Raum zeitgleich:
                                   </div>
 
-                                  <div style={{ background: '#ffffff', border: '1px solid #fee2e2', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ background: '#ffffff', border: 'none', padding: '10px 12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#991b1b' }}>
                                       <span>👤 Lehrkraft 2: {conflict.teacherNameB}</span>
                                       <span style={{ color: '#64748b', fontWeight: 600 }}>⏰ {conflict.timeB} Uhr</span>
@@ -1791,7 +1573,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   }
                                 }}
                                 style={{
-                                  background: '#ea4335',
+                                  background: '#ef4444',
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '10px',
@@ -1824,12 +1606,12 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     background: '#ffffff',
                     borderRadius: '24px',
                     padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                    boxShadow: 'none',
+                    border: 'none'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ background: '#eff6ff', color: '#2563eb', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <ClipboardList size={16} />
                         </div>
                         <div>
@@ -1846,15 +1628,15 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {pendingSchedules.length === 0 ? (
                         <div style={{
-                          background: 'rgba(52, 168, 83, 0.04)',
-                          border: '1px solid rgba(52, 168, 83, 0.1)',
-                          color: '#34a853',
+                          background: '#dcfce7',
+                          border: 'none',
+                          color: '#15803d',
                           borderRadius: '16px',
                           padding: '16px',
                           textAlign: 'center'
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-                            <CheckCircle size={22} color="#34a853" />
+                            <CheckCircle size={22} color="#16a34a" />
                           </div>
                           <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Alles freigegeben</strong>
                           <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Es liegen aktuell keine ausstehenden Stundenplaneinreichungen vor.</span>
@@ -1912,8 +1694,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                               <div key={tId} style={{
                                 padding: '12px 16px',
                                 borderRadius: '16px',
-                                border: '1px solid rgba(0, 0, 0, 0.05)',
-                                background: 'rgba(0, 0, 0, 0.01)',
+                                border: 'none',
+                                background: '#f8fafc',
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
@@ -1943,7 +1725,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                     setExpandedSidebarTeacherId(tId);
                                   }}
                                   style={{
-                                    background: '#007aff',
+                                    background: '#4f46e5',
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '10px',
@@ -1968,63 +1750,280 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                 </div>
 
-                {/* RIGHT COLUMN: SIDEBAR */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  
-                  {/* WIDGET: Unterrichtsausfälle heute (Ausfall- & Raumfreigabe-Monitor) */}
-                  {activeAusfallTeachers.length > 0 ? (
-                    <div style={{
+                {/* RIGHT COLUMN: SIDEBAR (0,1% Goldstandard: Consolidated 2x2 Telemetry Cockpit + Quick Actions) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                  {/* WIDGET 1: Tages-Puls & Systemstatus (2x2 Bento KPI Cockpit) */}
+                  <div
+                    id="tour-secretary-kpis"
+                    style={{
                       background: '#ffffff',
                       borderRadius: '24px',
-                      padding: '24px',
-                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                      border: '1px solid rgba(239, 68, 68, 0.15)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                        <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                          <CalendarX size={16} color="#ef4444" />
+                      padding: '20px',
+                      boxShadow: 'none',
+                      border: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ background: '#e0e7ff', color: '#4f46e5', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Clock size={16} />
                         </div>
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            Unterrichtsausfälle heute
+                          <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Tages-Puls &amp; Auslastung
                           </h3>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' }}>
-                            {activeAusfallTeachers.length} {activeAusfallTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet'}
+                          <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Live-Telemetrie heute
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        color: (activeAusfallTeachers.length === 0 && scheduleConflicts.length === 0) ? '#15803d' : '#b91c1c',
+                        background: (activeAusfallTeachers.length === 0 && scheduleConflicts.length === 0) ? '#dcfce7' : '#fee2e2',
+                        padding: '3px 9px',
+                        borderRadius: '999px'
+                      }}>
+                        {(activeAusfallTeachers.length === 0 && scheduleConflicts.length === 0) ? 'Planmäßig ✓' : 'Prüfung aktiv'}
+                      </span>
+                    </div>
+
+                    {/* 2x2 Compact Bento KPI Grid */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                        gap: '10px'
+                      }}
+                    >
+                      {/* Tile 1: Raumauslastung */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Raumauslastung ${roomOccupancyRate} Prozent, zum Räume-Board wechseln`}
+                        onClick={() => {
+                          if (setRoomsSubView) setRoomsSubView('plan');
+                          setActiveTab('secretary');
+                          setSecretarySubTab('rooms');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            if (setRoomsSubView) setRoomsSubView('plan');
+                            setActiveTab('secretary');
+                            setSecretarySubTab('rooms');
+                          }
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '12px 13px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '66px',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raumauslastung</span>
+                          <div style={{ background: '#e0e7ff', padding: '4px', borderRadius: '7px', display: 'flex' }}>
+                            <DoorOpen size={12} color="#4f46e5" />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {roomOccupancyRate}%
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>
+                            ({todayAllocations.length} Slots)
                           </span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {/* Tile 2: Aktivierung */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Schüler-Aktivierung ${activationRate} Prozent, zur Schülerübersicht wechseln`}
+                        onClick={() => {
+                          setActiveTab('campus');
+                          setCampusSubTab('students');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setActiveTab('campus');
+                            setCampusSubTab('students');
+                          }
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '12px 13px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '66px',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktivierung</span>
+                          <div style={{ background: '#dcfce7', padding: '4px', borderRadius: '7px', display: 'flex' }}>
+                            <UserCheck size={12} color="#15803d" />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {activationRate}%
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>
+                            ({activeStudentsCount}/{totalStudentsCount})
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tile 3: Konflikte */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Terminkonflikte: ${scheduleConflicts.length}, zum Stundenplan wechseln`}
+                        onClick={() => {
+                          setActiveTab('campus');
+                          setCampusSubTab('schedules');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setActiveTab('campus');
+                            setCampusSubTab('schedules');
+                          }
+                        }}
+                        style={{
+                          background: scheduleConflicts.length === 0 ? '#f8fafc' : '#facc15',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '12px 13px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '66px',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#475569' : '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konflikte</span>
+                          <div style={{ background: scheduleConflicts.length === 0 ? '#dcfce7' : 'rgba(15, 23, 42, 0.1)', padding: '4px', borderRadius: '7px', display: 'flex' }}>
+                            <ShieldAlert size={12} color={scheduleConflicts.length === 0 ? '#15803d' : '#0f172a'} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {scheduleConflicts.length}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#15803d' : '#0f172a' }}>
+                            {scheduleConflicts.length === 0 ? 'Stabil ✓' : 'Konflikt'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tile 4: Ausfälle Heute */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Ausfälle heute: ${activeAusfallTeachers.length}, zum Ausfall-Cockpit wechseln`}
+                        onClick={() => {
+                          setActiveTab('secretary');
+                          setSecretarySubTab('crisis');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setActiveTab('secretary');
+                            setSecretarySubTab('crisis');
+                          }
+                        }}
+                        style={{
+                          background: activeAusfallTeachers.length === 0 ? '#f8fafc' : '#ef4444',
+                          border: 'none',
+                          borderRadius: '16px',
+                          padding: '12px 13px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '66px',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#475569' : '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausfälle Heute</span>
+                          <div style={{ background: activeAusfallTeachers.length === 0 ? '#dcfce7' : 'rgba(255, 255, 255, 0.2)', padding: '4px', borderRadius: '7px', display: 'flex' }}>
+                            <CalendarX size={12} color={activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff'} />
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: activeAusfallTeachers.length === 0 ? '#0f172a' : '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                            {activeAusfallTeachers.length}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff' }}>
+                            {activeAusfallTeachers.length === 0 ? 'Planmäßig ✓' : (activeAusfallTeachers.length === 1 ? '1 Ausfall' : `${activeAusfallTeachers.length} Ausfälle`)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Active Teacher Absences List (if any today) */}
+                    {activeAusfallTeachers.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
                         {activeAusfallTeachers.map(teacher => {
                           const untilDateVal = teacher.ausfall_until;
                           const ausfallUntilStr = untilDateVal ? new Date(untilDateVal).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
                           return (
                             <div key={teacher.id} style={{
-                              padding: '12px 14px',
-                              borderRadius: '16px',
-                              border: '1px solid rgba(239, 68, 68, 0.15)',
-                              background: 'rgba(239, 68, 68, 0.04)',
+                              padding: '10px 12px',
+                              borderRadius: '12px',
+                              background: '#fef2f2',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '6px'
+                              gap: '4px'
                             }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <strong style={{ fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                                <strong style={{ fontSize: '0.78rem', color: '#991b1b', fontWeight: 700 }}>
                                   {formatTeacherFullName(teacher)}
                                 </strong>
                                 <span style={{
                                   background: '#fee2e2',
                                   color: '#b91c1c',
-                                  padding: '2px 8px',
+                                  padding: '2px 7px',
                                   borderRadius: '6px',
-                                  fontSize: '0.66rem',
+                                  fontSize: '0.64rem',
                                   fontWeight: 700
                                 }}>
                                   bis {ausfallUntilStr}
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.70rem', color: '#64748b' }}>
-                                <span style={{ color: '#16a34a', fontWeight: 700 }}>✓ Räume freigegeben</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.68rem', color: '#64748b' }}>
+                                <span style={{ color: '#15803d', fontWeight: 700 }}>✓ Räume freigegeben</span>
                                 <span>&bull;</span>
                                 <span style={{ color: '#2563eb', fontWeight: 600 }}>Schüler informiert</span>
                               </div>
@@ -2032,222 +2031,165 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           );
                         })}
                       </div>
+                    )}
+                  </div>
+
+                  {/* WIDGET 2: Schnellzugriff & Werkzeuge */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '22px 20px',
+                    boxShadow: 'none',
+                    border: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ background: '#fee2e2', color: '#ef4444', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Sparkles size={16} />
+                      </div>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          Schnellzugriff Sekretariat
+                        </h3>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                          Häufige Verwaltungsaktionen
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      {/* Calm Status Pill (Zero-Inbox Parity) */}
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '20px',
-                        padding: '16px 20px',
-                        boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)',
-                        border: '1px solid rgba(52, 168, 83, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
-                      }}>
-                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <CheckCircle size={18} color="#16a34a" />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#14532d' }}>
-                            Heutiger Unterricht vollzählig
-                          </div>
-                          <span style={{ fontSize: '0.72rem', color: '#166534', opacity: 0.9 }}>
-                            0 Ausfälle gemeldet &bull; Alle Lehrkräfte planmäßig
-                          </span>
-                        </div>
-                      </div>
 
-                      {/* WIDGET: Schnellzugriff & Werkzeuge */}
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '24px',
-                        padding: '22px 20px',
-                        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                        border: '1px solid rgba(0, 0, 0, 0.05)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ background: '#fef2f2', color: '#ea4335', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Sparkles size={16} />
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Schnellzugriff Sekretariat
-                            </h3>
-                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
-                              Häufige Verwaltungsaktionen
-                            </span>
-                          </div>
-                        </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <button
+                        type="button"
+                        aria-label="Zur Schülerübersicht und Stammdaten wechseln"
+                        onClick={() => {
+                          setActiveTab('campus');
+                          setCampusSubTab('students');
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '44px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Users size={15} color="#3b82f6" />
+                          <span>Schülerübersicht &amp; Stammdaten</span>
+                        </span>
+                        <ChevronRight size={14} color="#94a3b8" />
+                      </button>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <button
-                            type="button"
-                            aria-label="Zur Schülerübersicht und Stammdaten wechseln"
-                            onClick={() => {
-                              setActiveTab('campus');
-                              setCampusSubTab('students');
-                            }}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '12px',
-                              padding: '10px 14px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: '#1e293b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              minHeight: '44px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Users size={15} color="#3b82f6" />
-                              <span>Schülerübersicht &amp; Stammdaten</span>
-                            </span>
-                            <ChevronRight size={14} color="#94a3b8" />
-                          </button>
+                      <button
+                        type="button"
+                        aria-label="Zum Räume- und Belegungsplan wechseln"
+                        onClick={() => {
+                          if (setRoomsSubView) setRoomsSubView('plan');
+                          setActiveTab('secretary');
+                          setSecretarySubTab('rooms');
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '44px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <DoorOpen size={15} color="#ea580c" />
+                          <span>Räume- &amp; Belegungsplan</span>
+                        </span>
+                        <ChevronRight size={14} color="#94a3b8" />
+                      </button>
 
-                          <button
-                            type="button"
-                            aria-label="Zum Räume- und Belegungsplan wechseln"
-                            onClick={() => {
-                              if (setRoomsSubView) setRoomsSubView('plan');
-                              setActiveTab('secretary');
-                              setSecretarySubTab('rooms');
-                            }}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '12px',
-                              padding: '10px 14px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: '#1e293b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              minHeight: '44px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <DoorOpen size={15} color="#ea580c" />
-                              <span>Räume- &amp; Belegungsplan</span>
-                            </span>
-                            <ChevronRight size={14} color="#94a3b8" />
-                          </button>
+                      <button
+                        type="button"
+                        aria-label="Zu Abrechnung und Infrastruktur wechseln"
+                        onClick={() => {
+                          setActiveTab('secretary');
+                          setSecretarySubTab('licenses');
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '44px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <ClipboardList size={15} color="#16a34a" />
+                          <span>Abrechnung &amp; Infrastruktur</span>
+                        </span>
+                        <ChevronRight size={14} color="#94a3b8" />
+                      </button>
 
-                          <button
-                            type="button"
-                            aria-label="Zu Abrechnung und Infrastruktur wechseln"
-                            onClick={() => {
-                              setActiveTab('secretary');
-                              setSecretarySubTab('licenses');
-                            }}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '12px',
-                              padding: '10px 14px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: '#1e293b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              minHeight: '44px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <ClipboardList size={15} color="#16a34a" />
-                              <span>Abrechnung &amp; Infrastruktur</span>
-                            </span>
-                            <ChevronRight size={14} color="#94a3b8" />
-                          </button>
-
-                          <button
-                            type="button"
-                            aria-label="Zu Mitteilungen und Informationen wechseln"
-                            onClick={() => {
-                              setActiveTab('secretary');
-                              setSecretarySubTab('announcements');
-                            }}
-                            style={{
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              borderRadius: '12px',
-                              padding: '10px 14px',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: '#1e293b',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              minHeight: '44px',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
-                          >
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <BookOpen size={15} color="#8b5cf6" />
-                              <span>Mitteilungen &amp; Aushänge</span>
-                            </span>
-                            <ChevronRight size={14} color="#94a3b8" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* WIDGET: Tages-Takt & Auslastung (Baseline-Harmonie) */}
-                      <div style={{
-                        background: '#ffffff',
-                        borderRadius: '24px',
-                        padding: '20px',
-                        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                        border: '1px solid rgba(0, 0, 0, 0.05)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ background: '#eff6ff', color: '#2563eb', width: '28px', height: '28px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Clock size={15} />
-                            </div>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Tages-Takt &amp; Auslastung
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', padding: '2px 8px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                            {roomOccupancyRate}% Aktiv
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: '1.45' }}>
-                          {todayAllocations.length > 0 
-                            ? `${todayAllocations.length} Unterrichtsstunden auf ${rooms.length} Räume verteilt. Alle Schließsysteme und Instrumenten-Inventare sind einsatzbereit.` 
-                            : 'Heute keine regulären Termine hinterlegt. Alle Räume stehen für Spontan-Üben zur Verfügung.'}
-                        </div>
-                      </div>
-                    </>
-                  )}
+                      <button
+                        type="button"
+                        aria-label="Zu Mitteilungen und Informationen wechseln"
+                        onClick={() => {
+                          setActiveTab('secretary');
+                          setSecretarySubTab('announcements');
+                        }}
+                        style={{
+                          background: '#f8fafc',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          color: '#1e293b',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          minHeight: '44px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <BookOpen size={15} color="#8b5cf6" />
+                          <span>Mitteilungen &amp; Aushänge</span>
+                        </span>
+                        <ChevronRight size={14} color="#94a3b8" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
               </div>

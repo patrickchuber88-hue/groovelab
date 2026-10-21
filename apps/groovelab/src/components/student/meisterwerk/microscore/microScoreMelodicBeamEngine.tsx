@@ -18,6 +18,7 @@
 
 import React from 'react';
 import { MicroScoreNote } from './microScore.types';
+import { getPitchColorTheme } from './microScoreGridEngine';
 
 export interface MelodicBeamNoteInfo {
   note: MicroScoreNote;
@@ -28,6 +29,7 @@ export interface MelodicBeamNoteInfo {
   headY: number; // Höchste bzw. tiefste Note im Akkord an diesem Slot
   duration: '8' | '16';
   isDotted?: boolean;
+  color: string;
 }
 
 export interface SecondaryBeamSegment {
@@ -35,6 +37,8 @@ export interface SecondaryBeamSegment {
   y1: number;
   x2: number;
   y2: number;
+  color: string;
+  colorEnd?: string;
 }
 
 export interface MelodicBeamGroup {
@@ -84,39 +88,47 @@ export function calculateBarMelodicBeamGroups(
 
   if (barNotes.length === 0) return [];
 
-  // Finde alle eindeutigen Zählzeiten mit Noten
-  const fractions = Array.from(new Set(barNotes.map(n => Math.round(n.beatFraction)))).sort((a, b) => a - b);
+  const canonFrac = (f: number): number => Math.round(f * 100) / 100;
 
-  // Hilfsfunktion: X-Position eines Ticks berechnen
+  // Finde alle eindeutigen Zählzeiten mit Noten (inkl. exakter Triolen-Brüche 1.33 / 2.66)
+  const fractions = Array.from(new Set(barNotes.map(n => canonFrac(n.beatFraction)))).sort((a, b) => a - b);
+
+  // Hilfsfunktion: X-Position eines Ticks berechnen (synchron mit totalFractionsInBar in MicroScoreStaffNotation)
+  const totalFractionsInBar = timeSignature === '3/4' || timeSignature === '6/8' ? 12 : timeSignature === '2/4' ? 8 : 16;
   const getFractionX = (frac: number): number => {
-    return barStartX + 12 + (frac / 16) * (measureWidth - 24);
+    return barStartX + 12 + (frac / totalFractionsInBar) * (measureWidth - 24);
   };
 
   // Gruppiere Noten nach Zählzeiten
   const slotMap = new Map<number, MicroScoreNote[]>();
   for (const n of barNotes) {
-    const f = Math.round(n.beatFraction);
+    const f = canonFrac(n.beatFraction);
     const existing = slotMap.get(f) || [];
     existing.push(n);
     slotMap.set(f, existing);
   }
 
   // 2. Metrische Unterteilung nach Taktart
+  // Im 6/8-Takt: 2 punktierte Viertelschläge à 6 Sechzehntel (Gruppe 0: 0..5, Gruppe 1: 6..11)
   // Im 4/4-Takt: 4 Viertelschläge (Beat 0: 0..3, Beat 1: 4..7, Beat 2: 8..11, Beat 3: 12..15)
-  // Bei 3/4-Takt: 3 Viertelschläge
+  // Bei 3/4-Takt: 3 Viertelschläge, bei 2/4-Takt: 2 Viertelschläge
+  const is68 = timeSignature === '6/8';
   const is34 = timeSignature === '3/4';
-  const totalBeats = is34 ? 3 : 4;
+  const is24 = timeSignature === '2/4';
+  const groupSize = is68 ? 6 : 4;
+  const totalBeats = is68 ? 2 : is34 ? 3 : is24 ? 2 : 4;
   const rawGroups: number[][] = [];
 
   for (let b = 0; b < totalBeats; b++) {
-    const beatStart = b * 4;
-    const beatEnd = b * 4 + 3;
-    const beatFractions = fractions.filter(f => f >= beatStart && f <= beatEnd);
+    const beatStart = b * groupSize;
+    const beatEnd = (b + 1) * groupSize;
+    const beatFractions = fractions.filter(f => f >= beatStart - 0.05 && f < beatEnd - 0.05);
 
-    // Prüfe, ob alle Noten in diesem Beat balkbar sind (Achtel '8' oder Sechzehntel '16')
+    // Prüfe, ob an den Zählzeiten in diesem Beat balkbare Noten (Achtel '8' oder Sechzehntel '16') liegen
+    // (auch bei Polyphonie wie Bass-Viertel + Melodie-Achtel in "Spanische Romanze")
     const beatSlotsBeamable = beatFractions.every(f => {
       const notes = slotMap.get(f) || [];
-      return notes.length > 0 && notes.every(n => n.duration === '8' || n.duration === '16');
+      return notes.length > 0 && notes.some(n => n.duration === '8' || n.duration === '16');
     });
 
     if (beatSlotsBeamable && beatFractions.length >= 2) {
@@ -129,12 +141,12 @@ export function calculateBarMelodicBeamGroups(
   // Taktmitte (Beat 1 zu Beat 2, d.h. Tick 6 zu 8) darf NIEMALS überbrückt werden!
   const finalFractionGroups: number[][] = [];
 
-  if (!is34) {
-    const hasFullHalf1 = rawGroups.some(g => g.length === 2 && g[0] === 0 && g[1] === 2 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8'))) &&
-                         rawGroups.some(g => g.length === 2 && g[0] === 4 && g[1] === 6 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8')));
+  if (!is34 && !is68 && !is24) {
+    const hasFullHalf1 = rawGroups.some(g => g.length === 2 && g[0] === 0 && g[1] === 2 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8' && !n.isTriplet))) &&
+                         rawGroups.some(g => g.length === 2 && g[0] === 4 && g[1] === 6 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8' && !n.isTriplet)));
 
-    const hasFullHalf2 = rawGroups.some(g => g.length === 2 && g[0] === 8 && g[1] === 10 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8'))) &&
-                         rawGroups.some(g => g.length === 2 && g[0] === 12 && g[1] === 14 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8')));
+    const hasFullHalf2 = rawGroups.some(g => g.length === 2 && g[0] === 8 && g[1] === 10 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8' && !n.isTriplet))) &&
+                         rawGroups.some(g => g.length === 2 && g[0] === 12 && g[1] === 14 && g.every(f => (slotMap.get(f) || []).every(n => n.duration === '8' && !n.isTriplet)));
 
     for (const g of rawGroups) {
       const isH1B0 = g.length === 2 && g[0] === 0 && g[1] === 2;
@@ -168,6 +180,7 @@ export function calculateBarMelodicBeamGroups(
     // Ermittle alle Noten der Gruppe
     const groupNotesData: {
       note: MicroScoreNote;
+      allSlotNotes: MicroScoreNote[];
       fractionIdx: number;
       fractionX: number;
       headMinY: number;
@@ -183,10 +196,14 @@ export function calculateBarMelodicBeamGroups(
       const relYs = notes.map(n => getStaffY(n.pitch, isBassClef, false));
       const headMinY = staffTopY + Math.min(...relYs);
       const headMaxY = staffTopY + Math.max(...relYs);
-      const avgStaffRelY = relYs.reduce((a, b) => a + b, 0) / relYs.length;
+      const beamableNotesAtSlot = notes.filter(n => n.duration === '8' || n.duration === '16');
+      const melodyRelYs = (beamableNotesAtSlot.length > 0 ? beamableNotesAtSlot : notes).map(n => getStaffY(n.pitch, isBassClef, false));
+      const avgStaffRelY = melodyRelYs.reduce((a, b) => a + b, 0) / melodyRelYs.length;
+      const shortestNote = notes.find(n => n.duration === '16') || notes.find(n => n.duration === '8') || notes[0];
 
       groupNotesData.push({
-        note: notes[0],
+        note: shortestNote,
+        allSlotNotes: notes,
         fractionIdx: frac,
         fractionX: fracX,
         headMinY,
@@ -234,9 +251,6 @@ export function calculateBarMelodicBeamGroups(
     // Berechne vertikalen Shift (yRef), sodass JEDER Hals mindestens MIN_STEM_LENGTH lang ist
     let yRef = 0;
     if (stemUp) {
-      // Hälse nach oben: Balken muss oberhalb aller Notenköpfe liegen
-      // y(x) = yRef + slope * (x - xStart) <= headMinY - MIN_STEM_LENGTH
-      // yRef <= headMinY - MIN_STEM_LENGTH - slope * (x - xStart)
       let maxAllowedY = Infinity;
       for (const d of groupNotesData) {
         const x = d.fractionX + stemOffset;
@@ -247,8 +261,6 @@ export function calculateBarMelodicBeamGroups(
       }
       yRef = maxAllowedY;
     } else {
-      // Hälse nach unten: Balken muss unterhalb aller Notenköpfe liegen
-      // yRef >= headMaxY + MIN_STEM_LENGTH - slope * (x - xStart)
       let minAllowedY = -Infinity;
       for (const d of groupNotesData) {
         const x = d.fractionX + stemOffset;
@@ -263,12 +275,19 @@ export function calculateBarMelodicBeamGroups(
     const yStart = yRef;
     const yEnd = yRef + slope * (xEnd - xStart);
 
-    // Berechne NoteInfo für jede Note der Gruppe
+    // Berechne NoteInfo für jede Note der Gruppe inkl. synästhetischer Tonhöhenfarbe
     const notesInfo: MelodicBeamNoteInfo[] = groupNotesData.map(d => {
       const stemX = d.fractionX + stemOffset;
       const beamY = yStart + slope * (stemX - xStart);
       // 0,1% Elaine Gould Präzision: Hals taucht 1.0px in den Balken ein (verhindert Retina-Subpixel-Gaps)
       const stemTipY = stemUp ? beamY - 1.0 : beamY + 1.0;
+      const sortedAtSlot = [...d.allSlotNotes].sort(
+        (a, b) => getStaffY(a.pitch, isBassClef, false) - getStaffY(b.pitch, isBassClef, false)
+      );
+      const anchorNote = stemUp
+        ? sortedAtSlot[0]
+        : sortedAtSlot[sortedAtSlot.length - 1];
+      const noteColor = getPitchColorTheme((anchorNote || d.note).pitch).border;
       return {
         note: d.note,
         fractionIdx: d.fractionIdx,
@@ -276,8 +295,9 @@ export function calculateBarMelodicBeamGroups(
         stemX,
         stemTipY,
         headY: stemUp ? d.headMinY : d.headMaxY,
-        duration: d.note.duration as '8' | '16',
-        isDotted: d.note.isDotted
+        duration: (d.note.duration === '16' ? '16' : '8') as '8' | '16',
+        isDotted: d.note.isDotted,
+        color: noteColor
       };
     });
 
@@ -296,7 +316,9 @@ export function calculateBarMelodicBeamGroups(
             x1: curr.stemX,
             y1: (yStart + slope * (curr.stemX - xStart)) + secYOffset,
             x2: next.stemX,
-            y2: (yStart + slope * (next.stemX - xStart)) + secYOffset
+            y2: (yStart + slope * (next.stemX - xStart)) + secYOffset,
+            color: curr.color,
+            colorEnd: next.color
           });
         } else {
           // Isolierte 16tel (z. B. nach oder vor einer 8tel):
@@ -313,7 +335,8 @@ export function calculateBarMelodicBeamGroups(
               x1,
               y1: (yStart + slope * (x1 - xStart)) + secYOffset,
               x2,
-              y2: (yStart + slope * (x2 - xStart)) + secYOffset
+              y2: (yStart + slope * (x2 - xStart)) + secYOffset,
+              color: curr.color
             });
           } else {
             // Nach rechts (innen) zeigen
@@ -323,7 +346,8 @@ export function calculateBarMelodicBeamGroups(
               x1,
               y1: (yStart + slope * (x1 - xStart)) + secYOffset,
               x2,
-              y2: (yStart + slope * (x2 - xStart)) + secYOffset
+              y2: (yStart + slope * (x2 - xStart)) + secYOffset,
+              color: curr.color
             });
           }
         }
@@ -349,19 +373,21 @@ export function calculateBarMelodicBeamGroups(
 }
 
 /**
- * Erstellt eine schnelle Lookup-Map für Zählzeiten-Slots im Takt
+ * Erstellt eine schnelle Lookup-Map für Zählzeiten-Slots im Takt (inkl. Triolen-Toleranz)
  */
 export function buildMelodicBeamLookup(beamGroups: MelodicBeamGroup[]): Map<number, MelodicBeamSlotAnalysis> {
   const map = new Map<number, MelodicBeamSlotAnalysis>();
 
   for (const group of beamGroups) {
     for (const n of group.notes) {
-      map.set(n.fractionIdx, {
+      const analysis: MelodicBeamSlotAnalysis = {
         isBeamed: true,
         stemUp: group.stemUp,
         stemTipY: n.stemTipY,
         beamGroupId: group.id
-      });
+      };
+      map.set(n.fractionIdx, analysis);
+      map.set(Math.round(n.fractionIdx * 100) / 100, analysis);
     }
   }
 
@@ -370,45 +396,85 @@ export function buildMelodicBeamLookup(beamGroups: MelodicBeamGroup[]): Map<numb
 
 /**
  * 0,1% Goldstandard SVG-Renderer für Notenbalken (Primary & Secondary Beams)
+ * mit synästhetischer Pro-Noten-Farbcodierung entlang der Balkensteigung.
  */
 export const MicroScoreMelodicBeams: React.FC<{
   beamGroups: MelodicBeamGroup[];
   color?: string;
-}> = ({ beamGroups, color = '#0f172a' }) => {
+}> = ({ beamGroups, color }) => {
   if (!beamGroups || beamGroups.length === 0) return null;
 
   return (
     <g id="melodic-beams-layer" style={{ pointerEvents: 'none' }}>
       {beamGroups.map(group => {
-        const { id, stemUp, xStart, xEnd, yStart, yEnd, beamThickness, secondarySegments } = group;
+        const { id, stemUp, xStart, yStart, slope, beamThickness, notes, secondarySegments } = group;
 
-        // Primärbalken als mathematisch präzises Parallelogramm / Polygon
-        // stemUp: Balken sitzt mit seiner Unterkante auf dem Halsende (yStart .. yEnd)
-        // stemDown: Balken sitzt mit seiner Oberkante auf dem Halsende (yStart .. yEnd)
+        // Primärbalken als mathematisch präzises Parallelogramm / Polygon pro Noten-Spanne
         const polyYOffset = stemUp ? -beamThickness : beamThickness;
-        const primaryPoints = `${xStart},${yStart} ${xEnd},${yEnd} ${xEnd},${yEnd + polyYOffset} ${xStart},${yStart + polyYOffset}`;
+        const getBeamY = (x: number): number => yStart + slope * (x - xStart);
 
         return (
           <g key={id} id={id}>
-            {/* 1. Primärer Hauptbalken (Achtel & Sechzehntel) */}
-            <polygon
-              points={primaryPoints}
-              fill={color}
-              stroke={color}
-              strokeWidth="0.3"
-            />
+            {/* 1. Primärer Hauptbalken (Achtel & Sechzehntel) - pro Note farbcodiert */}
+            {notes.slice(0, -1).map((curr, nIdx) => {
+              const next = notes[nIdx + 1];
+              const x1 = curr.stemX;
+              const x2 = next.stemX;
+              const y1 = getBeamY(x1);
+              const y2 = getBeamY(x2);
+              const c1 = color || curr.color || '#0f172a';
+              const c2 = color || next.color || '#0f172a';
 
-            {/* 2. Sekundäre Nebenbalken (für Sechzehntel & Beamlets) */}
-            {secondarySegments.map((seg, sIdx) => {
-              const secPoints = `${seg.x1},${seg.y1} ${seg.x2},${seg.y2} ${seg.x2},${seg.y2 + polyYOffset} ${seg.x1},${seg.y1 + polyYOffset}`;
+              if (c1 === c2) {
+                const pts = `${x1},${y1} ${x2},${y2} ${x2},${y2 + polyYOffset} ${x1},${y1 + polyYOffset}`;
+                return (
+                  <polygon
+                    key={`prim-${id}-${nIdx}`}
+                    points={pts}
+                    fill={c1}
+                    stroke={c1}
+                    strokeWidth="0.35"
+                  />
+                );
+              }
+
+              const xMid = (x1 + x2) / 2;
+              const yMid = getBeamY(xMid);
+              const ptsLeft = `${x1},${y1} ${xMid},${yMid} ${xMid},${yMid + polyYOffset} ${x1},${y1 + polyYOffset}`;
+              const ptsRight = `${xMid},${yMid} ${x2},${y2} ${x2},${y2 + polyYOffset} ${xMid},${yMid + polyYOffset}`;
               return (
-                <polygon
-                  key={`sec-${id}-${sIdx}`}
-                  points={secPoints}
-                  fill={color}
-                  stroke={color}
-                  strokeWidth="0.3"
-                />
+                <g key={`prim-${id}-${nIdx}`}>
+                  <polygon points={ptsLeft} fill={c1} stroke={c1} strokeWidth="0.35" />
+                  <polygon points={ptsRight} fill={c2} stroke={c2} strokeWidth="0.35" />
+                </g>
+              );
+            })}
+
+            {/* 2. Sekundäre Nebenbalken (für Sechzehntel & Beamlets) - pro Note farbcodiert */}
+            {secondarySegments.map((seg, sIdx) => {
+              const c1 = color || seg.color || '#0f172a';
+              const c2 = color || seg.colorEnd || c1;
+              if (c1 === c2) {
+                const secPoints = `${seg.x1},${seg.y1} ${seg.x2},${seg.y2} ${seg.x2},${seg.y2 + polyYOffset} ${seg.x1},${seg.y1 + polyYOffset}`;
+                return (
+                  <polygon
+                    key={`sec-${id}-${sIdx}`}
+                    points={secPoints}
+                    fill={c1}
+                    stroke={c1}
+                    strokeWidth="0.35"
+                  />
+                );
+              }
+              const xMid = (seg.x1 + seg.x2) / 2;
+              const yMid = (seg.y1 + seg.y2) / 2;
+              const ptsLeft = `${seg.x1},${seg.y1} ${xMid},${yMid} ${xMid},${yMid + polyYOffset} ${seg.x1},${seg.y1 + polyYOffset}`;
+              const ptsRight = `${xMid},${yMid} ${seg.x2},${seg.y2} ${seg.x2},${seg.y2 + polyYOffset} ${xMid},${yMid + polyYOffset}`;
+              return (
+                <g key={`sec-${id}-${sIdx}`}>
+                  <polygon points={ptsLeft} fill={c1} stroke={c1} strokeWidth="0.35" />
+                  <polygon points={ptsRight} fill={c2} stroke={c2} strokeWidth="0.35" />
+                </g>
               );
             })}
           </g>

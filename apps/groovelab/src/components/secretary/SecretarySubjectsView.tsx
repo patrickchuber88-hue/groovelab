@@ -33,12 +33,12 @@ const getAlphabeticalColor = (name: string) => {
   const trimmed = (name || '').trim();
   if (trimmed.toLowerCase() === 'ohne zuweisung') {
     return {
-      avatarBg: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+      avatarBg: '#f1f5f9',
       avatarColor: '#475569'
     };
   }
   const hue = getAlphabeticalHue(trimmed);
-  const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
+  const avatarBg = `hsl(${hue}, 85%, 94%)`;
   const avatarColor = `hsl(${hue}, 90%, 25%)`;
   return { avatarBg, avatarColor };
 };
@@ -526,7 +526,7 @@ export const SecretarySubjectsView: React.FC<SecretarySubjectsViewProps> = ({
                         style={{
                           padding: '7px',
                           borderRadius: '10px',
-                          border: '1px solid #fee2e2',
+                          border: 'none',
                           background: '#fff5f5',
                           cursor: 'pointer',
                           color: '#dc2626',

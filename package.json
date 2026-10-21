@@ -52,6 +52,7 @@
     "guard:test-facade": "node scripts/test_facade_guard.mjs",
     "guard:sw": "node scripts/verify_sw_integrity.mjs",
     "guard:exocortex": "node scripts/product_bible_guard.mjs --check",
+    "guard:bsi-matrix": "node scripts/bsi_360_cybersecurity_matrix_guard.mjs",
     "exocortex:snapshot": "node scripts/product_bible_guard.mjs --snapshot",
     "exocortex:restore": "node scripts/product_bible_guard.mjs --restore",
     "exocortex:list": "node scripts/product_bible_guard.mjs --list",

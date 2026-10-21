@@ -236,8 +236,8 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
             touchAction: 'manipulation'
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(234, 179, 8, 0.2)';
-            e.currentTarget.style.borderColor = '#eab308';
+            e.currentTarget.style.background = 'rgba(250, 204, 21, 0.2)';
+            e.currentTarget.style.borderColor = '#facc15';
             e.currentTarget.style.transform = 'scale(1.08)';
           }}
           onMouseLeave={e => {
@@ -254,7 +254,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
           className="milestone-badge-artistic"
           style={{
             background: 'rgba(234, 179, 8, 0.12)',
-            border: '1px solid rgba(234, 179, 8, 0.35)',
+            border: 'none',
             color: '#facc15',
             boxShadow: 'none'
           }}
@@ -296,7 +296,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
               className="animation-pulse" 
               style={{ 
                 background: 'rgba(234, 179, 8, 0.14)', 
-                border: '1px solid rgba(234, 179, 8, 0.4)', 
+                border: 'none', 
                 padding: '10px 24px', 
                 borderRadius: '16px',
                 display: 'flex',
@@ -365,7 +365,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
                   className="musician-avatar-stage"
                   style={{
                     position: 'relative',
-                    borderColor: isFilled ? '#eab308' : 'rgba(255, 255, 255, 0.1)'
+                    borderColor: isFilled ? '#facc15' : 'rgba(255, 255, 255, 0.1)'
                   }}
                 >
                   {isFilled ? (
@@ -456,7 +456,7 @@ export const ArtistGateway: React.FC<ArtistGatewayProps> = ({
             onClick={onClose}
             className="hero-cta-artistic"
             style={{ 
-              background: 'linear-gradient(135deg, #ca8a04, #eab308)', 
+              background: '#facc15', 
               border: 'none', 
               padding: '20px 54px', 
               borderRadius: '24px', 

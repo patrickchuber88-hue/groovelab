@@ -298,7 +298,7 @@ export const SkillDetailSheetModal: React.FC<SkillDetailSheetModalProps> = ({
               style={{
                 background: '#fef3c7',
                 color: '#92400e',
-                border: '1px solid #fde68a',
+                border: 'none',
                 padding: '5px 14px',
                 borderRadius: '100px',
                 fontSize: '0.82rem',
@@ -318,7 +318,7 @@ export const SkillDetailSheetModal: React.FC<SkillDetailSheetModalProps> = ({
           <div
             style={{
               background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-              border: '1.5px solid #fcd34d',
+              border: 'none',
               borderRadius: '18px',
               padding: '14px 16px',
               display: 'flex',
@@ -370,7 +370,7 @@ export const SkillDetailSheetModal: React.FC<SkillDetailSheetModalProps> = ({
         <div
           style={{
             background: '#f0fdf4',
-            border: '1.5px solid #bbf7d0',
+            border: 'none',
             borderRadius: '20px',
             padding: '16px 18px',
             display: 'flex',
@@ -383,7 +383,7 @@ export const SkillDetailSheetModal: React.FC<SkillDetailSheetModalProps> = ({
               width: '32px',
               height: '32px',
               borderRadius: '10px',
-              background: '#22c55e',
+              background: '#34a853',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',

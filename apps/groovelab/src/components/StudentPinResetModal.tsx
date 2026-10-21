@@ -17,7 +17,7 @@ interface StudentPinResetModalProps {
     day_of_birth?: number | null;
   };
   onClose: () => void;
-  accentColor?: string; // '#ea4335' (Admin/Sec) or '#34a853' (Campus) or '#eab308' (GrooveLab)
+  accentColor?: string; // '#ea4335' (Admin/Sec) or '#34a853' (Campus) or '#facc15' (GrooveLab)
 }
 
 export function StudentPinResetModal({
@@ -355,7 +355,7 @@ export function StudentPinResetModal({
         <div
           style={{
             background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
+            border: 'none',
             borderRadius: '12px',
             padding: '10px 14px',
             display: 'flex',

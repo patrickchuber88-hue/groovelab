@@ -633,13 +633,7 @@ export function useCampusDashboardDataLoader({
             profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
           )
         )
-      `).eq('school_id', schoolId).eq('is_groovelab_active', true);
-
-      const effectiveTeacherId = userData?.role === 'teacher' ? userData?.id : userData?.teacher_id;
-      if (effectiveTeacherId) {
-        songsQuery = songsQuery.or(`teacher_id.eq.${effectiveTeacherId},teacher_id.is.null`);
-      }
-      songsQuery = songsQuery.order('level').order('artist');
+      `).or(`school_id.eq.${schoolId},school_id.is.null`).eq('is_groovelab_active', true).order('level').order('artist');
 
       const [skillsRes, wallRes, membersRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
         bootstrapData?.skills

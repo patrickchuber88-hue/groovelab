@@ -614,7 +614,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             height: '56px',
             borderRadius: '16px',
             background: '#fef2f2',
-            border: '1px solid #fecaca',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -978,7 +978,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <div style={{
               flexShrink: 0,
               background: '#fee2e2',
-              border: '1px solid #fca5a5',
+              border: 'none',
               borderRadius: '12px',
               padding: '12px 14px',
               display: 'flex',
@@ -1370,7 +1370,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           {errorMsg && (
             <div style={{
               background: '#fee2e2',
-              border: '1px solid #fca5a5',
+              border: 'none',
               borderRadius: '10px',
               padding: '8px 12px',
               display: 'flex',

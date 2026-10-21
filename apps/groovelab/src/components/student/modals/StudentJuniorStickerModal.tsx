@@ -159,8 +159,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
         <div style={{ flexShrink: 0, marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
             <div style={{
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              color: '#d97706',
+              background: '#fef9c3',
+              color: '#854d0e',
               width: '50px',
               height: '50px',
               borderRadius: '18px',
@@ -179,9 +179,9 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   Deine Auszeichnungen
                 </span>
                 <span style={{
-                  background: '#ecfdf5',
-                  color: '#059669',
-                  border: '1px solid #a7f3d0',
+                  background: '#d1fae5',
+                  color: '#047857',
+                  border: 'none',
                   fontSize: '0.70rem',
                   fontWeight: 900,
                   padding: '2px 10px',
@@ -222,14 +222,14 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   style={{
                     background: isActive ? '#0f172a' : '#f1f5f9',
                     color: isActive ? '#ffffff' : '#475569',
-                    border: isActive ? '1.5px solid #0f172a' : '1.5px solid #e2e8f0',
+                    border: 'none',
                     borderRadius: '100px',
                     padding: '8px 16px',
                     fontSize: '0.82rem',
                     fontWeight: 850,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    boxShadow: isActive ? '0 4px 12px rgba(15, 23, 42, 0.2)' : 'none',
+                    boxShadow: 'none',
                     transition: 'all 0.15s ease',
                     flexShrink: 0,
                     touchAction: 'manipulation',
@@ -289,8 +289,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     }
                   }}
                   style={{
-                    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                    border: '1.5px solid #10b981',
+                    background: '#d1fae5',
+                    border: 'none',
                     borderRadius: '24px',
                     padding: isMobile ? '12px 14px' : '16px 18px',
                     display: 'flex',
@@ -311,8 +311,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     width: isMobile ? '60px' : '68px',
                     height: isMobile ? '60px' : '68px',
                     borderRadius: '18px',
-                    background: '#0a0e1a',
-                    border: '2px solid #10b981',
+                    background: '#0f172a',
+                    border: 'none',
                     boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -358,7 +358,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         color: '#ffffff',
                         fontSize: '0.62rem',
                         fontWeight: 950,
@@ -369,7 +369,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       }}>
                         CAMPUS-RANG 🎒
                       </span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#059669' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#047857' }}>
                         ★ Im Album
                       </span>
                     </div>
@@ -404,7 +404,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         setJuniorStickerCategory('schuljahr');
                       }}
                       style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         border: 'none',
                         color: '#ffffff',
                         borderRadius: '100px',
@@ -447,8 +447,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     }
                   }}
                   style={{
-                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                    border: '1.5px solid #fde68a',
+                    background: '#fef9c3',
+                    border: 'none',
                     borderRadius: '24px',
                     padding: isMobile ? '12px 14px' : '16px 18px',
                     display: 'flex',
@@ -470,7 +470,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     height: isMobile ? '60px' : '68px',
                     borderRadius: '18px',
                     background: '#ffffff',
-                    border: '2px dashed #f59e0b',
+                    border: 'none',
                     boxShadow: 'none',
                     display: 'flex',
                     alignItems: 'center',
@@ -517,7 +517,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       position: 'absolute',
                       bottom: '-2px',
                       right: '-2px',
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      background: '#f97316',
                       color: '#ffffff',
                       width: '20px',
                       height: '20px',
@@ -536,7 +536,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{
-                        background: '#d97706',
+                        background: '#f97316',
                         color: '#ffffff',
                         fontSize: '0.62rem',
                         fontWeight: 950,
@@ -546,7 +546,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       }}>
                         NÄCHSTE MISSION 🎯
                       </span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#854d0e' }}>
                         Greifbar nah
                       </span>
                     </div>
@@ -566,7 +566,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     <p style={{
                       margin: '0 0 6px 0',
                       fontSize: '0.72rem',
-                      color: '#92400e',
+                      color: '#854d0e',
                       fontWeight: 850,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -580,13 +580,13 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                       width: '100%',
                       height: '7px',
                       borderRadius: '100px',
-                      background: 'rgba(217, 119, 6, 0.15)',
+                      background: 'rgba(133, 77, 14, 0.15)',
                       overflow: 'hidden'
                     }}>
                       <div style={{
                         width: `${nextMilestone.percent}%`,
                         height: '100%',
-                        background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+                        background: '#f97316',
                         borderRadius: '100px',
                         transition: 'width 0.3s ease'
                       }} />
@@ -595,20 +595,20 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                 </div>
               ) : (
                 <div style={{
-                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  border: '1.5px solid #fde68a',
+                  background: '#fef9c3',
+                  border: 'none',
                   borderRadius: '24px',
                   padding: '16px 18px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px'
                 }}>
-                  <Sparkles size={28} color="#d97706" />
+                  <Sparkles size={28} color="#854d0e" />
                   <div>
-                    <h3 style={{ margin: '0 0 2px 0', fontSize: '0.96rem', fontWeight: 950, color: '#92400e' }}>
+                    <h3 style={{ margin: '0 0 2px 0', fontSize: '0.96rem', fontWeight: 950, color: '#854d0e' }}>
                       Alle Sammel-Sticker gemeistert! 🌟
                     </h3>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#b45309', fontWeight: 800 }}>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#854d0e', fontWeight: 800 }}>
                       Herausragende Leistung! Dein musikalischer Fleiß ist legendär.
                     </p>
                   </div>
@@ -624,8 +624,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
               {/* Intro Banner */}
               <div style={{
-                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                border: '1.5px solid #bae6fd',
+                background: '#e0f2fe',
+                border: 'none',
                 borderRadius: '24px',
                 padding: isMobile ? '14px 16px' : '18px 20px',
                 display: 'flex',
@@ -639,7 +639,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     width: '44px',
                     height: '44px',
                     borderRadius: '14px',
-                    background: '#0284c7',
+                    background: '#0ea5e9',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
@@ -652,7 +652,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                     <h3 style={{ margin: '0 0 2px 0', fontSize: isMobile ? '0.94rem' : '1.05rem', fontWeight: 950, color: '#0369a1' }}>
                       Die 15-jährige Ausbildungs-Reise
                     </h3>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#0c4a6e', fontWeight: 700 }}>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#0369a1', fontWeight: 700 }}>
                       Zu jedem neuen Campus-Schuljahr erhältst du ein exklusives Wappen für deine musikalische Chronik.
                     </p>
                   </div>
@@ -660,8 +660,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
 
                 <span style={{
                   background: '#ffffff',
-                  border: '1px solid #7dd3fc',
-                  color: '#0284c7',
+                  border: 'none',
+                  color: '#0369a1',
                   fontSize: '0.72rem',
                   fontWeight: 950,
                   padding: '4px 12px',
@@ -687,14 +687,6 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                   const isLegendary = st.rarity === 'legendary';
                   const isEpic = st.rarity === 'epic';
                   const isRare = st.rarity === 'rare';
-
-                  const rarityGlow = isLegendary 
-                    ? 'rgba(250, 204, 21, 0.4)' 
-                    : isEpic 
-                    ? 'rgba(192, 132, 252, 0.35)' 
-                    : isRare 
-                    ? 'rgba(96, 165, 250, 0.3)' 
-                    : 'rgba(52, 168, 83, 0.3)';
 
                   return (
                     <div
@@ -753,8 +745,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             textTransform: 'uppercase',
                             padding: '2px 6px',
                             borderRadius: '100px',
-                            background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
-                            color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#475569'
+                            background: isLegendary ? '#fef9c3' : isEpic ? '#f3e8ff' : isRare ? '#dbeafe' : '#f1f5f9',
+                            color: isLegendary ? '#854d0e' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#475569'
                           }}>
                             {st.rarityLabel}
                           </span>
@@ -777,12 +769,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderRadius: '16px',
-                        background: isUnlocked 
-                          ? '#0a0e1a' 
-                          : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                        border: isUnlocked 
-                          ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #4ade80')
-                          : '1.5px dashed #cbd5e1',
+                        background: isUnlocked ? '#0f172a' : '#f1f5f9',
+                        border: isUnlocked ? 'none' : '1.5px dashed #cbd5e1',
                         boxShadow: 'none',
                         overflow: 'hidden',
                         padding: '3px'
@@ -828,7 +816,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             position: 'absolute',
                             bottom: '-2px',
                             right: '-2px',
-                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            background: '#f97316',
                             color: '#ffffff',
                             width: '20px',
                             height: '20px',
@@ -846,7 +834,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             position: 'absolute',
                             bottom: '-2px',
                             right: '-2px',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            background: '#10b981',
                             color: '#ffffff',
                             width: '20px',
                             height: '20px',
@@ -882,7 +870,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '3px',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            background: '#10b981',
                             color: '#ffffff',
                             fontSize: '0.62rem',
                             fontWeight: 950,
@@ -922,11 +910,11 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
           {juniorStickerCategory !== 'schuljahr' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '18px' : '24px', width: '100%' }}>
               {[
-                { id: 'ueben', title: '⏱️ Übe-Fleiß & Zeiterfolge', icon: Clock, iconColor: '#10b981' },
-                { id: 'xp', title: '⭐ Zauber-XP & Meilensteine', icon: Sparkles, iconColor: '#eab308' },
+                { id: 'ueben', title: '⏱️ Übe-Fleiß & Zeiterfolge', icon: Clock, iconColor: '#34a853' },
+                { id: 'xp', title: '⭐ Zauber-XP & Meilensteine', icon: Sparkles, iconColor: '#facc15' },
                 { id: 'streaks', title: '🔥 Übe-Streaks & Kontinuität', icon: Flame, iconColor: '#ef4444' },
-                { id: 'songs', title: '🎵 Repertoire & Meisterstücke', icon: Music, iconColor: '#8b5cf6' },
-                { id: 'spezial', title: '🏆 Spezial-Auszeichnungen & Bühne', icon: Star, iconColor: '#d97706' }
+                { id: 'songs', title: '🎵 Repertoire & Meisterstücke', icon: Music, iconColor: '#a855f7' },
+                { id: 'spezial', title: '🏆 Spezial-Auszeichnungen & Bühne', icon: Star, iconColor: '#f97316' }
               ]
                 .filter(cat => juniorStickerCategory === 'all' || cat.id === juniorStickerCategory)
                 .map(cat => {
@@ -954,7 +942,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                         </div>
 
                         <span style={{
-                          background: isCatComplete ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
+                          background: isCatComplete ? '#10b981' : '#f1f5f9',
                           border: isCatComplete ? 'none' : '1px solid #e2e8f0',
                           color: isCatComplete ? '#ffffff' : '#64748b',
                           fontSize: '0.66rem',
@@ -982,14 +970,6 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                           const isLegendary = st.rarity === 'legendary';
                           const isEpic = st.rarity === 'epic';
                           const isRare = st.rarity === 'rare';
-
-                          const rarityGlow = isLegendary 
-                            ? 'rgba(250, 204, 21, 0.45)' 
-                            : isEpic 
-                            ? 'rgba(192, 132, 252, 0.4)' 
-                            : isRare 
-                            ? 'rgba(96, 165, 250, 0.35)' 
-                            : 'rgba(16, 185, 129, 0.35)';
 
                           return (
                             <div
@@ -1033,9 +1013,9 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                 letterSpacing: '0.05em',
                                 padding: '2px 8px',
                                 borderRadius: '100px',
-                                background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
-                                color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#475569',
-                                border: isLegendary ? '1px solid #fde68a' : 'none'
+                                background: isLegendary ? '#fef9c3' : isEpic ? '#f3e8ff' : isRare ? '#dbeafe' : '#f1f5f9',
+                                color: isLegendary ? '#854d0e' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#475569',
+                                border: 'none'
                               }}>
                                 {st.rarityLabel}
                               </span>
@@ -1049,12 +1029,8 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 borderRadius: '16px',
-                                background: isUnlocked 
-                                  ? '#0a0e1a' 
-                                  : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                border: isUnlocked 
-                                  ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #4ade80')
-                                  : '1.5px dashed #cbd5e1',
+                                background: isUnlocked ? '#0f172a' : '#f1f5f9',
+                                border: isUnlocked ? 'none' : '1.5px dashed #cbd5e1',
                                 boxShadow: 'none',
                                 overflow: 'hidden',
                                 padding: '3px'
@@ -1101,7 +1077,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     position: 'absolute',
                                     bottom: '-2px',
                                     right: '-2px',
-                                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                    background: '#f97316',
                                     color: '#ffffff',
                                     width: '20px',
                                     height: '20px',
@@ -1119,7 +1095,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     position: 'absolute',
                                     bottom: '-2px',
                                     right: '-2px',
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    background: '#10b981',
                                     color: '#ffffff',
                                     width: '20px',
                                     height: '20px',
@@ -1155,7 +1131,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '3px',
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    background: '#10b981',
                                     color: '#ffffff',
                                     fontSize: '0.62rem',
                                     fontWeight: 950,
@@ -1172,12 +1148,12 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
                                     alignItems: 'center',
                                     gap: '3px',
                                     fontSize: '0.60rem',
-                                    color: '#b45309',
+                                    color: '#854d0e',
                                     fontWeight: 900,
-                                    background: '#fef3c7',
+                                    background: '#fef9c3',
                                     padding: '2px 6px',
                                     borderRadius: '100px',
-                                    border: '1px solid #fde68a',
+                                    border: 'none',
                                     maxWidth: '100%',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
@@ -1221,7 +1197,7 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
               padding: isMobile ? '14px' : '15px',
               borderRadius: '20px',
               border: 'none',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: '#f97316',
               color: '#ffffff',
               fontSize: isMobile ? '0.98rem' : '1.02rem',
               fontWeight: 950,

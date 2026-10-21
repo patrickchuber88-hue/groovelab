@@ -252,18 +252,18 @@ const DocumentStage: React.FC<{ doc: LegalDocumentDefinition; extraBadge?: strin
       {/* Title & Metadata Card */}
       <div style={{
         background: 'linear-gradient(180deg, #f0fdf4 0%, #f8fafc 100%)',
-        border: '1px solid #bbf7d0',
+        border: 'none',
         borderRadius: '16px',
         padding: '18px 20px',
         boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#ecfdf5', color: '#065f46', padding: '3px 10px', borderRadius: '100px', border: '1px solid #10b981' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#ecfdf5', color: '#065f46', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
               {doc.badge}
             </span>
             {extraBadge && (
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bae6fd' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                 {extraBadge}
               </span>
             )}
@@ -790,7 +790,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                     >
                       🧒 Für Schüler (Leichte Sprache)
                     </button>
-                    <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', border: '1px solid #16a34a', background: '#f0fdf4', color: '#166534' }}>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '5px 12px', borderRadius: '8px', border: 'none', background: '#f0fdf4', color: '#166534' }}>
                       👔 Vollständige Rechtsfassung
                     </span>
                   </div>
@@ -801,7 +801,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
 
             {activeTab === 'junior_privacy' && (
               <div role="tabpanel" id="legal-tabpanel-junior_privacy" aria-labelledby="legal-tab-junior_privacy" tabIndex={0} style={{ outline: 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', padding: '10px 14px', borderRadius: '12px', border: '1px solid #bbf7d0', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', padding: '10px 14px', borderRadius: '12px', border: 'none', marginBottom: '16px' }}>
                   <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#166534' }}>
                     🧒 Datenschutz für Kinder &amp; Jugendliche (Leichte Sprache gem. Art. 12 Abs. 1 DSGVO)
                   </span>

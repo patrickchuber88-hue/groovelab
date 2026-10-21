@@ -93,7 +93,7 @@ export const MicroScoreSnippetButton: React.FC<MicroScoreSnippetButtonProps> = (
         aria-label={hasSnippet ? `Noten-Schnipsel für ${taskTitle || 'Aufgabe'} öffnen (1–4 Takte)` : `Noten-Schnipsel für ${taskTitle || 'Aufgabe'} anlegen`}
         style={{
           border: hasSnippet ? 'none' : '1px solid #cbd5e1',
-          background: hasSnippet ? '#0f172a' : '#ffffff',
+          background: hasSnippet ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#ffffff',
           color: hasSnippet ? '#ffffff' : '#64748b',
           borderRadius: '99px',
           width: badgeSize,
@@ -106,7 +106,7 @@ export const MicroScoreSnippetButton: React.FC<MicroScoreSnippetButtonProps> = (
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'all 0.15s ease',
-          boxShadow: hasSnippet ? '0 2px 5px rgba(15, 23, 42, 0.18)' : '0 1px 2px rgba(0,0,0,0.02)',
+          boxShadow: hasSnippet ? '0 2px 8px rgba(79, 70, 229, 0.40)' : '0 1px 2px rgba(0,0,0,0.02)',
           touchAction: 'manipulation',
           flexShrink: 0,
           userSelect: 'none',

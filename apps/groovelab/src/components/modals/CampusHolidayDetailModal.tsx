@@ -242,7 +242,7 @@ export const CampusHolidayDetailModal: React.FC<CampusHolidayDetailModalProps> =
             padding: '12px 16px',
             borderRadius: '14px',
             background: '#fefce8',
-            border: '1px solid #fef08a'
+            border: 'none'
           }}>
             <Sparkles size={18} color="#ca8a04" style={{ flexShrink: 0 }} />
             <div style={{ fontSize: '0.78rem', color: '#854d0e', lineHeight: 1.4 }}>

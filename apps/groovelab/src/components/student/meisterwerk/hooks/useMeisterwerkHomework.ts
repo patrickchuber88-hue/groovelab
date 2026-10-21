@@ -27,78 +27,27 @@ import { parseHomeworkNotesPayload } from '../../../../utils/homeworkSnapshotHel
 import { syncSingleBookPageFromMeisterwerk } from '../../../../services/homeworkSyncEngine';
 
 export interface UseMeisterwerkHomeworkParams {
-  student: Student;
-  readOnly: boolean;
-  activeItem: any;
-  topicName: string;
-  setTopicName: (val: string) => void;
-  status: string;
-  setStatus: (status: any) => void;
-  isCurrentHomework: boolean;
-  setIsCurrentHomework: (val: boolean) => void;
-  activeInputTab: string;
-  setActiveInputTab: (tab: any) => void;
-  activeSubView: string;
-  setActiveSubView: (view: any) => void;
-  activeLehrwerkId: string | null;
-  activePageNumber: number | null;
-  selectedActiveSongId: string | null;
-  songProgressPercent?: number;
-  assignedLehrwerke: any[];
-  setAssignedLehrwerke: (arr: any[]) => void;
-  globalLehrwerke: any[];
-  progressItems: any[];
-  setProgressItems: React.Dispatch<React.SetStateAction<any[]>>;
-  activeSongSkills: any[];
-  setActiveSongSkills: React.Dispatch<React.SetStateAction<any[]>>;
-  fetchProgress: () => Promise<void>;
-  loadLehrwerke: () => Promise<void>;
-  loadActiveSongSkills: () => Promise<void>;
-  notifyHomeworkChange: () => void;
-  getCurrentTeacherId: () => Promise<string | null>;
-  effectiveGroupStudents: any[];
-  setShowMatchConfetti: (val: boolean) => void;
-  setStudentNotesSavedToast: (val: boolean) => void;
-  getLehrwerkColor: (title: string) => any;
-  getItemWeek: (item: any) => string;
+  student: Student; readOnly: boolean; activeItem: any; topicName: string; setTopicName: (val: string) => void;
+  status: string; setStatus: (status: any) => void; isCurrentHomework: boolean; setIsCurrentHomework: (val: boolean) => void;
+  activeInputTab: string; setActiveInputTab: (tab: any) => void; activeSubView: string; setActiveSubView: (view: any) => void;
+  activeLehrwerkId: string | null; activePageNumber: number | null; selectedActiveSongId: string | null; songProgressPercent?: number;
+  assignedLehrwerke: any[]; setAssignedLehrwerke: (arr: any[]) => void; globalLehrwerke: any[];
+  progressItems: any[]; setProgressItems: React.Dispatch<React.SetStateAction<any[]>>;
+  activeSongSkills: any[]; setActiveSongSkills: React.Dispatch<React.SetStateAction<any[]>>;
+  fetchProgress: () => Promise<void>; loadLehrwerke: () => Promise<void>; loadActiveSongSkills: () => Promise<void>;
+  notifyHomeworkChange: () => void; getCurrentTeacherId: () => Promise<string | null>;
+  effectiveGroupStudents: any[]; setShowMatchConfetti: (val: boolean) => void; setStudentNotesSavedToast: (val: boolean) => void;
+  getLehrwerkColor: (title: string) => any; getItemWeek: (item: any) => string;
 }
 
 export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => {
   const {
-    student,
-    readOnly,
-    activeItem,
-    topicName,
-    setTopicName,
-    status,
-    setStatus,
-    isCurrentHomework,
-    setIsCurrentHomework,
-    activeInputTab,
-    setActiveInputTab,
-    activeSubView,
-    setActiveSubView,
-    activeLehrwerkId,
-    activePageNumber,
-    selectedActiveSongId,
-    songProgressPercent,
-    assignedLehrwerke,
-    setAssignedLehrwerke,
-    globalLehrwerke,
-    progressItems,
-    setProgressItems,
-    activeSongSkills,
-    setActiveSongSkills,
-    fetchProgress,
-    loadLehrwerke,
-    loadActiveSongSkills,
-    notifyHomeworkChange,
-    getCurrentTeacherId,
-    effectiveGroupStudents,
-    setShowMatchConfetti,
-    setStudentNotesSavedToast,
-    getLehrwerkColor,
-    getItemWeek
+    student, readOnly, activeItem, topicName, setTopicName, status, setStatus, isCurrentHomework, setIsCurrentHomework,
+    activeInputTab, setActiveInputTab, activeSubView, setActiveSubView, activeLehrwerkId, activePageNumber,
+    selectedActiveSongId, songProgressPercent, assignedLehrwerke, setAssignedLehrwerke, globalLehrwerke,
+    progressItems, setProgressItems, activeSongSkills, setActiveSongSkills, fetchProgress, loadLehrwerke,
+    loadActiveSongSkills, notifyHomeworkChange, getCurrentTeacherId, effectiveGroupStudents, setShowMatchConfetti,
+    setStudentNotesSavedToast, getLehrwerkColor, getItemWeek
   } = params;
 
   // Calendar week navigation state
@@ -124,50 +73,75 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
     latestTeacherNotesRef.current = teacherNotes;
   }, [teacherNotes]);
 
-  // 🏛️ Tier-1 Hydration of generalHomeworkNotes from current week's snapshot or local cache
+  // 🏛️ Tier-1 Hydration of generalHomeworkNotes and homeworkNotesList from current week's snapshot or local cache
   useEffect(() => {
     if (!student?.id) return;
     if (viewingWeekOffset !== 0) return;
 
-    if (!generalHomeworkNotes.trim()) {
-      const currentIso = getTargetWeekIso(0);
-      const currentWeekNum = currentIso.split('-W')[1] || '';
+    const currentIso = getTargetWeekIso(0);
+    const currentWeekNum = currentIso.split('-W')[1] || '';
 
-      // 1. From progressItems (DB SSOT)
-      const curItem = (progressItems || []).find((item: any) => {
-        if (!item?.topic_name?.startsWith('Hausaufgabe KW ')) return false;
-        const itW = getItemWeek(item);
-        if (itW && itW === currentIso) return true;
-        if (item.updated_at && getISOWeek(item.updated_at) === currentIso) return true;
-        if (currentWeekNum && item.topic_name.includes(`KW ${currentWeekNum}`)) return true;
-        return false;
-      });
+    // 1. From progressItems (DB SSOT)
+    const curItem = (progressItems || []).find((item: any) => {
+      if (!item?.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+      const itW = getItemWeek(item);
+      if (itW && itW === currentIso) return true;
+      if (item.updated_at && getISOWeek(item.updated_at) === currentIso) return true;
+      if (currentWeekNum && item.topic_name.includes(`KW ${currentWeekNum}`)) return true;
+      return false;
+    });
 
-      if (curItem?.homework_notes) {
-        try {
-          const parsed = parseHomeworkNotesPayload(curItem.homework_notes);
-          if (parsed.didacticNotes.length > 0) {
-            const joined = parsed.didacticNotes.join('\n\n');
-            setGeneralHomeworkNotes(joined);
-            latestGeneralHomeworkNotesRef.current = joined;
-            return;
-          }
-        } catch {}
+    let rawNotesArray: string[] = [];
+    if (curItem?.homework_notes) {
+      try {
+        if (typeof curItem.homework_notes === 'string') {
+          const p = JSON.parse(curItem.homework_notes);
+          if (Array.isArray(p)) rawNotesArray = p;
+          else rawNotesArray = [curItem.homework_notes];
+        } else if (Array.isArray(curItem.homework_notes)) {
+          rawNotesArray = curItem.homework_notes;
+        }
+      } catch {
+        rawNotesArray = [String(curItem.homework_notes)];
       }
+    }
 
-      // 2. From L1 Cache (localStorage)
+    // 2. From L1 Cache (localStorage fallback)
+    if (rawNotesArray.length === 0) {
       try {
         const raw = localStorage.getItem(`campus_homework_notes_${student.id}`);
         if (raw) {
-          const parsed = parseHomeworkNotesPayload(raw);
+          const p = JSON.parse(raw);
+          if (Array.isArray(p)) rawNotesArray = p;
+          else rawNotesArray = [raw];
+        }
+      } catch {}
+    }
+
+    if (rawNotesArray.length > 0) {
+      setHomeworkNotesList(prev => {
+        if (!prev || prev.length === 0) {
+          return rawNotesArray;
+        }
+        const updated = [...prev];
+        rawNotesArray.forEach(rn => {
+          if (typeof rn === 'string' && (rn.includes('AUDIO:') || rn.startsWith('SNAPSHOT_'))) {
+            if (!updated.includes(rn)) updated.push(rn);
+          }
+        });
+        return updated;
+      });
+
+      if (!generalHomeworkNotes.trim()) {
+        try {
+          const parsed = parseHomeworkNotesPayload(rawNotesArray);
           if (parsed.didacticNotes.length > 0) {
             const joined = parsed.didacticNotes.join('\n\n');
             setGeneralHomeworkNotes(joined);
             latestGeneralHomeworkNotesRef.current = joined;
-            return;
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
   }, [student?.id, viewingWeekOffset, progressItems]);
 
@@ -688,6 +662,45 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       if (sourceTransferData.sourceS.length > 0) {
         finalNotesList.push(`SNAPSHOT_SONGS:${JSON.stringify(sourceTransferData.sourceS)}`);
       }
+
+      // 🛡️ 0.1% Goldstandard Safe-Merge: Vorhandene Audio- & Snapshot-Tokens aus progress_matrix niemals verlieren
+      const targetWeekIso = getTargetWeekIso(viewingWeekOffset);
+      const existingWeeklyItem = progressItems.find(item =>
+        item.topic_name.startsWith('Hausaufgabe KW ') &&
+        getItemWeek(item) === targetWeekIso
+      );
+      if (existingWeeklyItem && existingWeeklyItem.homework_notes) {
+        try {
+          const rawExisting = existingWeeklyItem.homework_notes;
+          let existingArr: string[] = [];
+          if (typeof rawExisting === 'string') {
+            try { existingArr = JSON.parse(rawExisting); } catch { existingArr = [rawExisting]; }
+          } else if (Array.isArray(rawExisting)) {
+            existingArr = rawExisting;
+          }
+          if (Array.isArray(existingArr)) {
+            existingArr.forEach(exNote => {
+              if (typeof exNote === 'string' && exNote.includes('AUDIO:')) {
+                const exParts = exNote.substring(exNote.indexOf('AUDIO:') + 6).split('|');
+                const exUrl = exParts[0]?.trim();
+                const alreadyPresent = finalNotesList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(exUrl));
+                if (!alreadyPresent && exUrl) {
+                  finalNotesList.push(exNote);
+                }
+              } else if (typeof exNote === 'string' && (exNote.startsWith('SNAPSHOT_LEHRWERKE:') || exNote.startsWith('SNAPSHOT_SONGS:'))) {
+                const prefix = exNote.startsWith('SNAPSHOT_LEHRWERKE:') ? 'SNAPSHOT_LEHRWERKE:' : 'SNAPSHOT_SONGS:';
+                const alreadyHasSnap = finalNotesList.some(m => typeof m === 'string' && m.startsWith(prefix));
+                if (!alreadyHasSnap) {
+                  finalNotesList.push(exNote);
+                }
+              }
+            });
+          }
+        } catch (mergeErr) {
+          console.warn('[handleSave] Safe-merge notice:', mergeErr);
+        }
+      }
+      setHomeworkNotesList(finalNotesList);
     }
     const combinedHomeworkNotes = JSON.stringify(finalNotesList);
 

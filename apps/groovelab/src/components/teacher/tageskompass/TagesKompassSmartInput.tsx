@@ -241,7 +241,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             background: '#fef2f2',
-            border: '1.5px solid #f87171',
+            border: 'none',
             borderRadius: '16px',
             padding: '8px 14px',
             minHeight: '48px',

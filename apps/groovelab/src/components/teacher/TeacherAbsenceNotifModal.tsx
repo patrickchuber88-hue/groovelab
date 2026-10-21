@@ -205,7 +205,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                     background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
-                    border: '2px solid #fecaca',
+                    border: 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '0.85rem', fontWeight: 800, color: '#dc2626',
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
@@ -230,7 +230,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
                   <span style={{
                     fontSize: '0.65rem', fontWeight: 800, padding: '3px 10px',
                     borderRadius: '100px', background: '#fef2f2', color: '#dc2626',
-                    border: '1px solid #fecaca', whiteSpace: 'nowrap',
+                    border: 'none', whiteSpace: 'nowrap',
                   }}>Storno</span>
                 </div>
               );

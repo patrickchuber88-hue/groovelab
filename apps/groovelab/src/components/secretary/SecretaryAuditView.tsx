@@ -199,7 +199,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
               Gelöschte Stammdaten:
             </span>
             {validEntries.map(({ key, label, valStr }) => (
-              <div key={key} style={{ fontSize: '0.72rem', color: '#64748b', background: '#fef2f2', border: '1px solid #fecaca', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex', gap: '4px' }}>
+              <div key={key} style={{ fontSize: '0.72rem', color: '#64748b', background: '#fef2f2', border: 'none', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex', gap: '4px' }}>
                 <span>{label}:</span>
                 <span style={{ textDecoration: 'line-through' }}>{valStr}</span>
               </div>
@@ -393,7 +393,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                   padding: '8px 14px',
                   borderRadius: '10px',
                   background: '#fff1f2',
-                  border: '1px solid #fecdd3',
+                  border: 'none',
                   color: '#be123c',
                   cursor: 'pointer',
                   fontWeight: 750
@@ -669,7 +669,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                         {/* Statutory Countdown / Status Badge */}
                         <div>
                           {req.status === 'completed' && (
-                            <div style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #10b981', padding: '4px 10px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <div style={{ background: '#ecfdf5', color: '#059669', border: 'none', padding: '4px 10px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                               <CheckCircle2 size={13} /> Erledigt am {new Date(req.completed_at || req.created_at).toLocaleDateString('de-DE')}
                             </div>
                           )}
@@ -680,15 +680,15 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                           )}
                           {req.status === 'pending' && (
                             daysLeft > 14 ? (
-                              <div style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #10b981', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ background: '#ecfdf5', color: '#059669', border: 'none', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <Clock size={14} /> Noch {daysLeft} Tage Frist (Fristgerecht)
                               </div>
                             ) : daysLeft >= 4 ? (
-                              <div style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ background: '#fef3c7', color: '#b45309', border: 'none', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <AlertTriangle size={14} /> Noch {daysLeft} Tage Frist (Dringend)
                               </div>
                             ) : (
-                              <div style={{ background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <div style={{ background: '#fee2e2', color: '#b91c1c', border: 'none', padding: '5px 12px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <AlertTriangle size={14} /> {daysLeft <= 0 ? 'Frist abgelaufen (Art. 12 Abs. 3 DSGVO)' : `Noch ${daysLeft} Tage Frist (Kritisch!)`}
                               </div>
                             )

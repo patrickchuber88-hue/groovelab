@@ -45,7 +45,7 @@ export function useNetworkProfile(): UseNetworkProfileResult {
   // Derive 1% Senior UX badge attributes
   let badgeText = 'WLAN • Studio (320k)';
   let badgeSubtext = 'Volle Dynamik';
-  let badgeColor = '#22c55e'; // Green
+  let badgeColor = '#34a853'; // Campus-Grün
 
   if (!profile.isOnline) {
     badgeText = 'Offline-Tresor';
@@ -58,7 +58,7 @@ export function useNetworkProfile(): UseNetworkProfileResult {
   } else if (profile.tier === 'cellular_fast') {
     badgeText = 'Mobilfunk • Smart-Audio (128k)';
     badgeSubtext = 'Spart 60% Daten • Upload im WLAN';
-    badgeColor = '#eab308'; // Yellow/Gold
+    badgeColor = '#facc15'; // GrooveLab-Gelb
   }
 
   return {

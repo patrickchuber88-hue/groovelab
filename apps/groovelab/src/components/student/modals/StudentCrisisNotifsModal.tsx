@@ -181,14 +181,14 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
           aria-label={isReinstated ? "Unterrichtsteilnahme bestätigen" : "Ausfall zur Kenntnis nehmen"}
           style={{
             background: isReinstated
-              ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+              ? '#34a853'
               : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
             color: 'white', border: 'none', borderRadius: '16px',
             padding: '16px', fontWeight: 900, fontSize: '0.88rem',
             cursor: isSubmitting ? 'not-allowed' : 'pointer',
             fontFamily: '"Outfit", "Inter", sans-serif',
             boxShadow: isReinstated
-              ? '0 6px 20px rgba(34, 197, 94, 0.3)'
+              ? '0 6px 20px rgba(52, 168, 83, 0.3)'
               : '0 6px 20px rgba(239, 68, 68, 0.25)',
             transition: 'transform 0.2s, box-shadow 0.2s, opacity 0.2s',
             opacity: isSubmitting ? 0.75 : 1,

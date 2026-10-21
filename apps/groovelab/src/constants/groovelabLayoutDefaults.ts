@@ -37,10 +37,10 @@ export const CANONICAL_GROOVELAB_STUDIO_ROOM: CanonicalRoomRecord = {
 };
 
 export const CANONICAL_GROOVELAB_STUDIO_STATIONS: CanonicalStationRecord[] = [
-  { id: 'canonical-ipad-1', name: 'iPad 1', instrument: 'Drums', color: '#eab308', pos_x: 39, pos_y: 75, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
+  { id: 'canonical-ipad-1', name: 'iPad 1', instrument: 'Drums', color: '#facc15', pos_x: 39, pos_y: 75, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
   { id: 'canonical-ipad-2', name: 'iPad 2', instrument: 'Guitar', color: '#ef4444', pos_x: 29, pos_y: 50, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
   { id: 'canonical-ipad-3', name: 'iPad 3', instrument: 'Keys', color: '#a855f7', pos_x: 18, pos_y: 25, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
-  { id: 'canonical-ipad-4', name: 'iPad 4', instrument: 'Bass', color: '#eab308', pos_x: 39, pos_y: 25, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
+  { id: 'canonical-ipad-4', name: 'iPad 4', instrument: 'Bass', color: '#facc15', pos_x: 39, pos_y: 25, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
   { id: 'canonical-ipad-5', name: 'iPad 5', instrument: 'Vocals', color: '#34a853', pos_x: 61, pos_y: 25, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
   { id: 'canonical-ipad-6', name: 'iPad 6', instrument: 'Guitar', color: '#ef4444', pos_x: 82, pos_y: 25, room_id: 'canonical-groovelab-studio', is_canonical_default: true },
   { id: 'canonical-ipad-7', name: 'iPad 7', instrument: 'Keys', color: '#a855f7', pos_x: 71, pos_y: 50, room_id: 'canonical-groovelab-studio', is_canonical_default: true },

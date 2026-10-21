@@ -61,6 +61,7 @@ export interface TeacherDashboardProps {
   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
   wallSongs?: any[];
   rehearsalSuggestions?: any[];
+  onLockRoom?: () => void;
 }
 
 export function TeacherDashboard({ 
@@ -84,21 +85,52 @@ export function TeacherDashboard({
   activePlatform: propsActivePlatform,
   onSwitchPlatform,
   wallSongs: propsWallSongs,
-  rehearsalSuggestions: propsRehearsalSuggestions
+  rehearsalSuggestions: propsRehearsalSuggestions,
+  onLockRoom
 }: TeacherDashboardProps) {
-  const activePlatform: 'campus' | 'groovelab' = (propsActivePlatform === 'groovelab' || (typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab')) ? 'groovelab' : 'campus';
+  const activePlatform: 'campus' | 'groovelab' = propsActivePlatform
+    ? (propsActivePlatform === 'groovelab' ? 'groovelab' : 'campus')
+    : ((typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab') ? 'groovelab' : 'campus');
   
-  // Layout & Viewport state
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  // Layout & Viewport state (Simulator-aware for In-DOM & Iframe modes)
+  const resolveTeacherViewportWidth = () => {
+    if (typeof window === 'undefined') return 1200;
+    if (typeof document !== 'undefined') {
+      const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simWidth > 0) return simWidth;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    }
+    return window.innerWidth;
+  };
+  const resolveTeacherViewportHeight = () => {
+    if (typeof window === 'undefined') return 800;
+    if (typeof document !== 'undefined') {
+      const simHeight = Number(document.documentElement.getAttribute('data-sim-height'));
+      if (simHeight > 0) return simHeight;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientHeight > 0) return simEl.clientHeight;
+    }
+    return window.innerHeight;
+  };
+  const [windowWidth, setWindowWidth] = useState(resolveTeacherViewportWidth);
+  const [windowHeight, setWindowHeight] = useState(resolveTeacherViewportHeight);
   const [containerWidth, setContainerWidth] = useState(1000);
-  const isMobileDevice = windowWidth <= 768;
+  const isSimTablet = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'tablet' ||
+    Boolean(document.querySelector('.sim-viewport-tablet'))
+  );
+  const isSimMobile = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'mobile' ||
+    Boolean(document.querySelector('.sim-viewport-mobile'))
+  );
+  const isMobileDevice = isSimMobile || (!isSimTablet && windowWidth <= 768);
   const [showMediaLibraryModal, setShowMediaLibraryModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
+      setWindowWidth(resolveTeacherViewportWidth());
+      setWindowHeight(resolveTeacherViewportHeight());
       const containerElem = document.querySelector('.live-lab-grid') || document.querySelector('.blueprint-viewport');
       if (containerElem) {
         setContainerWidth((containerElem as HTMLDivElement).offsetWidth || 1000);
@@ -106,10 +138,12 @@ export function TeacherDashboard({
     };
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
     handleResize();
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
     };
   }, []);
 
@@ -170,6 +204,26 @@ export function TeacherDashboard({
       setActiveTabRaw(initialTab);
     }
   }, [initialTab]);
+
+  // 🚀 DOM Keep-Alive & Idle Pre-Warming for 0ms Briefing ⇄ Live Lab switching
+  const [hasVisitedBriefing, setHasVisitedBriefing] = useState(activeTab === 'briefing');
+  const [hasVisitedLive, setHasVisitedLive] = useState(activeTab === 'live');
+  useEffect(() => {
+    if (activeTab === 'briefing' && !hasVisitedBriefing) setHasVisitedBriefing(true);
+    if (activeTab === 'live' && !hasVisitedLive) setHasVisitedLive(true);
+  }, [activeTab, hasVisitedBriefing, hasVisitedLive]);
+
+  useEffect(() => {
+    const preload = () => {
+      import('./teacher/TeacherLiveView').catch(() => {});
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback(preload, { timeout: 2000 });
+      return () => (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleId);
+    }
+    const timerId = setTimeout(preload, 1200);
+    return () => clearTimeout(timerId);
+  }, []);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -453,16 +507,13 @@ export function TeacherDashboard({
   }, [data.teacher]);
 
   const teacherBriefingAvatarSrc = useMemo(() => {
-    if (activePlatform === 'groovelab') {
-      return resolveGrooveLabTeacherAvatar(data.teacher);
-    }
     return resolveCampusStudentAvatar({ 
       ...(data.teacher || {}), 
       role: 'teacher', 
       isTeacherContext: true,
       instrument: data.teacher?.instrument || 'Gitarre'
     });
-  }, [activePlatform, data.teacher]);
+  }, [data.teacher]);
 
   const handleToggleTeacherBriefingSidebar = useCallback((collapsed: boolean) => {
     data.setIsTeacherBriefingSidebarCollapsed(collapsed);
@@ -478,8 +529,8 @@ export function TeacherDashboard({
       color: '#0f172a',
       fontFamily: "'Plus Jakarta Sans', sans-serif"
     }}>
-      {/* Dashboard Top Header Navigation */}
-      {!hideHeader && (
+      {/* Dashboard Top Header Navigation (Desktop Only - Mobile uses GeminiMobileShell) */}
+      {!hideHeader && !isMobileDevice && (
         <TeacherDashboardHeader
           activePlatform={activePlatform}
           schoolName={data.schoolData?.name}
@@ -490,6 +541,10 @@ export function TeacherDashboard({
           onOpenCommandPalette={() => setShowCommandPalette(true)}
           teacher={data.teacher}
           onOpenMediaLibrary={() => setShowMediaLibraryModal(true)}
+          onLockRoom={onLockRoom || (() => {
+            sessionStorage.setItem('campus_locked_at', String(Date.now()));
+            window.location.reload();
+          })}
         />
       )}
 
@@ -499,7 +554,7 @@ export function TeacherDashboard({
         maxWidth: '1600px',
         width: '100%',
         margin: '0 auto',
-        padding: hideHeader ? '8px 16px 24px 16px' : '24px 24px 80px 24px',
+        padding: isMobileDevice ? '8px 8px 24px 8px' : (hideHeader ? '8px 16px 24px 16px' : '24px 24px 80px 24px'),
         boxSizing: 'border-box'
       }}>
         {/* ⏳ 0,1% Goldstandard: 15-Minuten-Grace-Period Banner für Lehrkraft */}
@@ -510,193 +565,201 @@ export function TeacherDashboard({
           isSubmitting={absence.submittingAbsence}
         />
 
-        {activeTab === 'briefing' ? (
-          <TeacherBriefingTab
-            userId={userId}
-            teacher={data.teacher}
-            schoolData={data.schoolData}
-            activePlatform={activePlatform}
-            isMobileDevice={isMobileDevice}
-            windowWidth={windowWidth}
-            isTeacherBriefingSidebarCollapsed={data.isTeacherBriefingSidebarCollapsed}
-            handleToggleTeacherBriefingSidebar={handleToggleTeacherBriefingSidebar}
-            hasTeacherAppointmentAlerts={bookings.hasTeacherAppointmentAlerts}
-            hasTeacherFeedAlerts={bookings.hasTeacherFeedAlerts}
-            teacherSidebarTotalAlertsCount={bookings.teacherSidebarTotalAlertsCount}
-            briefingLoading={false}
-            briefingData={tagesplan.briefingData}
-            activePlanningEvents={[]}
-            dismissedBanners={dismissedBanners}
-            setDismissedBanners={setDismissedBanners}
-            isTodayHoliday={bookings.isTodayHoliday}
-            isTeacherCurrentlyAbsent={absence.activeAbsenceCancellations.length > 0}
-            bypassAbsenceView={bypassAbsenceView}
-            setBypassAbsenceView={setBypassAbsenceView}
-            handleEndAbsence={absence.handleEndAbsence}
-            submittingAbsence={absence.submittingAbsence}
-            totalAbsenceCancellationsCount={absence.totalAbsenceCancellationsCount}
-            unreadCancellationsCount={absence.unreadCancellationsCount}
-            setShowAbsenceOverviewModal={absence.setShowAbsenceOverviewModal}
-            setShowAbsenceModal={absence.setShowAbsenceModal}
-            resolvedTeacherFullName={resolvedTeacherFullName}
-            teacherBriefingAvatarSrc={teacherBriefingAvatarSrc}
-            activeMakeupTokens={absence.activeMakeupTokens}
-            showRealNames={students.showRealNames}
-            toggleRealNames={students.toggleRealNames}
-            setSelectedMakeupToken={absence.setSelectedMakeupToken}
-            setSelectedMakeupSlot={absence.setSelectedMakeupSlot}
-            setMakeupModalMode={absence.setMakeupModalMode}
-            setIsMakeupModalOpen={absence.setIsMakeupModalOpen}
-            activeChatOcc={tagesplan.activeChatOcc}
-            setActiveChatOcc={tagesplan.setActiveChatOcc}
-            activeChatOccIds={tagesplan.activeChatOccIds}
-            unreadChatOccIds={tagesplan.unreadChatOccIds}
-            docStudent={students.modalDocStudent}
-            setDocStudent={students.setDocStudent}
-            allStudents={students.allStudents}
-            isAbsenceWidgetExpanded={false}
-            setIsAbsenceWidgetExpanded={() => {}}
-            absenceStartDate={absence.absenceStartDate}
-            setAbsenceStartDate={absence.setAbsenceStartDate}
-            absenceUntilDate={absence.absenceUntilDate}
-            setAbsenceUntilDate={absence.setAbsenceUntilDate}
-            setQuickAbsencePreset={absence.setQuickAbsencePreset}
-            currentTimeStr={currentTimeStr}
-            quickAudioStudent={tagesplan.quickAudioStudent}
-            setQuickAudioStudent={tagesplan.setQuickAudioStudent}
-            loadingPrepMirror={loadingPrepMirror}
-            activeTimelineSlotRef={{ current: null }}
-            relevantRoomIssuesToday={tagesplan.tagesplanRoomIssues}
-            teacherTodayRooms={tagesplan.teacherTodayRooms}
-            isFreeDay={isFreeDay}
-            isWeekend={isWeekend}
-            isTourDemoScheduleActive={false}
-            urgentCancellations={absence.urgentCancellations}
-            setIsUrgentModalOpen={absence.setIsUrgentModalOpen}
-            handleResolveRoomIssueInTagesplan={tagesplan.handleResolveRoomIssueInTagesplan}
-            handleUpdateIssueRoomInTagesplan={tagesplan.handleUpdateIssueRoomInTagesplan}
-            leftColumnTab={leftColumnTab}
-            setLeftColumnTab={setLeftColumnTab}
-            onTabChange={setActiveTab}
-            activeStudent={activeStudent}
-            activeGroupStudents={activeGroupStudents}
-            selectedGroupStudentId={selectedGroupStudentId}
-            setSelectedGroupStudentId={setSelectedGroupStudentId}
-            selectedStudentProfile={students.selectedStudentProfile}
-            setSelectedStudentProfile={students.setSelectedStudentProfile}
-            dynamicPrepMirror={dynamicPrepMirror}
-            setDynamicPrepMirror={setDynamicPrepMirror}
-            setLoadingPrepMirror={setLoadingPrepMirror}
-            firstSlotStartStr={firstSlotStartStr}
-            widgetState={widgetState}
-            startTour={startTour}
-            rooms={data.rooms}
-            holidays={bookings.holidays}
-            myBookings={bookings.myBookings}
-            myChangedAppointments={bookings.myChangedAppointments}
-            showAllChangedAppointments={bookings.showAllChangedAppointments}
-            setShowAllChangedAppointments={bookings.setShowAllChangedAppointments}
-            showAllBookings={bookings.showAllBookings}
-            setShowAllBookings={bookings.setShowAllBookings}
-            adminFeedbackRequests={feed.adminFeedbackRequests}
-            adminFeedbackResponses={feed.adminFeedbackResponses}
-            campusFeedAnnouncements={feed.campusFeedAnnouncements}
-            feedInteractions={feed.feedInteractions}
-            teacherFeedTab={feed.teacherFeedTab}
-            setTeacherFeedTab={feed.setTeacherFeedTab}
-            classFeedPosts={feed.classFeedPosts}
-            classFeedInteractions={feed.classFeedInteractions}
-            respondingToRequestId={feed.respondingToRequestId}
-            setRespondingToRequestId={feed.setRespondingToRequestId}
-            questionnaireAnswers={feed.questionnaireAnswers}
-            setQuestionnaireAnswers={feed.setQuestionnaireAnswers}
-            submittingFeedback={feed.submittingFeedback}
-            adminFeedbackTab={feed.adminFeedbackTab}
-            setAdminFeedbackTab={feed.setAdminFeedbackTab}
-            planningEvents={[]}
-            mySubmittedProgramPoints={[]}
-            visibleChangedAppointments={bookings.visibleChangedAppointments}
-            handleBookingClick={bookings.handleBookingClick}
-            handleDeleteMyBooking={bookings.handleDeleteMyBooking}
-            handleMarkRequestAsDone={feed.handleMarkRequestAsDone}
-            handleReactToPost={feed.handleReactToPost}
-            handleSubmitFeedbackResponse={feed.handleSubmitFeedbackResponse}
-            getCountdownString={bookings.getCountdownString}
-            setMyChangedAppointments={bookings.setMyChangedAppointments}
-            todayTagesplanStudents={tagesplan.todayTagesplanStudents}
-            activeTimelineSlot={tagesplan.activeTimelineSlot}
-            setShowNotesDrawer={setShowNotesDrawer}
-          />
-        ) : activeTab === 'live' ? (
-          <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Live Lab wird geladen...</div>}>
-            <TeacherLiveView
-              teacher={data.teacher}
+        {(hasVisitedBriefing || activeTab === 'briefing') && (
+          <div style={{ display: activeTab === 'briefing' ? 'block' : 'none', width: '100%' }}>
+            <TeacherBriefingTab
               userId={userId}
-              viewMode={viewMode}
+              teacher={data.teacher}
+              schoolData={data.schoolData}
               activePlatform={activePlatform}
-              hideHeader={hideHeader}
+              isMobileDevice={isMobileDevice}
               windowWidth={windowWidth}
-              windowHeight={windowHeight}
-              containerWidth={containerWidth}
-              containerRef={containerRef}
+              isTeacherBriefingSidebarCollapsed={data.isTeacherBriefingSidebarCollapsed}
+              handleToggleTeacherBriefingSidebar={handleToggleTeacherBriefingSidebar}
+              hasTeacherAppointmentAlerts={bookings.hasTeacherAppointmentAlerts}
+              hasTeacherFeedAlerts={bookings.hasTeacherFeedAlerts}
+              teacherSidebarTotalAlertsCount={bookings.teacherSidebarTotalAlertsCount}
+              briefingLoading={false}
+              briefingData={tagesplan.briefingData}
+              activePlanningEvents={[]}
+              dismissedBanners={dismissedBanners}
+              setDismissedBanners={setDismissedBanners}
+              isTodayHoliday={bookings.isTodayHoliday}
+              isTeacherCurrentlyAbsent={absence.activeAbsenceCancellations.length > 0}
+              bypassAbsenceView={bypassAbsenceView}
+              setBypassAbsenceView={setBypassAbsenceView}
+              handleEndAbsence={absence.handleEndAbsence}
+              submittingAbsence={absence.submittingAbsence}
+              totalAbsenceCancellationsCount={absence.totalAbsenceCancellationsCount}
+              unreadCancellationsCount={absence.unreadCancellationsCount}
+              setShowAbsenceOverviewModal={absence.setShowAbsenceOverviewModal}
+              setShowAbsenceModal={absence.setShowAbsenceModal}
+              resolvedTeacherFullName={resolvedTeacherFullName}
+              teacherBriefingAvatarSrc={teacherBriefingAvatarSrc}
+              activeMakeupTokens={absence.activeMakeupTokens}
               showRealNames={students.showRealNames}
-              rooms={data.rooms}
-              selectedRoomId={data.selectedRoomId}
-              setSelectedRoomId={data.setSelectedRoomId}
-              stations={data.stations} isSyncing={data.isSyncing}
-              activeSessions={data.activeSessions}
-              setActiveSessions={data.setActiveSessions}
-              coaches={data.coaches}
-              setSelectedCoachProfile={data.setSelectedCoachProfile}
+              toggleRealNames={students.toggleRealNames}
+              setSelectedMakeupToken={absence.setSelectedMakeupToken}
+              setSelectedMakeupSlot={absence.setSelectedMakeupSlot}
+              setMakeupModalMode={absence.setMakeupModalMode}
+              setIsMakeupModalOpen={absence.setIsMakeupModalOpen}
+              activeChatOcc={tagesplan.activeChatOcc}
+              setActiveChatOcc={tagesplan.setActiveChatOcc}
+              activeChatOccIds={tagesplan.activeChatOccIds}
+              unreadChatOccIds={tagesplan.unreadChatOccIds}
+              docStudent={students.modalDocStudent}
+              setDocStudent={students.setDocStudent}
+              allStudents={students.allStudents}
+              isAbsenceWidgetExpanded={false}
+              setIsAbsenceWidgetExpanded={() => {}}
+              absenceStartDate={absence.absenceStartDate}
+              setAbsenceStartDate={absence.setAbsenceStartDate}
+              absenceUntilDate={absence.absenceUntilDate}
+              setAbsenceUntilDate={absence.setAbsenceUntilDate}
+              setQuickAbsencePreset={absence.setQuickAbsencePreset}
+              currentTimeStr={currentTimeStr}
+              quickAudioStudent={tagesplan.quickAudioStudent}
+              setQuickAudioStudent={tagesplan.setQuickAudioStudent}
+              loadingPrepMirror={loadingPrepMirror}
+              activeTimelineSlotRef={{ current: null }}
+              relevantRoomIssuesToday={tagesplan.tagesplanRoomIssues}
+              teacherTodayRooms={tagesplan.teacherTodayRooms}
+              isFreeDay={isFreeDay}
+              isWeekend={isWeekend}
+              isTourDemoScheduleActive={false}
+              urgentCancellations={absence.urgentCancellations}
+              setIsUrgentModalOpen={absence.setIsUrgentModalOpen}
+              handleResolveRoomIssueInTagesplan={tagesplan.handleResolveRoomIssueInTagesplan}
+              handleUpdateIssueRoomInTagesplan={tagesplan.handleUpdateIssueRoomInTagesplan}
+              leftColumnTab={leftColumnTab}
+              setLeftColumnTab={setLeftColumnTab}
+              onTabChange={setActiveTab}
+              activeStudent={activeStudent}
+              activeGroupStudents={activeGroupStudents}
+              selectedGroupStudentId={selectedGroupStudentId}
+              setSelectedGroupStudentId={setSelectedGroupStudentId}
+              selectedStudentProfile={students.selectedStudentProfile}
               setSelectedStudentProfile={students.setSelectedStudentProfile}
-              helpRequests={data.helpRequests}
-              unreadShouts={data.unreadShouts}
-              submissions={feed.submissions}
-              allSubmissions={feed.allSubmissions}
-              setShowAllSubmissions={feed.setShowAllSubmissions}
-              wallSongs={propsWallSongs !== undefined ? propsWallSongs : livelab.wallSongs}
-              rehearsalSuggestions={propsRehearsalSuggestions !== undefined ? propsRehearsalSuggestions : livelab.rehearsalSuggestions}
-              openProposals={data.openProposals}
-              zoomFactor={tagesplan.zoomFactor}
-              handleZoomChange={tagesplan.handleZoomChange}
-              isSidebarCollapsed={isSidebarCollapsed}
-              setIsSidebarCollapsed={setIsSidebarCollapsed}
-              sidebarNotificationsCount={sidebarNotificationsCount}
-              setActiveTab={setActiveTab}
-              onTabChange={onTabChange}
-              onFoundBand={onFoundBand}
-              showKioskView={livelab.showKioskView}
-              setShowKioskView={livelab.setShowKioskView}
-              showKioskPinSetup={livelab.showKioskPinSetup}
-              setShowKioskPinSetup={livelab.setShowKioskPinSetup}
-              kioskPinInput={livelab.kioskPinInput}
-              setKioskPinInput={livelab.setKioskPinInput}
-              targetKioskStation={livelab.targetKioskStation}
-              setTargetKioskStation={livelab.setTargetKioskStation}
-              checkingInStatus={livelab.checkingInStatus}
-              setCheckingInStatus={livelab.setCheckingInStatus}
-              geoErrorMsg={livelab.checkInErrorMsg}
-              checkInErrorMsg={livelab.checkInErrorMsg}
-              shakeLock={livelab.shakeLock}
-              isUserCheckedIn={livelab.isUserCheckedIn}
-              handleGeofenceCheck={livelab.handleLiveLabCheckIn}
-              handleLiveLabCheckIn={livelab.handleLiveLabCheckIn}
-              handleKioskStationSelect={livelab.handleKioskStationSelect}
-              handleTeacherSelfCheckout={livelab.handleTeacherSelfCheckout}
-              handleTeacherCheckout={livelab.handleTeacherCheckout}
-              handleLogoutStudent={livelab.handleLogoutStudent}
-              onLogout={onLogout}
-              handleResolveHelp={livelab.handleResolveHelp}
-              handleMarkAsRead={livelab.handleMarkAsRead}
-              handleMarkAllAsRead={livelab.handleMarkAllAsRead}
-              handleApproveSubmission={feed.handleApproveSubmission}
-              handleRejectSubmission={feed.handleRejectSubmission}
-              fetchData={data.fetchData}
-              cleanRoomName={cleanRoomName}
-              setToastMessage={setToastMessage}
+              dynamicPrepMirror={dynamicPrepMirror}
+              setDynamicPrepMirror={setDynamicPrepMirror}
+              setLoadingPrepMirror={setLoadingPrepMirror}
+              firstSlotStartStr={firstSlotStartStr}
+              widgetState={widgetState}
+              startTour={startTour}
+              rooms={data.rooms}
+              holidays={bookings.holidays}
+              myBookings={bookings.myBookings}
+              myChangedAppointments={bookings.myChangedAppointments}
+              showAllChangedAppointments={bookings.showAllChangedAppointments}
+              setShowAllChangedAppointments={bookings.setShowAllChangedAppointments}
+              showAllBookings={bookings.showAllBookings}
+              setShowAllBookings={bookings.setShowAllBookings}
+              adminFeedbackRequests={feed.adminFeedbackRequests}
+              adminFeedbackResponses={feed.adminFeedbackResponses}
+              campusFeedAnnouncements={feed.campusFeedAnnouncements}
+              feedInteractions={feed.feedInteractions}
+              teacherFeedTab={feed.teacherFeedTab}
+              setTeacherFeedTab={feed.setTeacherFeedTab}
+              classFeedPosts={feed.classFeedPosts}
+              classFeedInteractions={feed.classFeedInteractions}
+              respondingToRequestId={feed.respondingToRequestId}
+              setRespondingToRequestId={feed.setRespondingToRequestId}
+              questionnaireAnswers={feed.questionnaireAnswers}
+              setQuestionnaireAnswers={feed.setQuestionnaireAnswers}
+              submittingFeedback={feed.submittingFeedback}
+              adminFeedbackTab={feed.adminFeedbackTab}
+              setAdminFeedbackTab={feed.setAdminFeedbackTab}
+              planningEvents={[]}
+              mySubmittedProgramPoints={[]}
+              visibleChangedAppointments={bookings.visibleChangedAppointments}
+              handleBookingClick={bookings.handleBookingClick}
+              handleDeleteMyBooking={bookings.handleDeleteMyBooking}
+              handleMarkRequestAsDone={feed.handleMarkRequestAsDone}
+              handleReactToPost={feed.handleReactToPost}
+              handleSubmitFeedbackResponse={feed.handleSubmitFeedbackResponse}
+              getCountdownString={bookings.getCountdownString}
+              setMyChangedAppointments={bookings.setMyChangedAppointments}
+              todayTagesplanStudents={tagesplan.todayTagesplanStudents}
+              activeTimelineSlot={tagesplan.activeTimelineSlot}
+              setShowNotesDrawer={setShowNotesDrawer}
             />
-          </Suspense>
-        ) : activeTab === 'proposals' ? (
+          </div>
+        )}
+
+        {(hasVisitedLive || activeTab === 'live') && (
+          <div style={{ display: activeTab === 'live' ? 'block' : 'none', width: '100%' }}>
+            <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Live Lab wird geladen...</div>}>
+              <TeacherLiveView
+                teacher={data.teacher}
+                userId={userId}
+                viewMode={viewMode}
+                activePlatform={activePlatform}
+                hideHeader={hideHeader}
+                windowWidth={windowWidth}
+                windowHeight={windowHeight}
+                containerWidth={containerWidth}
+                containerRef={containerRef}
+                showRealNames={students.showRealNames}
+                rooms={data.rooms}
+                selectedRoomId={data.selectedRoomId}
+                setSelectedRoomId={data.setSelectedRoomId}
+                stations={data.stations} isSyncing={data.isSyncing}
+                activeSessions={data.activeSessions}
+                setActiveSessions={data.setActiveSessions}
+                coaches={data.coaches}
+                setSelectedCoachProfile={data.setSelectedCoachProfile}
+                setSelectedStudentProfile={students.setSelectedStudentProfile}
+                helpRequests={data.helpRequests}
+                unreadShouts={data.unreadShouts}
+                submissions={feed.submissions}
+                allSubmissions={feed.allSubmissions}
+                setShowAllSubmissions={feed.setShowAllSubmissions}
+                wallSongs={propsWallSongs !== undefined ? propsWallSongs : livelab.wallSongs}
+                rehearsalSuggestions={propsRehearsalSuggestions !== undefined ? propsRehearsalSuggestions : livelab.rehearsalSuggestions}
+                openProposals={data.openProposals}
+                zoomFactor={tagesplan.zoomFactor}
+                handleZoomChange={tagesplan.handleZoomChange}
+                isSidebarCollapsed={isSidebarCollapsed}
+                setIsSidebarCollapsed={setIsSidebarCollapsed}
+                sidebarNotificationsCount={sidebarNotificationsCount}
+                setActiveTab={setActiveTab}
+                onTabChange={onTabChange}
+                onFoundBand={onFoundBand}
+                showKioskView={livelab.showKioskView}
+                setShowKioskView={livelab.setShowKioskView}
+                showKioskPinSetup={livelab.showKioskPinSetup}
+                setShowKioskPinSetup={livelab.setShowKioskPinSetup}
+                kioskPinInput={livelab.kioskPinInput}
+                setKioskPinInput={livelab.setKioskPinInput}
+                targetKioskStation={livelab.targetKioskStation}
+                setTargetKioskStation={livelab.setTargetKioskStation}
+                checkingInStatus={livelab.checkingInStatus}
+                setCheckingInStatus={livelab.setCheckingInStatus}
+                geoErrorMsg={livelab.checkInErrorMsg}
+                checkInErrorMsg={livelab.checkInErrorMsg}
+                shakeLock={livelab.shakeLock}
+                isUserCheckedIn={livelab.isUserCheckedIn}
+                handleGeofenceCheck={livelab.handleLiveLabCheckIn}
+                handleLiveLabCheckIn={livelab.handleLiveLabCheckIn}
+                handleKioskStationSelect={livelab.handleKioskStationSelect}
+                handleTeacherSelfCheckout={livelab.handleTeacherSelfCheckout}
+                handleTeacherCheckout={livelab.handleTeacherCheckout}
+                handleLogoutStudent={livelab.handleLogoutStudent}
+                onLogout={onLogout}
+                handleResolveHelp={livelab.handleResolveHelp}
+                handleMarkAsRead={livelab.handleMarkAsRead}
+                handleMarkAllAsRead={livelab.handleMarkAllAsRead}
+                handleApproveSubmission={feed.handleApproveSubmission}
+                handleRejectSubmission={feed.handleRejectSubmission}
+                fetchData={data.fetchData}
+                cleanRoomName={cleanRoomName}
+                setToastMessage={setToastMessage}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        {activeTab === 'proposals' ? (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Band-Projekte werden geladen...</div>}>
             <TeacherBandWorkspace
               allBands={data.allBands}
@@ -781,7 +844,7 @@ export function TeacherDashboard({
               windowWidth={windowWidth}
             />
           </Suspense>
-        ) : (
+        ) : activeTab === 'bands' ? (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Bands werden geladen...</div>}>
             <TeacherBandWorkspace
               allBands={data.allBands}
@@ -796,7 +859,7 @@ export function TeacherDashboard({
               isProposalsView={false}
             />
           </Suspense>
-        )}
+        ) : null}
       </main>
 
       {/* Declarative Modals Hub */}

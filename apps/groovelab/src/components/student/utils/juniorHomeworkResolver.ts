@@ -8,6 +8,7 @@ export interface JuniorWeeklyHomeworkSummary {
     notesList: Array<{ num: number; text: string }>;
   }>;
   otherActiveSongs: any[];
+  microScores: any[];
   audioTracks: AudioTrackItem[];
   generalNote: string;
   specificTeacherNote: string;
@@ -254,7 +255,7 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
   });
 
   // 🔄 Snapshot Hydration for Junior Summary
-  if (Object.keys(activeJuniorBooksMap).length === 0 || otherActiveSongs.length === 0) {
+  if (Object.keys(activeJuniorBooksMap).length === 0 && otherActiveSongs.length === 0) {
     const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
     allSnapshotCandidates.sort((a: any, b: any) => {
       const wA = getItemWeek(a);
@@ -494,8 +495,24 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
     }
   });
 
-  // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest snapshot or progressItems if current week has none
-  if (audioTracks.length === 0) {
+  const microScores: any[] = [];
+  currentWeekNotes.forEach((n, idx) => {
+    if (typeof n === 'string' && n.startsWith('MICROSCORE:')) {
+      try {
+        const parsed = JSON.parse(n.substring('MICROSCORE:'.length).trim());
+        if (parsed && typeof parsed === 'object') {
+          const id = parsed.id || `ms-${idx}`;
+          const title = parsed.title || 'Notenschnipsel';
+          if (!microScores.some(m => (m.id && m.id === id) || (m.title && m.title.toLowerCase() === title.toLowerCase()))) {
+            microScores.push({ ...parsed, id, title, rawToken: n });
+          }
+        }
+      } catch {}
+    }
+  });
+
+  // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest snapshot or progressItems if current week has no homework at all
+  if (audioTracks.length === 0 && formattedJuniorBooks.length === 0 && otherActiveSongs.length === 0 && microScores.length === 0) {
     const allAudioSnapshots = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
     allAudioSnapshots.sort((a: any, b: any) => {
       const wA = getItemWeek(a);
@@ -606,7 +623,7 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
       try {
         const p = JSON.parse(clean);
         if (Array.isArray(p)) {
-          clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:') && !x.startsWith('WORLDTOUR_MASTERY:') && !x.startsWith('LEHRER_NOTIZ:') && !x.startsWith('PRIVATE_NOTE:')).join(' ');
+          clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('MICROSCORE:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:') && !x.startsWith('TASK_REFL:') && !x.startsWith('WORLDTOUR_MASTERY:') && !x.startsWith('LEHRER_NOTIZ:') && !x.startsWith('PRIVATE_NOTE:')).join(' ');
         } else if (typeof p === 'string') {
           clean = p;
         }
@@ -627,11 +644,11 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
 
   let isPastNoteCarriedOver = false;
   let carriedOverWeekLabel = '';
-  const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('LEHRER_NOTIZ:') && !n.startsWith('PRIVATE_NOTE:') && !n.startsWith('EARLAB_SCORE:');
+  const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('MICROSCORE:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('TASK_REFL:') && !n.startsWith('❓ Frage für den Unterricht:') && !n.startsWith('WORLDTOUR_MASTERY:') && !n.startsWith('LEHRER_NOTIZ:') && !n.startsWith('PRIVATE_NOTE:') && !n.startsWith('EARLAB_SCORE:');
 
   let allTeacherNotes: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(n => !isPlaceholderNote(n));
 
-  if (allTeacherNotes.length === 0) {
+  if (allTeacherNotes.length === 0 && formattedJuniorBooks.length === 0 && otherActiveSongs.length === 0 && microScores.length === 0) {
     const pastHwSnapshots = (progressItems || []).filter((item: any) => {
       if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
       const itWeekIso = getItemWeek(item);
@@ -732,11 +749,12 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
     }
   }
 
-  const hasAnyHomework = formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0 || audioTracks.length > 0 || Boolean(validGeneralNote) || Boolean(studentQuestionText);
+  const hasAnyHomework = formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0 || microScores.length > 0 || audioTracks.length > 0 || Boolean(validGeneralNote) || Boolean(studentQuestionText);
 
   return {
     formattedJuniorBooks,
     otherActiveSongs,
+    microScores,
     audioTracks,
     generalNote: validGeneralNote,
     specificTeacherNote,

@@ -165,7 +165,7 @@ export const AdminTextbausteinModal: React.FC<AdminTextbausteinModalProps> = ({
             </div>
 
             {/* Content: Form and List in Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', minHeight: 0, flex: 1 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '24px', minHeight: 0, flex: 1 }}>
               
               {/* Form Column */}
               <form onSubmit={handleSaveTextbaustein} style={{ display: 'flex', flexDirection: 'column', gap: '14px', background: '#ffffff', padding: '20px', borderRadius: '20px', border: '1.5px solid #e2e8f0', justifyContent: 'space-between', height: '100%', boxShadow: '0 4px 14px rgba(0, 0, 0, 0.03)' }}>

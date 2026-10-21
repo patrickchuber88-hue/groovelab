@@ -33,9 +33,26 @@ app.use(cors({
   credentials: true,
 }));
 
+// Helper to resolve authoritative client IP (prioritizes Nginx-injected X-Real-IP, strips spoofable CF-Connecting-IP)
+export const resolveClientIp = (req: express.Request): string => {
+  delete req.headers['cf-connecting-ip'];
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim().length > 0) {
+    return realIp.trim();
+  }
+  if (Array.isArray(realIp) && realIp[0]) {
+    return realIp[0].trim();
+  }
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim().length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || '0.0.0.0';
+};
+
 // Helper to log and forward security alerts
 const dispatchSecurityAlert = async (type: string, req: express.Request, details: Record<string, any>) => {
-  const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const ip = resolveClientIp(req);
   const alertPayload = {
     timestamp: new Date().toISOString(),
     type,
@@ -68,6 +85,7 @@ const authRateLimiter = rateLimit({
   max: 150, // 150 login attempts per 15 minutes per IP (supports entire classroom on shared NAT IP)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => resolveClientIp(req),
   handler: (req, res) => {
     dispatchSecurityAlert('AUTH_RATE_LIMIT_EXCEEDED', req, { threshold: 150, window: '15m' });
     res.status(429).json({ error: 'Too many authentication attempts. Security cooldown active.' });
@@ -79,6 +97,7 @@ const apiRateLimiter = rateLimit({
   max: 1200, // 1,200 requests per minute per IP (prevents throttling during multi-user classroom sessions)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => resolveClientIp(req),
   handler: (req, res) => {
     dispatchSecurityAlert('API_RATE_LIMIT_EXCEEDED', req, { threshold: 1200, window: '1m' });
     res.status(429).json({ error: 'Too many API requests. Rate limit exceeded.' });
@@ -90,6 +109,7 @@ const storageRateLimiter = rateLimit({
   max: 120, // 120 presigned upload tickets per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => resolveClientIp(req),
   handler: (req, res) => {
     dispatchSecurityAlert('STORAGE_RATE_LIMIT_EXCEEDED', req, { threshold: 120, window: '1m' });
     res.status(429).json({ error: 'Too many storage requests. Rate limit active.' });
@@ -111,7 +131,7 @@ export const tenantRateLimiter = (req: express.Request, res: express.Response, n
   const rawSchoolId = (req.headers['x-school-id'] as string) || (req.query.school_id as string);
   if (!rawSchoolId || !TENANT_ID_PATTERN.test(rawSchoolId)) return next();
 
-  const clientIp = req.ip || req.socket.remoteAddress || '0.0.0.0';
+  const clientIp = resolveClientIp(req);
   const bucketKey = `${rawSchoolId}:${clientIp}`;
   const now = Date.now();
   let bucket = tenantBuckets.get(bucketKey);

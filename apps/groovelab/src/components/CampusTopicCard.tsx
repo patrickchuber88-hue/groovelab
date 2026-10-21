@@ -670,7 +670,7 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
                   title={chip.text}
                   style={{
                     background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    border: 'none',
                     color: '#166534',
                     borderRadius: '100px',
                     padding: '3px 10px',

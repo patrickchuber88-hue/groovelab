@@ -221,10 +221,10 @@ export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubber
                 height: `${Math.max(18, h)}%`,
                 borderRadius: '9999px',
                 background: isFilled 
-                  ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
-                  : 'rgba(22, 163, 74, 0.14)',
+                  ? '#34a853' 
+                  : 'rgba(52, 168, 83, 0.14)',
                 opacity: isOutsideLocator ? 0.32 : 1,
-                boxShadow: isHead ? '0 0 8px rgba(34, 197, 94, 0.75)' : 'none',
+                boxShadow: isHead ? '0 0 8px rgba(52, 168, 83, 0.75)' : 'none',
                 transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
               }}
             />
@@ -266,7 +266,7 @@ export const DynamicStageWaveformScrubber: React.FC<DynamicStageWaveformScrubber
         <div style={{
           width: `${progressRatio * 100}%`,
           height: '100%',
-          background: 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
+          background: '#34a853',
           borderRadius: '99px',
           transition: 'width 0.1s linear'
         }} />
@@ -312,7 +312,7 @@ export const DynamicStageActiveBadges: React.FC<DynamicStageActiveBadgesProps> =
           fontWeight: 850,
           color: '#15803d',
           background: '#dcfce7',
-          border: '1px solid #16a34a',
+          border: 'none',
           borderRadius: '99px',
           padding: '2px 8px',
           fontVariantNumeric: 'tabular-nums'
@@ -339,7 +339,7 @@ export const DynamicStageActiveBadges: React.FC<DynamicStageActiveBadgesProps> =
           fontWeight: 850,
           color: '#15803d',
           background: '#dcfce7',
-          border: '1px solid #16a34a',
+          border: 'none',
           borderRadius: '99px',
           padding: '2px 8px'
         }}>

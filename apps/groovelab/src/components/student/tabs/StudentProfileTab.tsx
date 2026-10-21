@@ -159,14 +159,12 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
       }} className="animation-slide-up">
         {activeTab === 'profile' && studentUser && (
           <>
-            {/* Header Card with Premium Campus Green Gradient */}
+            {/* Header Card with Premium Campus Green Solid Fill */}
           <div style={{
-            background: 'linear-gradient(135deg, #34a853 0%, #0d4d22 100%)',
-            backdropFilter: 'blur(24px) saturate(1.8)',
-            WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            background: '#34a853',
+            border: 'none',
             borderRadius: '32px',
-            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.15)',
+            boxShadow: 'none',
             display: 'flex',
             overflow: 'visible',
             position: 'relative',
@@ -211,7 +209,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }}>
                 <span style={{
                   background: '#ffffff',
-                  color: '#34a853', 
+                  color: '#15803d', 
                   padding: '4px 14px', 
                   borderRadius: '10px',
                   fontSize: '0.7rem', 
@@ -251,7 +249,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                   style={{
                     background: 'rgba(255, 255, 255, 0.2)',
                     color: '#ffffff',
-                    border: '1px solid rgba(255, 255, 255, 0.35)',
+                    border: 'none',
                     padding: '3px 12px',
                     borderRadius: '10px',
                     fontSize: '0.72rem',
@@ -262,7 +260,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     gap: '6px',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)'
+                    boxShadow: 'none'
                   }}
                   title="Campus-ID (Klicken zum Kopieren für Support, Überweisung & Ausweis)"
                   aria-label={`Campus-ID ${resolvedCampusId}, klicken zum Kopieren`}
@@ -295,7 +293,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     alignItems: 'center',
                     gap: '6px',
                     background: 'rgba(255, 255, 255, 0.15)',
-                    border: '1px solid rgba(255, 255, 255, 0.25)',
+                    border: 'none',
                     color: '#ffffff',
                     padding: '4px 12px',
                     borderRadius: '12px',
@@ -315,8 +313,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 style={{ 
                   background: '#ffffff', 
                   border: 'none', 
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
-                  color: '#34a853', 
+                  boxShadow: 'none',
+                  color: '#15803d', 
                   fontSize: '0.85rem', 
                   fontWeight: 800, 
                   cursor: 'pointer', 
@@ -343,8 +341,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                 }} 
                 style={{ 
                   background: 'rgba(255, 255, 255, 0.15)', 
-                  border: '1px solid rgba(255, 255, 255, 0.25)', 
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  border: 'none', 
+                  boxShadow: 'none',
                   color: '#ffffff', 
                   fontSize: '0.85rem', 
                   fontWeight: 800, 
@@ -369,9 +367,9 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
             {/* Metric 1: XP */}
             {xpActive && (
-              <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(52, 168, 83, 0.08)', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Star size={22} fill="#34a853" />
+              <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
+                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: '#dcfce7', color: '#15803d', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Star size={22} fill="#34a853" color="#34a853" />
                 </div>
                 <div>
                   <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '2px' }}>Erfahrung (XP)</div>
@@ -384,8 +382,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
 
             {/* Metric 2: Übe-Streak */}
             {flamesActive && (
-              <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
+                <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: '#fee2e2', color: '#b91c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Flame size={22} fill="#ef4444" color="#ef4444" />
                 </div>
                 <div>
@@ -398,8 +396,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
             )}
 
             {/* Metric 3: Focus Month */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(234, 179, 8, 0.08)', color: '#eab308', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: '#fef9c3', color: '#854d0e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Clock size={22} />
               </div>
               <div>
@@ -411,8 +409,8 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
             </div>
 
             {/* Metric 4: Weekly Lessons */}
-            <div style={{ background: 'white', border: '1px solid rgba(0,0,0,0.04)', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.01)' }}>
-              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: 'rgba(59, 130, 246, 0.08)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', display: 'flex', gap: '16px', alignItems: 'center', boxShadow: 'none' }}>
+              <div style={{ height: '48px', width: '48px', borderRadius: '14px', background: '#dbeafe', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={22} />
               </div>
               <div>
@@ -814,34 +812,20 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                         let shadow = 'none';
 
                         if (minutes > 0) {
-                          if (minutes <= 15) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6fbf0 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 2px 6px rgba(52, 168, 83, 0.04)';
-                          } else if (minutes <= 60) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 3px 8px rgba(52, 168, 83, 0.07)';
-                          } else if (minutes <= 180) {
-                            bg = 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)';
-                            border = '1px solid #e6f4ea';
-                            labelColor = '#34a853';
-                            textColor = '#34a853';
-                            numColor = '#34a853';
-                            shadow = '0 4px 12px rgba(52, 168, 83, 0.12)';
+                          if (minutes <= 180) {
+                            bg = '#dcfce7';
+                            border = 'none';
+                            labelColor = '#15803d';
+                            textColor = '#15803d';
+                            numColor = '#15803d';
+                            shadow = 'none';
                           } else {
-                            bg = 'linear-gradient(135deg, #34a853 0%, #34a853 100%)';
-                            border = '1px solid #34a853';
-                            labelColor = 'rgba(255, 255, 255, 0.8)';
-                            textColor = 'rgba(255, 255, 255, 0.9)';
+                            bg = '#34a853';
+                            border = 'none';
+                            labelColor = 'rgba(255, 255, 255, 0.9)';
+                            textColor = 'rgba(255, 255, 255, 0.95)';
                             numColor = '#ffffff';
-                            shadow = '0 6px 15px rgba(52, 168, 83, 0.25)';
+                            shadow = 'none';
                           }
                         }
 
@@ -863,20 +847,6 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                               boxShadow: shadow,
                               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                               cursor: 'default'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              if (minutes > 0) {
-                                e.currentTarget.style.boxShadow = shadow.replace(/0\.\d+/, '0.3');
-                              } else {
-                                e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.04)';
-                                e.currentTarget.style.borderColor = '#cbd5e1';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0px)';
-                              e.currentTarget.style.boxShadow = shadow;
-                              e.currentTarget.style.borderColor = border.split(' ')[2];
                             }}
                           >
                             <span style={{ 
@@ -922,13 +892,13 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f8fafc', border: '1px solid #e2e8f0' }} /> 0m
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6fbf0', border: '1px solid #e6f4ea' }} /> &lt;15m
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#dcfce7', border: 'none' }} /> &lt;15m
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6f4ea', border: '1px solid #e6f4ea' }} /> &lt;1h
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#dcfce7', border: 'none' }} /> &lt;1h
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e6f4ea', border: '1px solid #e6f4ea' }} /> &lt;3h
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#dcfce7', border: 'none' }} /> &lt;3h
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34a853' }} /> 3h+
@@ -995,7 +965,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     width: '64px',
                     height: '64px',
                     borderRadius: '20px',
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    background: '#fef9c3',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1049,7 +1019,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                         }
                       }}
                       style={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        background: '#10b981',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '16px',
@@ -1171,9 +1141,9 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                     type="button"
                     onClick={() => setShowAvatarSelector(!showAvatarSelector)}
                     style={{
-                      background: showAvatarSelector ? '#34a8530c' : '#ffffff',
-                      border: `1.5px solid ${showAvatarSelector ? '#34a853' : 'rgba(0,0,0,0.08)'}`,
-                      color: showAvatarSelector ? '#34a853' : '#0f172a',
+                      background: showAvatarSelector ? '#dcfce7' : '#ffffff',
+                      border: showAvatarSelector ? 'none' : '1.5px solid #e2e8f0',
+                      color: showAvatarSelector ? '#15803d' : '#0f172a',
                       fontSize: '0.78rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -1183,7 +1153,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                       padding: '8px 16px',
                       borderRadius: '12px',
                       transition: 'all 0.2s',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                      boxShadow: 'none'
                     }}
                     onMouseOver={(e) => {
                       if (!showAvatarSelector) {
@@ -1285,11 +1255,11 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                       gap: '12px', 
                       marginTop: '4px',
                       padding: '16px',
-                      background: 'rgba(52, 168, 83, 0.03)',
+                      background: '#f8fafc',
                       borderRadius: '20px',
-                      border: '1.5px dashed rgba(52, 168, 83, 0.15)'
+                      border: '1.5px dashed #cbd5e1'
                     }}>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', display: 'block' }}>Wähle deinen neuen Instrumenten-Avatar</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'block' }}>Wähle deinen neuen Instrumenten-Avatar</label>
                       
                       {/* Category Filter Tabs */}
                       {(() => {
@@ -1313,7 +1283,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                                     fontSize: '0.75rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
-                                    border: `1.5px solid ${isCatSelected ? '#34a853' : '#e2e8f0'}`,
+                                    border: isCatSelected ? 'none' : '1.5px solid #e2e8f0',
                                     background: isCatSelected ? '#34a853' : 'white',
                                     color: isCatSelected ? 'white' : '#64748b',
                                     transition: 'all 0.15s ease'
@@ -1360,7 +1330,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                                   cursor: 'pointer',
                                   transition: 'all 0.15s',
                                   outline: 'none',
-                                  boxShadow: isSelected ? '0 4px 10px rgba(52, 168, 83, 0.15)' : 'none'
+                                  boxShadow: 'none'
                                 }}
                               >
                                 <div style={{ 
@@ -1368,7 +1338,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                                   height: '56px', 
                                   borderRadius: '10px', 
                                   overflow: 'hidden', 
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                                  boxShadow: 'none',
                                   background: 'white',
                                   border: '1px solid #e2e8f0',
                                   display: 'flex',
@@ -1409,7 +1379,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                   <button 
                     type="submit" 
                     disabled={savingProfile}
-                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
+                    style={{ flex: 2, padding: '14px', borderRadius: '16px', border: 'none', background: '#34a853', color: 'white', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer', boxShadow: 'none' }}
                   >
                     {savingProfile ? 'Wird gespeichert...' : 'Änderungen speichern'}
                   </button>

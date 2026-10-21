@@ -19,7 +19,7 @@ const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
 });
 const INSTRUMENT_COLORS: Record<string, string> = { 
   Guitar: "#ef4444", 
-  Bass: "#eab308", 
+  Bass: "#facc15", 
   Drums: "#3b82f6", 
   Keys: "#a855f7",
   Vocals: "#34a853"
@@ -124,10 +124,10 @@ const getStationColor = (name: string | null | undefined, dbColor?: string | nul
   const matches = name.match(/\d+/g);
   if (!matches) return '#64748b';
   const num = parseInt(matches[matches.length - 1]);
-  if (num === 1 || num === 2) return '#eab308'; // Yellow
+  if (num === 1 || num === 2) return '#facc15'; // Yellow
   if (num === 3 || num === 4) return '#a855f7'; // Purple
   if (num === 5 || num === 6) return '#3b82f6'; // Blue
-  if (num === 7 || num === 8) return '#eab308'; // Yellow
+  if (num === 7 || num === 8) return '#facc15'; // Yellow
   return '#64748b';
 };
 
@@ -344,7 +344,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               onClick={(e) => { e.stopPropagation(); onLogout(sess.id); }}
               style={{ 
                 background: '#fef2f2', 
-                border: '1px solid #fee2e2', 
+                border: 'none', 
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%', 
@@ -375,7 +375,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
               borderRadius: '24px', 
               overflow: 'hidden', 
               border: `2px solid ${color}`, 
-              boxShadow: `0 10px 28px ${color}25`, 
+              boxShadow: 'none', 
               flexShrink: 0, 
               marginBottom: '4px',
               transition: 'all 0.3s ease'
@@ -886,7 +886,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               left: 0,
               right: 0,
               height: '3px',
-              background: 'linear-gradient(90deg, #f59e0b 0%, #eab308 50%, #facc15 100%)',
+              background: '#facc15',
               boxShadow: 'none',
               opacity: isSyncing ? 1 : 0,
               transition: 'opacity 0.35s ease',
@@ -901,7 +901,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 style={{
                   width: '45%',
                   height: '100%',
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent)',
+                  background: 'rgba(255,255,255,0.85)',
                   animation: 'groovelabSyncSweep 1.2s infinite ease-in-out'
                 }} 
               />
@@ -949,11 +949,11 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             gap: '4px',
                             padding: '2px 7px',
                             borderRadius: '999px',
-                            background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
-                            border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                            background: isSyncing ? '#fef9c3' : '#d1fae5',
+                            border: 'none',
                             fontSize: '0.68rem',
                             fontWeight: 700,
-                            color: isSyncing ? '#b45309' : '#047857'
+                            color: isSyncing ? '#854d0e' : '#047857'
                           }}
                         >
                           <span 
@@ -961,7 +961,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               width: '5px',
                               height: '5px',
                               borderRadius: '50%',
-                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              backgroundColor: isSyncing ? '#facc15' : '#34a853',
                               boxShadow: 'none',
                               animation: isSyncing ? 'pulse 1s infinite' : 'none'
                             }} 
@@ -1004,7 +1004,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               }}
                               style={{
                                 border: 'none',
-                                background: isSelected ? '#eab308' : '#f1f5f9',
+                                background: isSelected ? '#facc15' : '#f1f5f9',
                                 color: isSelected ? '#0f172a' : '#64748b',
                                 padding: '8px 14px',
                                 borderRadius: '12px',
@@ -1112,7 +1112,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                       aria-label={isSelf ? 'Vom Lehrer iPad abmelden' : 'Coach abmelden'}
                                       style={{
                                         background: '#fef2f2',
-                                        border: '1px solid #fee2e2',
+                                        border: 'none',
                                         borderRadius: '50%',
                                         width: '20px',
                                         height: '20px',
@@ -1166,7 +1166,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 padding: '12px 16px',
                                 position: 'relative',
                                 gap: '12px',
-                                boxShadow: isActive ? `0 6px 16px ${instColor}08` : 'none',
+                                boxShadow: 'none',
                                 cursor: isActive ? 'pointer' : 'default',
                                 minWidth: 0
                               }}
@@ -1259,7 +1259,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   }}
                                   style={{
                                     background: '#fef2f2',
-                                    border: '1px solid #fee2e2',
+                                    border: 'none',
                                     width: '24px',
                                     height: '24px',
                                     borderRadius: '50%',
@@ -1283,7 +1283,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         })}
                         {unassignedStudentSessions.map((sess, uIdx) => {
                           const customName = sess.stations?.name || `Station (App ${uIdx + 1})`;
-                          const instColor = getStationColor(customName, sess.stations?.color || '#eab308');
+                          const instColor = getStationColor(customName, sess.stations?.color || '#facc15');
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const isMe = sess?.user_id === userId;
                           const hasHelp = (viewMode !== 'student' || isMe) && helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id);
@@ -1301,7 +1301,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                 padding: '12px 16px',
                                 position: 'relative',
                                 gap: '12px',
-                                boxShadow: `0 6px 16px ${instColor}08`,
+                                boxShadow: 'none',
                                 cursor: 'pointer',
                                 minWidth: 0
                               }}
@@ -1353,7 +1353,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   }}
                                   style={{
                                     background: '#fef2f2',
-                                    border: '1px solid #fee2e2',
+                                    border: 'none',
                                     width: '24px',
                                     height: '24px',
                                     borderRadius: '50%',
@@ -1423,7 +1423,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               width: '8px',
                               height: '8px',
                               borderRadius: '50%',
-                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              backgroundColor: isSyncing ? '#facc15' : '#34a853',
                               boxShadow: 'none',
                               animation: isSyncing ? 'pulse 1s infinite' : 'none',
                               display: 'inline-block'
@@ -1673,11 +1673,11 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             gap: '6px',
                             padding: '4px 10px',
                             borderRadius: '999px',
-                            background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
-                            border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                            background: isSyncing ? '#fef9c3' : '#d1fae5',
+                            border: 'none',
                             fontSize: '0.72rem',
                             fontWeight: 700,
-                            color: isSyncing ? '#b45309' : '#047857',
+                            color: isSyncing ? '#854d0e' : '#047857',
                             transition: 'all 0.3s ease'
                           }}
                           title={isSyncing ? 'Synchronisiere Live-Sessions...' : 'Live-Sessions aktuell'}
@@ -1687,7 +1687,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                               width: '6px',
                               height: '6px',
                               borderRadius: '50%',
-                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              backgroundColor: isSyncing ? '#facc15' : '#34a853',
                               boxShadow: 'none',
                               animation: isSyncing ? 'pulse 1s infinite' : 'none'
                             }} 
@@ -2100,7 +2100,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     {unassignedStudentSessions.map((sess, uIdx) => {
                       const customName = sess.stations?.name || `Station (App ${uIdx + 1})`;
                       const inst = sess.stations?.instrument || sess.users?.instrument || 'Tablet';
-                      const instColor = getStationColor(customName, sess.stations?.color || '#eab308');
+                      const instColor = getStationColor(customName, sess.stations?.color || '#facc15');
 
                       return (
                         <div key={sess.id || `unassigned-${uIdx}`}>
@@ -2163,8 +2163,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               className="sidebar-edge-toggle"
               title="Band-Matching & Zusatz-Infos ausklappen"
             >
-              <ChevronLeft size={18} color="#eab308" />
-              <Zap size={16} fill="#eab308" color="#eab308" />
+              <ChevronLeft size={18} color="#facc15" />
+              <Zap size={16} fill="#facc15" color="#facc15" />
               <span style={{ writingMode: 'vertical-rl', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: '0.65rem' }}>Matching & Infos</span>
             </button>
           )}
@@ -2196,7 +2196,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               paddingBottom: '12px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={18} color="#eab308" fill="#eab308" />
+                <Zap size={18} color="#facc15" fill="#facc15" />
                 <span style={{ fontWeight: 950, fontSize: '0.9rem', color: '#1e293b', letterSpacing: '-0.02em' }}>Matching & Infos</span>
               </div>
               <button 
@@ -2229,7 +2229,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 background: '#fff1f2', 
                 padding: '24px', 
                 borderRadius: '32px',
-                border: '1px solid #fecdd3',
+                border: 'none',
                 boxShadow: 'none',
                 animation: 'pulse-red 2s infinite'
               }}>
@@ -2289,8 +2289,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             {rehearsalSuggestions.length > 0 && (
               <div className="card" style={{ 
                 padding: '24px', 
-                background: 'linear-gradient(135deg, #e6f4ea 0%, #f0fdfa 100%)', 
-                border: '1px solid #e6f4ea',
+                background: '#dcfce7', 
+                border: 'none',
                 borderRadius: '32px',
                 boxShadow: 'none'
               }}>
@@ -2298,28 +2298,28 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                   <div style={{ background: '#34a853', color: 'white', padding: '8px', borderRadius: '10px' }}>
                     <Clock size={18} />
                   </div>
-                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
+                  <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Bandprobe Vorschläge</h3>
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {rehearsalSuggestions.map((s, idx) => (
                     <div key={idx} style={{ 
-                      background: 'rgba(255,255,255,0.6)', 
+                      background: '#ffffff', 
                       padding: '8px 12px', 
                       borderRadius: '12px', 
-                      border: '1px solid rgba(52, 168, 83, 0.1)',
+                      border: 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '12px'
                     }}>
-                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#34a853', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 900, color: '#15803d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{s.bandName}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ 
                           fontSize: '0.62rem', 
                           fontWeight: 950, 
-                          color: s.count === (s.totalMembers || s.count) ? '#34a853' : '#a16207',
-                          background: s.count === (s.totalMembers || s.count) ? '#e6f4ea' : '#fef9c3',
+                          color: s.count === (s.totalMembers || s.count) ? '#15803d' : '#854d0e',
+                          background: s.count === (s.totalMembers || s.count) ? '#dcfce7' : '#fef9c3',
                           padding: '2px 6px',
                           borderRadius: '6px',
                           display: 'inline-block'
@@ -2340,13 +2340,13 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
             {/* Band-Matching Section */}
             <div className="card" style={{ 
                padding: '24px', 
-               background: 'linear-gradient(135deg, #fefce8 0%, #fffbeb 100%)', 
-               border: '1px solid #fef3c7',
+               background: '#fef9c3', 
+               border: 'none',
                borderRadius: '32px',
                boxShadow: 'none'
              }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ background: '#eab308', color: '#0f172a', padding: '8px', borderRadius: '10px', boxShadow: 'none' }}>
+                  <div style={{ background: '#facc15', color: '#0f172a', padding: '8px', borderRadius: '10px', boxShadow: 'none' }}>
                     <Zap size={18} color="#0f172a" fill="#0f172a" />
                   </div>
                   <h3 style={{ fontSize: '0.85rem', fontWeight: 1000, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Band-Matching</h3>
@@ -2530,7 +2530,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                     justifyContent: 'center',
                                     position: 'relative',
                                     transition: 'all 0.2s ease',
-                                    boxShadow: isFilled ? `0 2px 8px ${color}20` : 'none'
+                                    boxShadow: 'none'
                                   }}
                                   title={`${inst}${memberName ? `: ${memberName}` : ' (noch frei)'}`}
                                   >
@@ -2593,7 +2593,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                      className="hero-cta-artistic"
                                      style={{
                                        width: '100%',
-                                       background: 'linear-gradient(135deg, #ca8a04, #eab308)',
+                                       background: '#facc15',
                                        border: 'none',
                                        padding: '8px 16px',
                                        borderRadius: '12px',
@@ -2660,7 +2660,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 background: '#f1f5f9', // Clean app-surface background
                 padding: '24px', 
                 borderRadius: '32px',
-                border: '1px solid #e2e8f0',
+                border: 'none',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px' }}>
@@ -2977,8 +2977,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 onClick={() => setActiveTab('proposals')}
                 style={{ 
                   padding: '24px', 
-                  background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
-                  border: '1px solid rgba(165, 180, 252, 0.15)',
+                  background: '#0f172a', 
+                  border: 'none',
                   borderRadius: '32px',
                   boxShadow: 'none',
                   cursor: 'pointer',
@@ -3170,8 +3170,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         style={{
                           padding: '8px 14px',
                           borderRadius: '12px',
-                          border: '1px solid',
-                          borderColor: selectedRoomId === room.id ? '#6366f1' : 'rgba(0,0,0,0.1)',
+                          border: selectedRoomId === room.id ? 'none' : '1px solid rgba(0,0,0,0.1)',
                           background: selectedRoomId === room.id ? '#6366f1' : 'transparent',
                           color: selectedRoomId === room.id ? '#ffffff' : '#1e293b',
                           fontSize: '12px',
@@ -3405,7 +3404,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       style={{
                         height: '56px',
                         borderRadius: '16px',
-                        border: '1px solid #e2e8f0',
+                        border: 'none',
                         background: '#f8fafc',
                         color: '#0f172a',
                         fontSize: '1.25rem',

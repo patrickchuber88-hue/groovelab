@@ -313,8 +313,8 @@ export function CampusSetupScreen({
             title: 'Stundenplan & Sync',
             subtitle: icalActive ? 'iCal Kalender aktiv' : 'Manuelle Termine',
             badge: icalActive ? 'Live-Sync' : 'Lokal',
-            gradient: 'linear-gradient(135deg, #34a853 0%, #2e9648 100%)',
-            shadowColor: 'rgba(52, 168, 83, 0.40)',
+            gradient: '#34a853',
+            shadowColor: 'none',
             icon: Clock
           },
           {
@@ -322,8 +322,8 @@ export function CampusSetupScreen({
             title: 'Kommunikation & Chat',
             subtitle: studentToTeacherChat ? 'Direktnachrichten aktiv' : 'Nur Lehrer-Nachrichten',
             badge: studentToTeacherChat ? 'Freigeschaltet' : 'Eingeschränkt',
-            gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            shadowColor: 'rgba(59, 130, 246, 0.40)',
+            gradient: '#3b82f6',
+            shadowColor: 'none',
             icon: MessageSquare
           },
           {
@@ -331,8 +331,8 @@ export function CampusSetupScreen({
             title: 'Motivation & XP',
             subtitle: (flamesActive && xpActive) ? 'Flames & Level aktiv' : 'Teilweise aktiv',
             badge: (flamesActive && xpActive) ? 'Voll Aktiv' : 'Konfigurieren',
-            gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            shadowColor: 'rgba(245, 158, 11, 0.40)',
+            gradient: '#f97316',
+            shadowColor: 'none',
             icon: Flame
           },
           {
@@ -340,8 +340,8 @@ export function CampusSetupScreen({
             title: 'Datenschutz & AVV',
             subtitle: '21/21 DSGVO Standards',
             badge: 'DSGVO-Audit',
-            gradient: 'linear-gradient(135deg, #34a853 0%, #2e9648 100%)',
-            shadowColor: 'rgba(52, 168, 83, 0.40)',
+            gradient: '#34a853',
+            shadowColor: 'none',
             icon: ShieldCheck
           },
           {
@@ -351,8 +351,8 @@ export function CampusSetupScreen({
               ? (securityOverview?.has_passkey ? '4-stellige PIN & Passkey aktiv' : '4-stellige PIN aktiv • Passkey hinzufügen')
               : (securityOverview?.has_passkey ? 'Passkey aktiv • PIN einrichten' : 'PIN & Passkey einrichten'),
             badge: (securityOverview?.has_personal_pin || admin?.has_personal_pin) ? 'PIN Aktiv ✓' : 'Sicherheit',
-            gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
-            shadowColor: 'rgba(202, 138, 4, 0.40)',
+            gradient: '#facc15',
+            shadowColor: 'none',
             icon: Key
           },
           {
@@ -360,8 +360,8 @@ export function CampusSetupScreen({
             title: 'Ideenschmiede',
             subtitle: 'Wünsche & Fehler melden',
             badge: 'Mitgestalten',
-            gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
-            shadowColor: 'rgba(236, 72, 153, 0.40)',
+            gradient: '#a855f7',
+            shadowColor: 'none',
             icon: Lightbulb
           }
         ].map((module) => {
@@ -403,9 +403,9 @@ export function CampusSetupScreen({
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: '14px',
-                boxShadow: `0 8px 20px -4px ${module.shadowColor}`
+                boxShadow: 'none'
               }}>
-                <IconComp size={30} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} />
+                <IconComp size={30} color={module.id === 'pin_login' ? '#0f172a' : '#ffffff'} style={{ filter: 'none' }} />
               </div>
 
               {/* Status Badge */}
@@ -607,24 +607,24 @@ export function CampusSetupScreen({
                   height: '42px',
                   borderRadius: '12px',
                   background: activeCampusSettingsModal === 'calendar'
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    ? '#34a853'
                     : activeCampusSettingsModal === 'communication'
-                    ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                    ? '#3b82f6'
                     : activeCampusSettingsModal === 'gamification'
-                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                    ? '#f97316'
                     : activeCampusSettingsModal === 'pin_login'
-                    ? 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)'
-                    : 'linear-gradient(135deg, #34a853 0%, #15803d 100%)',
+                    ? '#facc15'
+                    : '#34a853',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                  boxShadow: 'none'
                 }}>
                   {activeCampusSettingsModal === 'calendar' && <Clock size={20} color="#ffffff" />}
                   {activeCampusSettingsModal === 'communication' && <MessageSquare size={20} color="#ffffff" />}
                   {activeCampusSettingsModal === 'gamification' && <Flame size={20} color="#ffffff" />}
                   {activeCampusSettingsModal === 'datenschutz' && <ShieldCheck size={20} color="#ffffff" />}
-                  {activeCampusSettingsModal === 'pin_login' && <Key size={20} color="#ffffff" />}
+                  {activeCampusSettingsModal === 'pin_login' && <Key size={20} color="#0f172a" />}
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -764,7 +764,7 @@ export function CampusSetupScreen({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {/* Visual Enterprise Audit Status Banner */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #064e3b 0%, #047857 100%)',
+                    background: '#10b981',
                     borderRadius: '16px',
                     padding: '16px 20px',
                     color: '#ffffff',
@@ -865,7 +865,7 @@ export function CampusSetupScreen({
                     {(admin?.role === 'admin' || admin?.role === 'secretary') && (
                       <div style={{ 
                         background: '#e6f4ea', 
-                        border: '1px solid #a7f3d0', 
+                        border: 'none', 
                         borderRadius: '16px', 
                         padding: '16px', 
                         fontSize: '0.76rem',
@@ -880,7 +880,7 @@ export function CampusSetupScreen({
                     {/* DSB Freigabepaket Download Card */}
                     <div style={{ 
                       background: '#ecfdf5', 
-                      border: '1.5px solid #10b981', 
+                      border: 'none', 
                       borderRadius: '16px', 
                       padding: '16px', 
                       display: 'flex', 
@@ -923,7 +923,7 @@ export function CampusSetupScreen({
                     {/* Optional Fallback Download Card */}
                     <div style={{ 
                       background: '#fefce8', 
-                      border: '1px solid #fef08a', 
+                      border: 'none', 
                       borderRadius: '16px', 
                       padding: '16px', 
                       display: 'flex', 
@@ -945,7 +945,7 @@ export function CampusSetupScreen({
                         }}
                         style={{ 
                           padding: '8px 16px',
-                          background: '#eab308',
+                          background: '#facc15',
                           color: '#0f172a',
                           border: 'none',
                           borderRadius: '8px',
@@ -1172,7 +1172,7 @@ export function CampusSetupScreen({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {/* 1. STATUS & ARCHITEKTUR BANNER */}
                     <div style={{
-                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      background: '#f8fafc',
                       border: '1px solid #e2e8f0',
                       borderRadius: '18px',
                       padding: '20px',
@@ -1188,7 +1188,7 @@ export function CampusSetupScreen({
                           height: '44px',
                           borderRadius: '12px',
                           background: '#fefce8',
-                          border: '1px solid #fef08a',
+                          border: 'none',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1207,7 +1207,7 @@ export function CampusSetupScreen({
                               borderRadius: '999px',
                               background: hasPin ? '#dcfce7' : '#fef3c7',
                               color: hasPin ? '#15803d' : '#b45309',
-                              border: `1px solid ${hasPin ? '#bbf7d0' : '#fde68a'}`
+                              border: 'none'
                             }}>
                               {hasPin ? 'PIN Aktiviert ✓' : 'PIN nicht hinterlegt'}
                             </span>
@@ -1219,7 +1219,7 @@ export function CampusSetupScreen({
                                 borderRadius: '999px',
                                 background: '#e0f2fe',
                                 color: '#0369a1',
-                                border: '1px solid #bae6fd'
+                                border: 'none'
                               }}>
                                 {passkeyCount} Passkey(s) aktiv ✓
                               </span>
@@ -1273,7 +1273,7 @@ export function CampusSetupScreen({
                             height: '36px',
                             borderRadius: '10px',
                             background: '#fefce8',
-                            border: '1px solid #fef08a',
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1288,11 +1288,11 @@ export function CampusSetupScreen({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {hasPin ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                               <CheckCircle2 size={14} /> Aktiviert
                             </span>
                           ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #fde68a' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
                               <AlertCircle size={14} /> Keine PIN hinterlegt
                             </span>
                           )}
@@ -1308,7 +1308,7 @@ export function CampusSetupScreen({
                           padding: '12px 16px',
                           borderRadius: '12px',
                           background: '#f0fdf4',
-                          border: '1px solid #bbf7d0',
+                          border: 'none',
                           color: '#15803d',
                           fontSize: '0.82rem',
                           fontWeight: 700,
@@ -1326,7 +1326,7 @@ export function CampusSetupScreen({
                           padding: '12px 16px',
                           borderRadius: '12px',
                           background: '#fef2f2',
-                          border: '1px solid #fecaca',
+                          border: 'none',
                           color: '#b91c1c',
                           fontSize: '0.82rem',
                           fontWeight: 700,
@@ -1400,7 +1400,7 @@ export function CampusSetupScreen({
                             padding: '12px 22px',
                             minHeight: '46px',
                             borderRadius: '12px',
-                            background: newPinInput.trim().length === 4 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#e2e8f0',
+                            background: newPinInput.trim().length === 4 ? '#10b981' : '#e2e8f0',
                             color: newPinInput.trim().length === 4 ? '#ffffff' : '#94a3b8',
                             border: 'none',
                             fontWeight: 850,
@@ -1439,7 +1439,7 @@ export function CampusSetupScreen({
                             height: '36px',
                             borderRadius: '10px',
                             background: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
+                            border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -1454,11 +1454,11 @@ export function CampusSetupScreen({
                         </div>
                         <div>
                           {isWebAuthnSupported() ? (
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#dcfce7', color: '#15803d', border: 'none' }}>
                               Gerät unterstützt Biometrie ✓
                             </span>
                           ) : (
-                            <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#fee2e2', color: '#b91c1c', border: 'none' }}>
                               Nicht unterstützt
                             </span>
                           )}

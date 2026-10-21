@@ -53,7 +53,7 @@ Bereitstellung, Hosting, Weiterentwicklung und Wartung der cloudbasierten Schulm
 
 ### Frage 1: Werden fremde Daten oder Systeme gehostet / verwaltet (Cloud/SaaS)?
 > **Antwort: JA.**  
-> **Erläuterung:** Bereitstellung einer mandantentrennten Multi-Tenant-SaaS-Plattform. Die tatsächliche Server- und Rechenzentrumsinfrastruktur wird zu 100 % in ISO/IEC 27001-zertifizierten deutschen Rechenzentren der **Hetzner Online GmbH** (Falkenstein/Vogtland & Nürnberg) angemietet.
+> **Erläuterung:** Bereitstellung einer mandantentrennten Multi-Tenant-SaaS-Plattform. Die tatsächliche Server- und Rechenzentrumsinfrastruktur wird zu 100 % in ISO/IEC 27001-zertifizierten deutschen Rechenzentren der **IONOS SE** (Montabaur/Deutschland – Primärer Produktionsserver `85.215.73.216`) sowie der **Hetzner Online GmbH** (Falkenstein/Vogtland & Nürnberg – Georedundantes Backup, Failover & Storage Box) angemietet.
 
 ### Frage 2: Werden Kreditkarten-, Bank- oder sonstige Zahlungsdaten verarbeitet/gespeichert?
 > **Antwort: NEIN.**  

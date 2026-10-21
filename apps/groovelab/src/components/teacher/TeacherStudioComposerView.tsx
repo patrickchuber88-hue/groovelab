@@ -586,7 +586,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
           fontWeight: 800,
           animation: 'fadeIn 0.2s ease-out'
         }}>
-          <CheckCircle2 size={20} color="#22c55e" />
+          <CheckCircle2 size={20} color="#34a853" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -648,7 +648,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
             width: '42px',
             height: '42px',
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            background: '#0ea5e9',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
@@ -670,7 +670,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   onClick={() => loadTemplate(tmpl)}
                   style={{
                     background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
+                    border: 'none',
                     borderRadius: '100px',
                     padding: '3px 10px',
                     fontSize: '0.68rem',
@@ -699,7 +699,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
           display: 'inline-flex',
           alignItems: 'center',
           gap: '4px',
-          border: '1px solid #e2e8f0'
+          border: 'none'
         }}>
           <button
             type="button"
@@ -773,7 +773,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
       {errorMessage && (
         <div style={{
           background: '#fef2f2',
-          border: '1px solid #fee2e2',
+          border: 'none',
           borderRadius: '14px',
           padding: '12px 18px',
           color: '#991b1b',
@@ -837,7 +837,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         fontSize: '0.70rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        background: difficultyLevel === 'core' ? '#22c55e' : '#f1f5f9',
+                        background: difficultyLevel === 'core' ? '#34a853' : '#f1f5f9',
                         color: difficultyLevel === 'core' ? '#ffffff' : '#475569'
                       }}
                     >
@@ -869,7 +869,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         fontSize: '0.70rem',
                         fontWeight: 800,
                         cursor: 'pointer',
-                        background: difficultyLevel === 'master' ? '#eab308' : '#f1f5f9',
+                        background: difficultyLevel === 'master' ? '#facc15' : '#f1f5f9',
                         color: difficultyLevel === 'master' ? '#0f172a' : '#475569'
                       }}
                     >
@@ -905,7 +905,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     Übeanweisung für den Schüler
                   </label>
                   <SpeechDictationButton
-                    onTranscript={(txt) => setHomeworkNotes(prev => prev ? `${prev} ${txt}` : txt)}
+                    value={homeworkNotes}
+                    onChange={setHomeworkNotes}
+                    joinWithNewline
                     size="sm"
                     title="Übeanweisung diktieren"
                   />
@@ -942,8 +944,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         type="button"
                         onClick={() => toggleTag(tag)}
                         style={{
-                          background: isSelected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
-                          border: isSelected ? 'none' : '1px solid #e2e8f0',
+                          background: isSelected ? '#10b981' : '#f1f5f9',
+                          border: 'none',
                           borderRadius: '100px',
                           padding: isSelected ? '4px 11px' : '3px 10px',
                           fontSize: '0.70rem',
@@ -973,9 +975,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => handleOpenMediaPicker('lehrwerke')}
                     style={{
-                      background: '#f0f9ff',
-                      border: '1px solid #bae6fd',
-                      color: '#0284c7',
+                      background: '#e0f2fe',
+                      border: 'none',
+                      color: '#0369a1',
                       borderRadius: '8px',
                       padding: '4px 10px',
                       fontSize: '0.74rem',
@@ -1015,7 +1017,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         key={lw.id}
                         style={{
                           background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
+                          border: 'none',
                           borderRadius: '12px',
                           padding: '10px 14px',
                           display: 'flex',
@@ -1030,7 +1032,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                             width: '32px',
                             height: '38px',
                             borderRadius: '4px',
-                            background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+                            background: '#0f172a',
                             color: '#ffffff',
                             display: 'flex',
                             alignItems: 'center',
@@ -1105,7 +1107,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   type="button"
                   onClick={() => setActiveStep(2)}
                   style={{
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    background: '#0ea5e9',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '12px',
@@ -1168,8 +1170,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
                 {/* Big Apple-Grade Record Bar */}
                 <div style={{
-                  background: '#faf5ff',
-                  border: '1.5px solid #e9d5ff',
+                  background: '#f3e8ff',
+                  border: 'none',
                   borderRadius: '16px',
                   padding: '16px 20px',
                   display: 'flex',
@@ -1183,7 +1185,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                       type="button"
                       onClick={startRecording}
                       style={{
-                        background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                        background: '#a855f7',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '12px',
@@ -1275,7 +1277,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     onClick={() => handleOpenMediaPicker('songs')}
                     style={{
                       background: '#fefce8',
-                      border: '1px solid #fef08a',
+                      border: 'none',
                       color: '#a16207',
                       borderRadius: '8px',
                       padding: '4px 10px',
@@ -1316,7 +1318,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         key={song.id}
                         style={{
                           background: '#fffbeb',
-                          border: '1px solid #fde68a',
+                          border: 'none',
                           borderRadius: '12px',
                           padding: '10px 14px',
                           display: 'flex',
@@ -1388,7 +1390,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     onClick={() => handleOpenMediaPicker('audios')}
                     style={{
                       background: '#ecfdf5',
-                      border: '1px solid #10b981',
+                      border: 'none',
                       color: '#059669',
                       borderRadius: '8px',
                       padding: '4px 10px',
@@ -1429,7 +1431,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         key={audio.id}
                         style={{
                           background: '#ecfdf5',
-                          border: '1px solid #10b981',
+                          border: 'none',
                           borderRadius: '12px',
                           padding: '10px 14px',
                           display: 'flex',
@@ -1443,7 +1445,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                             width: '32px',
                             height: '32px',
                             borderRadius: '8px',
-                            background: '#22c55e',
+                            background: '#34a853',
                             color: '#ffffff',
                             display: 'flex',
                             alignItems: 'center',
@@ -1500,7 +1502,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     onClick={() => setShowSpeedLadder(!showSpeedLadder)}
                     style={{
                       background: showSpeedLadder ? '#e0f2fe' : '#f1f5f9',
-                      border: showSpeedLadder ? '1px solid #7dd3fc' : '1px solid #e2e8f0',
+                      border: 'none',
                       color: showSpeedLadder ? '#0369a1' : '#475569',
                       borderRadius: '100px',
                       padding: '6px 14px',
@@ -1521,7 +1523,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     onClick={() => setShowSpotlight(!showSpotlight)}
                     style={{
                       background: showSpotlight ? '#f3e8ff' : '#f1f5f9',
-                      border: showSpotlight ? '1px solid #d8b4fe' : '1px solid #e2e8f0',
+                      border: 'none',
                       color: showSpotlight ? '#7e22ce' : '#475569',
                       borderRadius: '100px',
                       padding: '6px 14px',
@@ -1545,7 +1547,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     }}
                     style={{
                       background: showLoop ? '#fef9c3' : '#f1f5f9',
-                      border: showLoop ? '1px solid #fde047' : '1px solid #e2e8f0',
+                      border: 'none',
                       color: showLoop ? '#854d0e' : '#475569',
                       borderRadius: '100px',
                       padding: '6px 14px',
@@ -1565,8 +1567,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => setShowParentMemo(!showParentMemo)}
                     style={{
-                      background: showParentMemo ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#f1f5f9',
-                      border: showParentMemo ? 'none' : '1px solid #e2e8f0',
+                      background: showParentMemo ? '#10b981' : '#f1f5f9',
+                      border: 'none',
                       color: showParentMemo ? '#ffffff' : '#475569',
                       borderRadius: '100px',
                       padding: '6px 14px',
@@ -1586,7 +1588,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
               {/* Collapsible Tool 1: Spotlight-Looping */}
               {showSpotlight && (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px' }}>
+                <div style={{ background: '#f8fafc', border: 'none', borderRadius: '12px', padding: '12px 16px' }}>
                   <label style={{ fontSize: '0.76rem', fontWeight: 850, color: '#334155', display: 'block', marginBottom: '6px' }}>
                     🔁 Problemstellen-Loop (z.B. Takt 9–12)
                   </label>
@@ -1602,7 +1604,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
               {/* Collapsible Tool 2: Loopstation Backing */}
               {showLoop && (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px 16px' }}>
+                <div style={{ background: '#f8fafc', border: 'none', borderRadius: '12px', padding: '12px 16px' }}>
                   <label style={{ fontSize: '0.76rem', fontWeight: 850, color: '#334155', display: 'block', marginBottom: '6px' }}>
                     🎛️ Loopstation Backing-Track
                   </label>
@@ -1626,8 +1628,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
               {/* Collapsible Tool 3: Eltern-Hinweis */}
               {showParentMemo && (
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '12px', padding: '12px 16px' }}>
-                  <label style={{ fontSize: '0.76rem', fontWeight: 850, color: '#065f46', display: 'block', marginBottom: '6px' }}>
+                <div style={{ background: '#d1fae5', border: 'none', borderRadius: '12px', padding: '12px 16px' }}>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 850, color: '#047857', display: 'block', marginBottom: '6px' }}>
                     👨‍👩‍👧 Eltern-Quick-Check
                   </label>
                   <input
@@ -1635,7 +1637,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     value={parentMemo}
                     onChange={(e) => setParentMemo(e.target.value)}
                     placeholder="Hör-Tipp für Eltern..."
-                    style={{ width: '100%', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '8px 12px', fontSize: '0.80rem', fontWeight: 600, color: '#065f46' }}
+                    style={{ width: '100%', border: 'none', borderRadius: '8px', padding: '8px 12px', fontSize: '0.80rem', fontWeight: 600, color: '#047857' }}
                   />
                 </div>
               )}
@@ -1667,7 +1669,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   type="button"
                   onClick={() => setActiveStep(3)}
                   style={{
-                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    background: '#0ea5e9',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '12px',
@@ -1709,21 +1711,21 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   <button
                     type="button"
                     onClick={selectAllToday}
-                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
                   >
                     Heute ({todayStudents.length})
                   </button>
                   <button
                     type="button"
                     onClick={selectAllFiltered}
-                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
                   >
                     Alle ({allStudents.length})
                   </button>
                   <button
                     type="button"
                     onClick={clearSelection}
-                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
+                    style={{ background: '#f1f5f9', border: 'none', borderRadius: '6px', padding: '3px 10px', fontSize: '0.70rem', fontWeight: 800, cursor: 'pointer' }}
                   >
                     Leeren
                   </button>
@@ -1826,7 +1828,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                           )}
                         </div>
                         {isToday && (
-                          <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 8px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '0.66rem', fontWeight: 850, color: '#ffffff', background: '#10b981', padding: '2px 8px', borderRadius: '4px' }}>
                             Heute
                           </span>
                         )}
@@ -1843,11 +1845,11 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => setTargetWeekOffset(0)}
                     style={{
-                      border: '1px solid #cbd5e1',
+                      border: targetWeekOffset === 0 ? 'none' : '1px solid #cbd5e1',
                       borderRadius: '6px',
                       padding: '4px 10px',
                       fontWeight: targetWeekOffset === 0 ? 850 : 600,
-                      background: targetWeekOffset === 0 ? '#0284c7' : '#ffffff',
+                      background: targetWeekOffset === 0 ? '#0ea5e9' : '#ffffff',
                       color: targetWeekOffset === 0 ? '#ffffff' : '#475569',
                       cursor: 'pointer'
                     }}
@@ -1858,11 +1860,11 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     type="button"
                     onClick={() => setTargetWeekOffset(1)}
                     style={{
-                      border: '1px solid #cbd5e1',
+                      border: targetWeekOffset === 1 ? 'none' : '1px solid #cbd5e1',
                       borderRadius: '6px',
                       padding: '4px 10px',
                       fontWeight: targetWeekOffset === 1 ? 850 : 600,
-                      background: targetWeekOffset === 1 ? '#0284c7' : '#ffffff',
+                      background: targetWeekOffset === 1 ? '#0ea5e9' : '#ffffff',
                       color: targetWeekOffset === 1 ? '#ffffff' : '#475569',
                       cursor: 'pointer'
                     }}
@@ -1933,8 +1935,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
             {/* Simulated Clean Mobile Card */}
             <div style={{
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-              border: '1.5px solid #cbd5e1',
+              background: '#f8fafc',
+              border: 'none',
               borderRadius: '16px',
               padding: '16px',
               display: 'flex',
@@ -1951,7 +1953,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                   </span>
                 </div>
                 {selectedTags.length > 0 && (
-                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '2px 8px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#ffffff', background: '#10b981', padding: '2px 8px', borderRadius: '100px' }}>
                     {selectedTags[0]}
                   </span>
                 )}
@@ -1973,14 +1975,14 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          background: '#fff7ed',
-                          border: '1px solid #ffedd5',
+                          background: '#ffedd5',
+                          border: 'none',
                           padding: '3px 8px',
                           borderRadius: '6px'
                         }}
                       >
-                        <BookOpen size={11} color="#ea580c" />
-                        <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#9a3412' }}>
+                        <BookOpen size={11} color="#c2410c" />
+                        <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#c2410c' }}>
                           {lw.title} {lw.pages ? `(S. ${lw.pages})` : ''}
                         </span>
                       </div>
@@ -1999,7 +2001,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         background: '#ffffff',
                         borderRadius: '10px',
                         padding: '8px 10px',
-                        border: '1px solid #fef08a',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
@@ -2026,7 +2028,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
               {recordedAudioUrl && (
                 <div style={{ background: '#ffffff', borderRadius: '10px', padding: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#8b5cf6', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#a855f7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Play size={12} />
                     </div>
                     <div>
@@ -2056,7 +2058,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                         background: '#ffffff',
                         borderRadius: '10px',
                         padding: '8px 10px',
-                        border: '1px solid #bbf7d0',
+                        border: 'none',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
@@ -2068,7 +2070,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                           {audio.title}
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#ffffff', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', padding: '1px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#ffffff', background: '#10b981', padding: '1px 6px', borderRadius: '4px' }}>
                         {audio.duration || 30}s
                       </span>
                     </div>
@@ -2080,7 +2082,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
               {showLoop && includeLoop && loopTitle && (
                 <div style={{ background: '#ffffff', borderRadius: '10px', padding: '8px 10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Sliders size={12} color="#eab308" />
+                    <Sliders size={12} color="#facc15" />
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
                       {loopTitle}
                     </span>
@@ -2125,7 +2127,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                 width: '100%',
                 background: selectedStudentIds.size === 0
                   ? '#94a3b8'
-                  : 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  : '#0ea5e9',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '14px',

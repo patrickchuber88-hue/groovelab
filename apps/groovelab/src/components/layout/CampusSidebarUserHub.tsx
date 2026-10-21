@@ -71,9 +71,9 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center', 
-        gap: '10px',
+        gap: '6px',
         width: '100%',
-        padding: '8px 0',
+        padding: '4px 0',
         boxSizing: 'border-box'
       }}>
         {/* Tactile Mini Ausweis Button */}
@@ -84,9 +84,9 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
             title={`Digitalen Ausweis öffnen (ID: ${canonicalCampusId})`}
             aria-label={`Digitalen Ausweis öffnen – ID ${canonicalCampusId}`}
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '12px',
+              width: '38px',
+              height: '38px',
+              borderRadius: '11px',
               border: 'none',
               background: badgeBg,
               color: badgeColor,
@@ -100,7 +100,7 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
             }}
             className="hover-scale sidebar-bottom-btn"
           >
-            <QrCode size={18} strokeWidth={2.4} />
+            <QrCode size={17} strokeWidth={2.4} />
           </button>
         )}
 
@@ -111,8 +111,8 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
           title={`${userDisplayName} – Mein Profil`}
           aria-label="Mein Profil öffnen"
           style={{
-            width: '42px',
-            height: '42px',
+            width: '38px',
+            height: '38px',
             borderRadius: '50%',
             border: 'none',
             background: '#f8fafc',
@@ -238,8 +238,8 @@ export const CampusSidebarUserHub: React.FC<CampusSidebarUserHubProps> = ({
           }}
           className="hover-scale"
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = isGreenTheme ? '#ecfdf5' : '#fefce8';
-            e.currentTarget.style.borderColor = isGreenTheme ? '#10b981' : '#fde047';
+            e.currentTarget.style.background = isGreenTheme ? '#e6f4ea' : '#fefce8';
+            e.currentTarget.style.borderColor = isGreenTheme ? '#34a853' : '#fde047';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.04)';
           }}
           onMouseLeave={(e) => {

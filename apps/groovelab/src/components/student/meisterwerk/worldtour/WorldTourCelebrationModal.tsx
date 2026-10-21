@@ -242,7 +242,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                 padding: '6px 14px',
                 borderRadius: '12px',
                 background: '#f5f3ff',
-                border: '1.5px solid #ddd6fe',
+                border: 'none',
                 color: '#6d28d9',
                 fontWeight: 900,
                 fontSize: '0.86rem',
@@ -283,7 +283,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                 padding: '8px 12px',
                 borderRadius: '10px',
                 background: '#fefce8',
-                border: '1px solid #fef08a',
+                border: 'none',
                 fontSize: '0.78rem',
                 color: '#854d0e',
                 fontWeight: 750,
@@ -342,7 +342,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                   padding: '8px',
                   borderRadius: '10px',
                   background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  border: 'none',
                   textAlign: 'center'
                 }}
               >
@@ -360,7 +360,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                   padding: '8px',
                   borderRadius: '10px',
                   background: '#fefce8',
-                  border: '1px solid #fef08a',
+                  border: 'none',
                   textAlign: 'center'
                 }}
               >
@@ -378,7 +378,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
                   padding: '8px',
                   borderRadius: '10px',
                   background: '#fff1f2',
-                  border: '1px solid #fecdd3',
+                  border: 'none',
                   textAlign: 'center'
                 }}
               >
@@ -418,7 +418,7 @@ export const WorldTourCelebrationModal: React.FC<WorldTourCelebrationModalProps>
               padding: '12px 18px',
               borderRadius: '12px',
               background: '#f0f9ff',
-              border: '1.5px solid #bae6fd',
+              border: 'none',
               color: '#0369a1',
               fontWeight: 850,
               fontSize: '0.90rem',

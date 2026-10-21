@@ -129,6 +129,80 @@ async function getOrCreatePersistentSalt(): Promise<Uint8Array> {
   return volatileSessionSalt;
 }
 
+const VAULT_CRYPTOKEY_IDB_KEY = 'campus_offline_vault_nonextractable_key_v2';
+
+/**
+ * Retrieves or generates a hardware-bound, non-extractable 256-bit AES-GCM CryptoKey in IndexedDB.
+ * Structured clone in IndexedDB preserves the CryptoKey across reloads while keeping raw key bytes
+ * completely inaccessible to JavaScript (extractable = false, OWASP ASVS L3 V14).
+ */
+async function getOrCreateIndexedDbNonExtractableKey(): Promise<CryptoKey | null> {
+  if (typeof window === 'undefined' || !window.indexedDB || !window.crypto?.subtle) {
+    return null;
+  }
+
+  try {
+    const existingKey = await new Promise<CryptoKey | null>((resolve) => {
+      const req = window.indexedDB.open(VAULT_META_STORE, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('metadata')) {
+          req.result.createObjectStore('metadata');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction('metadata', 'readonly');
+          const getReq = tx.objectStore('metadata').get(VAULT_CRYPTOKEY_IDB_KEY);
+          getReq.onsuccess = () => {
+            const res = getReq.result;
+            resolve(res && typeof res === 'object' && 'type' in res ? (res as CryptoKey) : null);
+          };
+          getReq.onerror = () => resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    });
+
+    if (existingKey) {
+      return existingKey;
+    }
+
+    const generatedKey = await window.crypto.subtle.generateKey(
+      { name: VAULT_CONFIG.ALGORITHM, length: VAULT_CONFIG.KEY_LENGTH },
+      false, // non-extractable!
+      ['encrypt', 'decrypt']
+    );
+
+    await new Promise<void>((resolve) => {
+      const req = window.indexedDB.open(VAULT_META_STORE, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains('metadata')) {
+          req.result.createObjectStore('metadata');
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction('metadata', 'readwrite');
+          tx.objectStore('metadata').put(generatedKey, VAULT_CRYPTOKEY_IDB_KEY);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch {
+          resolve();
+        }
+      };
+      req.onerror = () => resolve();
+    });
+
+    return generatedKey;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Initialisiert oder liefert den flüchtigen Sitzungsschlüssel
  */
@@ -141,15 +215,24 @@ async function getOrCreateSessionKey(customPassphrase?: string): Promise<CryptoK
     throw new Error('Web Cryptography API (crypto.subtle) ist in dieser Umgebung nicht verfügbar.');
   }
 
+  // [P2-5] Primary path: Use non-extractable 256-bit AES-GCM CryptoKey stored in IndexedDB
+  if (!customPassphrase) {
+    const idbKey = await getOrCreateIndexedDbNonExtractableKey();
+    if (idbKey) {
+      volatileSessionKey = idbKey;
+      return idbKey;
+    }
+  }
+
   if (!volatileSessionSalt) {
     volatileSessionSalt = await getOrCreatePersistentSalt();
   }
 
-  // Ableitung aus Passphrase oder gerätegebundenem Seed
-  const seedString = customPassphrase || (
-    'campus_session_vault_' + 
-    volatileSessionSalt[0] + '_' + volatileSessionSalt[7] + '_' + volatileSessionSalt[15]
-  );
+  // Full 128-bit/256-bit entropy derivation (all 16 bytes of salt encoded in hex, never 3 bytes)
+  const fullSaltHex = Array.from(volatileSessionSalt)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const seedString = customPassphrase || `campus_session_vault_v2_${fullSaltHex}`;
 
   const encoder = new TextEncoder();
   const baseKey = await window.crypto.subtle.importKey(

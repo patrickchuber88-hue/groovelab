@@ -107,12 +107,12 @@ export const RAINBOW_MARKER_PALETTE: RainbowMarkerColor[] = [
     label: 'Amber'
   },
   {
-    bg: '#eab308',
+    bg: '#facc15',
     border: '#ca8a04',
     iconColor: '#0f172a', // Strikter WCAG 2.2 AA Kontrast Slate-900 auf GrooveLab-Gelb (> 12:1)
-    lightBg: 'rgba(234, 179, 8, 0.12)',
-    lightBorder: 'rgba(234, 179, 8, 0.35)',
-    accentBar: '#eab308',
+    lightBg: 'rgba(250, 204, 21, 0.12)',
+    lightBorder: 'rgba(250, 204, 21, 0.35)',
+    accentBar: '#facc15',
     label: 'GrooveLab-Gelb'
   },
   {
@@ -1166,7 +1166,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         style={{
           background: '#ffffff',
           borderRadius: isMobile ? '22px' : '26px',
-          maxWidth: '560px',
+          maxWidth: isMobile ? '100%' : 'min(820px, 95vw)',
           width: '100%',
           maxHeight: isMobile ? '94dvh' : '92vh',
           boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.32)',
@@ -1195,7 +1195,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                 width: '40px',
                 height: '40px',
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.18) 100%)',
+                background: '#fee2e2',
                 border: 'none',
                 display: 'flex',
                 alignItems: 'center',
@@ -1318,18 +1318,18 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
           </div>
         )}
 
-        {/* 🎛️ Scrollable Body */}
+        {/* ⚓ Fixed Sticky Studio Stage: Waveform & Transport are ALWAYS visible! */}
         <div
           style={{
-            padding: '16px 20px',
-            overflowY: 'auto',
+            padding: isMobile ? '12px 14px 10px 14px' : '14px 20px 12px 20px',
+            background: '#ffffff',
+            borderBottom: '1px solid #f1f5f9',
             display: 'flex',
             flexDirection: 'column',
-            gap: '14px',
-            flex: 1
+            gap: isMobile ? '10px' : '12px',
+            flexShrink: 0,
+            zIndex: 10
           }}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
         >
           {/* 🌊 1. High-Energy Kinetische Wellenform & Laser-Playhead (YouTube Style) */}
           <StudioWaveformTimelineStage
@@ -1352,6 +1352,10 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             onWaveformPointerDown={handleWaveformPointerDown}
             onPinPointerDown={handlePinPointerDown}
             onPlayNotePreRoll={handlePlayNotePreRoll}
+            isAddingNote={isAddingNote}
+            newNoteTime={newNoteTime}
+            newNoteTag={newNoteTag}
+            onNewNoteTimeChange={setNewNoteTime}
           />
 
           {/* 🎬 2. Hero Transport Dock & Segmented Speed Capsule (YouTube Player Bar) */}
@@ -1368,7 +1372,22 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             onOpenNoteAtTime={handleOpenNoteAtTime}
             isMobile={isMobile}
           />
+        </div>
 
+        {/* 📜 Dynamic Scrollable Feed: Only Notes & Composer scroll here */}
+        <div
+          style={{
+            padding: isMobile ? '12px 14px' : '14px 20px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            flex: 1,
+            minHeight: 0
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {/* 📱 3. Creator Moments & Marker Feed (Instagram Story Style) */}
           <StudioMarkerFeed
             notes={notes}

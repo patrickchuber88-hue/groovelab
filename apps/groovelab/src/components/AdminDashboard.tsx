@@ -61,7 +61,7 @@ export function AdminDashboard({
   forceTab, 
   onTabChange, 
   onOpenBandProfile, 
-  activePlatform = 'groovelab',
+  activePlatform = 'campus',
   session,
   onSessionChange,
   locationMode,
@@ -146,6 +146,7 @@ export function AdminDashboard({
     admin,
     userId,
     activePlatform,
+    activeTab,
     songs,
     setSongs
   });
@@ -159,17 +160,52 @@ export function AdminDashboard({
     fetchData,
     teachers,
     activeWorkspace,
-    userRole
+    userRole,
+    activeTab
   });
 
-  // UI helpers
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  // 🚀 DOM Keep-Alive for 0ms Campus ⇄ GrooveLab switching
+  const isTeacherViewActive = activeTab === 'live' || activeTab === 'briefing';
+  const [hasVisitedTeacherView, setHasVisitedTeacherView] = useState(isTeacherViewActive);
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    if (isTeacherViewActive && !hasVisitedTeacherView) {
+      setHasVisitedTeacherView(true);
+    }
+  }, [isTeacherViewActive, hasVisitedTeacherView]);
+
+  // UI helpers (Simulator-aware for In-DOM & Iframe modes)
+  const resolveAdminViewportWidth = () => {
+    if (typeof window === 'undefined') return 1200;
+    if (typeof document !== 'undefined') {
+      const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
+      if (simWidth > 0) return simWidth;
+      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+    }
+    return window.innerWidth;
+  };
+  const [windowWidth, setWindowWidth] = useState(resolveAdminViewportWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(resolveAdminViewportWidth());
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('groovelab_orientation_changed', handleResize);
+    handleResize();
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('groovelab_orientation_changed', handleResize);
+    };
   }, []);
-  const isMobile = windowWidth <= 768;
+  const isSimTablet = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'tablet' ||
+    Boolean(document.querySelector('.sim-viewport-tablet'))
+  );
+  const isSimMobile = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'mobile' ||
+    Boolean(document.querySelector('.sim-viewport-mobile'))
+  );
+  const isMobile = isSimMobile || (!isSimTablet && windowWidth <= 768);
 
   // 🏛️ Tier-1 SWR Preload: Pre-warm CampusEventsBoard chunk in browser cache during idle
   useEffect(() => {
@@ -244,7 +280,7 @@ export function AdminDashboard({
       style={{ 
         flex: 1, 
         padding: hideHeader ? '0px' : ((activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? '0px' : '0px 10px 10px 10px') : (isMobile ? '0px' : '10px')), 
-        overflowY: (activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? 'visible' : 'hidden') : 'auto',
+        overflowY: isMobile ? 'visible' : ((activeTab === 'live' || activeTab === 'briefing') ? 'hidden' : 'auto'),
         height: (activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? 'auto' : '100%') : 'auto',
         display: 'flex',
         flexDirection: 'column',
@@ -256,7 +292,7 @@ export function AdminDashboard({
       {/* Ghost Mode Support Banner */}
       {isGhostActive && (
         <div style={{
-          background: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
+          background: '#6366f1',
           color: 'white',
           padding: '12px 20px',
           borderRadius: '16px',
@@ -264,6 +300,8 @@ export function AdminDashboard({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '10px',
           boxShadow: 'none',
           zIndex: 100
         }}>
@@ -326,27 +364,29 @@ export function AdminDashboard({
         </header>
       )}
 
-      {/* TAB 1: LIVE LAB & BRIEFING */}
-      {(activeTab === 'live' || activeTab === 'briefing') && (
-        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Lehrer-Dashboard wird geladen...</div>}>
-          <TeacherDashboard 
-            key={`teacher-dashboard-view-${activePlatform}`}
-            userId={userId} 
-            initialTeacher={admin}
-            hideHeader={true} 
-            hideSidebar={true}
-            viewMode="admin" 
-            activePlatform={activePlatform as any}
-            initialTab={activePlatform === 'campus' ? 'briefing' : 'live'}
-            onTabChange={(id) => onTabChange?.(id)}
-            isSidebarCollapsed={isSidebarCollapsed}
-            setIsSidebarCollapsed={setIsSidebarCollapsed}
-            session={session}
-            onSessionChange={onSessionChange}
-            locationMode={locationMode}
-            onLocationModeChange={onLocationModeChange}
-          />
-        </Suspense>
+      {/* TAB 1: LIVE LAB & BRIEFING (Preserved in DOM for 0ms Campus ⇄ GrooveLab Switch) */}
+      {(hasVisitedTeacherView || isTeacherViewActive) && (
+        <div style={{ display: isTeacherViewActive ? 'block' : 'none', width: '100%' }}>
+          <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Lehrer-Dashboard wird geladen...</div>}>
+            <TeacherDashboard 
+              key="teacher-dashboard-view"
+              userId={userId} 
+              initialTeacher={admin}
+              hideHeader={true} 
+              hideSidebar={true}
+              viewMode="admin" 
+              activePlatform={activePlatform as any}
+              initialTab={activeTab === 'briefing' ? 'briefing' : 'live'}
+              onTabChange={(id) => onTabChange?.(id)}
+              isSidebarCollapsed={isSidebarCollapsed}
+              setIsSidebarCollapsed={setIsSidebarCollapsed}
+              session={session}
+              onSessionChange={onSessionChange}
+              locationMode={locationMode}
+              onLocationModeChange={onLocationModeChange}
+            />
+          </Suspense>
+        </div>
       )}
 
       {/* TAB: STUNDENPLAN (SCHEDULE) */}
@@ -488,7 +528,7 @@ export function AdminDashboard({
             handleDeleteTeacher={teachersState.handleDeleteTeacher}
             handleToggleObserver={teachersState.handleToggleObserver}
             setSelectedQRUser={studentsState.setSelectedQRUser}
-            windowWidth={typeof window !== 'undefined' ? window.innerWidth : 1200}
+            windowWidth={windowWidth}
           />
         </Suspense>
       )}

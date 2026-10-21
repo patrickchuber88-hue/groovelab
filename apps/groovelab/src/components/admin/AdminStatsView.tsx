@@ -76,7 +76,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
   handleDeleteGoal,
   resolveUserAvatar
 }) => {
-  const brandColor = activePlatform === "campus" ? "#34a853" : (activePlatform === "groovelab" ? "#eab308" : "#ea4335");
+  const brandColor = activePlatform === "campus" ? "#34a853" : (activePlatform === "groovelab" ? "#facc15" : "#ea4335");
     if (!stats) return (
       <div style={{ textAlign: 'center', padding: '60px' }}>
         <div style={{ fontSize: '1.2rem', color: '#64748b', fontWeight: 600 }}>Lade Statistiken...</div>
@@ -333,7 +333,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                       style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600 }}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Ziel (Minuten)</label>
                       <input 
@@ -754,7 +754,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                 { name: 'E-Gitarre', value: stats.stageReadyPerInst?.guitar || 0, iconKey: 'E-Gitarre', color: '#ef4444' }, // Red
                 { name: 'E-Piano / Keys', value: stats.stageReadyPerInst?.keys || 0, iconKey: 'E-Piano', color: '#a855f7' }, // Purple
                 { name: 'E-Drums', value: stats.stageReadyPerInst?.drums || 0, iconKey: 'E-Drums', color: '#3b82f6' }, // Blue
-                { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, iconKey: 'E-Bass', color: '#eab308' }, // Yellow
+                { name: 'E-Bass', value: stats.stageReadyPerInst?.bass || 0, iconKey: 'E-Bass', color: '#facc15' }, // Yellow
                 { name: 'Vocals / Gesang', value: stats.stageReadyPerInst?.vocals || 0, iconKey: 'Vocals', color: '#ec4899' } // Pink
               ].map((inst, idx) => {
                 const maxVal = Math.max(...Object.values(stats.stageReadyPerInst || {}).map(Number), 1);
@@ -898,7 +898,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                         <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{artist}</div>
                       </div>
                     </div>
-                    <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, border: '1px solid #dbeafe' }}>
+                    <div style={{ background: '#eff6ff', color: '#2563eb', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 850, border: 'none' }}>
                       {song.count} Schüler üben
                     </div>
                   </div>

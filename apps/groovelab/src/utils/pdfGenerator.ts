@@ -26,7 +26,7 @@ export const generateConsentPDF = async (
 
   // Colors
   const primaryColor = activePlatform === 'groovelab'
-    ? [234, 179, 8]      // Yellow (#eab308)
+    ? [250, 204, 21]      // Yellow (#facc15)
     : [52, 168, 83];     // Green (#34a853)
   
   const textDark = [30, 41, 59];     // Slate 800
@@ -111,7 +111,7 @@ export const generateConsentPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.text('• Deutsche Server (Hetzner)', 82, currentY + 13);
+  doc.text('• IONOS & Hetzner (DE)', 82, currentY + 13);
   doc.text('• DSGVO-AVV gezeichnet', 82, currentY + 18);
 
   // Col 3: Kosten
@@ -772,7 +772,7 @@ export const generateParentQuickstartPDF = async (
 
   // Dynamic Theme Colors
   const primaryColor = activePlatform === 'groovelab'
-    ? [234, 179, 8]      // Gold-Yellow (#eab308)
+    ? [250, 204, 21]      // Gold-Yellow (#facc15)
     : activePlatform === 'campus'
       ? [52, 168, 83]    // Campus Green (#34a853)
       : [5, 150, 105];   // Emerald Green (#059669)
@@ -966,11 +966,11 @@ export const generateParentQuickstartPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  const step2Text = '2. Schülerausweis scannen oder Zugangs-PIN eingeben (ohne Registrierung)';
+  const step2Text = '2. Schülerausweis scannen oder 4-stellige Schüler-PIN eingeben (Eltern-PIN: 6-stellig für Jugendschutz)';
   const step3Text = activePlatform === 'groovelab'
-    ? '3. Musiker-Avatar wählen, Band-Room beitreten und losgrooven!'
+    ? '3. 3D-Band-Avatar wählen, Band-Room beitreten und losgrooven!'
     : activePlatform === 'campus'
-      ? '3. Hausaufgabenheft öffnen und direkt losüben!'
+      ? '3. Hausaufgabenheft öffnen und direkt mit Instrumenten-Avatar üben!'
       : '3. Aufgabenheft & Band-Rooms auf Smartphone oder Tablet öffnen!';
   doc.text(step2Text, 24, y + 28.5);
   doc.text(step3Text, 24, y + 35.5);
@@ -1009,11 +1009,11 @@ export const generateParentQuickstartPDF = async (
 
   // 6. Pricing Transparency Box
   let pricingText = activePlatform === 'groovelab'
-    ? 'VOLLSTÄNDIG INKLUSIVE: Die Nutzung des GrooveLab-Moduls wird zu 100% von der Musikschule getragen und ist für Schüler kostenfrei.'
-    : '100% KOSTENLOS: Die Musikschule übernimmt alle Cloud- & Bereitstellungsgebühren für Schüler und Eltern.';
+    ? 'VOLLSTÄNDIG INKLUSIVE: Die Bereitstellung des GrooveLab-Moduls wird zu 100% von der Musikschule getragen und ist für Familien kostenfrei.'
+    : '100% KOSTENLOS: Die Musikschule ist Sammelzahler und übernimmt 100% aller Bereitstellungsgebühren für Schüler und Eltern.';
   if (activePlatform !== 'groovelab') {
     if (studentBillingOption === 'student_full' || studentBillingOption === 'student_partial') {
-      pricingText = 'KOSTENTRANSPARENZ: Jahresbeitrag für die Cloud-Bereitstellung: 0,49 € / Mo. (1. Monat kostenlos, max. 11 × 0,49 € = 5,39 € / Schuljahr; keine Lizenzkaufgebühren).';
+      pricingText = 'KOSTENTRANSPARENZ: Basisfunktionen (Hausaufgabenheft, Termine) sind 100% kostenlos. Erweiterte Studio- & Übetools max. 5,39 € / Schuljahr.';
     }
   }
 
@@ -1033,11 +1033,11 @@ export const generateParentQuickstartPDF = async (
   doc.line(18, footerY - 4, 192, footerY - 4);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.setTextColor(mutedText[0], mutedText[1], mutedText[2]);
   const footerContact = contactEmail ? ` • Kontakt: ${contactEmail}` : '';
-  doc.text(`${schoolName} • Offizielle Eltern-Information • Powered by Campus-Groovelab${footerContact}`, 18, footerY);
-  doc.text('Seite 1 / 1 • DSGVO-konform', 192, footerY, { align: 'right' });
+  doc.text(`${schoolName} • Datenschutzkonform nach Kultusministerien-Leitlinien • Hosting: IONOS & Hetzner (DE)${footerContact}`, 18, footerY);
+  doc.text('Freiwillig • Art. 7 Abs. 3 DSGVO formlos widerruflich', 192, footerY, { align: 'right' });
 
   const cleanSchool = (schoolName || 'Musikschule').replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, '_');
   const platformTag = activePlatform === 'groovelab'

@@ -5,48 +5,49 @@
  */
 
 export const CANONICAL_LEHRWERK_COLOR = {
-  from: '#ffe4e6',
-  to: '#fecdd3',
-  text: '#e11d48',
-  accent: '#e11d48',
-  border: '#fecdd3',
-  badgeBg: '#fff1f2',
-  badgeText: '#e11d48',
-  shadowFrom: 'rgba(225, 29, 72, 0.18)',
-  shadowTo: 'rgba(225, 29, 72, 0.12)'
+  from: '#fee2e2',
+  to: '#fee2e2',
+  text: '#b91c1c',
+  accent: '#ef4444',
+  border: 'transparent',
+  badgeBg: '#fee2e2',
+  badgeText: '#b91c1c',
+  shadowFrom: 'rgba(15, 23, 42, 0.04)',
+  shadowTo: 'rgba(15, 23, 42, 0.02)'
 };
 
 export const getLehrwerkColor = (_title?: string, _customLehrwerkeList?: any[]) => {
   return CANONICAL_LEHRWERK_COLOR;
 };
 
+// 100% Solid Single-Color Mapping auf die 12 Notenschnipsel-Tonfarben (BOOMWHACKER_COLORS C bis H + REST)
 export const CURATED_ALPHABETICAL_SONG_PALETTE: Record<string, { from: string; to: string; text: string; shadowFrom?: string; shadowTo?: string }> = {
-  A: { from: '#ffe4e6', to: '#fecdd3', text: '#be123c', shadowFrom: 'rgba(190, 18, 60, 0.2)', shadowTo: 'rgba(190, 18, 60, 0.12)' },
-  B: { from: '#ffedd5', to: '#fed7aa', text: '#c2410c', shadowFrom: 'rgba(194, 65, 12, 0.2)', shadowTo: 'rgba(194, 65, 12, 0.12)' },
-  C: { from: '#fef3c7', to: '#fde68a', text: '#b45309', shadowFrom: 'rgba(180, 83, 9, 0.2)', shadowTo: 'rgba(180, 83, 9, 0.12)' },
-  D: { from: '#fef9c3', to: '#fef08a', text: '#854d0e', shadowFrom: 'rgba(133, 77, 14, 0.2)', shadowTo: 'rgba(133, 77, 14, 0.12)' },
-  E: { from: '#ecfccb', to: '#d9f99d', text: '#4d7c0f', shadowFrom: 'rgba(77, 124, 15, 0.2)', shadowTo: 'rgba(77, 124, 15, 0.12)' },
-  F: { from: '#d1fae5', to: '#a7f3d0', text: '#047857', shadowFrom: 'rgba(4, 120, 87, 0.2)', shadowTo: 'rgba(4, 120, 87, 0.12)' },
-  G: { from: '#ccfbf1', to: '#99f6e4', text: '#0f766e', shadowFrom: 'rgba(15, 118, 110, 0.2)', shadowTo: 'rgba(15, 118, 110, 0.12)' },
-  H: { from: '#e0f2fe', to: '#bae6fd', text: '#0369a1', shadowFrom: 'rgba(3, 105, 161, 0.2)', shadowTo: 'rgba(3, 105, 161, 0.12)' },
-  I: { from: '#dbeafe', to: '#bfdbfe', text: '#1d4ed8', shadowFrom: 'rgba(29, 78, 216, 0.2)', shadowTo: 'rgba(29, 78, 216, 0.12)' },
-  J: { from: '#e0e7ff', to: '#c7d2fe', text: '#4338ca', shadowFrom: 'rgba(67, 56, 202, 0.2)', shadowTo: 'rgba(67, 56, 202, 0.12)' },
-  K: { from: '#ede9fe', to: '#ddd6fe', text: '#6d28d9', shadowFrom: 'rgba(109, 40, 217, 0.2)', shadowTo: 'rgba(109, 40, 217, 0.12)' },
-  L: { from: '#f3e8ff', to: '#e9d5ff', text: '#7e22ce', shadowFrom: 'rgba(126, 34, 206, 0.2)', shadowTo: 'rgba(126, 34, 206, 0.12)' },
-  M: { from: '#fae8ff', to: '#f5d0fe', text: '#a21caf', shadowFrom: 'rgba(162, 28, 175, 0.2)', shadowTo: 'rgba(162, 28, 175, 0.12)' },
-  N: { from: '#fce7f3', to: '#fbcfe8', text: '#be185d', shadowFrom: 'rgba(190, 24, 93, 0.2)', shadowTo: 'rgba(190, 24, 93, 0.12)' },
-  O: { from: '#f5f3ff', to: '#ede9fe', text: '#5b21b6', shadowFrom: 'rgba(91, 33, 182, 0.2)', shadowTo: 'rgba(91, 33, 182, 0.12)' },
-  P: { from: '#fff1f2', to: '#ffe4e6', text: '#9f1239', shadowFrom: 'rgba(159, 18, 57, 0.2)', shadowTo: 'rgba(159, 18, 57, 0.12)' },
-  Q: { from: '#ffedd5', to: '#fed7aa', text: '#9a3412', shadowFrom: 'rgba(154, 52, 18, 0.2)', shadowTo: 'rgba(154, 52, 18, 0.12)' },
-  R: { from: '#ffe4e6', to: '#fecdd3', text: '#881337', shadowFrom: 'rgba(136, 19, 55, 0.2)', shadowTo: 'rgba(136, 19, 55, 0.12)' },
-  S: { from: '#dcfce7', to: '#bbf7d0', text: '#15803d', shadowFrom: 'rgba(21, 128, 61, 0.2)', shadowTo: 'rgba(21, 128, 61, 0.12)' },
-  T: { from: '#cffafe', to: '#a5f3fc', text: '#0e7490', shadowFrom: 'rgba(14, 116, 144, 0.2)', shadowTo: 'rgba(14, 116, 144, 0.12)' },
-  U: { from: '#e0f2fe', to: '#bae6fd', text: '#0284c7', shadowFrom: 'rgba(2, 132, 199, 0.2)', shadowTo: 'rgba(2, 132, 199, 0.12)' },
-  V: { from: '#ede9fe', to: '#ddd6fe', text: '#5b21b6', shadowFrom: 'rgba(91, 33, 182, 0.2)', shadowTo: 'rgba(91, 33, 182, 0.12)' },
-  W: { from: '#ccfbf1', to: '#99f6e4', text: '#115e59', shadowFrom: 'rgba(17, 94, 89, 0.2)', shadowTo: 'rgba(17, 94, 89, 0.12)' },
-  X: { from: '#f1f5f9', to: '#e2e8f0', text: '#334155', shadowFrom: 'rgba(51, 65, 85, 0.2)', shadowTo: 'rgba(51, 65, 85, 0.12)' },
-  Y: { from: '#f8fafc', to: '#f1f5f9', text: '#1e293b', shadowFrom: 'rgba(30, 41, 59, 0.2)', shadowTo: 'rgba(30, 41, 59, 0.12)' },
-  Z: { from: '#e2e8f0', to: '#cbd5e1', text: '#0f172a', shadowFrom: 'rgba(15, 23, 42, 0.2)', shadowTo: 'rgba(15, 23, 42, 0.12)' }
+  A: { from: '#dbeafe', to: '#dbeafe', text: '#1d4ed8', shadowFrom: 'none', shadowTo: 'none' }, // Note A (Blau)
+  B: { from: '#f3e8ff', to: '#f3e8ff', text: '#7e22ce', shadowFrom: 'none', shadowTo: 'none' }, // Note B/H (Violett)
+  C: { from: '#fee2e2', to: '#fee2e2', text: '#b91c1c', shadowFrom: 'none', shadowTo: 'none' }, // Note C (Rot)
+  D: { from: '#ffedd5', to: '#ffedd5', text: '#c2410c', shadowFrom: 'none', shadowTo: 'none' }, // Note D (Orange)
+  E: { from: '#fef9c3', to: '#fef9c3', text: '#854d0e', shadowFrom: 'none', shadowTo: 'none' }, // Note E (GrooveLab-Gelb hell)
+  F: { from: '#e6f4ea', to: '#e6f4ea', text: '#137333', shadowFrom: 'none', shadowTo: 'none' }, // Note F (Campus-Grün hell)
+  G: { from: '#cffafe', to: '#cffafe', text: '#0e7490', shadowFrom: 'none', shadowTo: 'none' }, // Note G (Türkis)
+  H: { from: '#f3e8ff', to: '#f3e8ff', text: '#7e22ce', shadowFrom: 'none', shadowTo: 'none' }, // Note H (Violett)
+  I: { from: '#e0e7ff', to: '#e0e7ff', text: '#4338ca', shadowFrom: 'none', shadowTo: 'none' }, // Note A# (Indigo)
+  J: { from: '#d1fae5', to: '#d1fae5', text: '#047857', shadowFrom: 'none', shadowTo: 'none' }, // Note F# (Smaragd)
+  K: { from: '#e0f2fe', to: '#e0f2fe', text: '#0369a1', shadowFrom: 'none', shadowTo: 'none' }, // Note G# (Himmelblau)
+  L: { from: '#fee2e2', to: '#fee2e2', text: '#b91c1c', shadowFrom: 'none', shadowTo: 'none' }, // Note C# (Hellrot)
+  M: { from: '#ffedd5', to: '#ffedd5', text: '#c2410c', shadowFrom: 'none', shadowTo: 'none' }, // Note D# (Hellorange)
+  N: { from: '#fef9c3', to: '#fef9c3', text: '#854d0e', shadowFrom: 'none', shadowTo: 'none' }, // Note E (GrooveLab-Gelb hell)
+  O: { from: '#e6f4ea', to: '#e6f4ea', text: '#137333', shadowFrom: 'none', shadowTo: 'none' }, // Note F (Campus-Grün hell)
+  P: { from: '#d1fae5', to: '#d1fae5', text: '#047857', shadowFrom: 'none', shadowTo: 'none' }, // Note F# (Smaragd)
+  Q: { from: '#cffafe', to: '#cffafe', text: '#0e7490', shadowFrom: 'none', shadowTo: 'none' }, // Note G (Türkis)
+  R: { from: '#e0f2fe', to: '#e0f2fe', text: '#0369a1', shadowFrom: 'none', shadowTo: 'none' }, // Note G# (Himmelblau)
+  S: { from: '#dbeafe', to: '#dbeafe', text: '#1d4ed8', shadowFrom: 'none', shadowTo: 'none' }, // Note A (Blau)
+  T: { from: '#e0e7ff', to: '#e0e7ff', text: '#4338ca', shadowFrom: 'none', shadowTo: 'none' }, // Note A# (Indigo)
+  U: { from: '#f3e8ff', to: '#f3e8ff', text: '#7e22ce', shadowFrom: 'none', shadowTo: 'none' }, // Note B (Violett)
+  V: { from: '#fee2e2', to: '#fee2e2', text: '#b91c1c', shadowFrom: 'none', shadowTo: 'none' }, // Note C (Rot)
+  W: { from: '#ffedd5', to: '#ffedd5', text: '#c2410c', shadowFrom: 'none', shadowTo: 'none' }, // Note D (Orange)
+  X: { from: '#f1f5f9', to: '#f1f5f9', text: '#475569', shadowFrom: 'none', shadowTo: 'none' }, // Note REST (Pause)
+  Y: { from: '#e0e7ff', to: '#e0e7ff', text: '#4338ca', shadowFrom: 'none', shadowTo: 'none' }, // Note A# (Indigo)
+  Z: { from: '#e6f4ea', to: '#e6f4ea', text: '#137333', shadowFrom: 'none', shadowTo: 'none' }  // Note F (Campus-Grün hell)
 };
 
 export const getSongColor = (title: string) => {
@@ -64,14 +65,5 @@ export const getSongColor = (title: string) => {
   if (CURATED_ALPHABETICAL_SONG_PALETTE[firstChar]) {
     return CURATED_ALPHABETICAL_SONG_PALETTE[firstChar];
   }
-  const charCode = firstChar.charCodeAt(0) || 65;
-  const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
-  return {
-    from: `hsl(${hue}, 85%, 92%)`,
-    to: `hsl(${hue}, 80%, 82%)`,
-    text: `hsl(${hue}, 90%, 25%)`,
-    shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-    shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-  };
+  return CURATED_ALPHABETICAL_SONG_PALETTE.C;
 };

@@ -752,7 +752,7 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
               padding: '24px',
               borderRadius: '24px',
               background: '#f0fdf4',
-              border: '1.5px solid #bbf7d0',
+              border: 'none',
               width: '100%',
               boxSizing: 'border-box'
             }}>

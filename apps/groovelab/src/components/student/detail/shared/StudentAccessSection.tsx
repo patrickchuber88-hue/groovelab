@@ -88,12 +88,12 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
     : 'linear-gradient(135deg, #e6f4ea 0%, #ffffff 100%)';
 
   const borderColor = isGroove
-    ? 'rgba(234, 179, 8, 0.3)'
+    ? 'rgba(250, 204, 21, 0.4)'
     : 'rgba(52, 168, 83, 0.3)';
 
-  const titleColor = isGroove ? '#ca8a04' : '#34a853';
+  const titleColor = isGroove ? '#854d0e' : '#34a853';
   const badgeText = isGroove ? 'GrooveLab' : 'Campus';
-  const badgeBg = isGroove ? '#eab308' : '#34a853';
+  const badgeBg = isGroove ? '#facc15' : '#34a853';
   const passTitle = isGroove ? 'GrooveLab Member Pass' : 'Campus Pass';
   const passSubtitle = isGroove
     ? 'Musiker-Avatar • GrooveLab PWA Link'
@@ -205,7 +205,7 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
               height: '48px',
               borderRadius: '14px',
               objectFit: 'cover',
-              border: isGroove ? '2px solid #eab308' : '2px solid #34a853'
+              border: isGroove ? '2px solid #facc15' : '2px solid #34a853'
             }}
           />
           <div>
@@ -266,8 +266,8 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
               style={{
                 flex: 1,
                 background: '#ffffff',
-                color: isGroove ? '#ca8a04' : '#34a853',
-                border: `1.5px solid ${isGroove ? '#eab308' : '#34a853'}`,
+                color: isGroove ? '#854d0e' : '#34a853',
+                border: `1.5px solid ${isGroove ? '#facc15' : '#34a853'}`,
                 borderRadius: '14px',
                 padding: '12px 14px',
                 fontSize: '0.8rem',
@@ -355,7 +355,7 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
             width: '100%',
             background: '#fee2e2',
             color: '#dc2626',
-            border: '1.5px solid #fca5a5',
+            border: 'none',
             borderRadius: '14px',
             padding: '12px 16px',
             fontSize: '0.82rem',

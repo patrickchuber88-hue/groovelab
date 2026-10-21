@@ -144,6 +144,28 @@ export class IdempotencyLedger {
 
     this.records.set(key, record);
     this.touch(key, record);
+
+    // [P2-4] Persist completed idempotency nonce to PostgreSQL private_auth.security_nonce_ledger
+    // so replay protection survives BFF container restarts without blocking synchronous hot path.
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    if (serviceKey && supabaseUrl && process.env.NODE_ENV !== 'test') {
+      const ttlSeconds = Math.max(10, Math.round(effectiveTtl / 1000));
+      fetch(`${supabaseUrl}/rest/v1/rpc/record_security_idempotency_nonce`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({
+          p_nonce_key: key,
+          p_status: 'COMPLETED',
+          p_status_code: statusCode,
+          p_ttl_seconds: ttlSeconds
+        })
+      }).catch(() => {});
+    }
   }
 
   /**
@@ -179,8 +201,16 @@ export class IdempotencyLedger {
   }
 
   /**
+   * Computes a compact 16-hex-char SHA-256 caller scope hash from session/auth headers & IP
+   * so explicit Idempotency-Key headers are strictly isolated per caller session ([Vector 5]).
+   */
+  public computeCallerScopeHash(callerMaterial: string): string {
+    return crypto.createHash('sha256').update(callerMaterial || 'anon').digest('hex').slice(0, 16);
+  }
+
+  /**
    * Computes a deterministic SHA-256 fingerprint for a request.
-   * Combines client IP, HTTP method, route, and sorted JSON body.
+   * Combines client IP/scope, HTTP method, route, and sorted JSON body.
    */
   public computeFingerprint(
     ip: string,

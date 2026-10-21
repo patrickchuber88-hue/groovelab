@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useParentSessionLock } from '../../../hooks/useParentSessionLock';
-import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics } from '../../../utils/webauthn';
+import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics, extractWebAuthnAssertionPayload } from '../../../utils/webauthn';
 import { getOrCreateDeviceKey } from '../../../utils/sessionLeaseManager';
 import {
   verifyParentPinAuthoritative,
@@ -219,10 +219,12 @@ export function useStudentParentControls({
         throw new Error('Keine biometrische Bestätigung empfangen.');
       }
 
+      const assertionPayload = extractWebAuthnAssertionPayload(assertion);
       const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
         p_credential_id: assertion.id,
         p_challenge: chalData.challenge,
-        p_school_id: studentUser?.school_id || null
+        p_school_id: studentUser?.school_id || null,
+        ...assertionPayload
       });
 
       if (authErr || !authResult?.success) {

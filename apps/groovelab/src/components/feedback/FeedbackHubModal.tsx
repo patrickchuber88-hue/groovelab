@@ -121,7 +121,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
 
   // Theme color based on module
   const accentColor = activePlatform === 'groovelab' 
-    ? '#eab308' 
+    ? '#facc15' 
     : (userRole === 'admin' || userRole === 'secretary' || activePlatform === 'admin_desk')
       ? '#ea4335'
       : '#34a853';
@@ -705,7 +705,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                           <div style={{
                             marginTop: '2px',
                             background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                            border: '1.5px solid #bae6fd',
+                            border: 'none',
                             borderRadius: '12px',
                             padding: '12px',
                             display: 'flex',
@@ -1011,7 +1011,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                 {(feedbackType === 'support_request' || feedbackType === 'bug') && (
                   <div style={{
                     background: '#ecfdf5',
-                    border: '1.5px solid #10b981',
+                    border: 'none',
                     borderRadius: '12px',
                     padding: '10px 14px',
                     display: 'flex',
@@ -1450,7 +1450,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   padding: '10px 14px',
                   borderRadius: '10px',
                   backgroundColor: '#fee2e2',
-                  border: '1px solid #fca5a5',
+                  border: 'none',
                   color: '#b91c1c',
                   fontSize: '0.82rem',
                   display: 'flex',

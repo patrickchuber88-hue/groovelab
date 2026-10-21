@@ -155,7 +155,7 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
           {error && (
             <div style={{
               backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              border: 'none',
               color: '#991b1b',
               padding: '0.75rem 1rem',
               borderRadius: '12px',
@@ -193,7 +193,7 @@ export const ConfirmDeleteStudentModal: React.FC<ConfirmDeleteStudentModalProps>
               {/* Warning Box */}
               <div style={{
                 backgroundColor: '#fff1f2',
-                border: '1px solid #ffe4e6',
+                border: 'none',
                 borderRadius: '16px',
                 padding: '1rem 1.25rem',
                 display: 'flex',

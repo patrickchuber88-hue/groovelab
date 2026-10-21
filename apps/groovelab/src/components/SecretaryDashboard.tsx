@@ -36,6 +36,7 @@ import { SecretaryDashboardStyles } from './secretary/SecretaryDashboardStyles';
 import { SecretaryTrialBlockedOverlay } from './secretary/modals/SecretaryTrialBlockedOverlay';
 import { SecretaryRealtimeBookingToast } from './secretary/SecretaryRealtimeBookingToast';
 import { SecretaryDeveloperResetButton } from './secretary/SecretaryDeveloperResetButton';
+import { SecretaryPersonalSecurityModal } from './secretary/modals/SecretaryPersonalSecurityModal';
 import { migrateRoomLocalStorageToSupabase } from './secretary/utils/migrateRoomLocalStorage';
 import { generateStarterPin } from './secretary/utils/secretaryAuthUtils';
 import { checkTimeOverlap, formatInstrumentName } from './secretary/utils/secretaryFormatters';
@@ -187,6 +188,7 @@ export function SecretaryDashboard({
   const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
+  const [showPersonalSecurityModal, setShowPersonalSecurityModal] = useState<boolean>(false);
 
   const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
   const activeSubjectsList = useMemo(() => {
@@ -672,54 +674,57 @@ export function SecretaryDashboard({
         onClose={() => setRealtimeToast(prev => ({ ...prev, visible: false }))}
       />
 
-      {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR */}
-      <SecretarySidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={toggleSidebarCollapse}
-        secretarySubTab={secretarySubTab}
-        setSecretarySubTab={setSecretarySubTab}
-        campusSubTab={campusSubTab}
-        setCampusSubTab={setCampusSubTab}
-        groovelabSubTab={groovelabSubTab}
-        setGroovelabSubTab={setGroovelabSubTab}
-        hasCampusSub={hasCampusSub}
-        hasGroovelabSub={hasGroovelabSub}
-        enabledCampusSubjects={enabledCampusSubjects}
-        enabledCampusRooms={enabledCampusRooms}
-        enabledCampusEvents={enabledCampusEvents}
-        enabledCampusSchedules={enabledCampusSchedules}
-        crisisNotifications={crisisNotifications}
-        pendingSchedules={pendingSchedules}
-        startTour={startTour}
-        currentUserProfile={currentUserProfile}
-        setShowOwnQrModal={setShowOwnQrModal}
-        onLogout={onLogout}
-        handleSecretaryLogout={handleSecretaryLogout}
-        schoolName={schoolName}
-        isCurrentUserTeacher={isCurrentUserTeacher}
-        onRoleSwitched={onRoleSwitched}
-        trialDaysRemaining={trialDaysRemaining}
-        isSchoolTrial={isSchoolTrial}
-        onOpenPrivacy={() => setShowPrivacy(true)}
-        onOpenAgb={() => setShowAgb(true)}
-        onOpenImpressum={() => setShowPrivacy(true)}
-        onOpenAccessibility={() => setShowPrivacy(true)}
-      />
+      {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR (iPad & Desktop > 768px) */}
+      {windowWidth > 768 && (
+        <SecretarySidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
+          secretarySubTab={secretarySubTab}
+          setSecretarySubTab={setSecretarySubTab}
+          campusSubTab={campusSubTab}
+          setCampusSubTab={setCampusSubTab}
+          groovelabSubTab={groovelabSubTab}
+          setGroovelabSubTab={setGroovelabSubTab}
+          hasCampusSub={hasCampusSub}
+          hasGroovelabSub={hasGroovelabSub}
+          enabledCampusSubjects={enabledCampusSubjects}
+          enabledCampusRooms={enabledCampusRooms}
+          enabledCampusEvents={enabledCampusEvents}
+          enabledCampusSchedules={enabledCampusSchedules}
+          crisisNotifications={crisisNotifications}
+          pendingSchedules={pendingSchedules}
+          startTour={startTour}
+          currentUserProfile={currentUserProfile}
+          setShowOwnQrModal={setShowOwnQrModal}
+          onLogout={onLogout}
+          handleSecretaryLogout={handleSecretaryLogout}
+          schoolName={schoolName}
+          isCurrentUserTeacher={isCurrentUserTeacher}
+          onRoleSwitched={onRoleSwitched}
+          trialDaysRemaining={trialDaysRemaining}
+          isSchoolTrial={isSchoolTrial}
+          onOpenPrivacy={() => setShowPrivacy(true)}
+          onOpenAgb={() => setShowAgb(true)}
+          onOpenImpressum={() => setShowPrivacy(true)}
+          onOpenAccessibility={() => setShowPrivacy(true)}
+          onOpenPersonalSecurity={() => setShowPersonalSecurityModal(true)}
+        />
+      )}
 
       {/* RIGHT CONTENT PANE */}
       <div style={{
         flex: 1,
-        height: '100vh',
+        minWidth: 0,
+        height: '100dvh',
         boxSizing: 'border-box',
-        overflowY: 'auto',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         background: '#f8fafc',
         color: '#1d1d1f',
-        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-        paddingBottom: windowWidth < 1024 ? '90px' : '0px'
+        transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
       }}>
         {/* Top Header & Banners */}
         <SecretaryHeader
@@ -748,10 +753,35 @@ export function SecretaryDashboard({
           setShowDunningPayModal={setShowDunningPayModal}
           secretarySubTab={secretarySubTab}
           setSecretarySubTab={setSecretarySubTab}
+          campusSubTab={campusSubTab}
+          setCampusSubTab={setCampusSubTab}
+          groovelabSubTab={groovelabSubTab}
+          setGroovelabSubTab={setGroovelabSubTab}
+          onOpenMobileMenu={() => setMobileSecretaryDrawerOpen(true)}
+          onOpenQrModal={() => setShowOwnQrModal(true)}
         />
 
-        {/* Main scrollable body content */}
-        <div id="secretary-main-scroll-container" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
+        {/* Main scrollable body content (Single Source of Scroll) */}
+        <div
+          id="secretary-main-scroll-container"
+          style={{
+            padding: windowWidth <= 768
+              ? 'calc(58px + env(safe-area-inset-top, 0px)) 12px calc(92px + env(safe-area-inset-bottom, 20px))'
+              : windowWidth <= 1180
+                ? '16px 18px 32px'
+                : '16px 24px 32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            flex: 1,
+            minWidth: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarGutter: 'stable',
+            boxSizing: 'border-box'
+          }}
+        >
           {/* Active Tab Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -797,6 +827,15 @@ export function SecretaryDashboard({
         {/* Master Modals Hub */}
         <SecretaryModalsMasterHub {...modalsHubProps} />
 
+        {/* 0,1% Goldstandard: Autarkes Persönliches Profil- & Sicherheits-Modal */}
+        <SecretaryPersonalSecurityModal
+          isOpen={showPersonalSecurityModal}
+          onClose={() => setShowPersonalSecurityModal(false)}
+          currentUserProfile={currentUserProfile}
+          schoolName={schoolName}
+          onOpenQrModal={() => setShowOwnQrModal(true)}
+        />
+
         {/* Floating Developer Reset Button (Dev Mode Only - ADM-33) */}
         <SecretaryDeveloperResetButton
           activeTab={activeTab}
@@ -804,39 +843,51 @@ export function SecretaryDashboard({
           onReset={handleDeveloperReset}
         />
 
-        {/* Apple Glass Mobile Bottom Navigation */}
-        <Suspense fallback={null}>
-          <SecretaryMobileNavigation
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            secretarySubTab={secretarySubTab}
-            setSecretarySubTab={setSecretarySubTab}
-            campusSubTab={campusSubTab}
-            setCampusSubTab={setCampusSubTab}
-            groovelabSubTab={groovelabSubTab}
-            setGroovelabSubTab={setGroovelabSubTab}
-            hasCampusSub={hasCampusSub}
-            crisisNotifications={crisisNotifications}
-            enabledCampusSubjects={enabledCampusSubjects}
-            enabledCampusRooms={enabledCampusRooms}
-            enabledCampusEvents={enabledCampusEvents}
-            enabledCampusSchedules={enabledCampusSchedules}
-            pendingSchedules={pendingSchedules}
-            mobileSecretaryDrawerOpen={mobileSecretaryDrawerOpen}
-            setMobileSecretaryDrawerOpen={setMobileSecretaryDrawerOpen}
-            setShowOwnQrModal={setShowOwnQrModal}
-            setIsFeedbackModalOpen={setIsFeedbackModalOpen}
-            onLogout={onLogout}
-            handleSecretaryLogout={handleSecretaryLogout}
-          />
-        </Suspense>
+        {/* Apple Glass Mobile Bottom Navigation (Mobile <= 768px only) */}
+        {windowWidth <= 768 && (
+          <Suspense fallback={null}>
+            <SecretaryMobileNavigation
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              secretarySubTab={secretarySubTab}
+              setSecretarySubTab={setSecretarySubTab}
+              campusSubTab={campusSubTab}
+              setCampusSubTab={setCampusSubTab}
+              groovelabSubTab={groovelabSubTab}
+              setGroovelabSubTab={setGroovelabSubTab}
+              hasCampusSub={hasCampusSub}
+              hasGroovelabSub={hasGroovelabSub}
+              crisisNotifications={crisisNotifications}
+              enabledCampusSubjects={enabledCampusSubjects}
+              enabledCampusRooms={enabledCampusRooms}
+              enabledCampusEvents={enabledCampusEvents}
+              enabledCampusSchedules={enabledCampusSchedules}
+              pendingSchedules={pendingSchedules}
+              mobileSecretaryDrawerOpen={mobileSecretaryDrawerOpen}
+              setMobileSecretaryDrawerOpen={setMobileSecretaryDrawerOpen}
+              setShowOwnQrModal={setShowOwnQrModal}
+              setIsFeedbackModalOpen={setIsFeedbackModalOpen}
+              onLogout={onLogout}
+              handleSecretaryLogout={handleSecretaryLogout}
+              schoolName={schoolName}
+              currentUserProfile={currentUserProfile}
+              isCurrentUserTeacher={isCurrentUserTeacher}
+              onRoleSwitched={onRoleSwitched}
+              onOpenPersonalSecurity={() => setShowPersonalSecurityModal(true)}
+              onOpenPrivacy={() => setShowPrivacy(true)}
+              onOpenAgb={() => setShowAgb(true)}
+              onOpenImpressum={() => setShowPrivacy(true)}
+              onOpenAccessibility={() => setShowPrivacy(true)}
+            />
+          </Suspense>
+        )}
 
         {/* Approval Toast Notification */}
         {approvalToast && (
           <div style={{
             position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
             zIndex: 9999,
-            background: approvalToast.type === 'success' ? 'linear-gradient(135deg, #34a853, #22c55e)' : 'linear-gradient(135deg, #ea4335, #ef4444)',
+            background: approvalToast.type === 'success' ? '#34a853' : '#ef4444',
             color: 'white', borderRadius: '16px', padding: '14px 24px', fontWeight: 700,
             fontSize: '0.9rem', boxShadow: '0 8px 32px rgba(0,0,0,0.2)', display: 'flex',
             alignItems: 'center', gap: 10, maxWidth: '90vw', whiteSpace: 'nowrap', animation: 'slideInUp 0.3s ease'

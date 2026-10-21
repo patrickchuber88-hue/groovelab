@@ -144,7 +144,7 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
         {errorMsg && (
           <div style={{
             background: '#fef2f2',
-            border: '1px solid #fecaca',
+            border: 'none',
             color: '#dc2626',
             borderRadius: '8px',
             padding: '6px 10px',
@@ -315,7 +315,7 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
         {errorMsg && (
           <div style={{
             background: '#fef2f2',
-            border: '1px solid #fecaca',
+            border: 'none',
             color: '#dc2626',
             borderRadius: '8px',
             padding: '6px 10px',

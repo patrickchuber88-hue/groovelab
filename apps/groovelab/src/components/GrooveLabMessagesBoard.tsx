@@ -295,7 +295,7 @@ export default function GrooveLabMessagesBoard({
                   setSelectedMessage(null);
                 }}
                 style={{
-                  background: '#eab308',
+                  background: '#facc15',
                   color: '#1e293b',
                   border: 'none',
                   width: '42px',
@@ -345,7 +345,7 @@ export default function GrooveLabMessagesBoard({
                 flex: 1,
                 padding: '8px',
                 border: 'none',
-                background: filterType === 'all' ? '#eab308' : 'transparent',
+                background: filterType === 'all' ? '#facc15' : 'transparent',
                 color: filterType === 'all' ? '#1e293b' : '#64748b',
                 borderRadius: '9px',
                 fontSize: '0.8rem',
@@ -366,7 +366,7 @@ export default function GrooveLabMessagesBoard({
                 flex: 1,
                 padding: '8px',
                 border: 'none',
-                background: filterType === 'school' ? '#eab308' : 'transparent',
+                background: filterType === 'school' ? '#facc15' : 'transparent',
                 color: filterType === 'school' ? '#1e293b' : '#64748b',
                 borderRadius: '9px',
                 fontSize: '0.8rem',
@@ -387,7 +387,7 @@ export default function GrooveLabMessagesBoard({
                 flex: 1,
                 padding: '8px',
                 border: 'none',
-                background: filterType === 'band' ? '#eab308' : 'transparent',
+                background: filterType === 'band' ? '#facc15' : 'transparent',
                 color: filterType === 'band' ? '#1e293b' : '#64748b',
                 borderRadius: '9px',
                 fontSize: '0.8rem',
@@ -435,7 +435,7 @@ export default function GrooveLabMessagesBoard({
                     padding: '16px',
                     borderRadius: '16px',
                     background: isSelected ? '#fefce8' : isRead ? '#ffffff' : '#fefce8',
-                    border: isSelected ? '2px solid #eab308' : '1px solid #fef08a',
+                    border: isSelected ? '2px solid #facc15' : '1px solid #fef08a',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
@@ -455,7 +455,7 @@ export default function GrooveLabMessagesBoard({
                       width: '10px',
                       height: '10px',
                       borderRadius: '50%',
-                      background: '#eab308',
+                      background: '#facc15',
                       boxShadow: 'none'
                     }} />
                   )}
@@ -583,7 +583,7 @@ export default function GrooveLabMessagesBoard({
                   type="submit"
                   disabled={isSubmitting || !composerTitle.trim() || !composerMessage.trim()}
                   style={{
-                    background: isSubmitting || !composerTitle.trim() || !composerMessage.trim() ? '#e2e8f0' : '#eab308',
+                    background: isSubmitting || !composerTitle.trim() || !composerMessage.trim() ? '#e2e8f0' : '#facc15',
                     color: isSubmitting || !composerTitle.trim() || !composerMessage.trim() ? '#94a3b8' : '#1e293b',
                     border: 'none',
                     padding: '8px 20px',
@@ -616,7 +616,7 @@ export default function GrooveLabMessagesBoard({
                       padding: '8px 16px',
                       borderRadius: '10px',
                       border: 'none',
-                      background: composerTarget === 'all' ? '#eab308' : '#fefce8',
+                      background: composerTarget === 'all' ? '#facc15' : '#fefce8',
                       color: composerTarget === 'all' ? '#1e293b' : '#64748b',
                       fontSize: '0.85rem',
                       fontWeight: 800,
@@ -632,7 +632,7 @@ export default function GrooveLabMessagesBoard({
                       padding: '8px 16px',
                       borderRadius: '10px',
                       border: 'none',
-                      background: composerTarget === 'students' ? '#eab308' : '#fefce8',
+                      background: composerTarget === 'students' ? '#facc15' : '#fefce8',
                       color: composerTarget === 'students' ? '#1e293b' : '#64748b',
                       fontSize: '0.85rem',
                       fontWeight: 800,
@@ -648,7 +648,7 @@ export default function GrooveLabMessagesBoard({
                       padding: '8px 16px',
                       borderRadius: '10px',
                       border: 'none',
-                      background: composerTarget === 'teachers' ? '#eab308' : '#fefce8',
+                      background: composerTarget === 'teachers' ? '#facc15' : '#fefce8',
                       color: composerTarget === 'teachers' ? '#1e293b' : '#64748b',
                       fontSize: '0.85rem',
                       fontWeight: 800,
@@ -664,7 +664,7 @@ export default function GrooveLabMessagesBoard({
                       padding: '8px 16px',
                       borderRadius: '10px',
                       border: 'none',
-                      background: composerTarget === 'specific' ? '#eab308' : '#fefce8',
+                      background: composerTarget === 'specific' ? '#facc15' : '#fefce8',
                       color: composerTarget === 'specific' ? '#1e293b' : '#64748b',
                       fontSize: '0.85rem',
                       fontWeight: 800,
@@ -719,7 +719,7 @@ export default function GrooveLabMessagesBoard({
                               padding: '6px 14px',
                               borderRadius: '20px',
                               border: 'none',
-                              background: isSel ? '#eab308' : 'white',
+                              background: isSel ? '#facc15' : 'white',
                               color: isSel ? '#1e293b' : '#64748b',
                               fontSize: '0.8rem',
                               fontWeight: 800,
@@ -748,7 +748,7 @@ export default function GrooveLabMessagesBoard({
                   style={{
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    border: '1px solid #fef08a',
+                    border: 'none',
                     background: '#fefce8',
                     fontWeight: 700,
                     fontSize: '0.95rem',
@@ -769,7 +769,7 @@ export default function GrooveLabMessagesBoard({
                   style={{
                     padding: '16px',
                     borderRadius: '12px',
-                    border: '1px solid #fef08a',
+                    border: 'none',
                     background: '#fefce8',
                     fontWeight: 500,
                     fontSize: '0.95rem',
@@ -881,7 +881,7 @@ export default function GrooveLabMessagesBoard({
               </div>
 
               {/* Auto-Read Feedback Badge */}
-              <div style={{ marginTop: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 800, padding: '12px 18px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0', width: 'fit-content' }}>
+              <div style={{ marginTop: '32px', display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 800, padding: '12px 18px', background: '#f0fdf4', borderRadius: '12px', border: 'none', width: 'fit-content' }}>
                 <CheckCircle size={18} strokeWidth={2.5} /> Nachricht gelesen & verstanden
               </div>
             </div>
@@ -900,7 +900,7 @@ export default function GrooveLabMessagesBoard({
               boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
               marginBottom: '20px'
             }}>
-              <Mail size={38} style={{ strokeWidth: 1.5, color: '#eab308' }} />
+              <Mail size={38} style={{ strokeWidth: 1.5, color: '#facc15' }} />
             </div>
             <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>Willkommen im GrooveLab Postfach</h3>
             <p style={{ fontSize: '0.95rem', color: '#64748b', maxWidth: '340px', lineHeight: 1.6, margin: '0 0 24px 0' }}>
@@ -910,7 +910,7 @@ export default function GrooveLabMessagesBoard({
               <button
                 onClick={() => setIsComposing(true)}
                 style={{
-                  background: '#eab308',
+                  background: '#facc15',
                   color: '#1e293b',
                   border: 'none',
                   padding: '12px 24px',

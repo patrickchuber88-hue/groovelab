@@ -257,7 +257,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
             borderRadius: '100px',
             fontSize: '0.72rem',
             fontWeight: 800,
-            border: '1px solid #10b981'
+            border: 'none'
           }}>
             Endet automatisch
           </span>
@@ -410,7 +410,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
           borderRadius: '10px',
           background: '#e0f2fe',
           color: '#0284c7',
-          border: '1px solid #bae6fd',
+          border: 'none',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

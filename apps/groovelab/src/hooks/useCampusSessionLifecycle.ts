@@ -133,7 +133,7 @@ export function useCampusSessionLifecycle({
         }
         // Auto-correct if a student on campus has an invalid groovelab tab saved (e.g. 'live' or 'bands')
         if (isStudent && activePlatform === 'campus') {
-          const validCampusStudentTabs = ['briefing', 'homework_book', 'mediathek', 'practice_board', 'campus_cup', 'events', 'profile', 'all_appointments', 'settings'];
+          const validCampusStudentTabs = ['briefing', 'homework_book', 'homework', 'mediathek', 'practice_board', 'campus_cup', 'events', 'messages', 'profile', 'all_appointments', 'settings'];
           if (!validCampusStudentTabs.includes(activeStudentTab)) {
             console.log('[Tab Sync] Auto-correcting invalid campus student tab to briefing:', activeStudentTab);
             setActiveStudentTab('briefing');

@@ -25,14 +25,28 @@ export function idempotencyBarrier(options: IdempotencyOptions = {}) {
       return next();
     }
 
-    // 1. Resolve Idempotency Key
+    // 1. Resolve Idempotency Key (Cryptographically bound to caller session/token/IP to block Cross-User Replay Cache Poisoning [Vector 5])
     const rawHeaderKey = req.headers['idempotency-key'] || req.headers['x-idempotency-key'];
+    const rawIp =
+      (typeof req.headers['x-real-ip'] === 'string' && req.headers['x-real-ip'].trim()) ||
+      req.ip ||
+      req.headers['x-forwarded-for'] ||
+      req.socket.remoteAddress ||
+      '127.0.0.1';
+    const ip = Array.isArray(rawIp) ? rawIp[0] : String(rawIp);
+    const callerSessionMaterial = [
+      typeof req.headers['x-session-token'] === 'string' ? req.headers['x-session-token'] : '',
+      typeof req.headers['authorization'] === 'string' ? req.headers['authorization'] : '',
+      typeof req.cookies?.['__Host-session'] === 'string' ? req.cookies['__Host-session'] : '',
+      ip
+    ].join('|');
+    const callerBindingHash = ledger.computeCallerScopeHash(callerSessionMaterial);
     let idempotencyKey: string;
 
     if (typeof rawHeaderKey === 'string' && rawHeaderKey.trim().length > 0) {
-      // Clean and sanitize explicit client key
+      // Clean and sanitize explicit client key and bind to caller scope hash
       const sanitized = rawHeaderKey.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
-      const routePrefix = `${req.method}:${req.baseUrl || ''}${req.path}:`;
+      const routePrefix = `${req.method}:${req.baseUrl || ''}${req.path}:${callerBindingHash}:`;
       idempotencyKey = `${routePrefix}${sanitized}`;
     } else {
       if (options.requireKey) {
@@ -42,11 +56,9 @@ export function idempotencyBarrier(options: IdempotencyOptions = {}) {
         });
       }
 
-      // Compute deterministic SHA-256 fingerprint from IP, method, route, and body
-      const rawIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-      const ip = Array.isArray(rawIp) ? rawIp[0] : String(rawIp);
+      // Compute deterministic SHA-256 fingerprint from caller binding, method, route, and body
       const path = req.originalUrl || req.path || '/';
-      const fingerprint = ledger.computeFingerprint(ip, req.method, path, req.body);
+      const fingerprint = ledger.computeFingerprint(callerBindingHash, req.method, path, req.body);
       idempotencyKey = `fp:${fingerprint}`;
     }
 

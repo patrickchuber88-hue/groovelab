@@ -470,9 +470,17 @@ export function useCampusAppOrchestrator(): CampusAppOrchestratorResult {
   });
 
   const { width: rawWidth, height: rawHeight } = useWindowSize();
-  const width = useMemo(() => rawWidth, [rawWidth]);
+  const width = useMemo(() => (windowWidth > 0 && windowWidth < rawWidth ? windowWidth : rawWidth), [windowWidth, rawWidth]);
   const height = useMemo(() => Math.round(rawHeight / 64) * 64, [Math.round(rawHeight / 64)]);
-  const isMobile = width < 768;
+  const isSimTablet = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'tablet' ||
+    Boolean(document.querySelector('.sim-viewport-tablet'))
+  );
+  const isSimMobile = typeof document !== 'undefined' && (
+    document.documentElement.getAttribute('data-sim-category') === 'mobile' ||
+    Boolean(document.querySelector('.sim-viewport-mobile'))
+  );
+  const isMobile = isSimMobile || (!isSimTablet && width <= 768);
   const isKioskMode = (stationIdFromStorage && stationIdFromStorage !== "skip") || (typeof window !== "undefined" ? !!localStorage.getItem("groovelab_kiosk_token") : false);
 
   // 18. Messaging Data Loader

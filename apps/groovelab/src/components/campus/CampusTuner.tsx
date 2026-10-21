@@ -657,7 +657,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+            background: '#06b6d4',
             color: '#ffffff',
             padding: '6px 13px',
             borderRadius: '12px',
@@ -719,8 +719,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             type="button"
             onClick={() => setUseGermanNotation(prev => !prev)}
             style={{
-              padding: '6px 12px', borderRadius: '10px', border: useGermanNotation ? '1.5px solid #06b6d4' : '1.5px solid #e2e8f0',
-              background: useGermanNotation ? 'rgba(6, 182, 212, 0.08)' : '#ffffff', color: useGermanNotation ? '#0891b2' : '#0f172a',
+              padding: '6px 12px', borderRadius: '10px', border: useGermanNotation ? 'none' : '1.5px solid #e2e8f0',
+              background: useGermanNotation ? '#cffafe' : '#ffffff', color: useGermanNotation ? '#0e7490' : '#0f172a',
               fontSize: '0.76rem', fontWeight: 850, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
             }}
             className="hover-scale"
@@ -739,7 +739,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             title="Barrierefreie Audio-Richtungsführung (Tonimpuls für zu tief / zu hoch)"
             style={{
               padding: '6px 12px', borderRadius: '10px', border: a11yAudioGuideEnabled ? 'none' : '1.5px solid #e2e8f0',
-              background: a11yAudioGuideEnabled ? '#0891b2' : '#ffffff', color: a11yAudioGuideEnabled ? '#ffffff' : '#0f172a',
+              background: a11yAudioGuideEnabled ? '#06b6d4' : '#ffffff', color: a11yAudioGuideEnabled ? '#ffffff' : '#0f172a',
               fontSize: '0.76rem', fontWeight: 850, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s ease'
             }}
             className="hover-scale"
@@ -880,9 +880,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               padding: '8px 16px',
               borderRadius: '14px',
               border: 'none',
-              background: isListening
-                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                : 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+              background: isListening ? '#ef4444' : '#06b6d4',
               color: '#ffffff',
               fontSize: '0.84rem',
               fontWeight: 900,
@@ -904,8 +902,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       {/* Fehler-Meldung */}
       {micError && (
         <div style={{
-          background: '#fef2f2',
-          border: '1.5px solid #fecaca',
+          background: '#fee2e2',
+          border: 'none',
           borderRadius: '14px',
           padding: '10px 14px',
           color: '#b91c1c',
@@ -923,7 +921,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
       <div style={{
         background: '#ffffff',
         border: isInTune
-          ? '2px solid #22c55e'
+          ? '2px solid #34a853'
           : isListening
           ? '1.5px solid #06b6d4'
           : '1.5px solid #e2e8f0',
@@ -943,7 +941,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
           <div style={{
             position: 'absolute',
             top: '12px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            background: '#10b981',
             color: '#ffffff',
             padding: '4px 14px',
             borderRadius: '99px',
@@ -1037,7 +1035,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             <path
               d="M 210 40.3 A 160 160 0 0 1 230 40.3"
               fill="none"
-              stroke={isInTune ? '#16a34a' : '#22c55e'}
+              stroke={isInTune ? '#16a34a' : '#34a853'}
               strokeWidth={isInTune ? '14' : '10'}
               strokeLinecap="round"
               style={{
@@ -1133,10 +1131,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                 : '#cbd5e1',
               letterSpacing: '-0.05em',
               lineHeight: 1,
-              textShadow: isInTune
-                ? '0 0 40px rgba(34, 197, 94, 0.55), 0 0 80px rgba(34, 197, 94, 0.25)'
-                : 'none',
-              transition: 'color 0.2s ease, text-shadow 0.2s ease'
+              textShadow: 'none',
+              transition: 'color 0.2s ease'
             }}>
               {detectedNote}
             </span>
@@ -1144,7 +1140,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
               <span style={{
                 fontSize: '2.5rem',
                 fontWeight: 900,
-                color: isInTune ? '#22c55e' : '#64748b',
+                color: isInTune ? '#34a853' : '#64748b',
                 lineHeight: 1
               }}>
                 {detectedOctave}
@@ -1157,7 +1153,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
             {isListening && detectedPitch !== null ? (
               isInTune ? (
                 <div style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  background: '#10b981',
                   border: 'none',
                   color: '#ffffff',
                   padding: '7px 20px',
@@ -1174,9 +1170,9 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                 </div>
               ) : isFlat ? (
                 <div style={{
-                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  border: '1.5px solid #fcd34d',
-                  color: '#b45309',
+                  background: '#fef9c3',
+                  border: 'none',
+                  color: '#854d0e',
                   padding: '7px 20px',
                   borderRadius: '99px',
                   fontSize: '0.92rem',
@@ -1191,8 +1187,8 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                 </div>
               ) : (
                 <div style={{
-                  background: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)',
-                  border: '1.5px solid #fdba74',
+                  background: '#ffedd5',
+                  border: 'none',
                   color: '#c2410c',
                   padding: '7px 20px',
                   borderRadius: '99px',
@@ -1227,7 +1223,7 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                 type="button"
                 onClick={startListening}
                 style={{
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                  background: '#06b6d4',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '16px',
@@ -1363,30 +1359,16 @@ export const CampusTuner: React.FC<CampusTunerProps> = ({ onBack, uiLevel = 'pro
                       minHeight: '84px',
                       padding: '12px 14px',
                       borderRadius: '18px',
-                      border: isLocked
-                        ? '2px solid #0891b2'
+                      border: (isLocked || isTuned || isSelected || isPegPlaying) ? 'none' : '1.5px solid #e2e8f0',
+                      background: (isLocked || isSelected || isPegPlaying)
+                        ? '#cffafe'
                         : isTuned
-                        ? '2px solid #10b981'
-                        : isSelected
-                        ? '2px solid #06b6d4'
-                        : isPegPlaying
-                        ? '2px solid #0891b2'
-                        : '1.5px solid #e2e8f0',
-                      background: isLocked
-                        ? 'rgba(6, 182, 212, 0.14)'
-                        : isTuned
-                        ? '#ecfdf5'
-                        : isSelected
-                        ? 'rgba(6, 182, 212, 0.07)'
-                        : isPegPlaying
-                        ? 'rgba(6, 182, 212, 0.10)'
+                        ? '#d1fae5'
                         : '#f8fafc',
-                      color: isLocked
-                        ? '#0891b2'
-                        : isTuned
-                        ? '#065f46'
-                        : isSelected
+                      color: (isLocked || isSelected || isPegPlaying)
                         ? '#0e7490'
+                        : isTuned
+                        ? '#047857'
                         : '#1e293b',
                       cursor: 'pointer',
                       transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
