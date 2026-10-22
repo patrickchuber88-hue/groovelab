@@ -3,6 +3,7 @@ import { Mic, Square, Play, Pause, Trash2, Check, Lock, AlertCircle, Volume2 } f
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
@@ -112,13 +113,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
       await stabilizeAudioStream(stream, 300);
       streamRef.current = stream;
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : 'audio/webm';
-
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const { recorder: mediaRecorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -211,15 +206,8 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
     }
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
-      try { rec.requestData(); } catch (e) {}
-      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
-      setTimeout(() => {
-        try {
-          if (rec.state !== 'inactive') {
-            rec.stop();
-          }
-        } catch (e) {}
-      }, 500);
+      // 🛡️ 750ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      AudioCaptureEngine.stopRecorderWithTail(rec, 750);
     }
     setIsRecording(false);
   };

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, cleanTextForTts } from '../../../services/neuralTtsService';
+import { useMeisterwerkTts } from '../meisterwerk/hooks/useMeisterwerkTts';
 
 interface UseStudentFeedProps {
   studentId: string;
@@ -16,14 +16,12 @@ export function useStudentFeed({
   const [classFeedInteractions, setClassFeedInteractions] = useState<any[]>([]);
   const [feedInteractions, setFeedInteractions] = useState<any[]>([]);
 
-  // TTS States
-  const [activeTtsKey, setActiveTtsKey] = useState<string | null>(null);
-  const [isTtsSpeaking, setIsTtsSpeaking] = useState(false);
-  const [ttsStatusText, setTtsStatusText] = useState<string | null>(null);
+  // 🛡️ 0,1% Goldstandard: Kanonische Meisterwerk-TTS Engine einbinden (Parität zu MeisterwerkDocumentTab & QrAuthoritativeHomeworkSection)
+  const tts = useMeisterwerkTts();
+
   const [draftAllowTts, setDraftAllowTts] = useState<boolean | null>(() => {
     return studentUser?.parent_allow_tts ?? true;
   });
-  const ttsSessionIdRef = useRef(0);
 
   // Fetch Announcements
   const fetchAnnouncements = useCallback(async () => {
@@ -122,115 +120,6 @@ export function useStudentFeed({
     }
   };
 
-  // TTS Controls
-  const handleStopSpeaking = useCallback(() => {
-    ttsSessionIdRef.current += 1;
-    stopNeuralSpeech();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      try {
-        window.speechSynthesis.resume();
-      } catch {}
-    }
-    setIsTtsSpeaking(false);
-    setActiveTtsKey(null);
-    setTtsStatusText(null);
-  }, []);
-
-  const handleSpeakText = useCallback(async (textOrPhrases: string | string[], elementKey: string = 'global') => {
-    if (isTtsSpeaking && activeTtsKey === elementKey) {
-      handleStopSpeaking();
-      return;
-    }
-
-    handleStopSpeaking();
-
-    const normalizedInput = Array.isArray(textOrPhrases)
-      ? textOrPhrases.map(p => cleanTextForTts(p)).join(' ')
-      : cleanTextForTts(textOrPhrases);
-
-    if (!normalizedInput.trim()) return;
-
-    const currentSessionId = ttsSessionIdRef.current;
-    setIsTtsSpeaking(true);
-    setActiveTtsKey(elementKey);
-
-    let audioPlayed = false;
-
-    // 1. Primär-Versuch: Lokale neuronale TTS (falls aktiv/konfiguriert)
-    try {
-      const audioBlob = await synthesizeNeuralSpeech(normalizedInput, 'thorsten');
-      if (audioBlob && ttsSessionIdRef.current === currentSessionId) {
-        await playAudioBlob(audioBlob);
-        audioPlayed = true;
-      }
-    } catch {
-      // Sovereign Zero US Cloud / Piper WASM disabled -> nahtloser Übergang zu nativer Browser-Sprache
-    }
-
-    if (ttsSessionIdRef.current !== currentSessionId) return;
-
-    // 2. Resilienter 0,1% Goldstandard WebSpeech Fallback (0ms Latenz, 0 Byte Netztraffic, iOS/Android/Desktop optimiert)
-    if (!audioPlayed && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.cancel();
-        try { window.speechSynthesis.resume(); } catch {}
-
-        const utter = new SpeechSynthesisUtterance(normalizedInput);
-        utter.lang = 'de-DE';
-        utter.rate = 0.92; // Kindgerechtes, leicht entschleunigtes Übetempo für 6-10 Jahre
-        utter.pitch = 1.05; // Freundliche, helle Stimmfarbe
-
-        // Beste deutsche Systemstimme ermitteln
-        const voices = window.speechSynthesis.getVoices();
-        const preferredVoice = voices.find(v => v.lang.startsWith('de') && (
-          v.name.includes('Anna') ||
-          v.name.includes('Markus') ||
-          v.name.includes('Petra') ||
-          v.name.includes('Google') ||
-          v.name.includes('Siri') ||
-          v.name.includes('Deutsch')
-        )) || voices.find(v => v.lang.startsWith('de'));
-
-        if (preferredVoice) {
-          utter.voice = preferredVoice;
-        }
-
-        utter.onend = () => {
-          if (ttsSessionIdRef.current === currentSessionId) {
-            setIsTtsSpeaking(false);
-            setActiveTtsKey(null);
-            setTtsStatusText(null);
-          }
-        };
-
-        utter.onerror = () => {
-          if (ttsSessionIdRef.current === currentSessionId) {
-            setIsTtsSpeaking(false);
-            setActiveTtsKey(null);
-            setTtsStatusText(null);
-          }
-        };
-
-        window.speechSynthesis.speak(utter);
-      } catch {
-        setIsTtsSpeaking(false);
-        setActiveTtsKey(null);
-        setTtsStatusText(null);
-      }
-    } else if (!audioPlayed) {
-      setIsTtsSpeaking(false);
-      setActiveTtsKey(null);
-      setTtsStatusText(null);
-    }
-  }, [isTtsSpeaking, activeTtsKey, handleStopSpeaking]);
-
-  const handleSetTtsMode = useCallback((mode: string) => {
-    try {
-      localStorage.setItem('campus_student_tts_mode', mode);
-    } catch {}
-  }, []);
-
   return {
     campusFeedAnnouncements,
     setCampusFeedAnnouncements,
@@ -242,14 +131,16 @@ export function useStudentFeed({
     setFeedInteractions,
     handleReactToPost,
     handleSubmitClassFeedInteraction,
-    activeTtsKey,
-    setActiveTtsKey,
-    isTtsSpeaking,
-    ttsStatusText,
+    activeTtsKey: tts.activeTtsKey,
+    setActiveTtsKey: tts.setActiveTtsKey,
+    isTtsSpeaking: tts.isTtsSpeaking,
+    ttsStatusText: tts.ttsStatusText,
     draftAllowTts,
     setDraftAllowTts,
-    handleSpeakText,
-    handleStopSpeaking,
-    handleSetTtsMode
+    handleSpeakText: tts.handleSpeakText,
+    handleStopSpeaking: tts.handleStopSpeaking,
+    handleSetTtsMode: tts.handleSetTtsMode,
+    buildCompleteWeeklyHomeworkSpeechPhrases: tts.buildCompleteWeeklyHomeworkSpeechPhrases,
+    ttsMode: tts.ttsMode
   };
 }

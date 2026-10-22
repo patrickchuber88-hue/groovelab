@@ -15,6 +15,7 @@ import {
 import { storeBlob } from '../../utils/blobStorage';
 import { MilestoneData, CustomPlaylist, CustomPlaylistTrack } from './AudioBiographyView';
 import { acquireAudioStream, stabilizeAudioStream, STUDIO_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 
 interface JuniorAudioBiographyWizardProps {
   isOpen: boolean;
@@ -257,7 +258,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
       await stabilizeAudioStream(stream, 300);
       streamRef.current = stream;
 
-      const recorder = new MediaRecorder(stream);
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -271,7 +272,7 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
           streamRef.current.getTracks().forEach(t => t.stop());
           streamRef.current = null;
         }
-        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
         await handleAudioProcessing(rawBlob);
       };
 
@@ -313,15 +314,8 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
-      try { rec.requestData(); } catch (e) {}
-      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
-      setTimeout(() => {
-        try {
-          if (rec.state !== 'inactive') {
-            rec.stop();
-          }
-        } catch (e) {}
-      }, 500);
+      // 🛡️ 900ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall nach dem Klick auf Beenden
+      AudioCaptureEngine.stopRecorderWithTail(rec, 900);
     }
     setIsRecording(false);
     setIsProcessing(true);

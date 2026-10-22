@@ -143,6 +143,9 @@ export function useCampusChatActions({
     const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
     if (!uid) return;
 
+    const isParentSender = user?.role === 'parent' || (typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('campus_parent_session_lease')));
+    const senderRole = isParentSender ? 'parent' : ((user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary') ? user.role : 'student');
+
     // 0ms Optimistic UI update: immediately display message in UI
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const optimisticMessage: any = {
@@ -150,7 +153,8 @@ export function useCampusChatActions({
       sender_id: uid,
       content,
       created_at: new Date().toISOString(),
-      is_read: false
+      is_read: false,
+      sender_role: senderRole
     };
     if (groupId) {
       optimisticMessage.group_id = groupId;
@@ -172,7 +176,8 @@ export function useCampusChatActions({
       const payload: any = {
         sender_id: uid,
         content,
-        school_id: effectiveSchoolId
+        school_id: effectiveSchoolId,
+        sender_role: senderRole
       };
       if (groupId) {
         payload.group_id = groupId;

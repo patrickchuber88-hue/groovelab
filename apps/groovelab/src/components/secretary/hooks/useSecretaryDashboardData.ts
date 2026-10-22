@@ -391,21 +391,17 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
     try {
       setLoading(true);
 
-      // 🛡️ Fail-Closed Auth Recovery Guard: Ensure cryptographic session lease is present
-      const activeLease = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
-        || (typeof localStorage !== 'undefined' ? localStorage.getItem('gl_active_session_lease_id') : null);
-      if (!activeLease && userId && schoolId) {
-        try {
-          const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
-            p_credential: userId,
-            p_school_id: schoolId
-          });
-          if (authResult?.success && authResult?.lease_token) {
-            if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-            if (typeof localStorage !== 'undefined') localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-          }
-        } catch (authErr) {
-          console.warn('[useSecretaryDashboardData] Auto-heal session lease notice:', authErr);
+      // 🛡️ Fail-Closed Auth Recovery Guard: Ensure cryptographic session lease is present and belongs to current user
+      let activeLease = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null;
+      if (!activeLease && typeof localStorage !== 'undefined') {
+        const localOwner = localStorage.getItem('gl_active_session_lease_user_id') || localStorage.getItem('groovelab_user_id');
+        if (!userId || !localOwner || localOwner === userId) {
+          activeLease = localStorage.getItem('gl_active_session_lease_id');
+        } else {
+          try {
+            localStorage.removeItem('gl_active_session_lease_id');
+            localStorage.removeItem('gl_active_session_lease_user_id');
+          } catch {}
         }
       }
 

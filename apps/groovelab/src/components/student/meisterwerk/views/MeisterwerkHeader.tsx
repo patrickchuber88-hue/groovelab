@@ -78,6 +78,7 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
     (activeViewMode === 'document' || activeViewMode === 'recordings') &&
     activeModalTab === 'document';
   const isModulesActive = !isHausaufgabenActive;
+  const isAnyTeacher = Boolean(isTeacherTools || isTeacherMode || isTeacherSandbox || isTeacherSelf);
 
   const overrides =
     effectiveParentPermissions?.module_overrides ||
@@ -595,14 +596,17 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
             className="header-right-actions"
           >
-            {onOpenAssignModal && (
+            {isAnyTeacher && onOpenAssignModal && (
               <button
                 type="button"
-                onClick={onOpenAssignModal}
-                aria-label="Hausaufgabe an Schüler zuweisen"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenAssignModal();
+                }}
+                aria-label="Wochen-Fahrplan für Schüler öffnen & zuweisen"
                 style={{
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  border: '1px solid rgba(255,255,255,0.35)',
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  border: '1px solid rgba(255,255,255,0.4)',
                   borderRadius: '20px',
                   padding: '6px 14px',
                   height: '32px',
@@ -615,13 +619,13 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                   fontWeight: 850,
                   fontSize: '0.80rem',
                   flexShrink: 0,
-                  boxShadow: 'none'
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
                 }}
                 className="hover-scale"
-                title="Hausaufgabe an Schüler zuweisen"
+                title="Wochen-Fahrplan für Schüler öffnen (Lehrwerk, Songs & Metronom)"
               >
                 <Send size={13} />
-                <span>An Schüler zuweisen</span>
+                <span>Wochen-Fahrplan</span>
               </button>
             )}
             {isMobileOrSim && (activeViewMode !== 'document' || activeModalTab !== 'document' || activeSubView !== 'hub' || hubTab === 'protocol') && (

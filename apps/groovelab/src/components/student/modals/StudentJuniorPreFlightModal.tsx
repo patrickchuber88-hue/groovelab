@@ -11,6 +11,7 @@ export interface StudentJuniorPreFlightModalProps {
     books?: any[];
     songs?: any[];
     audioTracks?: any[];
+    microScores?: any[];
     teacherNote?: string;
   };
   targetMins: number;
@@ -193,8 +194,23 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                   </div>
 
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', flexShrink: 0 }}>
-                    {b.pageNums.map((pNum: number) => (
-                      <span key={`p-pill-${pNum}`} style={{
+                    {b.pageNums.length <= 2 ? (
+                      b.pageNums.map((pNum: number) => (
+                        <span key={`p-pill-${pNum}`} style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          border: 'none',
+                          fontSize: '0.76rem',
+                          fontWeight: 850,
+                          padding: '2px 8px',
+                          borderRadius: '99px',
+                          boxShadow: 'none'
+                        }}>
+                          S. {pNum}
+                        </span>
+                      ))
+                    ) : (
+                      <span style={{
                         background: '#dcfce7',
                         color: '#15803d',
                         border: 'none',
@@ -204,9 +220,9 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
                         borderRadius: '99px',
                         boxShadow: 'none'
                       }}>
-                        S. {pNum}
+                        S. {b.pageNums[0]}–{b.pageNums[b.pageNums.length - 1]}
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
               ))}
@@ -217,7 +233,8 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
           {missionInfo.songs && missionInfo.songs.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {missionInfo.songs.map((s: any, sIdx: number) => {
-                const cleanT = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                const rawClean = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                const cleanT = rawClean.replace(/linken park/gi, 'Linkin Park');
                 const songColor = getSongColor(cleanT);
                 return (
                   <div key={`pre-s-${sIdx}`} style={{
@@ -253,8 +270,53 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
             </div>
           )}
 
-          {/* 3. Fallback when neither books nor songs exist */}
-          {(!missionInfo.books || missionInfo.books.length === 0) && (!missionInfo.songs || missionInfo.songs.length === 0) && (
+          {/* 3. All MicroScores Assigned (Notenschnipsel) */}
+          {missionInfo.microScores && missionInfo.microScores.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {missionInfo.microScores.map((ms: any, msIdx: number) => {
+                const msTitle = ms.title || 'Notenschnipsel';
+                return (
+                  <div key={`pre-ms-${msIdx}`} style={{
+                    background: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '10px 14px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#0284c7',
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)',
+                        flexShrink: 0
+                      }}>
+                        <Music size={15} strokeWidth={2.4} />
+                      </div>
+                      <span style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {msTitle}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {ms.tempoBpm || 80} BPM · {ms.barsCount || 2} Takte
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 4. Fallback when neither books, songs nor microScores exist */}
+          {(!missionInfo.books || missionInfo.books.length === 0) && (!missionInfo.songs || missionInfo.songs.length === 0) && (!missionInfo.microScores || missionInfo.microScores.length === 0) && (
             <div style={{
               background: '#ffffff',
               borderRadius: '16px',

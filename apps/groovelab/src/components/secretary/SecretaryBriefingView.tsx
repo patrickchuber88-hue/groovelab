@@ -37,6 +37,7 @@ export interface SecretaryBriefingViewProps {
   handleRejectBooking: (id: string) => Promise<void> | void; getEffectiveStorageUsedBytes: (profile: any) => number;
   roomsSubView?: 'overview' | 'plan' | 'settings'; setRoomsSubView?: (view: 'overview' | 'plan' | 'settings') => void;
   roomSearchQuery?: string; setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>>; onOpenFacilityLogModal?: () => void;
+  dunningStatus?: any; onOpenDunningPayModal?: () => void; subscriptionBypass?: boolean;
 }
 
 export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
@@ -51,22 +52,15 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   studentLevyMonthly_global, extraLevyMonthly_global, studentSharePreview_global, schoolShareBookedExtra_global,
   currentTotalB2B_global, mixedTotal_global, fetchLogbookBookings, handleConfirmBooking, handleRejectBooking,
   getEffectiveStorageUsedBytes, roomsSubView, setRoomsSubView, roomSearchQuery, setRoomSearchQuery, onOpenFacilityLogModal,
+  dunningStatus, onOpenDunningPayModal, subscriptionBypass = false,
 }) => {
             const [showIntegrityDetails, setShowIntegrityDetails] = useState<boolean>(false);
             const [roomIssuesTab, setRoomIssuesTab] = useState<'open' | 'resolved' | 'all'>('open');
-            const effectiveWidth = useMemo(() => {
-              if (typeof windowWidth === 'number' && windowWidth > 0) return windowWidth;
-              if (typeof window === 'undefined') return 1280;
-              return window.innerWidth;
-            }, [windowWidth]);
-            const isMobileView = effectiveWidth <= 768;
-            const isTabletOrMobile = effectiveWidth <= 1180;
-            const simDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
-            const todayDayNum = simDate.getDay() === 0 ? 7 : simDate.getDay();
-            const todayDateStr = simulatedToday || new Date().toISOString().split('T')[0];
-            const safeRooms = rooms || [];
-            const safeStudents = students || [];
-            const safeAllocations = matrixAllocations || [];
+  const effectiveWidth = useMemo(() => (typeof windowWidth === 'number' && windowWidth > 0) ? windowWidth : (typeof window === 'undefined' ? 1280 : window.innerWidth), [windowWidth]);
+  const isMobileView = effectiveWidth <= 768, isTabletOrMobile = effectiveWidth <= 1180;
+  const simDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
+  const todayDayNum = simDate.getDay() === 0 ? 7 : simDate.getDay(), todayDateStr = simulatedToday || new Date().toISOString().split('T')[0];
+  const safeRooms = rooms || [], safeStudents = students || [], safeAllocations = matrixAllocations || [];
 
             const { todayAllocations, roomOccupancyRate, todayTeachersCount } = useMemo(() => {
               const safeAllocs = matrixAllocations || [];
@@ -378,22 +372,36 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     </div>
                   )}
 
+                  {/* Enterprise B2B Delinquency Alert in Secretary Briefing */}
+                  {!subscriptionBypass && dunningStatus?.isDelinquent && dunningStatus.totalOverdueAmount > 0 && (
+                    <div style={{ background: dunningStatus.isSecretaryReadOnly ? '#fee2e2' : (dunningStatus.level === 'level_2_warning' ? '#fef3c7' : '#dbeafe'), border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
+                        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', flexShrink: 0 }}>
+                          {dunningStatus.isSecretaryReadOnly ? <ShieldAlert size={24} style={{ color: '#dc2626' }} /> : <Clock size={24} style={{ color: dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb' }} />}
+                        </div>
+                        <div>
+                          <strong style={{ display: 'block', fontSize: '1rem', color: dunningStatus.isSecretaryReadOnly ? '#991b1b' : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e3a8a'), marginBottom: '4px' }}>
+                            {dunningStatus.isSecretaryReadOnly ? `Administrativer Schreibschutz aktiv (${dunningStatus.unpaidInvoicesCount} ${dunningStatus.unpaidInvoicesCount === 1 ? 'Beleg' : 'Belege'} überfällig)` : `Offene B2B-Abrechnung (${dunningStatus.unpaidInvoicesCount} ${dunningStatus.unpaidInvoicesCount === 1 ? 'Beleg' : 'Belege'} seit ${dunningStatus.overdueDays} Tagen fällig)`}
+                          </strong>
+                          <span style={{ fontSize: '0.84rem', color: dunningStatus.isSecretaryReadOnly ? '#7f1d1d' : (dunningStatus.level === 'level_2_warning' ? '#78350f' : '#1e40af'), lineHeight: '1.4' }}>
+                            Ausstehender Gesamtbetrag: <strong>{dunningStatus.totalOverdueAmount.toFixed(2).replace('.', ',')} €</strong>. Schüler- &amp; Lehrkräfte-Accounts genießen 100 % didaktische Immunität und werden niemals gesperrt.
+                          </span>
+                        </div>
+                      </div>
+                      <button type="button" aria-label="B2B-Sofortausgleich via EPC-QR öffnen" onClick={() => { if (onOpenDunningPayModal) onOpenDunningPayModal(); else setSecretarySubTab('licenses'); }} style={{ background: dunningStatus.isSecretaryReadOnly ? '#dc2626' : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'), color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: 'none', transition: 'transform 0.15s, background-color 0.15s' }}>
+                        ⚡ Sofort ausgleichen (EPC-QR)
+                      </button>
+                    </div>
+                  )}
+
                   {(() => {
                     if (!isBillingBooked || dismissedInvoiceAlert) return null;
-                    const today = simulatedToday ? new Date(simulatedToday + 'T23:59:59') : new Date();
-                    const y = today.getFullYear();
-                    const m = today.getMonth() + 1;
-                    const lastDay = new Date(y, m, 0).getDate();
-                    const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
+                    const today = simulatedToday ? new Date(simulatedToday + 'T23:59:59') : new Date(), y = today.getFullYear(), m = today.getMonth() + 1;
+                    const lastDay = new Date(y, m, 0).getDate(), creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
                     if (today.getTime() < creationTime.getTime()) return null;
-
-                    const monthStr = m < 10 ? `0${m}` : `${m}`;
-                    const yearShort = String(y).slice(-2);
-                    const currentInvoiceId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
+                    const monthStr = m < 10 ? `0${m}` : `${m}`, yearShort = String(y).slice(-2), currentInvoiceId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
                     const deMonths = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-                    const monthName = deMonths[m];
-                    const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
-                    const dueDateObj = new Date(y, m - 1, lastDay);
+                    const monthName = deMonths[m], invoiceDateStr = `${lastDay}. ${monthName} ${y}`, dueDateObj = new Date(y, m - 1, lastDay);
                     dueDateObj.setDate(dueDateObj.getDate() + 30);
                     if (dueDateObj.getDay() === 6) dueDateObj.setDate(dueDateObj.getDate() + 2);
                     else if (dueDateObj.getDay() === 0) dueDateObj.setDate(dueDateObj.getDate() + 1);

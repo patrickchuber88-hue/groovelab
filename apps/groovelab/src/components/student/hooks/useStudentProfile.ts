@@ -353,20 +353,10 @@ export function useStudentProfile({
       window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
     setActiveTab(tab);
-    if (tab !== 'settings' && tab !== 'parent_controls' && !isAdultStudent) {
-      try {
-        sessionStorage.removeItem('groovelab_parent_unlocked_global');
-        if (studentId) {
-          sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
-          sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
-        }
-      } catch (e) {}
-      window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
-    }
     if (onTabChange) {
       onTabChange(tab);
     }
-  }, [isAdultStudent, studentId, onTabChange]);
+  }, [onTabChange]);
 
   // Mobile viewport detection (Simulator & Real Device aware, excluding Tablet/iPad)
   const computeIsStudentMobile = () => {

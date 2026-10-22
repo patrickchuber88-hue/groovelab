@@ -10,8 +10,10 @@ import {
   alignAudioBufferToGrid,
   TARGET_PURE_RAW_LUFS,
   TARGET_PEAK_DBTP,
-  MAX_PURE_RAW_LIMITER_GR_DB
+  MAX_PURE_RAW_LIMITER_GR_DB,
+  CURRENT_MASTERING_VERSION
 } from '../../../../utils/audioMasteringEngine';
+import { AudioCaptureEngine } from '../../../../services/audio/AudioCaptureEngine';
 import { storeBlob, deleteBlob } from '../../../../utils/blobStorage';
 import { validateMediaBlob } from '../../../../utils/mediaSecurityValidator';
 import { fixWebmDuration } from '../../../../utils/webmDurationPatcher';
@@ -184,13 +186,17 @@ export function useMeisterwerkAudioRecording({
     };
   }, []);
 
-  const cancelActiveRecordCountIn = () => {
+  const clearCountInTimersOnly = () => {
     if (recordCountInIntervalRef.current) {
       clearInterval(recordCountInIntervalRef.current);
       recordCountInIntervalRef.current = null;
     }
     setRecordCountInRemaining(null);
     setRecordCountInMode(null);
+  };
+
+  const cancelActiveRecordCountIn = () => {
+    clearCountInTimersOnly();
     isPcmCaptureActiveRef.current = false;
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
@@ -289,52 +295,24 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       const pcmChunksL: Float32Array[] = [];
       const pcmChunksR: Float32Array[] = [];
       let totalPcmSamples = 0;
-      let pcmSourceNode: MediaStreamAudioSourceNode | null = null;
-      let pcmProcessorNode: ScriptProcessorNode | null = null;
-      let pcmSilentGain: GainNode | null = null;
+      let pcmTap: Awaited<ReturnType<typeof AudioCaptureEngine.createRealtimePcmCaptureTap>> | null = null;
 
       try {
-        pcmSourceNode = audioCtx.createMediaStreamSource(stream);
-        pcmProcessorNode = audioCtx.createScriptProcessor(4096, 2, 2);
-        pcmSilentGain = audioCtx.createGain();
-        pcmSilentGain.gain.setValueAtTime(0, audioCtx.currentTime); // Prevent echo feedback to speakers
-
-        pcmProcessorNode.onaudioprocess = (e) => {
-          if (!isPcmCaptureActiveRef.current) return;
-          const inL = e.inputBuffer.getChannelData(0);
-          let inR = inL;
-          if (e.inputBuffer.numberOfChannels > 1) {
-            const rawR = e.inputBuffer.getChannelData(1);
-            let hasSignal = false;
-            for (let i = 0; i < rawR.length; i += 16) {
-              if (Math.abs(rawR[i]) > 0.0001) {
-                hasSignal = true;
-                break;
-              }
-            }
-            if (hasSignal) {
-              inR = rawR;
-            }
+        pcmTap = await AudioCaptureEngine.createRealtimePcmCaptureTap(audioCtx, stream, {
+          channelCount: 2,
+          onChunk: (chunkL, chunkR) => {
+            if (!isPcmCaptureActiveRef.current) return;
+            pcmChunksL.push(chunkL);
+            pcmChunksR.push(chunkR);
+            totalPcmSamples += chunkL.length;
           }
-          pcmChunksL.push(new Float32Array(inL));
-          pcmChunksR.push(new Float32Array(inR));
-          totalPcmSamples += inL.length;
-        };
-
-        pcmSourceNode.connect(pcmProcessorNode);
-        pcmProcessorNode.connect(pcmSilentGain);
-        pcmSilentGain.connect(audioCtx.destination);
+        });
+        pcmTap.start();
       } catch (pcmErr) {
         console.warn('[useMeisterwerkAudioRecording] PCM stream capture init fallback:', pcmErr);
       }
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : '';
-
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const { recorder } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       const audioChunks: Blob[] = [];
 
       recorder.ondataavailable = (event) => {
@@ -344,14 +322,11 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       };
 
       recorder.onstop = async () => {
-        // Disconnect PCM recording graph
+        // Disconnect & flush AudioWorklet / PCM recording graph
         try {
-          if (pcmProcessorNode) {
-            pcmProcessorNode.onaudioprocess = null;
-            pcmProcessorNode.disconnect();
+          if (pcmTap) {
+            await pcmTap.stopAndFlush();
           }
-          if (pcmSilentGain) pcmSilentGain.disconnect();
-          if (pcmSourceNode) pcmSourceNode.disconnect();
         } catch {}
 
         stream.getTracks().forEach(track => track.stop());
@@ -387,8 +362,8 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
             if (latencyCompensationSec > 0) {
               capturedBuffer = alignAudioBufferToGrid(capturedBuffer, latencyCompensationSec, audioCtx);
             }
-            // 🪄 0,1% DAW Goldstandard: Zero-Pop Envelopes (5ms Head Fade-In + 35ms Cos² Tail Soft-Release)
-            applyBufferZeroPopEnvelopes(capturedBuffer, 0.005, 0.035);
+            // 🪄 0,1% DAW Goldstandard: Zero-Pop Envelopes (5ms Head Fade-In + 110ms Cos² Tail Soft-Release)
+            applyBufferZeroPopEnvelopes(capturedBuffer, 0.005, 0.110);
 
             if (isMasterworkSong) {
               const masterRes = await processStudioMasteringAudioBuffer(capturedBuffer);
@@ -401,8 +376,8 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
                 maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
                 padActive: isRecordingPadActiveRef.current
               });
-              // Nach Normalisierung erneut klickfreien Nulldurchgang an den Schnittgrenzen sichern
-              applyBufferZeroPopEnvelopes(capturedBuffer, 0.003, 0.035);
+              // Nach Normalisierung erneut samtigen 110ms Nulldurchgang am Ende sichern
+              applyBufferZeroPopEnvelopes(capturedBuffer, 0.003, 0.110);
               dspDuration = capturedBuffer.duration;
               processedBlob = audioBufferToWavBlob(capturedBuffer, {
                 title: overrideLabel || audioLabelRef.current || 'Aufnahme',
@@ -521,6 +496,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
             metronomeBpm: metronomeBpmToSave,
             bpm: metronomeBpmToSave,
             latencyOffsetMs: effectiveLatencyMs,
+            masteringVersion: CURRENT_MASTERING_VERSION,
             cloudSyncStatus: 'local'
           };
 
@@ -811,12 +787,20 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
     if (isStoppingAudioRef.current) return;
+
+    // Falls noch im Vorzähler (Count-In) abgebrochen wird, sofort ohne Speicherung abbrechen
+    if (recordCountInIntervalRef.current !== null && !isRecordingAudio) {
+      cancelActiveRecordCountIn();
+      cancelPlayAlongCountIn();
+      return;
+    }
+
     isStoppingAudioRef.current = true;
     setIsReleasingAudio(true);
 
-    // ⏱️ Metronom, Klick-Track & Count-In stoppen SOFORT (0 ms Latenz)
-    setRecordCountInMode(null);
-    cancelActiveRecordCountIn();
+    // ⏱️ Metronom, Klick-Track & Count-In-Timer stoppen SOFORT (0 ms Latenz),
+    // ABER Mikrofon-Stream & PCM-Tap bleiben für STUDIO_RECORDING_TAIL_DECAY_MS (1.100 ms) offen!
+    clearCountInTimersOnly();
     cancelPlayAlongCountIn();
 
     if (recordingMetronomeIntervalRef.current) {
@@ -832,20 +816,30 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
       recordingTimerRef.current = null;
     }
 
-    // 🎧 0,1% DAW Goldstandard: Musikalische Ausklingzeit (Tail Decay Buffer)
-    // Mikrofon und verlustfreier PCM-Stream bleiben für STUDIO_RECORDING_TAIL_DECAY_MS (750 ms)
-    // aktiv, um Saiten-, Raum- und Korpusschwingungen natürlich und voll ausklingen zu lassen.
+    // 🎧 0,1% DAW Goldstandard: Musikalische Ausklingzeit (Tail Decay Buffer = 1.100 ms)
+    // Mikrofon und verlustfreier PCM-Stream bleiben für STUDIO_RECORDING_TAIL_DECAY_MS aktiv,
+    // um Saiten-, Raum- und Korpusschwingungen nach dem Klick auf „Beenden“ natürlich ausklingen zu lassen.
     if (tailDecayTimerRef.current) {
       clearTimeout(tailDecayTimerRef.current as any);
       tailDecayTimerRef.current = null;
     }
 
+    const rec = activeRecorder || mediaRecorderRef.current;
+    if (rec && rec.state === 'recording') {
+      try {
+        rec.requestData();
+      } catch {}
+    }
+
     tailDecayTimerRef.current = setTimeout(() => {
       isPcmCaptureActiveRef.current = false;
-      const rec = activeRecorder || mediaRecorderRef.current;
-      if (rec && rec.state !== 'inactive') {
+      const targetRec = activeRecorder || mediaRecorderRef.current;
+      if (targetRec && targetRec.state !== 'inactive') {
         try {
-          rec.stop();
+          targetRec.requestData();
+        } catch {}
+        try {
+          targetRec.stop();
         } catch {}
       }
       setIsRecordingAudio(false);
@@ -897,6 +891,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
     const maxSec = hasTresorStorage ? 420 : 60;
 
     if (!isCountInEnabled) {
+      isPcmCaptureActiveRef.current = true;
       setAudioDuration(0);
       setIsRecordingAudio(true);
       recordStartTimeRef.current = Date.now();
@@ -918,6 +913,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
     }
 
     cancelPlayAlongCountIn();
+    isPcmCaptureActiveRef.current = false;
     let count = 4;
     setPlayAlongCountInRemaining(count);
     playMetronomeTick(true);
@@ -935,6 +931,7 @@ const getSharedMetronomeAudioCtx = (): AudioContext | null => {
         }
         setPlayAlongCountInRemaining(null);
 
+        isPcmCaptureActiveRef.current = true;
         setAudioDuration(0);
         setIsRecordingAudio(true);
         recordStartTimeRef.current = Date.now();

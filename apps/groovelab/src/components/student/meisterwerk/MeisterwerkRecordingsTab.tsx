@@ -18,6 +18,7 @@ import { AlbumRecordingActionBar } from './AlbumRecordingActionBar';
 import { UniversalLatencyEngine } from '../../../utils/universalLatencyEngine';
 import { resolveAuthoritativeUiLevel } from '../../../utils/audioTempoHelper';
 import { getCanonicalAudioKey, getCachedWaveformPeaks } from '../../../utils/waveformHelper';
+import { remasterExistingStudentRecordings } from '../../../services/audio/audioRetroRemasterService';
 
 export interface MeisterwerkRecordingsTabProps {
   uiLevel?: 'junior' | 'teen' | 'pro';
@@ -1172,6 +1173,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
         setLocalRecordingsRevision(p => p + 1);
         window.dispatchEvent(new Event('campus_junior_recordings_updated'));
       }
+
+      void remasterExistingStudentRecordings(candidateStudentIds);
     } catch (e) {
       console.warn('[MeisterwerkRecordingsTab] Scrub error:', e);
     }

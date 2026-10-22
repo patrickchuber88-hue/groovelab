@@ -8,23 +8,29 @@
  * Verhindert brutale Kanten-Cuts, schützt Raum- und Saitenresonanzen und eliminiert Clicks/Pops.
  */
 
-/** Standard DAW Tail-Hold Ausklingzeit in Millisekunden (Dreiviertelsekunde) */
-export const STUDIO_RECORDING_TAIL_DECAY_MS = 750;
+/** Standard DAW Tail-Hold Ausklingzeit in Millisekunden (1,1 Sekunden natürlicher Nachklang nach Klick auf „Beenden“) */
+export const STUDIO_RECORDING_TAIL_DECAY_MS = 1100;
+
+/** Natürliche Nachklangzeit für Sprachmemos & Kurz-Aufnahmen in Millisekunden */
+export const VOICE_MEMO_TAIL_DECAY_MS = 650;
+
+/** Standard DAW Soft-Release Fade-Out Dauer in Sekunden (110 ms samtiges Cos² Release) */
+export const STUDIO_TAIL_FADEOUT_SEC = 0.110;
 
 /**
  * 🪄 DAW Goldstandard: Cos² Soft-Release Fade-Out am Puffer-Ende (Zero-Pop Release)
  * 
- * Wendet über die letzten `fadeDurationSec` Sekunden (Standard: 35 ms)
+ * Wendet über die letzten `fadeDurationSec` Sekunden (Standard: 110 ms)
  * eine stetig differenzierbare (C¹-kontinuierliche) Cos²-Kurve an.
  * Dadurch gleitet das Signal harmonisch von 100 % Amplitude auf exakt 0.00 % Nulldurchgang.
  * 
  * @param buffer Der fertige Stereo- oder Mono-AudioBuffer
- * @param fadeDurationSec Dauer des Fade-Outs in Sekunden (Standard: 0.035 s = 35 ms)
+ * @param fadeDurationSec Dauer des Fade-Outs in Sekunden (Standard: 0.110 s = 110 ms)
  * @returns Der manipulierte AudioBuffer für Chaining
  */
 export function applyBufferTailFadeOut(
   buffer: AudioBuffer,
-  fadeDurationSec = 0.035
+  fadeDurationSec = STUDIO_TAIL_FADEOUT_SEC
 ): AudioBuffer {
   if (!buffer || buffer.length <= 0 || fadeDurationSec <= 0) return buffer;
 
@@ -116,7 +122,7 @@ export function applyBufferHeadFadeIn(
 export function applyBufferZeroPopEnvelopes(
   buffer: AudioBuffer,
   headFadeSec = 0.005,
-  tailFadeSec = 0.035
+  tailFadeSec = STUDIO_TAIL_FADEOUT_SEC
 ): AudioBuffer {
   applyBufferHeadFadeIn(buffer, headFadeSec);
   applyBufferTailFadeOut(buffer, tailFadeSec);

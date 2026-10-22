@@ -118,6 +118,49 @@ export function formatPageRangeString(pages: number[]): string {
 }
 
 /**
+ * 0,1% Goldstandard Smart Page Range Parser:
+ * Parst freie Benutzereingaben wie "7", "7-9", "7, 12", "S. 7–8 & 12", "7-10, 14"
+ * in ein sortiertes, dedupliziertes Array von Seitenzahlen [7, 8, 9, 12, 14].
+ */
+export function parsePageRangeString(input: string, maxPages = 200): number[] {
+  if (!input || typeof input !== 'string') return [];
+  const clean = input
+    .replace(/seite[n]?/gi, '')
+    .replace(/^s\.\s*/i, '')
+    .replace(/\s*bis\s*/gi, '-')
+    .replace(/&/g, ',')
+    .replace(/–/g, '-') // en-dash
+    .replace(/—/g, '-'); // em-dash
+
+  const parts = clean.split(/[,;\s]+/).map(p => p.trim()).filter(Boolean);
+  const pagesSet = new Set<number>();
+
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [startStr, endStr] = part.split('-');
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      if (!isNaN(start) && !isNaN(end)) {
+        const from = Math.min(start, end);
+        const to = Math.max(start, end);
+        for (let p = from; p <= to; p++) {
+          if (p >= 1 && p <= maxPages) pagesSet.add(p);
+        }
+      } else if (!isNaN(start) && start >= 1 && start <= maxPages) {
+        pagesSet.add(start);
+      }
+    } else {
+      const num = parseInt(part, 10);
+      if (!isNaN(num) && num >= 1 && num <= maxPages) {
+        pagesSet.add(num);
+      }
+    }
+  }
+
+  return Array.from(pagesSet).sort((a, b) => a - b);
+}
+
+/**
  * Removes instrument annotations like "(Gitarre)", "(Bass)" from titles for clean rendering
  */
 export function cleanHomeworkTitle(title: string): string {

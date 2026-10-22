@@ -162,131 +162,31 @@ export interface StudentBriefingTabProps {
 
 export function StudentBriefingTab(props: StudentBriefingTabProps) {
   const {
-    studentId,
-    assignedCampusSongs,
-    onOpenRescheduleBottomSheet,
-    isOfflineScheduleActive = false,
-    carrierGhostingDetected = false,
-    onRefreshConnection,
-    DEFAULT_FOKUS_LEVELS,
-    activeSongSkills,
-    activeTab,
-    activeTtsKey,
-    avatar,
-    briefingData,
-    campusFeedAnnouncements,
-    cancelJuniorRecording,
-    checkIsParentUnlockedGlobal,
-    checkOccurrenceHasMessages,
-    circleRadius,
-    classFeedInteractions,
-    classFeedPosts,
-    classGoals,
-    classWeeklyMins,
-    currentPlatform,
-    currentXp,
-    downloadJuniorRecording,
-    draftAllowTts,
-    effectiveLevel,
-    effectivePracticeMinutes,
-    feedInteractions,
-    finishPracticeSession,
-    flamesActive,
-    fokusLogs,
-    getDeterministicWeekMetrics,
-    getExactLogSeconds,
-    getJuniorWeeklyHomeworkSummary,
-    getOccRoomName,
-    getOccurrenceUnreadCount,
-    getTargetMinutes,
-    graceSecondsLeft,
-    handleAcknowledgeCancellation,
-    handleOpenContributions,
-    handleOpenHomeworkBookWithView,
-    handleReactToPost,
-    handleRejectReschedule,
-    handleSpeakText,
-    handleStopSpeaking,
-    handleSubmitClassFeedInteraction,
-    handleTabChangeLocal,
-    handleToggleRightSidebar,
-    handleTriggerCancelOccurrence,
-    handleTriggerConfirmReschedule,
-    handleTriggerUndoCancelOccurrence,
-    isExtraTime,
-    isGraceActive,
-    isMobile,
-    isMusicStandMode,
-    isRightSidebarCollapsed,
-    isStudentAbsenceAllowed,
-    isStudentRescheduleAllowed,
-    isTodayHoliday,
-    isTtsSpeaking,
-    juniorActivePlayingAudioId,
-    juniorAudioPlayerRef,
-    juniorCountdown,
-    juniorIsRecording,
-    juniorIsSaving,
-    juniorPreviewAudioRef,
-    juniorPreviewCurrentTime,
-    juniorPreviewDuration,
-    juniorPreviewPlaying,
-    juniorRecordDuration,
-    juniorRecordTitle,
-    juniorRecordedUrl,
-    juniorRecordedBlob,
-    juniorTeacherRecordings,
-    lehrwerke,
-    localProgress,
-    progressItems,
-    saveJuniorRecording,
-    scheduleOccurrences,
-    schoolFokusLevels,
-    schoolYearOccurrences,
-    secondsElapsed,
-    secondsToDisplayMinutes,
-    sessionActive,
-    setActiveTab,
-    setAppointmentChatData,
-    setIsPhoneFlat,
-    setJuniorActivePlayingAudioId,
-    setJuniorMissionPhase,
-    setJuniorPreviewCurrentTime,
-    setJuniorRecordTitle,
-    requestOrientationPermission,
-    setSessionActive,
-    setShowAppointmentChat,
-    setShowJuniorHomeworkModal: setShowJuniorHomeworkModalProp,
-    setShowJuniorPreFlightModal,
-    setShowJuniorRecordingsModal: setShowJuniorRecordingsModalProp,
-    setShowJuniorStickerModal,
-    setShowJuniorTimerModal: setShowJuniorTimerModalProp,
-    setShowRulesModal,
-    setShowStudentToolbox,
-    setStudentFeedTab,
-    showJuniorHomeworkModal: showJuniorHomeworkModalProp,
-    showJuniorRecordModal,
-    showJuniorRecordingsModal: showJuniorRecordingsModalProp,
-    showJuniorTimerModal: showJuniorTimerModalProp,
-    isJuniorPadActive,
-    setIsJuniorPadActive,
-    songStats,
-    songs,
-    startJuniorRecordingFlow,
-    stopJuniorRecording,
-    strokeDashoffset,
-    studentFeedTab,
-    studentInstrumentName,
-    studentUiLevel,
-    studentUser,
-    togglePlayJuniorPreview,
-    togglePlayJuniorRecording,
-    totalUnreadDirectMessages,
-    unifiedStickersMap,
-    unreadClassFeedCount,
-    xpActive,
-    pushEnabled,
-    setShowPushSoftPrompt
+    studentId, assignedCampusSongs, onOpenRescheduleBottomSheet, isOfflineScheduleActive = false, carrierGhostingDetected = false,
+    onRefreshConnection, DEFAULT_FOKUS_LEVELS, activeSongSkills, activeTab, activeTtsKey, avatar, briefingData,
+    campusFeedAnnouncements, cancelJuniorRecording, checkIsParentUnlockedGlobal, checkOccurrenceHasMessages, circleRadius,
+    classFeedInteractions, classFeedPosts, classGoals, classWeeklyMins, currentPlatform, currentXp, downloadJuniorRecording,
+    draftAllowTts, effectiveLevel, effectivePracticeMinutes, feedInteractions, finishPracticeSession, flamesActive, fokusLogs,
+    getDeterministicWeekMetrics, getExactLogSeconds, getJuniorWeeklyHomeworkSummary, getOccRoomName, getOccurrenceUnreadCount,
+    getTargetMinutes, graceSecondsLeft, handleAcknowledgeCancellation, handleOpenContributions, handleOpenHomeworkBookWithView,
+    handleReactToPost, handleRejectReschedule, handleSpeakText, handleStopSpeaking, handleSubmitClassFeedInteraction,
+    handleTabChangeLocal, handleToggleRightSidebar, handleTriggerCancelOccurrence, handleTriggerConfirmReschedule,
+    handleTriggerUndoCancelOccurrence, isExtraTime, isGraceActive, isMobile, isMusicStandMode, isRightSidebarCollapsed,
+    isStudentAbsenceAllowed, isStudentRescheduleAllowed, isTodayHoliday, isTtsSpeaking, juniorActivePlayingAudioId,
+    juniorAudioPlayerRef, juniorCountdown, juniorIsRecording, juniorIsSaving, juniorPreviewAudioRef, juniorPreviewCurrentTime,
+    juniorPreviewDuration, juniorPreviewPlaying, juniorRecordDuration, juniorRecordTitle, juniorRecordedUrl, juniorRecordedBlob,
+    juniorTeacherRecordings, lehrwerke, localProgress, progressItems, saveJuniorRecording, scheduleOccurrences, schoolFokusLevels,
+    schoolYearOccurrences, secondsElapsed, secondsToDisplayMinutes, sessionActive, setActiveTab, setAppointmentChatData,
+    setIsPhoneFlat, setJuniorActivePlayingAudioId, setJuniorMissionPhase, setJuniorPreviewCurrentTime, setJuniorRecordTitle,
+    requestOrientationPermission, setSessionActive, setShowAppointmentChat,
+    setShowJuniorHomeworkModal: setShowJuniorHomeworkModalProp, setShowJuniorPreFlightModal,
+    setShowJuniorRecordingsModal: setShowJuniorRecordingsModalProp, setShowJuniorStickerModal,
+    setShowJuniorTimerModal: setShowJuniorTimerModalProp, setShowRulesModal, setShowStudentToolbox, setStudentFeedTab,
+    showJuniorHomeworkModal: showJuniorHomeworkModalProp, showJuniorRecordModal,
+    showJuniorRecordingsModal: showJuniorRecordingsModalProp, showJuniorTimerModal: showJuniorTimerModalProp,
+    isJuniorPadActive, setIsJuniorPadActive, songStats, songs, startJuniorRecordingFlow, stopJuniorRecording, strokeDashoffset,
+    studentFeedTab, studentInstrumentName, studentUiLevel, studentUser, togglePlayJuniorPreview, togglePlayJuniorRecording,
+    totalUnreadDirectMessages, unifiedStickersMap, unreadClassFeedCount, xpActive, pushEnabled, setShowPushSoftPrompt
   } = props;
 
   // 🛡️ Fail-Safe Local State for Junior Briefing Modals (prevents dead prop stubs)
@@ -869,14 +769,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     const label = `${targetDayOfWeek} (${formattedDate}), ${nextLessonInfo.timeLabel} Uhr`;
     const hasToday = Boolean(briefingData?.todayLesson);
     setAppointmentChatData({
+      id: nextLessonInfo.finalOccurId,
+      occurrenceId: nextLessonInfo.finalOccurId,
+      occurrence_id: nextLessonInfo.finalOccurId,
+      schedule_id: nextLessonInfo.nextOcc?.schedule_id || nextLessonInfo.nextOcc?.schedule?.id || null,
       teacherId: nextLessonInfo.teacherId,
       teacher_id: nextLessonInfo.teacherId,
+      student_id: props.studentId || studentUser?.id,
+      studentId: props.studentId || studentUser?.id,
+      school_id: studentUser?.school_id || (Array.isArray(studentUser?.schools) ? studentUser?.schools[0]?.id : studentUser?.schools?.id) || null,
       teacher: hasToday ? briefingData.todayLesson?.teacher : nextLessonInfo.nextOcc?.teacher,
       teacher_name: hasToday ? (briefingData.todayLesson?.teacher_name || briefingData.todayLesson?.teacher) : (nextLessonInfo.nextOcc?.teacher_name || nextLessonInfo.nextOcc?.teacher),
       date: nextLessonInfo.targetDateStr,
       start_time: nextLessonInfo.timeLabel,
       label,
-      occurrenceId: nextLessonInfo.finalOccurId,
       status: nextLessonInfo.nextOcc?.status || (nextLessonInfo.isCanceled ? 'cancelled' : 'scheduled'),
       isCancelled: nextLessonInfo.isCanceled
     });
@@ -1285,7 +1191,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
             flexDirection: 'column', 
             gap: '24px', 
             position: isMobile ? 'static' : 'relative',
-            paddingBottom: isMobile ? 'calc(var(--mobile-bottom-nav-h, 72px) + env(safe-area-inset-bottom, 16px) + 36px)' : '32px'
+            paddingBottom: '0px'
           }}>
           <style>{`
             ${CAMPUS_XP_EFFECTS_CSS}
@@ -2225,6 +2131,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const narrative = buildContinuousHomeworkNarrative({
+                                        studentFirstName: studentUser?.first_name || (studentUser?.name ? studentUser.name.split(' ')[0] : undefined),
                                         teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
                                         instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
                                         books: activeJuniorBooks.map(b => ({ 
@@ -2236,6 +2143,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         songs: activeJuniorSongs.map(s => ({ 
                                           title: cleanTitle(s.topic_name || s.title), 
                                           note: s.homework_notes || s.note 
+                                        })),
+                                        microScores: ((memoizedJuniorHomework as any)?.microScores || []).map((ms: any) => ({
+                                          title: ms.title || 'Notenschnipsel',
+                                          tempoBpm: ms.tempoBpm || 80,
+                                          barsCount: ms.barsCount || 2
                                         })),
                                         audioCount: audioTracks.length,
                                         generalNotes: generalNote
@@ -2823,7 +2735,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* MODAL 1: JUNIOR HAUSAUFGABEN-MASKE                                        */}
                   {/* ========================================================================= */}
                   {showJuniorHomeworkModal && (() => {
-                    const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary() as any;
+                    const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework, microScores } = getJuniorWeeklyHomeworkSummary() as any;
                     const cleanTitle = (t: string) => (t || '').replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                     const handleTtsToggle = () => {
@@ -2831,6 +2743,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         handleStopSpeaking();
                       } else {
                         const narrative = buildContinuousHomeworkNarrative({
+                          studentFirstName: studentUser?.first_name || (studentUser?.name ? studentUser.name.split(' ')[0] : undefined),
                           teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
                           instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
                           books: formattedJuniorBooks.map((b: any) => ({
@@ -2841,6 +2754,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           songs: otherActiveSongs.map((s: any) => ({
                             title: cleanTitle(s.topic_name || s.title),
                             note: s.homework_notes
+                          })),
+                          microScores: (microScores || []).map((ms: any) => ({
+                            title: ms.title || 'Notenschnipsel',
+                            tempoBpm: ms.tempoBpm || 80,
+                            barsCount: ms.barsCount || 2
                           })),
                           audioCount: audioTracks.length,
                           generalNotes: generalNote
@@ -7598,6 +7516,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
         showQuestionModal={showQuestionModal} setShowQuestionModal={setShowQuestionModal} questionInput={questionInput} setQuestionInput={setQuestionInput} handleQuestionInputChange={handleQuestionInputChange} isSavingQuestion={isSavingQuestion} handleSaveQuestion={handleSaveQuestion} questionToast={questionToast} isListeningSpeech={isListeningSpeech} toggleSpeechRecognition={toggleSpeechRecognition}
         selectedAppointmentForDetail={selectedAppointmentForDetail} setSelectedAppointmentForDetail={setSelectedAppointmentForDetail} showCancelConfirmStep={showCancelConfirmStep} setShowCancelConfirmStep={setShowCancelConfirmStep} handleTriggerCancelOccurrence={handleTriggerCancelOccurrence} handleTriggerUndoCancelOccurrence={handleTriggerUndoCancelOccurrence} studentUser={studentUser} briefingData={briefingData} studentInstrumentName={studentInstrumentName} setAppointmentChatData={setAppointmentChatData} setShowAppointmentChat={setShowAppointmentChat} showRecordingsModal={showRecordingsModal} setShowRecordingsModal={setShowRecordingsModal} recordingsModalTracks={recordingsModalTracks} activeRecordingTrack={activeRecordingTrack} setActiveRecordingTrack={setActiveRecordingTrack} getJuniorWeeklyHomeworkSummary={getJuniorWeeklyHomeworkSummary} handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView} handleTabChangeLocal={handleTabChangeLocal} studentUiLevel={studentUiLevel}
         rescheduleDecisionModalOcc={rescheduleDecisionModalOcc} setRescheduleDecisionModalOcc={setRescheduleDecisionModalOcc} handleTriggerConfirmReschedule={handleTriggerConfirmReschedule} handleRejectReschedule={handleRejectReschedule} scheduleOccurrences={scheduleOccurrences} isMobile={isMobile}
+        checkOccurrenceHasMessages={checkOccurrenceHasMessages} getOccurrenceUnreadCount={getOccurrenceUnreadCount}
       />
       </div>
   );

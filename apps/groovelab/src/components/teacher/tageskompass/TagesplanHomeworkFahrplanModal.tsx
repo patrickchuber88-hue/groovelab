@@ -14,6 +14,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Mic, Square, BookOpen, Music, Sparkles, Check, Plus, Search,
   Volume2, VolumeX, Layers, Zap, ChevronRight, RotateCcw, Loader2,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream } from '../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../services/audio/AudioCaptureEngine';
 import { processPureRawBlob } from '../../../utils/audioMasteringEngine';
 import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { saveOfflineAudioRecord, removeOfflineAudioRecord } from '../../../utils/offlineAudioVault';
@@ -34,11 +36,18 @@ import {
   parseHomeworkNotesPayload,
   formatPageRangeString,
   cleanHomeworkTitle,
-  deleteCurrentHomeworkAuthoritative
+  deleteCurrentHomeworkAuthoritative,
+  parsePageRangeString
 } from '../../../utils/homeworkSnapshotHelper';
-import { autoRelievePreviousBookPages } from '../../../services/homeworkSyncEngine';
+import { autoRelievePreviousBookPages, calculateAuthoritativeBookProgress, AuthoritativeBookProgress } from '../../../services/homeworkSyncEngine';
+import { TagesplanSmartPageInput } from './TagesplanSmartPageInput';
+import { TagesplanBookPageMiniGrid } from './TagesplanBookPageMiniGrid';
 import { DidacticTextbausteineDock } from '../../student/meisterwerk/components/DidacticTextbausteineDock';
 import { capitalizeFirstLetter, formatSingleStudentAnonymized } from '../../../utils/nameHelper';
+import { MicroScoreSnippet } from '../../student/meisterwerk/microscore/microScore.types';
+import { fetchTeacherScoreSnippets, saveTeacherScoreSnippet } from '../../../services/teacherScoreSnippetService';
+import { MicroScoreStudioModal } from '../../student/meisterwerk/microscore/MicroScoreStudioModal';
+import { TagesplanHomeworkScoreSnippetsTab } from './TagesplanHomeworkScoreSnippetsTab';
 
 export interface TagesplanHomeworkFahrplanModalProps {
   isOpen: boolean;
@@ -49,6 +58,9 @@ export interface TagesplanHomeworkFahrplanModalProps {
   hasTresorStorage?: boolean;
   onClose: () => void;
   onSaved?: (resultUrlOrText: string) => void;
+  portalTarget?: HTMLElement | null;
+  zIndex?: number;
+  initialLehrwerkId?: string;
 }
 
 interface AssignedBookItem {
@@ -57,9 +69,20 @@ interface AssignedBookItem {
   title: string;
   totalPages: number;
   lastPracticedPage: number;
+  lastMasteredPage?: number;
+  highestConsecutiveMasteredPage?: number;
+  masteredPages?: number[];
+  pageStatesMap?: Record<number, any>;
+  proposals?: {
+    single: number;
+    double: [number, number];
+    repeatAndAdvance: [number, number];
+    block3: [number, number, number];
+  };
   selectedPages: number[];
   isSelected: boolean;
   pageNotes?: string;
+  isGridOpen?: boolean;
 }
 
 interface StudentSongItem {
@@ -72,11 +95,28 @@ interface StudentSongItem {
   selectedPassage: string;
 }
 
-const SONG_PASSAGE_PRESETS = ['Intro / Beginn', 'Knifflige Stelle 5x', 'Thema / Hauptteil', 'Ganzes Stück im Zieltempo'];
+const SONG_PASSAGE_PRESETS = [
+  'Intro & Beginn',
+  'Strophe / Formteil A',
+  'Refrain & Akkorde',
+  'Knifflige Stelle 5x',
+  'Solo & Melodie',
+  'Ganzes Stück im Zieltempo'
+];
 const METRONOME_PRESETS = [60, 80, 100, 120];
 
 export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanModalProps> = ({
-  isOpen, student, teacher, allStudents, dateStr, hasTresorStorage, onClose, onSaved
+  isOpen,
+  student,
+  teacher,
+  allStudents,
+  dateStr,
+  hasTresorStorage,
+  onClose,
+  onSaved,
+  portalTarget,
+  zIndex,
+  initialLehrwerkId
 }) => {
   // 1. Identity Resolution
   const studentFirstName = student?.first_name || (student?.name ? student.name.split(' ')[0] : 'Schüler');
@@ -88,7 +128,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
   const targetSchoolId = student?.school_id || teacher?.school_id || '';
 
   // 2. Navigation / Tabs
-  const [activeTab, setActiveTab] = useState<'fahrplan' | 'books' | 'songs' | 'audio'>('fahrplan');
+  const [activeTab, setActiveTab] = useState<'fahrplan' | 'books' | 'songs' | 'snippets' | 'audio'>('fahrplan');
   const [hasExistingHomework, setHasExistingHomework] = useState(false);
 
   // 3. Lehrwerke & Seiten-Progression
@@ -102,6 +142,12 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
   const [allSchoolSongs, setAllSchoolSongs] = useState<any[]>([]);
   const [songSearchQuery, setSongSearchQuery] = useState('');
   const [showAddSongDrawer, setShowAddSongDrawer] = useState(false);
+
+  // 4b. Notenschnipsel (MicroScores 1–4 Takte)
+  const [selectedSnippets, setSelectedSnippets] = useState<MicroScoreSnippet[]>([]);
+  const [allSchoolSnippets, setAllSchoolSnippets] = useState<MicroScoreSnippet[]>([]);
+  const [isSnippetDrawerOpen, setIsSnippetDrawerOpen] = useState(false);
+  const [isStudioModalOpen, setIsStudioModalOpen] = useState(false);
 
   // 5. Didaktischer Text & Diktat
   const [fahrplanText, setFahrplanText] = useState('');
@@ -209,74 +255,101 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
         if (dbSongs) schoolSongs = dbSongs;
         if (isMounted) setAllSchoolSongs(schoolSongs);
 
-        // C) Zugewiesene Lehrwerke & Übestände ermitteln (DB progress_matrix = SSOT)
-        let assignedList: AssignedBookItem[] = [];
+        // B2) Notenschnipsel-Katalog (VdM + Schule) laden
+        try {
+          const snippets = await fetchTeacherScoreSnippets(teacher?.id || '', targetSchoolId);
+          if (isMounted) setAllSchoolSnippets(snippets);
+        } catch (snipErr) {
+          console.warn('[TagesplanHomeworkFahrplanModal] Snippet load notice:', snipErr);
+        }
 
-        // 1. Primär: Aus progress_matrix (SSOT)
+        // C) Zugewiesene Lehrwerke & didaktische Übestände ermitteln (DB progress_matrix + Local SSOT)
+        let assignedList: AssignedBookItem[] = [];
+        let pmRows: any[] = [];
         if (isUUID(sId)) {
-          const { data: pmRows } = await supabase
+          const { data } = await supabase
             .from('progress_matrix')
             .select('*')
             .eq('student_id', sId)
             .order('updated_at', { ascending: false });
-
-          if (pmRows && pmRows.length > 0) {
-            pmRows.forEach((row: any) => {
-              if (row.topic_name && row.topic_name.includes(' - Seite ')) {
-                const [rawTitle, pStr] = row.topic_name.split(' - Seite ');
-                const bTitle = rawTitle.trim();
-                const pNum = parseInt(pStr, 10);
-                const existing = assignedList.find(a => a.title.toLowerCase() === bTitle.toLowerCase());
-                if (existing) {
-                  if (!isNaN(pNum) && pNum > existing.lastPracticedPage) {
-                    existing.lastPracticedPage = pNum;
-                    existing.selectedPages = [pNum + 1];
-                  }
-                } else if (!isNaN(pNum)) {
-                  assignedList.push({
-                    id: `book-${bTitle.toLowerCase().replace(/\s+/g, '-')}`,
-                    lehrwerkId: `book-${bTitle.toLowerCase().replace(/\s+/g, '-')}`,
-                    title: bTitle,
-                    totalPages: 50,
-                    lastPracticedPage: pNum,
-                    selectedPages: [pNum + 1],
-                    isSelected: true
-                  });
-                }
-              }
-            });
-          }
+          if (data) pmRows = data;
         }
 
-        // 2. Sekundär-Fallback: student_lehrwerke_progress nur falls DB noch leer
-        if (assignedList.length === 0) {
-          try {
-            const storedLwProgress = localStorage.getItem('student_lehrwerke_progress');
-            if (storedLwProgress) {
-              const studentItems = JSON.parse(storedLwProgress).filter((item: any) => String(item.studentId) === String(sId));
-              studentItems.forEach((lw: any) => {
-                const bookTitle = lw.bookTitle || lw.title || lw.lehrwerkTitle || 'Lehrwerk';
-                const pageStates = lw.pageStates || {};
-                let maxPage = 0;
-                Object.keys(pageStates).forEach(pStr => {
-                  const p = parseInt(pStr, 10);
-                  if (!isNaN(p) && p > maxPage) maxPage = p;
-                });
-                const targetP = maxPage > 0 ? maxPage + 1 : 1;
-                assignedList.push({
-                  id: lw.id || lw.lehrwerkId,
-                  lehrwerkId: lw.lehrwerkId || lw.id,
-                  title: bookTitle,
-                  totalPages: lw.totalPages || lw.total_pages || 50,
-                  lastPracticedPage: maxPage > 0 ? maxPage : 1,
-                  selectedPages: [targetP],
-                  isSelected: true,
-                  pageNotes: pageStates[targetP]?.homeworkNotes || pageStates[targetP]?.notes || ''
-                });
+        let localLwItems: any[] = [];
+        try {
+          const storedProgStr = localStorage.getItem('student_lehrwerke_progress');
+          if (storedProgStr) {
+            const allProg = JSON.parse(storedProgStr);
+            if (Array.isArray(allProg)) {
+              localLwItems = allProg.filter((item: any) => String(item.studentId) === String(sId));
+            }
+          }
+        } catch {}
+
+        // Sammle alle eindeutigen Lehrwerke des Schülers
+        const bookMap = new Map<string, { title: string; lehrwerkId: string; totalPages: number; localAssignment?: any }>();
+
+        // 1. Aus lokalem Fortschritt (student_lehrwerke_progress)
+        localLwItems.forEach((lw: any) => {
+          const rawTitle = lw.bookTitle || lw.title || lw.lehrwerkTitle || 'Lehrwerk';
+          const cleanTitle = cleanHomeworkTitle(rawTitle);
+          if (cleanTitle) {
+            const key = cleanTitle.toLowerCase();
+            if (!bookMap.has(key)) {
+              bookMap.set(key, {
+                title: cleanTitle,
+                lehrwerkId: lw.lehrwerkId || lw.id || `book-${key.replace(/\s+/g, '-')}`,
+                totalPages: lw.totalPages || lw.total_pages || 50,
+                localAssignment: lw
               });
             }
-          } catch {}
-        }
+          }
+        });
+
+        // 2. Aus progress_matrix (DB)
+        pmRows.forEach((row: any) => {
+          if (row.topic_name && row.topic_name.includes(' - Seite ')) {
+            const [rawTitle] = row.topic_name.split(' - Seite ');
+            const cleanTitle = cleanHomeworkTitle(rawTitle);
+            if (cleanTitle) {
+              const key = cleanTitle.toLowerCase();
+              if (!bookMap.has(key)) {
+                const matchInSchool = schoolBooks.find(b => cleanHomeworkTitle(b.title).toLowerCase() === key);
+                bookMap.set(key, {
+                  title: cleanTitle,
+                  lehrwerkId: matchInSchool?.id || `book-${key.replace(/\s+/g, '-')}`,
+                  totalPages: matchInSchool?.totalPages || matchInSchool?.total_pages || 50
+                });
+              }
+            }
+          }
+        });
+
+        // 3. 0,1% Goldstandard: Berechne für jedes Lehrwerk den autoritativen didaktischen Fortschritt
+        bookMap.forEach((bookInfo) => {
+          const progress = calculateAuthoritativeBookProgress({
+            bookTitle: bookInfo.title,
+            totalPages: bookInfo.totalPages,
+            pmRows,
+            localAssignment: bookInfo.localAssignment
+          });
+
+          assignedList.push({
+            id: `book-${bookInfo.title.toLowerCase().replace(/\s+/g, '-')}`,
+            lehrwerkId: bookInfo.lehrwerkId,
+            title: bookInfo.title,
+            totalPages: bookInfo.totalPages,
+            lastPracticedPage: progress.lastPracticedPage,
+            lastMasteredPage: progress.lastMasteredPage,
+            highestConsecutiveMasteredPage: progress.highestConsecutiveMasteredPage,
+            masteredPages: progress.masteredPages,
+            pageStatesMap: progress.pageStatesMap,
+            proposals: progress.proposals,
+            selectedPages: progress.defaultSelectedPages,
+            isSelected: true,
+            isGridOpen: false
+          });
+        });
 
         if (isMounted) setAssignedBooks(assignedList);
 
@@ -360,6 +433,15 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
             ) {
               foundExisting = true;
             }
+
+            if (parsedPayload.microScores.length > 0) {
+              const loadedSnippets: MicroScoreSnippet[] = parsedPayload.microScores
+                .map(m => m.snippet)
+                .filter(Boolean);
+              if (isMounted && loadedSnippets.length > 0) {
+                setSelectedSnippets(loadedSnippets);
+              }
+            }
           }
         }
 
@@ -367,10 +449,20 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
         if (!initialText) {
           try {
             const rawNotes = localStorage.getItem(`campus_homework_notes_${sId}`);
-            const textNotes = rawNotes ? (JSON.parse(rawNotes) as any[]).filter(n => typeof n === 'string' && !isInternalMetadataNote(n) && !n.startsWith('AUDIO:')) : [];
-            if (textNotes.length > 0) {
-              initialText = textNotes.join('\n\n');
-              foundExisting = true;
+            if (rawNotes) {
+              const parsedLocal = parseHomeworkNotesPayload(rawNotes);
+              if (parsedLocal.didacticNotes.length > 0) {
+                initialText = parsedLocal.didacticNotes.join('\n\n');
+                foundExisting = true;
+              }
+              if (parsedLocal.microScores.length > 0) {
+                const loadedSnippets: MicroScoreSnippet[] = parsedLocal.microScores
+                  .map(m => m.snippet)
+                  .filter(Boolean);
+                if (isMounted && loadedSnippets.length > 0) {
+                  setSelectedSnippets(loadedSnippets);
+                }
+              }
             }
           } catch {}
         }
@@ -394,14 +486,26 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
     };
   }, [isOpen, student, effectiveStudentId, targetSchoolId, studentInstrument]);
 
+  // 🎯 Automatische Fokussierung des initialen Lehrwerks aus Aufgabenheft-Aufruf
+  useEffect(() => {
+    if (initialLehrwerkId && assignedBooks.length > 0) {
+      setAssignedBooks(prev => prev.map(b => ({
+        ...b,
+        isSelected: b.lehrwerkId === initialLehrwerkId ? true : b.isSelected,
+        isGridOpen: b.lehrwerkId === initialLehrwerkId ? true : b.isGridOpen
+      })));
+    }
+  }, [initialLehrwerkId, assignedBooks.length]);
+
   // =========================================================================
   // 🔄 2. SEITEN-PROGRESION & FAHRPLAN-SYNCHRONISATION
   // =========================================================================
   const handleSelectBookPages = (bookId: string, pages: number[]) => {
+    const cleanPages = [...pages].filter(p => !isNaN(p) && p >= 1).sort((a, b) => a - b);
     setAssignedBooks(prev => {
       return prev.map(book => {
         if (book.id === bookId) {
-          return { ...book, selectedPages: pages, isSelected: true };
+          return { ...book, selectedPages: cleanPages, isSelected: cleanPages.length > 0 };
         }
         return book;
       });
@@ -410,20 +514,42 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
     // Fahrplan-Text aktualisieren
     const targetBook = assignedBooks.find(b => b.id === bookId);
     if (targetBook) {
-      const pageStr = formatPageRangeString(pages);
-      const bookLine = `${targetBook.title}: ${pageStr}`;
+      const pageStr = formatPageRangeString(cleanPages);
+      const bookLine = cleanPages.length > 0 ? `${targetBook.title}: ${pageStr}` : '';
 
       setFahrplanText(prev => {
         const lines = prev.split('\n');
         const existingIdx = lines.findIndex(l => l.includes(targetBook.title));
         if (existingIdx !== -1) {
-          lines[existingIdx] = bookLine;
+          if (bookLine) {
+            lines[existingIdx] = bookLine;
+          } else {
+            lines.splice(existingIdx, 1);
+          }
           return lines.join('\n');
-        } else {
+        } else if (bookLine) {
           return `${bookLine}\n${prev}`.trim();
         }
+        return prev;
       });
     }
+  };
+
+  const handleToggleMiniGridPage = (bookId: string, pageNum: number) => {
+    const target = assignedBooks.find(b => b.id === bookId);
+    if (!target) return;
+    const currentPages = target.selectedPages || [];
+    let nextPages: number[];
+    if (currentPages.includes(pageNum)) {
+      nextPages = currentPages.filter(p => p !== pageNum);
+    } else {
+      nextPages = [...currentPages, pageNum].sort((a, b) => a - b);
+    }
+    handleSelectBookPages(bookId, nextPages);
+  };
+
+  const handleToggleBookGridOpen = (bookId: string) => {
+    setAssignedBooks(prev => prev.map(b => b.id === bookId ? { ...b, isGridOpen: !b.isGridOpen } : b));
   };
 
   const handleStepBookPage = (bookId: string, delta: number) => {
@@ -494,6 +620,53 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
     });
   };
 
+  const handleSelectSnippet = (snippet: MicroScoreSnippet) => {
+    setSelectedSnippets(prev => {
+      if (prev.some(s => s.id === snippet.id)) return prev;
+      return [...prev, snippet];
+    });
+    setIsSnippetDrawerOpen(false);
+
+    setFahrplanText(prev => {
+      const snippetLine = `🎼 Notenschnipsel: ${snippet.title} (${snippet.tempoBpm || 80} BPM)`;
+      if (!prev.includes(snippet.title)) {
+        return prev ? `${prev}\n${snippetLine}` : snippetLine;
+      }
+      return prev;
+    });
+  };
+
+  const handleSaveStudioSnippet = async (snippet: MicroScoreSnippet) => {
+    setSelectedSnippets(prev => {
+      if (prev.some(s => s.id === snippet.id)) return prev;
+      return [...prev, snippet];
+    });
+    setIsStudioModalOpen(false);
+
+    try {
+      await saveTeacherScoreSnippet(teacher?.id || '', targetSchoolId, snippet);
+      setAllSchoolSnippets(prev => [snippet, ...prev.filter(s => s.id !== snippet.id)]);
+    } catch {}
+
+    setFahrplanText(prev => {
+      const snippetLine = `🎼 Notenschnipsel: ${snippet.title} (${snippet.tempoBpm || 80} BPM)`;
+      if (!prev.includes(snippet.title)) {
+        return prev ? `${prev}\n${snippetLine}` : snippetLine;
+      }
+      return prev;
+    });
+  };
+
+  const handleUpdateSnippetBpm = (snippetId: string, delta: number) => {
+    setSelectedSnippets(prev => prev.map(s => {
+      if (s.id === snippetId) {
+        const newBpm = Math.max(40, Math.min(240, (s.tempoBpm || 80) + delta));
+        return { ...s, tempoBpm: newBpm };
+      }
+      return s;
+    }));
+  };
+
   // =========================================================================
   // 🎙️ 3. AUDIO-MEMO & HARDWARE CONTROLS
   // =========================================================================
@@ -546,15 +719,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
   };
 
   const executeMediaRecorderStart = (stream: MediaStream) => {
-    let mimeType = 'audio/webm';
-    if (typeof MediaRecorder !== 'undefined') {
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-      else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-    }
-
-    const recOptions: MediaRecorderOptions = { audioBitsPerSecond: 256000 };
-    if (mimeType) recOptions.mimeType = mimeType;
-    const rec = new MediaRecorder(stream, recOptions);
+    const { recorder: rec, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
     mediaRecorderRef.current = rec;
 
     rec.ondataavailable = (e) => {
@@ -589,10 +754,19 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
   const stopRecording = () => {
     if (countInTimerRef.current) clearInterval(countInTimerRef.current);
     setCountInRemaining(null);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
     }
-    if (streamRef.current) {
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      AudioCaptureEngine.stopRecorderWithTail(rec, 800, () => {
+        if (streamRef.current) {
+          releaseAudioStream(streamRef.current);
+          streamRef.current = null;
+        }
+      });
+    } else if (streamRef.current) {
       releaseAudioStream(streamRef.current);
       streamRef.current = null;
     }
@@ -688,7 +862,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
       let finalAudioPublicUrl = '';
       if (recordedAudioBlob) {
         try {
-          const fileExt = recordedAudioBlob.type.includes('mp4') ? 'm4a' : 'webm';
+          const fileExt = AudioCaptureEngine.resolveAudioFileExtension(recordedAudioBlob);
           const filePath = `${sId}/voice-hw-${Date.now()}.${fileExt}`;
           const { error: upErr } = await supabase.storage
             .from('campus-assets')
@@ -707,15 +881,13 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
       const rawText = fahrplanText.trim();
       const didacticNotesList = rawText.split('\n\n').map(s => s.trim()).filter(Boolean);
 
-      // E) Bestehende Notenschnipsel (MICROSCORE:) bewahren & kanonisches homework_notes JSON schnüren
-      let existingMicroScores: string[] = [];
-      try {
-        const localHwRaw = sId ? localStorage.getItem(`campus_homework_notes_${sId}`) : null;
-        if (localHwRaw) {
-          const parsedLocal = parseHomeworkNotesPayload(localHwRaw);
-          existingMicroScores = parsedLocal.microScores.map(m => m.rawToken);
-        }
-      } catch {}
+      // E) Ausgewählte Notenschnipsel (MicroScores 1–4 Takte) serialisieren & kanonisches homework_notes JSON schnüren
+      const microScoresPayload = selectedSnippets.map(snip => ({
+        id: snip.id,
+        title: snip.title,
+        snippet: snip,
+        rawToken: `MICROSCORE:${JSON.stringify(snip)}`
+      }));
 
       let existingMatrixRow: { id: string; homework_notes?: any } | null = null;
       if (isUUID(sId)) {
@@ -728,14 +900,6 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
           .limit(1)
           .maybeSingle();
         existingMatrixRow = existingMatrix || null;
-        if (existingMatrixRow?.homework_notes) {
-          const parsedDb = parseHomeworkNotesPayload(existingMatrixRow.homework_notes);
-          parsedDb.microScores.forEach(m => {
-            if (!existingMicroScores.includes(m.rawToken)) {
-              existingMicroScores.push(m.rawToken);
-            }
-          });
-        }
       }
 
       const jsonPayload = buildHomeworkNotesPayload({
@@ -743,7 +907,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
         lehrwerke: lehrwerkeSnapshot,
         songs: songsSnapshot,
         audioTokens: audioTokens,
-        microScores: existingMicroScores
+        microScores: microScoresPayload
       });
 
       // F) In progress_matrix upserten (SSOT)
@@ -882,7 +1046,13 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
 
   if (!isOpen || !student) return null;
 
-  return (
+  const effectivePortalTarget = portalTarget ?? (typeof document !== 'undefined'
+    ? ((document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet') as HTMLElement) || document.body)
+    : null);
+
+  const effectiveZIndex = zIndex ?? 100005;
+
+  const modalMarkup = (
     <div
       role="dialog"
       aria-modal="true"
@@ -890,10 +1060,10 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
-        background: 'rgba(15, 23, 42, 0.72)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        zIndex: effectiveZIndex,
+        background: 'rgba(15, 23, 42, 0.78)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1034,6 +1204,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
               { id: 'fahrplan', label: 'Wochen-Fahrplan', icon: FileText, badge: fahrplanText.trim() ? 'Aktiv' : undefined },
               { id: 'books', label: `Lehrwerke (${assignedBooks.filter(b => b.isSelected).length})`, icon: BookOpen, badge: undefined },
               { id: 'songs', label: `Songs (${studentSongs.filter(s => s.isSelected).length})`, icon: Music, badge: undefined },
+              { id: 'snippets', label: `Notenschnipsel (${selectedSnippets.length})`, icon: Sparkles, badge: selectedSnippets.length > 0 ? `${selectedSnippets.length}` : undefined },
               { id: 'audio', label: 'Zieltempo & Audio', icon: Sliders, badge: recordedAudioUrl ? 'Take da' : undefined }
             ].map(tab => {
               const isActive = activeTab === tab.id;
@@ -1047,7 +1218,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                     padding: '6px 14px',
                     borderRadius: '10px',
                     border: 'none',
-                    background: isActive ? '#0f172a' : 'transparent',
+                    background: isActive ? '#4f46e5' : 'transparent',
                     color: isActive ? '#ffffff' : '#475569',
                     fontSize: '0.80rem',
                     fontWeight: isActive ? 850 : 650,
@@ -1234,6 +1405,74 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                     />
                   </div>
 
+                  {/* 🎼 QUICK NOTENSCHNIPSEL STRIP */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Music size={13} className="text-emerald-600" />
+                        <span>Notenschnipsel ({selectedSnippets.length}):</span>
+                      </span>
+                      {selectedSnippets.length === 0 ? (
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Noch kein Schnipsel angehängt
+                        </span>
+                      ) : (
+                        selectedSnippets.map(snip => (
+                          <span
+                            key={snip.id}
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              color: '#065f46',
+                              background: '#d1fae5',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <span>{snip.title}</span>
+                          </span>
+                        ))
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('snippets')}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: '#ecfdf5',
+                        color: '#047857',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                      className="hover-scale-mini"
+                    >
+                      <Plus size={13} />
+                      <span>{selectedSnippets.length === 0 ? 'Notenschnipsel anhängen' : 'Schnipsel verwalten'}</span>
+                    </button>
+                  </div>
+
                   {/* DIDAKTISCHE SCHNELLTEXTE DOCK */}
                   <div>
                     <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -1320,17 +1559,29 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                               type="button"
                               onClick={() => {
                                 if (!assignedBooks.some(ab => ab.title.toLowerCase() === b.title.toLowerCase())) {
+                                  const totalP = b.totalPages || b.total_pages || 50;
+                                  const progress = calculateAuthoritativeBookProgress({
+                                    bookTitle: b.title,
+                                    totalPages: totalP,
+                                    pmRows: []
+                                  });
                                   const newBook: AssignedBookItem = {
                                     id: b.id,
                                     lehrwerkId: b.id,
                                     title: b.title,
-                                    totalPages: b.totalPages || b.total_pages || 50,
-                                    lastPracticedPage: 1,
-                                    selectedPages: [1, 2],
-                                    isSelected: true
+                                    totalPages: totalP,
+                                    lastPracticedPage: progress.lastPracticedPage,
+                                    lastMasteredPage: progress.lastMasteredPage,
+                                    highestConsecutiveMasteredPage: progress.highestConsecutiveMasteredPage,
+                                    masteredPages: progress.masteredPages,
+                                    pageStatesMap: progress.pageStatesMap,
+                                    proposals: progress.proposals,
+                                    selectedPages: progress.defaultSelectedPages,
+                                    isSelected: true,
+                                    isGridOpen: false
                                   };
                                   setAssignedBooks(prev => [...prev, newBook]);
-                                  handleSelectBookPages(newBook.id, [1, 2]);
+                                  handleSelectBookPages(newBook.id, progress.defaultSelectedPages);
                                 }
                                 setShowAddBookDrawer(false);
                               }}
@@ -1362,11 +1613,35 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {assignedBooks.map(book => {
-                        const lastP = book.lastPracticedPage || 1, nextSingle = lastP + 1, nextDouble = [lastP + 1, lastP + 2], repeatAndAdvance = [lastP, lastP + 1];
+                        const maxP = book.totalPages || 50;
+                        const lastP = book.lastPracticedPage || 1;
+                        const singleProp = book.proposals?.single || Math.min(maxP, lastP + 1);
+                        const doubleProp = book.proposals?.double || [Math.min(maxP, lastP + 1), Math.min(maxP, lastP + 2)];
+                        const repeatProp = book.proposals?.repeatAndAdvance || [Math.max(1, lastP), Math.min(maxP, lastP + 1)];
+                        const blockProp = book.proposals?.block3 || [Math.min(maxP, lastP + 1), Math.min(maxP, lastP + 2), Math.min(maxP, lastP + 3)];
+
+                        const isSingleActive = book.selectedPages.length === 1 && book.selectedPages[0] === singleProp;
+                        const isDoubleActive = book.selectedPages.length === 2 && book.selectedPages[0] === doubleProp[0] && book.selectedPages[1] === doubleProp[1];
+                        const isRepeatActive = book.selectedPages.length === 2 && book.selectedPages[0] === repeatProp[0] && book.selectedPages[1] === repeatProp[1];
+                        const isBlockActive = book.selectedPages.length === 3 && book.selectedPages[0] === blockProp[0] && book.selectedPages[1] === blockProp[1] && book.selectedPages[2] === blockProp[2];
+
+                        const statusLabel = book.lastMasteredPage && book.lastMasteredPage > 0
+                          ? `Seite ${book.lastMasteredPage} gemeistert`
+                          : `Seite ${lastP}`;
+
                         return (
                           <div
                             key={book.id}
-                            style={{ padding: '14px 16px', borderRadius: '16px', background: '#ffffff', border: book.isSelected ? '1.5px solid #3b82f6' : '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', gap: '10px' }}
+                            style={{
+                              padding: '14px 16px',
+                              borderRadius: '16px',
+                              background: '#ffffff',
+                              border: book.isSelected ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '12px'
+                            }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1390,33 +1665,20 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                                     {book.title}
                                   </h5>
                                   <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                                    Bisheriger Übestand: <strong>Seite {lastP}</strong> (Gesamt: {book.totalPages} Seiten)
+                                    Bisheriger Übestand: <strong style={{ color: book.lastMasteredPage && book.lastMasteredPage > 0 ? '#15803d' : '#0f172a' }}>{statusLabel}</strong> (Gesamt: {book.totalPages} Seiten)
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Stepper für freie Seitenzahl */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStepBookPage(book.id, -1)}
-                                  style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', fontWeight: 900 }}
-                                  title="Vorherige Seite"
-                                >
-                                  -
-                                </button>
-                                <span style={{ fontSize: '0.86rem', fontWeight: 900, minWidth: '70px', textAlign: 'center', color: '#1e40af' }}>
-                                  {formatPageRangeString(book.selectedPages)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStepBookPage(book.id, 1)}
-                                  style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', fontWeight: 900 }}
-                                  title="Nächste Seite"
-                                >
-                                  +
-                                </button>
-                              </div>
+                              {/* 0,1% Goldstandard Smart Page Range Input & Stepper */}
+                              <TagesplanSmartPageInput
+                                selectedPages={book.selectedPages}
+                                onChange={(pages) => handleSelectBookPages(book.id, pages)}
+                                totalPages={book.totalPages}
+                                lastMasteredPage={book.lastMasteredPage || book.lastPracticedPage}
+                                isGridOpen={book.isGridOpen}
+                                onToggleGrid={() => handleToggleBookGridOpen(book.id)}
+                              />
                             </div>
 
                             {/* FORTSCHRITTS-VORSCHLÄGE CHIPS */}
@@ -1426,60 +1688,94 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
                                 <span>Fortlauf-Vorschläge:</span>
                               </span>
 
+                              {/* Vorschlag 1: Nächste Einzelseite */}
                               <button
                                 type="button"
-                                onClick={() => handleSelectBookPages(book.id, [nextSingle])}
+                                onClick={() => handleSelectBookPages(book.id, [singleProp])}
                                 style={{
                                   padding: '4px 10px',
                                   borderRadius: '8px',
-                                  border: book.selectedPages.length === 1 && book.selectedPages[0] === nextSingle ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                                  background: book.selectedPages.length === 1 && book.selectedPages[0] === nextSingle ? '#eff6ff' : '#ffffff',
-                                  color: book.selectedPages.length === 1 && book.selectedPages[0] === nextSingle ? '#1d4ed8' : '#334155',
+                                  border: isSingleActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                  background: isSingleActive ? '#eff6ff' : '#ffffff',
+                                  color: isSingleActive ? '#1d4ed8' : '#334155',
                                   fontSize: '0.74rem',
                                   fontWeight: 800,
                                   cursor: 'pointer'
                                 }}
                                 className="hover-scale-mini"
                               >
-                                S. {nextSingle} (Nächste Einzelseite)
+                                S. {singleProp} (Nächste Einzelseite)
                               </button>
 
+                              {/* Vorschlag 2: Doppelseite */}
                               <button
                                 type="button"
-                                onClick={() => handleSelectBookPages(book.id, nextDouble)}
+                                onClick={() => handleSelectBookPages(book.id, [doubleProp[0], doubleProp[1]])}
                                 style={{
                                   padding: '4px 10px',
                                   borderRadius: '8px',
-                                  border: book.selectedPages.length === 2 && book.selectedPages[0] === nextDouble[0] && book.selectedPages[1] === nextDouble[1] ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                                  background: book.selectedPages.length === 2 && book.selectedPages[0] === nextDouble[0] && book.selectedPages[1] === nextDouble[1] ? '#eff6ff' : '#ffffff',
-                                  color: book.selectedPages.length === 2 && book.selectedPages[0] === nextDouble[0] && book.selectedPages[1] === nextDouble[1] ? '#1d4ed8' : '#334155',
+                                  border: isDoubleActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                  background: isDoubleActive ? '#eff6ff' : '#ffffff',
+                                  color: isDoubleActive ? '#1d4ed8' : '#334155',
                                   fontSize: '0.74rem',
                                   fontWeight: 800,
                                   cursor: 'pointer'
                                 }}
                                 className="hover-scale-mini"
                               >
-                                S. {nextDouble[0]}–{nextDouble[1]} (Doppelseite)
+                                S. {doubleProp[0]}–{doubleProp[1]} (Doppelseite)
                               </button>
 
+                              {/* Vorschlag 3: Wiederholen & Weiter */}
                               <button
                                 type="button"
-                                onClick={() => handleSelectBookPages(book.id, repeatAndAdvance)}
+                                onClick={() => handleSelectBookPages(book.id, [repeatProp[0], repeatProp[1]])}
                                 style={{
                                   padding: '4px 10px',
                                   borderRadius: '8px',
-                                  border: book.selectedPages.length === 2 && book.selectedPages[0] === repeatAndAdvance[0] && book.selectedPages[1] === repeatAndAdvance[1] ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                                  background: book.selectedPages.length === 2 && book.selectedPages[0] === repeatAndAdvance[0] && book.selectedPages[1] === repeatAndAdvance[1] ? '#eff6ff' : '#ffffff',
-                                  color: book.selectedPages.length === 2 && book.selectedPages[0] === repeatAndAdvance[0] && book.selectedPages[1] === repeatAndAdvance[1] ? '#1d4ed8' : '#334155',
+                                  border: isRepeatActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                  background: isRepeatActive ? '#eff6ff' : '#ffffff',
+                                  color: isRepeatActive ? '#1d4ed8' : '#334155',
                                   fontSize: '0.74rem',
                                   fontWeight: 800,
                                   cursor: 'pointer'
                                 }}
                                 className="hover-scale-mini"
                               >
-                                S. {repeatAndAdvance[0]}–{repeatAndAdvance[1]} (Wiederholen & Weiter)
+                                S. {repeatProp[0]}–{repeatProp[1]} (Wiederholen & Weiter)
+                              </button>
+
+                              {/* Vorschlag 4: 3 Seiten Block */}
+                              <button
+                                type="button"
+                                onClick={() => handleSelectBookPages(book.id, [blockProp[0], blockProp[1], blockProp[2]])}
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  border: isBlockActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                                  background: isBlockActive ? '#eff6ff' : '#ffffff',
+                                  color: isBlockActive ? '#1d4ed8' : '#334155',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                                className="hover-scale-mini"
+                              >
+                                S. {blockProp[0]}–{blockProp[2]} (3 Seiten Block)
                               </button>
                             </div>
+
+                            {/* ▾ AUFKLAPPBARES MINI-SEITENRASTER */}
+                            {book.isGridOpen && (
+                              <TagesplanBookPageMiniGrid
+                                totalPages={book.totalPages}
+                                selectedPages={book.selectedPages}
+                                masteredPages={book.masteredPages || []}
+                                pageStatesMap={book.pageStatesMap || {}}
+                                onTogglePage={(p) => handleToggleMiniGridPage(book.id, p)}
+                                onSelectPages={(pages) => handleSelectBookPages(book.id, pages)}
+                              />
+                            )}
                           </div>
                         );
                       })}
@@ -1697,7 +1993,27 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
               )}
 
               {/* ========================================================================= */}
-              {/* TAB 4: AKUSTIK, METRONOM & AUDIO-MEMO                                     */}
+              {/* TAB 4: NOTENSCHNIPSEL (MICROSCORES 1–4 TAKTE)                            */}
+              {/* ========================================================================= */}
+              {activeTab === 'snippets' && (
+                <TagesplanHomeworkScoreSnippetsTab
+                  selectedSnippets={selectedSnippets}
+                  availableSnippets={allSchoolSnippets}
+                  studentInstrument={studentInstrument}
+                  onAddSnippet={handleSelectSnippet}
+                  onRemoveSnippet={(snippetId) => {
+                    setSelectedSnippets(prev => prev.filter(s => s.id !== snippetId));
+                  }}
+                  onUpdateSnippetBpm={handleUpdateSnippetBpm}
+                  onOpenStudioModal={() => setIsStudioModalOpen(true)}
+                  onAppendNoteToFahrplan={(line) => {
+                    setFahrplanText(prev => prev ? `${prev}\n${line}` : line);
+                  }}
+                />
+              )}
+
+              {/* ========================================================================= */}
+              {/* TAB 5: AKUSTIK, METRONOM & AUDIO-MEMO                                     */}
               {/* ========================================================================= */}
               {activeTab === 'audio' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1930,6 +2246,10 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
               <span>{studentSongs.filter(s => s.isSelected).length} Songs</span>
             </span>
             <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={12} className="text-emerald-600" />
+              <span>{selectedSnippets.length} {selectedSnippets.length === 1 ? 'Schnipsel' : 'Schnipsel'}</span>
+            </span>
+            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <Clock size={12} className="text-slate-600" />
               <span>{metronomeBpm} BPM</span>
             </span>
@@ -2018,8 +2338,25 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
           </div>
         </div>
       </div>
+
+      {/* 1–4 Takt Notenschnipsel Studio Modal */}
+      {isStudioModalOpen && (
+        <MicroScoreStudioModal
+          isOpen={isStudioModalOpen}
+          onClose={() => setIsStudioModalOpen(false)}
+          studentId={effectiveStudentId}
+          defaultInstrument={studentInstrument}
+          onSaveSnippet={handleSaveStudioSnippet}
+        />
+      )}
     </div>
   );
+
+  if (effectivePortalTarget && typeof document !== 'undefined') {
+    return createPortal(modalMarkup, effectivePortalTarget);
+  }
+
+  return modalMarkup;
 };
 
 export default TagesplanHomeworkFahrplanModal;

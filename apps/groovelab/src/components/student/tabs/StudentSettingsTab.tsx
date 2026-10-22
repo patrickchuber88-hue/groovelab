@@ -30,6 +30,7 @@ import { ParentConsentSettingsView } from '../settings/ParentConsentSettingsView
 import { ParentSponsorPatronageCard } from '../settings/ParentSponsorPatronageCard';
 import { ParentNotificationSettingsView } from '../settings/ParentNotificationSettingsView';
 import { ParentModulesSettingsView } from '../settings/ParentModulesSettingsView';
+import { purgeParentSessionLease } from '../../../services/parentSecurityLeaseService';
 
 export interface StudentSettingsTabProps {
   activeStudentSettingsModal: string | null;
@@ -163,142 +164,37 @@ export interface StudentSettingsTabProps {
   weeklyPracticeMinutes?: number;
   schoolYearPracticeMinutes?: number;
   lockParentSession?: () => void;
+  onTabChange?: (tab: string) => void;
   homeworkNotes?: any[];
 }
 
 export function StudentSettingsTab(props: StudentSettingsTabProps) {
   const {
-    activeStudentSettingsModal,
-    activeTab,
-    applyAndSaveParentControls,
-    avatar,
-    bedtimeEnd,
-    bedtimeModeEnabled,
-    bedtimeStart,
-    cancelledSchoolYearOccurrences,
-    checkIsParentSessionActive,
-    currentPlatform,
-    daytimeLockDays,
-    daytimeLockEnabled,
-    daytimeLockEnd,
-    daytimeLockStart,
-    draftAllowAbsences,
-    draftAllowAudio,
-    draftAllowChat,
-    draftAllowLeaderboard,
-    draftAllowProposals,
-    draftAllowReschedule,
-    draftAllowTimer,
-    draftAllowTts,
-    draftBoardOverrides,
-    draftUiLevel,
-    extendParentSession,
-    familyProfiles,
-    firstPinActiveField,
-    firstPinShowMask,
-    generateParentRecoveryKey,
-    getTargetMinutes,
-    handleBiometricUnlock,
-    handleRegisterParentPasskey,
-    handleCloseSettingsModal,
-    handleDownloadGoBdReceipt,
-    handleExportGdprReport,
-    handleExportFullDataArchive,
-    handleOpenSettingsModule,
-    handleRemoveFamilyProfile,
-    handleSetInstantLock,
-    handleSwitchFamilyStudent,
-    handleUndoCancelOccurrence,
-    handleUpdateBedtime,
-    handleUpdateDaytimeLock,
-    handleVerifyParentPinAttempt,
-    hasCopiedRecoveryKey,
-    instantLockUntil,
-    isAddSiblingModalOpen,
-    isAdultStudent,
-    isCurrentlyInInstantLock,
-    isIOS,
-    isMobile,
-    isParentGateShaking,
-    isParentLockWarning,
-    isParentUnlocked,
-    isPremiumUser,
-    isSavingPin,
-    isStandalone,
-    isVerifyingParentGate,
-    isWebAuthnAvailable,
-    newGeneratedRecoveryKey,
-    onProfileUpdate,
-    parentBriefingDismissed,
-    parentControlsTab,
-    parentGateCooldownSeconds,
-    parentGateError,
-    parentGatePinInput,
-    parentLockRemainingSeconds,
-    parentSetupConfirm,
-    parentSetupError,
-    parentSetupPin,
-    parentSetupStep,
-    pinFormConfirm,
-    pinFormError,
-    pinFormNew,
-    pinFormSuccess,
-    pushEnabled,
-    pushNotifChat,
-    pushNotifHomework,
-    pushNotifPracticeReminder,
-    pushNotifScheduleChanges,
-    pushNotifWeeklyDigest,
-    recentlyChangedDiff,
-    renderParentGateModal,
-    renderRecoveryKeyModal,
-    scheduleOccurrences,
-    securityPinTarget,
-    setActiveStudentSettingsModal,
-    setFamilyProfiles,
-    setFirstPinActiveField,
-    setFirstPinShowMask,
-    setHasCopiedRecoveryKey,
-    setIsAddSiblingModalOpen,
-    setIsHelpCenterOpen,
-    setIsSavingPin,
-    setNewGeneratedRecoveryKey,
-    setParentBriefingDismissed,
-    setParentControlsTab,
-    setParentGateError,
-    setParentGatePinInput,
-    setParentSetupConfirm,
-    setParentSetupError,
-    setParentSetupPin,
-    setParentSetupStep,
-    setPinFormConfirm,
-    setPinFormError,
-    setPinFormNew,
-    setPinFormSuccess,
-    setPushEnabled,
-    setPushNotifChat,
-    setPushNotifHomework,
-    setPushNotifPracticeReminder,
-    setPushNotifScheduleChanges,
-    setPushNotifWeeklyDigest,
-    setRecentlyChangedDiff,
-    setRecoveryKeyError,
-    setRecoveryKeyInput,
-    setSecurityPinTarget,
-    setSettingsSubTab,
-    setShowEmergencyKitModal,
-    setShowParentActivationModal,
-    setShowPushSoftPrompt,
-    setShowRecoveryKeyModal,
-    setStudentUser,
-    showEmergencyKitModal,
-    studentId,
-    studentUiLevel,
-    studentUser,
-    totalPracticeMinutes,
-    weeklyPracticeMinutes,
-    schoolYearPracticeMinutes,
-    homeworkNotes
+    activeStudentSettingsModal, activeTab, applyAndSaveParentControls, avatar, bedtimeEnd, bedtimeModeEnabled, bedtimeStart,
+    cancelledSchoolYearOccurrences, checkIsParentSessionActive, currentPlatform, daytimeLockDays, daytimeLockEnabled,
+    daytimeLockEnd, daytimeLockStart, draftAllowAbsences, draftAllowAudio, draftAllowChat, draftAllowLeaderboard,
+    draftAllowProposals, draftAllowReschedule, draftAllowTimer, draftAllowTts, draftBoardOverrides, draftUiLevel,
+    extendParentSession, familyProfiles, firstPinActiveField, firstPinShowMask, generateParentRecoveryKey, getTargetMinutes,
+    handleBiometricUnlock, handleRegisterParentPasskey, handleCloseSettingsModal, handleDownloadGoBdReceipt,
+    handleExportGdprReport, handleExportFullDataArchive, handleOpenSettingsModule, handleRemoveFamilyProfile,
+    handleSetInstantLock, handleSwitchFamilyStudent, handleUndoCancelOccurrence, handleUpdateBedtime,
+    handleUpdateDaytimeLock, handleVerifyParentPinAttempt, hasCopiedRecoveryKey, instantLockUntil, isAddSiblingModalOpen,
+    isAdultStudent, isCurrentlyInInstantLock, isIOS, isMobile, isParentGateShaking, isParentLockWarning, isParentUnlocked,
+    isPremiumUser, isSavingPin, isStandalone, isVerifyingParentGate, isWebAuthnAvailable, newGeneratedRecoveryKey,
+    onProfileUpdate, parentBriefingDismissed, parentControlsTab, parentGateCooldownSeconds, parentGateError,
+    parentGatePinInput, parentLockRemainingSeconds, parentSetupConfirm, parentSetupError, parentSetupPin, parentSetupStep,
+    pinFormConfirm, pinFormError, pinFormNew, pinFormSuccess, pushEnabled, pushNotifChat, pushNotifHomework,
+    pushNotifPracticeReminder, pushNotifScheduleChanges, pushNotifWeeklyDigest, recentlyChangedDiff, renderParentGateModal,
+    renderRecoveryKeyModal, scheduleOccurrences, securityPinTarget, setActiveStudentSettingsModal, setFamilyProfiles,
+    setFirstPinActiveField, setFirstPinShowMask, setHasCopiedRecoveryKey, setIsAddSiblingModalOpen, setIsHelpCenterOpen,
+    setIsSavingPin, setNewGeneratedRecoveryKey, setParentBriefingDismissed, setParentControlsTab, setParentGateError,
+    setParentGatePinInput, setParentSetupConfirm, setParentSetupError, setParentSetupPin, setParentSetupStep,
+    setPinFormConfirm, setPinFormError, setPinFormNew, setPinFormSuccess, setPushEnabled, setPushNotifChat,
+    setPushNotifHomework, setPushNotifPracticeReminder, setPushNotifScheduleChanges, setPushNotifWeeklyDigest,
+    setRecentlyChangedDiff, setRecoveryKeyError, setRecoveryKeyInput, setSecurityPinTarget, setSettingsSubTab,
+    setShowEmergencyKitModal, setShowParentActivationModal, setShowPushSoftPrompt, setShowRecoveryKeyModal,
+    setStudentUser, showEmergencyKitModal, studentId, studentUiLevel, studentUser, totalPracticeMinutes,
+    weeklyPracticeMinutes, schoolYearPracticeMinutes, homeworkNotes, onTabChange
   } = props;
 
   const [downloadingSection, setDownloadingSection] = React.useState<string | null>(null);
@@ -759,7 +655,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       style={{
                         width: '100%',
                         padding: '13px 20px',
-                        background: '#10b981',
+                        background: '#0284c7',
                         border: 'none',
                         borderRadius: '18px',
                         color: '#ffffff',
@@ -1008,40 +904,38 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </p>
                 </div>
 
-                {/* 🛡️ 1-Tap Parent Area Lock Button */}
-                {isMinorStudent && (
+                {!isAdultStudent && (
                   <button
                     type="button"
                     onClick={() => {
-                      const targetId = studentId || (studentUser as any)?.id;
-                      if (targetId) {
-                        sessionStorage.removeItem(`groovelab_parent_session_${targetId}`);
-                        sessionStorage.removeItem(`groovelab_parent_unlocked_${targetId}`);
+                      if (props.lockParentSession) {
+                        props.lockParentSession();
+                      } else {
+                        purgeParentSessionLease(studentId || studentUser?.id);
                       }
-                      sessionStorage.removeItem('groovelab_parent_unlocked_global');
-                      window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+                      if (onTabChange) {
+                        onTabChange('briefing');
+                      }
                     }}
                     style={{
+                      padding: '8px 16px',
+                      borderRadius: '14px',
+                      background: '#fee2e2',
+                      border: 'none',
+                      color: '#dc2626',
+                      fontSize: '0.80rem',
+                      fontWeight: 850,
+                      cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '8px',
-                      background: '#fef2f2',
-                      border: 'none',
-                      color: '#b91c1c',
-                      padding: '10px 18px',
-                      borderRadius: '16px',
-                      fontSize: '0.84rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      boxShadow: 'none'
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
                     }}
                     className="hover-scale"
-                    title="Elternbereich jetzt sofort sperren"
-                    aria-label="Elternbereich jetzt sperren"
+                    title="Elternbereich sofort verriegeln und zur Schüleransicht zurückkehren"
                   >
-                    <Lock size={15} strokeWidth={2.5} />
-                    <span>Bereich sperren</span>
+                    <Lock size={15} strokeWidth={2.4} />
+                    <span>Elternbereich sperren &amp; verlassen</span>
                   </button>
                 )}
               </div>
@@ -1139,15 +1033,16 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 </div>
               )}
 
-              {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & RECHTE STIFTER-URKUNDE (0,1% GOLDSTANDARD) */}
+              {/* 🌟 0,1% GOLDSTANDARD: ELTERNZONE & VOLLBREITEN-STIFTER-URKUNDE (ZERO-OVERLAP) */}
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 340px',
-                gap: '28px',
-                alignItems: 'start',
-                width: '100%'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '32px',
+                width: '100%',
+                minWidth: 0,
+                paddingBottom: '88px',
+                boxSizing: 'border-box'
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', minWidth: 0 }}>
 
                 {/* 1. Geschwister-Switcher Chips (wenn mehrere Profile vorhanden) */}
                 {familyProfiles && familyProfiles.length > 1 && (
@@ -1318,6 +1213,11 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     </button>
                   </div>
                 )}
+
+                {/* 🏛️ REPRÄSENTATIVE STIFTER-URKUNDE & BILDUNGSFÖRDERUNG (0,1% GOLDSTANDARD VOLLBREITEN-HERO) */}
+                <div style={{ width: '100%' }}>
+                  <ParentSponsorPatronageCard schoolId={(studentUser as any)?.school_id} variant="hero" />
+                </div>
 
                 {/* ABSCHNITT 1: Schutz & Wohlbefinden */}
                 <div>
@@ -1764,19 +1664,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
                 </div>
 
-                </div>
-
-                {/* 🏛️ RECHTE SIDEBAR: REPRÄSENTATIVE STIFTER-URKUNDE & BILDUNGSFÖRDERUNG (0,1% GOLDSTANDARD) */}
-                <div style={{
-                  position: isMobile ? 'static' : 'sticky',
-                  top: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  paddingTop: isMobile ? '0' : '44px'
-                }}>
-                  <ParentSponsorPatronageCard schoolId={(studentUser as any)?.school_id} />
-                </div>
               </div>
 
             {/* PARENT GATEKEEPER MODAL (6-Digit Parent Master PIN) */}

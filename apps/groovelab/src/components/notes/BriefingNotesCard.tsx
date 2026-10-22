@@ -31,6 +31,7 @@ export interface BriefingNotesCardProps {
   rooms?: any[];
   currentRoom?: string;
   teacherTodayRooms?: string[];
+  activeTimelineSlot?: any;
   onOpenDrawer?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
   widgetState?: string;
@@ -45,6 +46,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   rooms = [],
   currentRoom = '',
   teacherTodayRooms = [],
+  activeTimelineSlot,
   onOpenDrawer,
   onOpenHomeworkModal,
   widgetState = 'ACTIVE'
@@ -74,6 +76,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         rooms={rooms}
         currentRoom={currentRoom}
         teacherTodayRooms={teacherTodayRooms}
+        activeTimelineSlot={activeTimelineSlot}
         notes={notes}
         onCreateNote={createNote}
         onDeleteNote={deleteNote}

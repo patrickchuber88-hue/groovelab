@@ -16,6 +16,7 @@ import { RoomTopCatalogToggleBtn } from "./rooms/RoomTopCatalogToggleBtn";
 import { RoomHeaderDropdownSelector } from "./rooms/RoomHeaderDropdownSelector";
 import { RoomBookingActionDock } from "./rooms/RoomBookingActionDock";
 import { RoomBookingSidebarHeader } from "./rooms/RoomBookingSidebarHeader";
+import { CampusRoomsDailyRadarGrid, RoomCalendarModeSwitch, RoomCalendarViewMode } from "./rooms/CampusRoomsDailyRadarGrid";
 
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return "";
@@ -249,6 +250,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#facc15' : '#ea4335');
     const { isRightSidebarOpen, setIsRightSidebarOpen, toggleSidebar } = useRoomSidebarState();
     const { isTopCatalogCollapsed, toggleTopCatalog } = useRoomTopCatalogState();
+    const [roomCalendarViewMode, setRoomCalendarViewMode] = useState<RoomCalendarViewMode>('week');
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     const storedWorkspace = typeof window !== 'undefined'
       ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
@@ -1046,8 +1048,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       ? { id: 'all', name: 'Alle Räume' }
       : (roomsToRender.find(r => r.id === selectedCampusRoomId) || roomsToRender[0] || rooms.find(r => r.id === selectedCampusRoomId) || rooms[0]);
 
-    const getBookingsForSlot = (dayIdx: number, hourStr: string) => {
-      if (!selectedRoom) return [];
+    const getBookingsForSlot = (dayIdx: number, hourStr: string, targetRoomOverride?: any) => {
+      const effectiveRoom = targetRoomOverride || selectedRoom;
+      if (!effectiveRoom) return [];
       
       const mondayOfSelectedWeek = parseLocalDate(bookingDate);
       const dayOfWeek = mondayOfSelectedWeek.getUTCDay();
@@ -1070,7 +1073,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // 1. Manual room bookings
       const manualForSlot = campusBookings.filter((b: any) => {
-        if (b.roomId !== selectedRoom.id) return false;
+        if (b.roomId !== effectiveRoom.id) return false;
         const bDate = parseLocalDate(b.date);
         if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
         
@@ -1096,7 +1099,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // 1b. Database manual room bookings
       const dbManualForSlot = dbRoomBookings.filter((b: any) => {
-        if (b.roomId !== selectedRoom.id) return false;
+        if (b.roomId !== effectiveRoom.id) return false;
         const bDate = parseLocalDate(b.date);
         if (bDate < mondayOfSelectedWeek || bDate > sundayOfSelectedWeek) return false;
         
@@ -1144,9 +1147,9 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // 1% Monolith Goldstandard: Strict room matching - never leak unassigned schedules into rooms
       const isRoomMatch = (targetRoomId?: string) => {
-        if (!selectedRoom) return false;
-        if (selectedRoom.id === 'all') return true;
-        if (targetRoomId && targetRoomId === selectedRoom.id) return true;
+        if (!effectiveRoom) return false;
+        if (effectiveRoom.id === 'all') return true;
+        if (targetRoomId && targetRoomId === effectiveRoom.id) return true;
         return false;
       };
 
@@ -1271,8 +1274,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
           return {
             id: `teaching_block_${b.teacherId}_${dayIdx}_${b.startMin}_${idx}`,
-            roomId: selectedRoom.id,
-            roomName: selectedRoom.name,
+            roomId: effectiveRoom.id,
+            roomName: effectiveRoom.name,
             date: targetDateStr,
             startTime,
             endTime,
@@ -1287,7 +1290,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // 3. Weekly recurring blocked slots (Sperrzeiten)
       const blockedSlotsForSlot = roomBlockedSlots.filter((s: any) => {
-        if (s.room_id !== selectedRoom.id) return false;
+        if (s.room_id !== effectiveRoom.id) return false;
         if (s.day_of_week !== targetDayInt) return false;
 
         const startTimeStr = s.start_time ? s.start_time.substring(0, 5) : '';
@@ -1310,7 +1313,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         return {
           id: s.id,
           roomId: s.room_id,
-          roomName: selectedRoom.name,
+          roomName: effectiveRoom.name,
           date: targetDateStr,
           startTime: startTimeStr,
           endTime: endTimeStr,
@@ -1325,7 +1328,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
       // 4. Draft/Preview booking during input
       const draftPreviewBooking: any[] = [];
-      if (showPreviewField && !selectedBooking && bookingDate && bookingStartTime && bookingEndTime && selectedRoom) {
+      if (showPreviewField && !selectedBooking && bookingDate && bookingStartTime && bookingEndTime && effectiveRoom && (!selectedRoom || effectiveRoom.id === selectedRoom.id)) {
         const previewParts = bookingDate.split('-');
         const previewDate = previewParts.length === 3
           ? new Date(parseInt(previewParts[0]), parseInt(previewParts[1]) - 1, parseInt(previewParts[2]))
@@ -1353,8 +1356,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
               draftPreviewBooking.push({
                 id: 'preview_draft_booking',
-                roomId: selectedRoom.id,
-                roomName: selectedRoom.name,
+                roomId: effectiveRoom.id,
+                roomName: effectiveRoom.name,
                 date: bookingDate,
                 startTime: bookingStartTime,
                 endTime: bookingEndTime,
@@ -1958,7 +1961,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       setIsRightSidebarOpen(true);
     };
 
-    const handleCellClickWithDebounce = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>) => {
+    const handleCellClickWithDebounce = (dayIdx: number, hourStr: string, e?: React.MouseEvent<any>, overrideRoom?: any) => {
       const isSameCell = lastClickedCellRef.current && 
                          lastClickedCellRef.current.dayIdx === dayIdx && 
                          lastClickedCellRef.current.hour === hourStr;
@@ -1969,7 +1972,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
         if (isSameCell) {
           lastClickedCellRef.current = null;
-          handleCellDoubleClick(dayIdx, hourStr);
+          handleCellDoubleClick(dayIdx, hourStr, overrideRoom);
           return;
         }
       }
@@ -1982,7 +1985,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       }, 220);
     };
 
-    const handleCellDoubleClick = (dayIdx: number, hourStr: string) => {
+    const handleCellDoubleClick = (dayIdx: number, hourStr: string, overrideRoom?: any) => {
       const now = Date.now();
       if (now - lastDblClickTimeRef.current < 400) return;
       lastDblClickTimeRef.current = now;
@@ -1993,7 +1996,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       }
       lastClickedCellRef.current = null;
 
-      let targetRoom = selectedRoom;
+      let targetRoom = overrideRoom || selectedRoom;
       if (!targetRoom || targetRoom.id === 'all') {
         targetRoom = roomsToRender.find(r => r.id !== 'all') || rooms.find(r => r.id !== 'all');
         if (!targetRoom) {
@@ -3754,9 +3757,11 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 <div className="calendar-header-flex" style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1c1c1e', margin: 0, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                      <span>Wochenübersicht</span>
+                      <span>{roomCalendarViewMode === 'radar' ? 'Tagesradar' : 'Wochenübersicht'}</span>
                       <span style={{ color: '#cbd5e1', fontWeight: 600 }}>·</span>
-                      {isTopCatalogCollapsed ? (
+                      {roomCalendarViewMode === 'radar' ? (
+                        <span style={{ color: brandColor }}>{DAYS_OF_WEEK[getWeekdayIndex(bookingDate)]?.label}, {getWeekdayDate(getWeekdayIndex(bookingDate), bookingDate)} ({roomsToRender.length} Räume)</span>
+                      ) : isTopCatalogCollapsed ? (
                         <RoomHeaderDropdownSelector selectedRoomId={selectedCampusRoomId} rooms={roomsToRender} onSelectRoom={(id) => setSelectedCampusRoomId(id)} brandColor={brandColor} isRoomOccupiedNow={isRoomOccupiedNow} />
                       ) : (
                         <span>{selectedRoom?.name || 'Wähle einen Raum'}</span>
@@ -3781,6 +3786,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   {/* View Switcher & Week Controls */}
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: 'auto', justifyContent: 'space-between' }}>
                     <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <RoomCalendarModeSwitch mode={roomCalendarViewMode} onChange={setRoomCalendarViewMode} brandColor={brandColor} />
                       <button
                         onClick={() => {
                           const today = new Date();
@@ -3834,7 +3840,48 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Full 7-Day Calendar Grid Container */}
+                {/* Full 7-Day Calendar Grid Container OR Daily Multi-Room Radar */}
+                {roomCalendarViewMode === 'radar' ? (
+                  <CampusRoomsDailyRadarGrid
+                    rooms={roomsToRender}
+                    selectedRoomId={selectedCampusRoomId}
+                    onSelectRoom={(id) => setSelectedCampusRoomId(id)}
+                    daysOfWeek={DAYS_OF_WEEK}
+                    timeSlots={TIME_SLOTS}
+                    bookingDate={bookingDate}
+                    activeDayIdx={getWeekdayIndex(bookingDate)}
+                    onSelectDayIdx={(dIdx) => {
+                      setMobileSelectedDayIdx(dIdx);
+                      const cur = parseLocalDate(bookingDate);
+                      const dayOfWeek = cur.getUTCDay();
+                      const diffToMon = cur.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+                      cur.setUTCDate(diffToMon + dIdx);
+                      setBookingDate(toBerlinYYYYMMDD(cur));
+                    }}
+                    getWeekdayDate={getWeekdayDate}
+                    isTodayInWeek={isTodayInWeek}
+                    isDayToday={isDayToday}
+                    isRoomOccupiedNow={isRoomOccupiedNow}
+                    getBookingsForSlot={getBookingsForSlot}
+                    onSlotClick={(room, dIdx, hour) => {
+                      setSelectedCampusRoomId(room.id);
+                      handleCellClickWithDebounce(dIdx, hour, undefined, room);
+                    }}
+                    onSlotDoubleClick={(room, dIdx, hour) => {
+                      setSelectedCampusRoomId(room.id);
+                      handleCellDoubleClick(dIdx, hour, room);
+                    }}
+                    onBookingClick={(room, b) => {
+                      setSelectedCampusRoomId(room.id);
+                      setSelectedBooking(b);
+                      setBookingDate(b.date || bookingDate);
+                      setBookingStartTime(b.startTime || '12:00');
+                      setBookingEndTime(b.endTime || '13:00');
+                      setBookingPurpose(b.purpose || b.title || '');
+                    }}
+                    brandColor={brandColor}
+                  />
+                ) : (
                 <div style={{ overflowX: 'auto', width: '100%' }} className="custom-calendar-scrollbar">
                   <div style={{ display: 'flex', flexDirection: 'column', border: '1px solid #e5e5ea', borderRadius: '16px', overflow: 'hidden', minWidth: '950px' }}>
                     {/* Header Row */}
@@ -4170,6 +4217,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                     </div>
                   </div>
                 </div>
+                )}
               </div>
             </div>
           )}

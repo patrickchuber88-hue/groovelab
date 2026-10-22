@@ -46,13 +46,25 @@ export function useStudentSchedule({
   const [showAppointmentChat, setShowAppointmentChat] = useState(false);
   const [appointmentChatData, setAppointmentChatData] = useState<any | null>(null);
   const [rescheduleChatDraft, setRescheduleChatDraft] = useState('');
+  const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
+  const [unreadChatOccIds, setUnreadChatOccIds] = useState<Set<string>>(new Set());
 
   // Crisis Notifications
   const [unreadCrisisNotifs, setUnreadCrisisNotifs] = useState<any[]>([]);
 
+  const isAdult = Boolean(
+    studentUser?.is_adult === true || (() => {
+      const rawBd = studentUser?.birthdate || studentUser?.birth_date;
+      if (!rawBd) return false;
+      const bd = new Date(rawBd);
+      if (isNaN(bd.getTime())) return false;
+      return Math.abs(new Date(Date.now() - bd.getTime()).getUTCFullYear() - 1970) >= 18;
+    })()
+  );
   const isJuniorLevel = studentUiLevel === 'junior' || studentUser?.campus_ui_level === 'junior';
-  const isStudentAbsenceAllowed = isJuniorLevel ? false : Boolean(studentUser?.parent_allow_absences ?? (studentUiLevel === 'pro'));
-  const isStudentRescheduleAllowed = isJuniorLevel ? false : Boolean(studentUser?.parent_allow_reschedule_confirm ?? (studentUiLevel === 'pro'));
+  // 🛡️ Fail-Closed Vertragsschutz (§ 1626 BGB): Keine stillschweigende Erlaubnis für Minderjährige im Pro-Modus
+  const isStudentAbsenceAllowed = isAdult || (isJuniorLevel ? false : Boolean(studentUser?.parent_allow_absences === true));
+  const isStudentRescheduleAllowed = isAdult || (isJuniorLevel ? false : Boolean(studentUser?.parent_allow_reschedule_confirm === true));
 
   const fetchSchedule = useCallback(async () => {
     if (!studentId) return;
@@ -708,6 +720,121 @@ export function useStudentSchedule({
     }
   };
 
+  // 🏛️ 0,1% Goldstandard: Reales termingekoppeltes Chat-Tracking
+  const fetchChatMessages = useCallback(async () => {
+    if (!studentId) return;
+    try {
+      const { data, error } = await supabase
+        .from('campus_direct_messages')
+        .select('id, occurrence_id, content, sender_id, recipient_id, is_read, created_at')
+        .or(`sender_id.eq.${studentId},recipient_id.eq.${studentId}`)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) throw error;
+      if (data) {
+        const occIds = new Set<string>();
+        const unreadIds = new Set<string>();
+
+        data.forEach((m: any) => {
+          const hasContent = Boolean(m.content && String(m.content).trim().length > 0);
+          if (!hasContent) return;
+
+          const isUnreadForStudent = String(m.recipient_id) === String(studentId) && !m.is_read;
+
+          const addKey = (k: string) => {
+            if (!k) return;
+            occIds.add(k);
+            if (isUnreadForStudent) unreadIds.add(k);
+          };
+
+          if (m.occurrence_id) {
+            const rawOcc = String(m.occurrence_id);
+            addKey(rawOcc);
+            const matchIso = rawOcc.match(/\d{4}-\d{2}-\d{2}/);
+            if (matchIso) {
+              addKey(matchIso[0]);
+              if (m.sender_id) addKey(`${m.sender_id}_${matchIso[0]}`);
+              if (m.recipient_id) addKey(`${m.recipient_id}_${matchIso[0]}`);
+            }
+          }
+
+          // Extract date from content if present
+          const text = String(m.content || '');
+          const matchIsoText = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+          if (matchIsoText) {
+            const dStr = `${matchIsoText[1]}-${matchIsoText[2]}-${matchIsoText[3]}`;
+            addKey(dStr);
+            if (m.sender_id) addKey(`${m.sender_id}_${dStr}`);
+            if (m.recipient_id) addKey(`${m.recipient_id}_${dStr}`);
+          }
+        });
+
+        setActiveChatOccIds(occIds);
+        setUnreadChatOccIds(unreadIds);
+      }
+    } catch (e) {
+      console.warn('[useStudentSchedule] fetchChatMessages silent error:', e);
+    }
+  }, [studentId]);
+
+  const checkOccurrenceHasMessages = useCallback((occ: any, dateStr?: string): boolean => {
+    if (!occ) return false;
+    const occId = typeof occ === 'string' ? occ : (occ.id || occ.occurrenceId || occ.occurrence_id);
+    const dStr = dateStr || occ.date || (occ.start_date ? String(occ.start_date).split('T')[0] : '');
+    const schedId = occ.schedule_id || occ.schedule?.id;
+    const tId = occ.teacher_id || occ.teacherId;
+
+    if (occId && activeChatOccIds.has(String(occId))) return true;
+    if (dStr && activeChatOccIds.has(String(dStr))) return true;
+    if (schedId && dStr && activeChatOccIds.has(`virtual-${schedId}-${dStr}`)) return true;
+    if (studentId && dStr && activeChatOccIds.has(`virtual-${studentId}-${dStr}`)) return true;
+    if (studentId && dStr && activeChatOccIds.has(`${studentId}_${dStr}`)) return true;
+    if (tId && dStr && activeChatOccIds.has(`${tId}_${dStr}`)) return true;
+    return false;
+  }, [activeChatOccIds, studentId]);
+
+  const getOccurrenceUnreadCount = useCallback((occ: any, dateStr?: string): number => {
+    if (!occ) return 0;
+    const occId = typeof occ === 'string' ? occ : (occ.id || occ.occurrenceId || occ.occurrence_id);
+    const dStr = dateStr || occ.date || (occ.start_date ? String(occ.start_date).split('T')[0] : '');
+    const schedId = occ.schedule_id || occ.schedule?.id;
+    const tId = occ.teacher_id || occ.teacherId;
+
+    if (occId && unreadChatOccIds.has(String(occId))) return 1;
+    if (dStr && unreadChatOccIds.has(String(dStr))) return 1;
+    if (schedId && dStr && unreadChatOccIds.has(`virtual-${schedId}-${dStr}`)) return 1;
+    if (studentId && dStr && unreadChatOccIds.has(`virtual-${studentId}-${dStr}`)) return 1;
+    if (studentId && dStr && unreadChatOccIds.has(`${studentId}_${dStr}`)) return 1;
+    if (tId && dStr && unreadChatOccIds.has(`${tId}_${dStr}`)) return 1;
+    return 0;
+  }, [unreadChatOccIds, studentId]);
+
+  // Realtime & Event-Listener für Chat-Aktualisierungen
+  useEffect(() => {
+    fetchChatMessages();
+    const handleUpdated = () => fetchChatMessages();
+    window.addEventListener('campus_direct_messages_updated', handleUpdated);
+
+    const schoolId = studentUser?.school_id;
+    const channel = supabase
+      .channel(`student_chat_alerts_${studentId}`)
+      .on('postgres_changes', {
+        schema: 'public',
+        event: '*',
+        table: 'campus_direct_messages',
+        ...(schoolId ? { filter: `school_id=eq.${schoolId}` } : {})
+      }, () => {
+        fetchChatMessages();
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('campus_direct_messages_updated', handleUpdated);
+      supabase.removeChannel(channel);
+    };
+  }, [studentId, fetchChatMessages]);
+
   return {
     scheduleLoading,
     setScheduleLoading,
@@ -722,6 +849,11 @@ export function useStudentSchedule({
     carrierGhostingDetected,
     setCarrierGhostingDetected,
     fetchSchedule,
+    fetchChatMessages,
+    activeChatOccIds,
+    unreadChatOccIds,
+    checkOccurrenceHasMessages,
+    getOccurrenceUnreadCount,
     handleConfirmReschedule,
     handleCancelOccurrence,
     handleUndoCancelOccurrence,

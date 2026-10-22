@@ -184,15 +184,15 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
               alignItems: 'center', 
               justifyContent: 'center',
               gap: '8px', 
-              background: unreadMsgCount > 0 ? '#16a34a' : (hasMessage ? '#e0f2fe' : '#f1f5f9'), 
-              color: unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#0369a1' : '#0f172a'), 
+              background: unreadMsgCount > 0 ? '#fef3c7' : (hasMessage ? '#fef9c3' : '#f1f5f9'), 
+              color: unreadMsgCount > 0 ? '#92400e' : (hasMessage ? '#854d0e' : '#0f172a'), 
               padding: isMusicStandMode ? '10px 18px' : '10px 16px', 
               minHeight: '44px', 
               boxSizing: 'border-box', 
               borderRadius: '14px', 
               fontSize: isMusicStandMode ? '0.88rem' : '0.82rem', 
               fontWeight: 850, 
-              border: 'none', 
+              border: (hasMessage || unreadMsgCount > 0) ? '1px solid #fde047' : 'none', 
               cursor: 'pointer',
               boxShadow: 'none',
               transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -201,28 +201,28 @@ export const StudentBriefingActionButtons: React.FC<StudentBriefingActionButtons
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? '#15803d' : (hasMessage ? '#bae6fd' : '#e2e8f0');
+              e.currentTarget.style.background = unreadMsgCount > 0 ? '#fde68a' : (hasMessage ? '#fef08a' : '#e2e8f0');
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.background = unreadMsgCount > 0 ? '#16a34a' : (hasMessage ? '#e0f2fe' : '#f1f5f9');
+              e.currentTarget.style.background = unreadMsgCount > 0 ? '#fef3c7' : (hasMessage ? '#fef9c3' : '#f1f5f9');
             }}
             title="1:1 Shoutbox zum Unterrichtstermin"
-            aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : 'Nachricht an Lehrkraft öffnen'}
+            aria-label={unreadMsgCount > 0 ? `${unreadMsgCount} neue ungelesene Nachrichten von Lehrkraft öffnen` : (hasMessage ? 'Chat mit Lehrkraft öffnen' : 'Nachricht an Lehrkraft öffnen')}
           >
             <MessageSquare 
               size={15} 
-              color={unreadMsgCount > 0 ? '#ffffff' : (hasMessage ? '#0369a1' : '#334155')} 
-              fill={unreadMsgCount > 0 ? '#bbf7d0' : 'none'} 
+              color={(hasMessage || unreadMsgCount > 0) ? '#854d0e' : '#334155'} 
+              fill={(hasMessage || unreadMsgCount > 0) ? '#facc15' : 'none'} 
             />
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {unreadMsgCount > 0 
-                ? (unreadMsgCount === 1 ? '1 Nachricht' : `${unreadMsgCount} Nachrichten`) 
-                : (isMobile ? 'Nachricht' : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft'))}
+                ? (unreadMsgCount === 1 ? '1 neue Nachricht' : `${unreadMsgCount} neue Nachrichten`) 
+                : (isMobile ? (hasMessage ? 'Chat' : 'Nachricht') : (hasMessage ? 'Chat mit Lehrkraft' : 'Nachricht an Lehrkraft'))}
             </span>
             {unreadMsgCount > 0 && (
               <span style={{
-                background: '#15803d',
+                background: '#f59e0b',
                 color: '#ffffff',
                 fontSize: '0.70rem',
                 fontWeight: 950,

@@ -395,7 +395,7 @@ export const TeacherLibraryShareHomeworkModal: React.FC<TeacherLibraryShareHomew
                 </span>
               </div>
               <span style={{
-                background: '#0f172a',
+                background: '#4f46e5',
                 color: '#ffffff',
                 fontSize: '0.68rem',
                 fontWeight: 800,

@@ -188,6 +188,7 @@ export function useCampusNavigationAndWorkspaces({
     if (targetVal === 'homework_book') {
       window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
     }
+
     setActiveStudentTabRaw(targetVal);
     const tabLabels: Record<string, string> = {
       briefing: 'Briefing-Dashboard geöffnet',
@@ -224,7 +225,7 @@ export function useCampusNavigationAndWorkspaces({
         sessionStorage.setItem('groovelab_active_tab', val);
       }
     }
-  }, [onResetRecipient]);
+  }, [onResetRecipient, user]);
 
   // 4. Sidebar-Zustände
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);

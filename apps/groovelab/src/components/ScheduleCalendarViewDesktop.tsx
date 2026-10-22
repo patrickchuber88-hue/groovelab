@@ -1585,8 +1585,14 @@ export function ScheduleCalendarViewDesktop({
       }
       
       await fetchChat(studentId, occ.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error sending quick chat message:', err);
+      const errMsg = String(err?.message || '');
+      if (errMsg.includes('CRISIS') || errMsg.includes('CHAT_CRISIS')) {
+        await showAlert('Wir sind für dich da. Du bist nicht allein. Bitte wende dich an die Nummer gegen Kummer (116 111) oder den Notruf (112).');
+      } else {
+        await showAlert('Nachricht konnte nicht gesendet werden. Bitte Verbindung prüfen.');
+      }
     }
   };
   const getRoomConflict = (

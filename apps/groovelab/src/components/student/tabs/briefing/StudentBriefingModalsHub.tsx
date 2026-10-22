@@ -63,6 +63,8 @@ export interface StudentBriefingModalsHubProps {
   handleRejectReschedule?: (occ: any) => Promise<void>;
   scheduleOccurrences?: any[];
   isMobile?: boolean;
+  checkOccurrenceHasMessages?: (occ: any, dateStr?: string) => boolean;
+  getOccurrenceUnreadCount?: (occ: any, dateStr?: string) => number;
 }
 
 export function StudentBriefingModalsHub({
@@ -104,7 +106,9 @@ export function StudentBriefingModalsHub({
   handleTriggerConfirmReschedule,
   handleRejectReschedule,
   scheduleOccurrences,
-  isMobile
+  isMobile,
+  checkOccurrenceHasMessages,
+  getOccurrenceUnreadCount
 }: StudentBriefingModalsHubProps) {
   const formatQuickieDuration = (secs?: number | null) => {
     if (secs === null || secs === undefined || isNaN(secs)) return '0:00';
@@ -658,43 +662,71 @@ export function StudentBriefingModalsHub({
                 /* Standard Action Buttons */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {/* Shoutbox Direktchat */}
-                  {teacherId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAppointmentChatData({
-                          teacherId,
-                          date: appt.date,
-                          start_time: appt.start_time?.substring(0, 5) || '15:00',
-                          label: subjectText,
-                          occurrenceId: appt.id,
-                          status: appt.status || (isCanceled ? 'cancelled' : 'scheduled'),
-                          isCancelled: isCanceled
-                        });
-                        setShowAppointmentChat(true);
-                        setSelectedAppointmentForDetail(null);
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '14px',
-                        padding: '12px',
-                        color: '#0f172a',
-                        fontSize: '0.88rem',
-                        fontWeight: 850,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease'
-                      }}
-                      className="hover-scale"
-                    >
-                      <MessageSquare size={16} color="#0f172a" />
-                      <span>Nachricht an {effectiveTeacherName} (Shoutbox)</span>
-                    </button>
-                  )}
+                  {teacherId && (() => {
+                    const hasChatMessages = checkOccurrenceHasMessages ? checkOccurrenceHasMessages(appt, appt.date) : false;
+                    const unreadChatCount = getOccurrenceUnreadCount ? getOccurrenceUnreadCount(appt, appt.date) : 0;
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppointmentChatData({
+                            id: appt.id,
+                            occurrenceId: appt.id,
+                            occurrence_id: appt.id,
+                            schedule_id: appt.schedule_id || null,
+                            teacherId,
+                            teacher_id: teacherId,
+                            student_id: appt.student_id || studentUser?.id,
+                            date: appt.date,
+                            start_time: appt.start_time?.substring(0, 5) || '15:00',
+                            label: subjectText,
+                            status: appt.status || (isCanceled ? 'cancelled' : 'scheduled'),
+                            isCancelled: isCanceled
+                          });
+                          setShowAppointmentChat(true);
+                          setSelectedAppointmentForDetail(null);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          background: unreadChatCount > 0 ? '#fef3c7' : (hasChatMessages ? '#fef9c3' : '#f8fafc'),
+                          border: (hasChatMessages || unreadChatCount > 0) ? '1px solid #fde047' : '1.5px solid #cbd5e1',
+                          borderRadius: '14px',
+                          padding: '12px',
+                          color: (hasChatMessages || unreadChatCount > 0) ? '#854d0e' : '#0f172a',
+                          fontSize: '0.88rem',
+                          fontWeight: 850,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale"
+                      >
+                        <MessageSquare 
+                          size={16} 
+                          color={(hasChatMessages || unreadChatCount > 0) ? '#854d0e' : '#0f172a'} 
+                          fill={(hasChatMessages || unreadChatCount > 0) ? '#facc15' : 'none'} 
+                        />
+                        <span>{hasChatMessages ? `Chat mit ${effectiveTeacherName}` : `Nachricht an ${effectiveTeacherName} (Shoutbox)`}</span>
+                        {unreadChatCount > 0 && (
+                          <span style={{
+                            background: '#f59e0b',
+                            color: '#ffffff',
+                            fontSize: '0.70rem',
+                            fontWeight: 950,
+                            padding: '2px 7px',
+                            borderRadius: '100px',
+                            letterSpacing: '0.02em',
+                            marginLeft: '4px'
+                          }}>
+                            {unreadChatCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })()}
 
                   {/* Cancel or Re-activate Button */}
                   {isCanceled ? (
@@ -1013,9 +1045,14 @@ export function StudentBriefingModalsHub({
           onOpenChat={(teacherId, defaultMsg) => {
             if (setAppointmentChatData && setShowAppointmentChat) {
               setAppointmentChatData({
-                occurrence: rescheduleDecisionModalOcc,
-                teacherId,
+                ...(rescheduleDecisionModalOcc || {}),
+                id: rescheduleDecisionModalOcc?.id,
+                occurrenceId: rescheduleDecisionModalOcc?.id,
+                occurrence_id: rescheduleDecisionModalOcc?.id,
+                teacherId: teacherId || rescheduleDecisionModalOcc?.teacher_id,
+                teacher_id: teacherId || rescheduleDecisionModalOcc?.teacher_id,
                 teacherName: briefingData?.todayLesson?.teacher_name || briefingData?.nextLesson?.teacher_name || studentUser?.teacher_name,
+                teacher_name: briefingData?.todayLesson?.teacher_name || briefingData?.nextLesson?.teacher_name || studentUser?.teacher_name,
                 initialMessage: defaultMsg
               });
               setShowAppointmentChat(true);

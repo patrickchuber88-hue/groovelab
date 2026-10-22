@@ -483,26 +483,25 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenQuickModal ? onOpenQuickModal(activeStudent) : setIsEditingCurrentHomework(true)}
-                    aria-label="Hausaufgabe für heute bearbeiten"
+                    aria-label="Hausaufgaben-Fahrplan bearbeiten"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      color: '#475569',
+                      gap: '5px',
+                      background: '#eff6ff',
+                      border: 'none',
+                      color: '#1d4ed8',
                       fontSize: '0.72rem',
-                      fontWeight: 700,
+                      fontWeight: 800,
                       cursor: 'pointer',
-                      padding: '4px 10px',
+                      padding: '4px 11px',
                       borderRadius: '8px',
                       transition: 'all 0.15s ease'
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                    className="hover-scale-mini"
                   >
                     <Edit2 size={11} />
-                    <span>Bearbeiten</span>
+                    <span>Fahrplan bearbeiten</span>
                   </button>
 
                   {onDeleteHomework && (
@@ -679,22 +678,25 @@ export const TagesKompassLive: React.FC<TagesKompassLiveProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
+                  gap: '7px',
                   width: '100%',
-                  marginTop: '6px',
-                  background: 'transparent',
-                  border: '1px dashed #cbd5e1',
-                  borderRadius: '10px',
-                  padding: '6px 10px',
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  color: '#475569',
+                  marginTop: '8px',
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '8px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 850,
+                  color: '#065f46',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(16, 185, 129, 0.08)',
                   transition: 'all 0.15s ease'
                 }}
+                className="hover-scale-mini"
+                title="Wochen-Fahrplan im Detail mit Lehrwerken, Songs, Metronom & Diktat öffnen"
               >
-                <Zap size={12} color="#059669" />
-                <span>Im Schnellmodal (mit Metronom & Didaktik-Chips) öffnen</span>
+                <Zap size={14} color="#059669" />
+                <span>📋 Hausaufgaben-Fahrplan öffnen (Lehrwerk, Songs & Metronom)</span>
               </button>
             )}
           </div>

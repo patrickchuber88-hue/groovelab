@@ -304,34 +304,51 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
                 id: '11079eae-664a-49a4-8692-771d83a3193c',
                 name: 'Peter Pan',
                 role: 'admin',
+                roles: ['admin', 'teacher'],
                 school_id: fallbackSchoolId
               };
               const effectiveSchoolId = baseUser.school_id || fallbackSchoolId;
               const targetUser = {
                 ...baseUser,
+                roles: Array.isArray((baseUser as any).roles) ? (baseUser as any).roles : ['admin', 'teacher'],
                 school_id: effectiveSchoolId,
                 is_campus_active: true,
                 is_groovelab_active: true
               };
               console.log('[Bypass] Logging in as Verwaltung / Schulleitung:', targetUser.name);
               sessionStorage.removeItem('gl_active_session_lease_id');
+              sessionStorage.removeItem('gl_active_session_lease_user_id');
               localStorage.removeItem('gl_active_session_lease_id');
+              localStorage.removeItem('gl_active_session_lease_user_id');
               let resolvedDbUser: any = targetUser;
               try {
-                const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                  p_credential: targetUser.id,
+                // Authoritative Dev Bypass Session Minting (0.1% Goldstandard)
+                const { data: bypassRes } = await supabase.rpc('mint_dev_bypass_session_lease', {
+                  p_user_id: targetUser.id,
                   p_school_id: effectiveSchoolId
                 });
-                if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                  sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  if (authResult.user) {
-                    const authoritativeSchoolId = authResult.user.school_id || effectiveSchoolId;
-                    resolvedDbUser = { ...authResult.user, school_id: authoritativeSchoolId };
-                    if (typeof localStorage !== 'undefined' && authoritativeSchoolId) {
-                      localStorage.setItem('groovelab_school_id', authoritativeSchoolId);
-                      localStorage.setItem('groovelab_last_school_id', authoritativeSchoolId);
+                if (bypassRes?.success && bypassRes?.lease_token) {
+                  sessionStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  localStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  if (bypassRes.user) {
+                    resolvedDbUser = { ...targetUser, ...bypassRes.user };
+                    if (typeof localStorage !== 'undefined' && effectiveSchoolId) {
+                      localStorage.setItem('groovelab_school_id', effectiveSchoolId);
+                      localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
                     }
+                  }
+                } else {
+                  const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
                   }
                 }
               } catch (authErr) {
@@ -348,7 +365,9 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
               if (effectiveLeaseId) {
                 sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                sessionStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
                 localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
               }
               setLocalhostDevLegalBypassed(true);
               sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_min_2026.1`, 'true');
@@ -433,23 +452,37 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               };
               console.log('[Bypass] Logging in as Lehrer:', targetUser.name);
               sessionStorage.removeItem('gl_active_session_lease_id');
+              sessionStorage.removeItem('gl_active_session_lease_user_id');
               localStorage.removeItem('gl_active_session_lease_id');
+              localStorage.removeItem('gl_active_session_lease_user_id');
               let resolvedDbUser: any = targetUser;
               try {
-                const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                  p_credential: targetUser.id,
+                const { data: bypassRes } = await supabase.rpc('mint_dev_bypass_session_lease', {
+                  p_user_id: targetUser.id,
                   p_school_id: effectiveSchoolId
                 });
-                if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                  sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  if (authResult.user) {
-                    const authoritativeSchoolId = authResult.user.school_id || effectiveSchoolId;
-                    resolvedDbUser = { ...authResult.user, school_id: authoritativeSchoolId };
-                    if (typeof localStorage !== 'undefined' && authoritativeSchoolId) {
-                      localStorage.setItem('groovelab_school_id', authoritativeSchoolId);
-                      localStorage.setItem('groovelab_last_school_id', authoritativeSchoolId);
+                if (bypassRes?.success && bypassRes?.lease_token) {
+                  sessionStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  localStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  if (bypassRes.user) {
+                    resolvedDbUser = { ...targetUser, ...bypassRes.user };
+                    if (typeof localStorage !== 'undefined' && effectiveSchoolId) {
+                      localStorage.setItem('groovelab_school_id', effectiveSchoolId);
+                      localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
                     }
+                  }
+                } else {
+                  const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
                   }
                 }
               } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
@@ -458,7 +491,9 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
               if (effectiveLeaseId) {
                 sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                sessionStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
                 localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
               }
               setLocalhostDevLegalBypassed(true);
               ['min_2026.1', 'teacher_min_2026.1', 'admin_min_2026.1', 'secretary_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));
@@ -535,23 +570,37 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               };
               console.log('[Bypass] Logging in as Schüler:', targetUser.name);
               sessionStorage.removeItem('gl_active_session_lease_id');
+              sessionStorage.removeItem('gl_active_session_lease_user_id');
               localStorage.removeItem('gl_active_session_lease_id');
+              localStorage.removeItem('gl_active_session_lease_user_id');
               let resolvedDbUser: any = targetUser;
               try {
-                const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-                  p_credential: targetUser.id,
+                const { data: bypassRes } = await supabase.rpc('mint_dev_bypass_session_lease', {
+                  p_user_id: targetUser.id,
                   p_school_id: effectiveSchoolId
                 });
-                if (!rpcErr && authResult?.success && authResult?.lease_token) {
-                  sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-                  if (authResult.user) {
-                    const authoritativeSchoolId = authResult.user.school_id || effectiveSchoolId;
-                    resolvedDbUser = { ...authResult.user, school_id: authoritativeSchoolId };
-                    if (typeof localStorage !== 'undefined' && authoritativeSchoolId) {
-                      localStorage.setItem('groovelab_school_id', authoritativeSchoolId);
-                      localStorage.setItem('groovelab_last_school_id', authoritativeSchoolId);
+                if (bypassRes?.success && bypassRes?.lease_token) {
+                  sessionStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  localStorage.setItem('gl_active_session_lease_id', bypassRes.lease_token);
+                  localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                  if (bypassRes.user) {
+                    resolvedDbUser = { ...targetUser, ...bypassRes.user };
+                    if (typeof localStorage !== 'undefined' && effectiveSchoolId) {
+                      localStorage.setItem('groovelab_school_id', effectiveSchoolId);
+                      localStorage.setItem('groovelab_last_school_id', effectiveSchoolId);
                     }
+                  }
+                } else {
+                  const { data: authResult } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    sessionStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
+                    localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                    localStorage.setItem('gl_active_session_lease_user_id', targetUser.id);
                   }
                 }
               } catch (authErr) { console.warn('[Bypass] Auth credential notice:', authErr); }
@@ -560,7 +609,9 @@ export const LoginDevBypassBar: React.FC<LoginDevBypassBarProps> = ({
               const effectiveLeaseId = (leaseRes as any)?.leaseId || (leaseRes as any)?.lease_id;
               if (effectiveLeaseId) {
                 sessionStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                sessionStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
                 localStorage.setItem('gl_active_session_lease_id', effectiveLeaseId);
+                localStorage.setItem('gl_active_session_lease_user_id', resolvedDbUser.id);
               }
               setLocalhostDevLegalBypassed(true);
               ['min_2026.1', 'student_min_2026.1'].forEach(k => sessionStorage.setItem(`gl_legal_status_v_${resolvedDbUser.id}_${k}`, 'true'));

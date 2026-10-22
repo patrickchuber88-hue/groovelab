@@ -13,6 +13,7 @@ import { WorldTourScorePlayer } from './WorldTourScorePlayer';
 import { WorldTourDiplomaModal } from './WorldTourDiplomaModal';
 import { WorldTourPassportModal } from './WorldTourPassportModal';
 import { WorldTourCountryFlag, renderCountryFlagPaths } from './WorldTourCountryFlags';
+import { cleanTextForTts } from '../../../../services/neuralTtsService';
 
 interface WorldTourMapSpreadProps {
   onBackToHub?: () => void;
@@ -794,10 +795,11 @@ export const WorldTourMapSpread: React.FC<WorldTourMapSpreadProps> = ({
   // 🎵 Audio-Story abspielen (15 Sekunden didaktische Entdecker-Anekdote)
 
   const handlePlayStory = () => {
-    if ('speechSynthesis' in window) {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       if (!isStoryPlaying) {
-        const utterance = new SpeechSynthesisUtterance(activeCountry.story15s);
+        const cleanedStory = cleanTextForTts(activeCountry.story15s);
+        const utterance = new SpeechSynthesisUtterance(cleanedStory);
         utterance.lang = 'de-DE';
         utterance.rate = 0.95;
         utterance.onend = () => setIsStoryPlaying(false);

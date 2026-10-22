@@ -61,19 +61,30 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   // Base client info
   let clientInfo = rawHeaders['x-client-info'] || 'supabase-js/2.39.3';
   
-  // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
-  // 🛡️ Strict Tab Session Isolation with Persistent Multi-Tab / Safari Coldstart Fallback
-  // Only valid session lease tokens (gl_active_session_lease_id) may authenticate; device keys are hardware fingerprints only
-  const sessionToken = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
-    || (typeof localStorage !== 'undefined' ? localStorage.getItem('gl_active_session_lease_id') : null);
-  if (sessionToken) {
-    clientInfo += `;session_token=${sessionToken}`;
-  }
-
   const activeUserId = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null)
     || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_user_id') : null);
   if (activeUserId) {
     clientInfo += `;user_id=${activeUserId}`;
+  }
+
+  // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
+  // 🛡️ Strict Tab Session Isolation with Persistent Multi-Tab / Safari Coldstart Fallback
+  // Only valid session lease tokens (gl_active_session_lease_id) may authenticate; device keys are hardware fingerprints only
+  // Cross-account contamination guard: If localStorage holds a lease from a different user, purge it and do not send it.
+  let sessionToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null;
+  if (!sessionToken && typeof localStorage !== 'undefined') {
+    const localLeaseOwner = localStorage.getItem('gl_active_session_lease_user_id') || localStorage.getItem('groovelab_user_id');
+    if (!activeUserId || !localLeaseOwner || localLeaseOwner === activeUserId) {
+      sessionToken = localStorage.getItem('gl_active_session_lease_id');
+    } else {
+      try {
+        localStorage.removeItem('gl_active_session_lease_id');
+        localStorage.removeItem('gl_active_session_lease_user_id');
+      } catch {}
+    }
+  }
+  if (sessionToken) {
+    clientInfo += `;session_token=${sessionToken}`;
   }
   
   let qrToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
@@ -178,11 +189,14 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mintedLeaseId) &&
           typeof window !== 'undefined'
         ) {
+          const currentUid = window.sessionStorage?.getItem('groovelab_user_id') || window.localStorage?.getItem('groovelab_user_id');
           try {
             window.sessionStorage.setItem('gl_active_session_lease_id', mintedLeaseId);
+            if (currentUid) window.sessionStorage.setItem('gl_active_session_lease_user_id', currentUid);
           } catch {}
           try {
             window.localStorage.setItem('gl_active_session_lease_id', mintedLeaseId);
+            if (currentUid) window.localStorage.setItem('gl_active_session_lease_user_id', currentUid);
           } catch {}
         }
       } catch {}

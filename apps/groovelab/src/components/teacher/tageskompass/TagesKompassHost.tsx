@@ -117,7 +117,7 @@ export const TagesKompassHost: React.FC<TagesKompassHostProps> = ({
       // Falls im BriefingData Vermerk vorliegt
       const slotHasNote = Boolean((slot as any).hasCurrentHomework || (slot as any).hasHomework);
       if (!slotHasNote) {
-        list.push(slot.student);
+        list.push({ ...slot.student, startTime: (slot as any).startTime || slot.start_time });
       }
     });
 

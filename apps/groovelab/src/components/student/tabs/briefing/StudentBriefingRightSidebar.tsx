@@ -120,8 +120,8 @@ export function StudentBriefingRightSidebar({
         />
       )}
             <div style={{ 
-              position: isTabletSlideOver ? 'fixed' : undefined,
-              top: isTabletSlideOver ? 0 : undefined,
+              position: isTabletSlideOver ? 'fixed' : 'sticky',
+              top: isTabletSlideOver ? 0 : '0px',
               right: isTabletSlideOver ? 0 : undefined,
               bottom: isTabletSlideOver ? 0 : undefined,
               zIndex: isTabletSlideOver ? 1100 : undefined,
@@ -131,7 +131,7 @@ export function StudentBriefingRightSidebar({
               boxShadow: (isTabletSlideOver && !isRightSidebarCollapsed) ? '-12px 0 40px rgba(15, 23, 42, 0.18)' : undefined,
               borderLeft: (isTabletSlideOver && !isRightSidebarCollapsed) ? '1px solid #e2e8f0' : undefined,
               padding: isTabletSlideOver ? (isRightSidebarCollapsed ? '0px' : '20px 18px 40px 18px') : undefined,
-              maxHeight: isTabletSlideOver ? '100dvh' : undefined,
+              maxHeight: isTabletSlideOver ? '100dvh' : 'calc(100vh - 80px)',
               display: 'flex', 
               flexDirection: 'column', 
               gap: isMobileSheet ? '16px' : '24px',
@@ -141,8 +141,10 @@ export function StudentBriefingRightSidebar({
               opacity: isMobileSheet ? 1 : (isRightSidebarCollapsed ? 0 : 1),
               transform: isMobileSheet ? 'none' : (isRightSidebarCollapsed ? 'translateX(100%)' : 'translateX(0)'),
               pointerEvents: isMobileSheet ? 'auto' : (isRightSidebarCollapsed ? 'none' : 'auto'),
-              overflowY: isMobileSheet ? 'visible' : (isRightSidebarCollapsed ? 'hidden' : (isTabletSlideOver ? 'auto' : 'visible')),
+              overflowY: isMobileSheet ? 'visible' : (isRightSidebarCollapsed ? 'hidden' : 'auto'),
               overflowX: 'hidden',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
               boxSizing: 'border-box',
               transition: isMobileSheet ? 'none' : 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
             }}>
@@ -283,6 +285,9 @@ export function StudentBriefingRightSidebar({
                           const label = `${dayLabel} (${formattedDate}), ${occ.start_time?.substring(0, 5)} Uhr${statusSuffix}`;
                           setAppointmentChatData({
                             ...occ,
+                            id: occ.id,
+                            occurrenceId: occ.id,
+                            occurrence_id: occ.id,
                             teacherId: occ.teacher_id,
                             teacher_id: occ.teacher_id,
                             teacher: occ.teacher || occ.teacher_profile,
@@ -290,7 +295,6 @@ export function StudentBriefingRightSidebar({
                             date: occ.date,
                             start_time: occ.start_time?.substring(0, 5),
                             label,
-                            occurrenceId: occ.id,
                             status: occ.status || (isCancelled ? 'cancelled' : (isRescheduled ? 'rescheduled_confirmed' : 'scheduled')),
                             isCancelled
                           });
@@ -317,15 +321,15 @@ export function StudentBriefingRightSidebar({
                         const badgeText = isCancelled ? 'Ausfall' : (isRescheduled ? (isPendingProposal ? 'Vorschlag' : 'Verschoben') : 'Regulär');
 
                         const chatBtnBg = isCancelled 
-                          ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef3c7' : 'rgba(255, 255, 255, 0.2)'))
+                          ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef9c3' : 'rgba(255, 255, 255, 0.2)'))
                           : isRescheduled
-                            ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#f59e0b' : 'rgba(120, 53, 15, 0.12)'))
-                            : (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef3c7' : '#f8fafc'));
+                            ? (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef9c3' : 'rgba(120, 53, 15, 0.12)'))
+                            : (unreadCount > 0 ? '#fef3c7' : (hasMsg ? '#fef9c3' : '#f8fafc'));
                         const chatBtnColor = isCancelled
-                          ? ((unreadCount > 0 || hasMsg) ? '#d97706' : '#ffffff')
+                          ? ((unreadCount > 0 || hasMsg) ? '#854d0e' : '#ffffff')
                           : isRescheduled
-                            ? (hasMsg ? '#ffffff' : '#78350f')
-                            : ((unreadCount > 0 || hasMsg) ? '#d97706' : '#475569');
+                            ? ((unreadCount > 0 || hasMsg) ? '#854d0e' : '#78350f')
+                            : ((unreadCount > 0 || hasMsg) ? '#854d0e' : '#475569');
 
                         return (
                           <div 
@@ -408,7 +412,7 @@ export function StudentBriefingRightSidebar({
                                   width: '32px',
                                   height: '32px',
                                   borderRadius: '50%',
-                                  border: 'none',
+                                  border: (hasMsg || unreadCount > 0) ? '1px solid #fde047' : 'none',
                                   cursor: 'pointer',
                                   transition: 'all 0.2s',
                                   marginLeft: 'auto',
@@ -416,7 +420,11 @@ export function StudentBriefingRightSidebar({
                                 }}
                               >
                                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <MessageSquare size={14} fill={hasMsg ? 'currentColor' : 'none'} />
+                                  <MessageSquare 
+                                    size={14} 
+                                    color={(hasMsg || unreadCount > 0) ? '#854d0e' : (isCancelled ? '#ffffff' : '#64748b')} 
+                                    fill={(hasMsg || unreadCount > 0) ? '#facc15' : 'none'} 
+                                  />
                                   {unreadCount > 0 && (
                                     <span style={{
                                       position: 'absolute',
@@ -425,7 +433,7 @@ export function StudentBriefingRightSidebar({
                                       width: '7px',
                                       height: '7px',
                                       borderRadius: '50%',
-                                      background: '#ea4335',
+                                      background: '#f59e0b',
                                       border: 'none',
                                       boxShadow: 'none'
                                     }} />

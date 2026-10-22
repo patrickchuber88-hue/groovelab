@@ -77,6 +77,7 @@ const CampusTuner = lazy(() => import('./campus/CampusTuner').then(m => ({ defau
 const EarLabStudioModal = lazy(() => import('./campus/EarLabStudioModal').then(m => ({ default: m.EarLabStudioModal })));
 const AudioBiographyView = lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
 const WorldTourMapSpread = lazy(() => import('./student/meisterwerk/worldtour/WorldTourMapSpread').then(m => ({ default: m.WorldTourMapSpread })));
+const TagesplanHomeworkFahrplanModal = lazy(() => import('./teacher/tageskompass/TagesplanHomeworkFahrplanModal').then(m => ({ default: m.TagesplanHomeworkFahrplanModal })));
 
 // 100% Backward Compatible Re-Exports
 export type {
@@ -125,14 +126,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   onOpenAssignModal,
   schoolId: propSchoolId
 }) => {
-  const isTeacherSelf =
+  const isTeacherSelf = Boolean(
     isTeacherSandbox ||
-    isTeacherTools ||
     student?.id === 'teacher-self' ||
     student?.id === 'teacher-studio-sandbox' ||
-    (student as any)?.role === 'teacher' ||
-    (student as any)?.is_teacher ||
-    (student as any)?.role === 'admin';
+    ((student as any)?.role === 'teacher' && !student?.is_student && student?.id === (teacherId || (student as any)?.user_id)) ||
+    ((student as any)?.role === 'admin' && !student?.is_student && student?.id === (teacherId || (student as any)?.user_id))
+  );
 
   // UI Level Governance (SSOT in database, reactive sync)
   const resolveInitialUiLevel = (): 'junior' | 'teen' | 'pro' => {
@@ -207,10 +207,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const touchStartYRef = useRef<number | null>(null);
 
   // Modal Tabs & View Modes
-  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(initialModalTab || 'document');
+  const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(initialModalTab || student?.initialModalTab || 'document');
   const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'groovetrainer' | 'loopstation' | 'practice' | 'tuner' | 'earlab' | 'worldtour'>((initialViewMode as any) || 'document');
   const [activeSubView, setActiveSubView] = useState<'hub' | 'history' | 'repertoire' | 'lehrwerk' | 'song'>('hub');
-  const [hubTab, setHubTab] = useState<'modules' | 'protocol'>((student?.is_campus_active === false) ? 'protocol' : 'modules');
+  const [hubTab, setHubTab] = useState<'modules' | 'protocol'>(student?.initialHubTab || ((student?.is_campus_active === false) ? 'protocol' : 'modules'));
   const [recordingSearchQuery, setRecordingSearchQuery] = useState('');
   const [selectedTeacherMonth, setSelectedTeacherMonth] = useState<{ key: string; label: string } | null>(null);
   const [selectedStudentMonth, setSelectedStudentMonth] = useState<{ key: string; label: string } | null>(null);
@@ -264,10 +264,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, [initialViewMode]);
 
   useEffect(() => {
-    if (initialModalTab) {
-      setActiveModalTab(initialModalTab);
+    if (initialModalTab || student?.initialModalTab) {
+      setActiveModalTab(initialModalTab || student?.initialModalTab);
     }
-  }, [initialModalTab]);
+  }, [initialModalTab, student?.initialModalTab]);
+
+  useEffect(() => {
+    if (student?.initialHubTab) {
+      setHubTab(student.initialHubTab);
+    }
+  }, [student?.initialHubTab]);
 
   // 📚 0.1% Goldstandard Lehrwerk Normalizer
   const normLw = (item: any) => {
@@ -285,6 +291,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [activeSongSkills, setActiveSongSkills] = useState<any[]>(() => propActiveSongSkills || []);
   const [assignedCampusSongs, setAssignedCampusSongs] = useState<any[]>(() => propAssignedCampusSongs || initialSongs || []);
   const [songs, setSongs] = useState<any[]>([]);
+
+  // 🏛️ 0,1% Goldstandard: Universeller Wochen-Fahrplan Modal Trigger
+  const [showFahrplanModal, setShowFahrplanModal] = useState(false);
+  const [fahrplanInitialLehrwerkId, setFahrplanInitialLehrwerkId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const handleOpenFahrplan = (e: any) => {
+      if (e?.detail?.lehrwerkId) {
+        setFahrplanInitialLehrwerkId(e.detail.lehrwerkId);
+      }
+      setShowFahrplanModal(true);
+    };
+    window.addEventListener('campus_open_homework_fahrplan', handleOpenFahrplan);
+    return () => window.removeEventListener('campus_open_homework_fahrplan', handleOpenFahrplan);
+  }, []);
 
   useEffect(() => {
     if (propActiveSongSkills?.length) setActiveSongSkills(propActiveSongSkills);
@@ -1986,10 +2007,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const snap = getCurrentHomeworkSnapshot();
     const sections: string[] = [];
 
+    const isCustom = customSnap !== undefined && customSnap !== null;
+
     // 1. 📖 Lehrwerke & Etüden
     const lehrwerkeList: Array<{ title: string; pages?: number[]; notes?: string[] | string }> =
-      (customSnap?.lehrwerke && customSnap.lehrwerke.length > 0)
-        ? customSnap.lehrwerke
+      isCustom
+        ? (customSnap.lehrwerke || [])
         : snap.items.filter(it => it.type === 'lehrwerk').map(lw => ({
             title: lw.title,
             notes: lw.notes
@@ -2023,8 +2046,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // 2. Songs & Repertoire
     const songsList: Array<{ title: string; artist?: string; notes?: string }> =
-      (customSnap?.songs && customSnap.songs.length > 0)
-        ? customSnap.songs
+      isCustom
+        ? (customSnap.songs || [])
         : snap.items.filter(it => it.type === 'song').map(s => ({
             title: s.title,
             notes: s.notes
@@ -2046,10 +2069,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       sections.push(`SONGS & REPERTOIRE\n${songLines.join('\n\n')}`);
     }
 
+    // 2b. 🎼 Notenschnipsel & MicroScores (1–4 Takte)
+    const microScoresList: Array<{ title: string; subtitle?: string; tempoBpm?: number; barsCount?: number }> =
+      isCustom ? (customSnap.microScores || []) : [];
+
+    if (microScoresList.length > 0) {
+      const msLines = microScoresList.map(ms => {
+        const cleanTitle = (ms.title || 'Notenschnipsel').replace(/\s*\(Notenschnipsel\)/i, '').trim();
+        const tempoBpm = ms.tempoBpm || 80;
+        const barsCount = ms.barsCount || 2;
+        const detail = ms.subtitle ? ms.subtitle : `${tempoBpm} BPM · ${barsCount} Takte Notenschnipsel`;
+        return `• ${cleanTitle}\n  ${detail}`;
+      });
+      sections.push(`NOTENSCHNIPSEL & ÜBUNGEN\n${msLines.join('\n\n')}`);
+    }
+
+    // 2c. 🌍 Musik-Weltreise Meilensteine
+    const worldTourList: Array<{ stationTitle?: string; instrument?: string; level?: string }> =
+      isCustom ? (customSnap.worldTourMasteries || []) : [];
+
+    if (worldTourList.length > 0) {
+      const wtLines = worldTourList.map(wt => {
+        const station = wt.stationTitle || 'Weltreise-Station';
+        return `• Station: ${station}`;
+      });
+      sections.push(`MUSIK-WELTREISE\n${wtLines.join('\n')}`);
+    }
+
     // 3. Notizen & Schülerfragen
     const notesList: string[] =
-      (customSnap?.notes && customSnap.notes.length > 0)
-        ? customSnap.notes
+      isCustom
+        ? (customSnap.notes || [])
         : snap.items.filter(it => it.type === 'note').map(n => n.title);
 
     const studentQuestion: string | undefined = customSnap?.studentQuestion || snap.studentQuestion;
@@ -2067,8 +2117,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // 4. Unterrichtsaufnahmen zum Mitspielen
     const audioList: Array<{ label: string; duration?: string; date?: string; url?: string }> =
-      (customSnap?.audioRecordings && customSnap.audioRecordings.length > 0)
-        ? customSnap.audioRecordings
+      isCustom
+        ? (customSnap.audioRecordings || [])
         : (snap.audioRecordings || []);
 
     if (audioList.length > 0) {
@@ -2148,34 +2198,41 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const handlePrintHomeworkSheet = useCallback((customData?: any) => {
     try {
       const snap = getCurrentHomeworkSnapshot();
+      const isCustom = customData !== undefined && customData !== null;
 
       const lehrwerkeList: Array<{ title: string; pages?: number[]; notes?: string[] | string }> =
-        (customData?.lehrwerke && customData.lehrwerke.length > 0)
-          ? customData.lehrwerke
+        isCustom
+          ? (customData.lehrwerke || [])
           : snap.items.filter(it => it.type === 'lehrwerk').map(lw => ({
               title: lw.title,
               notes: lw.notes
             }));
 
       const songsList: Array<{ title: string; artist?: string; notes?: string }> =
-        (customData?.songs && customData.songs.length > 0)
-          ? customData.songs
+        isCustom
+          ? (customData.songs || [])
           : snap.items.filter(it => it.type === 'song').map(s => ({
               title: s.title,
               notes: s.notes
             }));
 
+      const microScoresList: Array<{ title: string; subtitle?: string; tempoBpm?: number; barsCount?: number }> =
+        isCustom ? (customData.microScores || []) : [];
+
+      const worldTourList: Array<{ stationTitle?: string; instrument?: string; level?: string }> =
+        isCustom ? (customData.worldTourMasteries || []) : [];
+
       const notesList: string[] =
-        (customData?.notes && customData.notes.length > 0)
-          ? customData.notes
+        isCustom
+          ? (customData.notes || [])
           : snap.items.filter(it => it.type === 'note').map(n => n.title);
 
       // 🛡️ Forensische Datentrennung: studentQuestion wird am Notenständer-Druckausdruck und in E-Mails
       // ausnahmslos weggelassen (vertraulicher didaktischer Dialog zwischen Schüler & Lehrkraft)
 
       const audioList: Array<{ label: string; duration?: string; date?: string; url?: string }> =
-        (customData?.audioRecordings && customData.audioRecordings.length > 0)
-          ? customData.audioRecordings
+        isCustom
+          ? (customData.audioRecordings || [])
           : (snap.audioRecordings || []);
 
       const studentFirstName = customData?.studentFirstName || snap.studentFirstName || 'Schüler';
@@ -2369,6 +2426,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         <div class="task-card">
           <div class="task-title">${displayTitle}</div>
           ${s.notes ? `<div class="task-notes">Fahrplan: ${s.notes}</div>` : ''}
+        </div>
+      `;
+    }).join('')}
+  ` : ''}
+
+  ${microScoresList.length > 0 ? `
+    <div class="section-title">Notenschnipsel & Übungen</div>
+    ${microScoresList.map(ms => {
+      const cleanTitle = (ms.title || 'Notenschnipsel').replace(/\s*\(Notenschnipsel\)/i, '').trim();
+      const tempoBpm = ms.tempoBpm || 80;
+      const barsCount = ms.barsCount || 2;
+      const subtitle = ms.subtitle || `${tempoBpm} BPM · ${barsCount} Takte Notenschnipsel`;
+      return `
+        <div class="task-card">
+          <div class="task-title">${cleanTitle}</div>
+          <div class="task-notes">${subtitle}</div>
+        </div>
+      `;
+    }).join('')}
+  ` : ''}
+
+  ${worldTourList.length > 0 ? `
+    <div class="section-title">Musik-Weltreise</div>
+    ${worldTourList.map(wt => {
+      const station = wt.stationTitle || 'Weltreise-Station';
+      return `
+        <div class="task-card">
+          <div class="task-title">Station: ${station}</div>
+          ${wt.level ? `<div class="task-notes">Level: ${wt.level}</div>` : ''}
         </div>
       `;
     }).join('')}
@@ -3126,7 +3212,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setMobileProtokollTab={setMobileProtokollTab}
         recordingSearchQuery={recordingSearchQuery}
         setRecordingSearchQuery={setRecordingSearchQuery}
-        onOpenAssignModal={onOpenAssignModal}
+        onOpenAssignModal={onOpenAssignModal || ((isTeacherTools || isTeacherSandbox || isTeacherSelf) ? () => setShowFahrplanModal(true) : undefined)}
         onBackToHub={handleBackToHub}
         renderFullscreenButton={renderFullscreenButton}
         renderCloseButton={renderCloseButton}
@@ -3735,7 +3821,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             newSongArtist=""
             newSongTitle=""
             onClose={onClose}
-            onOpenAssignModal={onOpenAssignModal}
+            onOpenAssignModal={onOpenAssignModal || ((isTeacherTools || isTeacherSandbox || isTeacherSelf) ? () => setShowFahrplanModal(true) : undefined)}
             pageHomeworkNotes={pageHomeworkNotes || ''}
             pageNotesSelectionRef={{ current: null } as any}
             pageNotesTextareaRef={{ current: null } as any}
@@ -3948,6 +4034,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             recordingSavedToast={recordingSavedToast} studentNotesSavedToast={studentNotesSavedToast}
           />
         </Suspense>
+
+        {showFahrplanModal && (
+          <Suspense fallback={null}>
+            <TagesplanHomeworkFahrplanModal
+              isOpen={showFahrplanModal}
+              student={student}
+              teacher={{ id: teacherId, name: propTeacherName, school_id: propSchoolId || student?.school_id }}
+              portalTarget={portalTarget}
+              zIndex={100005}
+              initialLehrwerkId={fahrplanInitialLehrwerkId}
+              onClose={() => {
+                setShowFahrplanModal(false);
+                setFahrplanInitialLehrwerkId(undefined);
+              }}
+              onSaved={() => {
+                setShowFahrplanModal(false);
+                setFahrplanInitialLehrwerkId(undefined);
+                if (typeof window !== 'undefined' && student?.id) {
+                  window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
+                }
+              }}
+            />
+          </Suspense>
+        )}
       </>
     );
   }
@@ -4018,6 +4128,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           recordingSavedToast={recordingSavedToast} studentNotesSavedToast={studentNotesSavedToast}
         />
       </Suspense>
+
+      {showFahrplanModal && (
+        <Suspense fallback={null}>
+          <TagesplanHomeworkFahrplanModal
+            isOpen={showFahrplanModal}
+            student={student}
+            teacher={{ id: teacherId, name: propTeacherName, school_id: propSchoolId || student?.school_id }}
+            portalTarget={portalTarget}
+            zIndex={100005}
+            initialLehrwerkId={fahrplanInitialLehrwerkId}
+            onClose={() => {
+              setShowFahrplanModal(false);
+              setFahrplanInitialLehrwerkId(undefined);
+            }}
+            onSaved={() => {
+              setShowFahrplanModal(false);
+              setFahrplanInitialLehrwerkId(undefined);
+              if (typeof window !== 'undefined' && student?.id) {
+                window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
+              }
+            }}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

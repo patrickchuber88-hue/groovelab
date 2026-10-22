@@ -27,6 +27,11 @@ export interface CrisisSupportInfo {
   helpline: string;
   phone: string;
   url: string;
+  hotlines?: readonly {
+    label: string;
+    phone: string;
+    description: string;
+  }[];
 }
 
 export const CRISIS_HELPLINE_INFO: CrisisSupportInfo = {
@@ -34,7 +39,12 @@ export const CRISIS_HELPLINE_INFO: CrisisSupportInfo = {
   title: 'Nummer gegen Kummer (Kinder- & Jugendtelefon)',
   helpline: 'Kostenlose, anonyme und vertrauliche Beratung',
   phone: '116 111',
-  url: 'https://www.nummergegenkummer.de'
+  url: 'https://www.nummergegenkummer.de',
+  hotlines: [
+    { label: 'Nummer gegen Kummer (Kinder/Jugend)', phone: '116 111', description: 'Mo-Sa 14-20 Uhr, anonym & kostenlos' },
+    { label: 'Telefonseelsorge (24/7)', phone: '0800 111 0 111', description: 'Rund um die Uhr, vertraulich & gebührenfrei' },
+    { label: 'Notruf bei akuter Gefahr', phone: '112', description: '24/7 Notfallhilfe' }
+  ]
 };
 
 // 🎵 Die Musik-Whitelist („Fagott- & Notenständer-Regel“)
@@ -104,11 +114,20 @@ const GUARD_PATTERNS: readonly GuardPattern[] = [
     regex: /\b(schwanzlutscher|pimmel|penis|vagina|titten|nutte[n]*|schlampe[n]*|nacktbild[er]*|zieh\s*dich\s*aus|sex\s*chat|blowjob)\b/i
   },
 
-  // 4. Schwere Gewaltandrohung & Selbstgefährdung (§ 241 StGB / § 8a SGB VIII)
+  // 4. Selbstgefährdung & Krisenintervention (§ 8a SGB VIII / Kindeswohl)
+  // Parität mit DB-Trigger trg_enforce_campus_chat_governance (Migration 569)
   {
     category: 'threat',
-    reason: 'Gewaltdrohungen und Aufforderungen zur Selbstgefährdung sind streng verboten.',
-    regex: /\b(ich\s*(bring|schlag|stech|knall)\s*dich\s*(um|tot|ab)|bring\s*dich\s*um|krepier[en]*|t[oö]te\s*dich|ich\s*bring\s*mich\s*um|ich\s*will\s*sterben)\b/i,
+    reason: 'Wir sind für dich da. Du bist nicht allein. Wenn es dir nicht gut geht oder du dich in einer Krise befindest, gibt es Menschen, die dir jetzt sofort und vertraulich helfen.',
+    regex: /\b(selbstmord|suizid|umbringen|mich\s*ritzen|nicht\s*mehr\s*leben|will\s*sterben|ich\s*bring\s*mich\s*um|ich\s*will\s*(mich\s*)?umbringen|bring\s*mich\s*um|t[oö]te\s*mich|mich\s*umbringen)\b/i,
+    isCrisis: true
+  },
+
+  // 5. Schwere Gewaltandrohung & Aufforderung zur Selbstgefährdung (§ 241 StGB)
+  {
+    category: 'threat',
+    reason: 'Gewaltdrohungen und Aufforderungen zur Gewalt oder Selbstgefährdung sind streng verboten.',
+    regex: /\b(ich\s*(bring|schlag|stech|knall)\s*dich\s*(um|tot|ab)|bring\s*dich\s*um|krepier[en]*|t[oö]te\s*dich)\b/i,
     isCrisis: true
   }
 ];
@@ -157,12 +176,23 @@ export function validateChatMessageContent(content: string | null | undefined): 
       });
 
       if (!isWhitelisted) {
-        const isCrisis = pattern.isCrisis || detectedTerm.includes('bring mich um') || detectedTerm.includes('will sterben');
+        const isCrisis = Boolean(
+          pattern.isCrisis ||
+          detectedTerm.includes('bring mich um') ||
+          detectedTerm.includes('will sterben') ||
+          detectedTerm.includes('umbringen') ||
+          detectedTerm.includes('suizid') ||
+          detectedTerm.includes('selbstmord') ||
+          detectedTerm.includes('ritzen') ||
+          detectedTerm.includes('nicht mehr leben')
+        );
         return {
           isValid: false,
           matchedTerm: detectedTerm,
           category: pattern.category,
-          reason: pattern.reason,
+          reason: isCrisis
+            ? 'Wir sind für dich da. Du bist nicht allein. Wenn es dir nicht gut geht oder du dich in einer Krise befindest, gibt es Menschen, die dir jetzt sofort und vertraulich helfen.'
+            : pattern.reason,
           isCrisis
         };
       }

@@ -118,12 +118,12 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '10px',
-          background: isPlaying ? '#0f172a' : '#ffffff',
+          background: isPlaying ? '#4f46e5' : '#ffffff',
           color: isPlaying ? '#ffffff' : '#0f172a',
-          border: isPlaying ? '1px solid #0f172a' : '1px solid #cbd5e1',
+          border: isPlaying ? '1px solid #4f46e5' : '1px solid #cbd5e1',
           borderRadius: '12px',
           padding: '8px 12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          boxShadow: isPlaying ? '0 4px 14px rgba(79, 70, 229, 0.25)' : '0 1px 3px rgba(0,0,0,0.03)',
           transition: 'all 0.18s ease'
         }}
       >
@@ -134,7 +134,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
               width: '28px',
               height: '28px',
               borderRadius: '8px',
-              background: isPlaying ? '#1e293b' : '#f1f5f9',
+              background: isPlaying ? '#4338ca' : '#f1f5f9',
               color: isPlaying ? '#ffffff' : '#0f172a',
               display: 'flex',
               alignItems: 'center',
@@ -161,7 +161,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
             <span
               style={{
                 fontSize: '0.70rem',
-                color: isPlaying ? '#94a3b8' : '#64748b',
+                color: isPlaying ? 'rgba(255, 255, 255, 0.8)' : '#64748b',
                 fontWeight: 600
               }}
             >
@@ -182,7 +182,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
               alignItems: 'center',
               gap: '4px',
               background: isPlaying ? '#ffffff' : '#f8fafc',
-              color: isPlaying ? '#0f172a' : '#334155',
+              color: isPlaying ? '#4f46e5' : '#334155',
               border: isPlaying ? 'none' : '1px solid #cbd5e1',
               borderRadius: '8px',
               padding: '5px 9px',
@@ -192,7 +192,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
               transition: 'all 0.15s ease'
             }}
           >
-            {isPlaying ? <Square size={11} fill="#0f172a" /> : <Play size={11} fill="#334155" />}
+            {isPlaying ? <Square size={11} fill="#4f46e5" /> : <Play size={11} fill="#334155" />}
             <span>{isPlaying ? 'Stopp' : 'Vorhören'}</span>
           </button>
 
@@ -205,7 +205,7 @@ export const TagesKompassScoreSnippetPill: React.FC<TagesKompassScoreSnippetPill
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
-              background: '#0f172a',
+              background: '#4f46e5',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',

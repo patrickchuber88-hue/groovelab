@@ -39,7 +39,7 @@ export function generateStudentMilestoneCertificateHtml(
     year: 'numeric'
   });
 
-  const stageLabel = input.vdmStageLabel || 'VdM-Aufbaustufe · Aktiver Musik-Entdecker';
+  const stageLabel = input.vdmStageLabel || 'Aufbaustufe · Aktiver Musik-Entdecker';
 
   return `<!DOCTYPE html>
 <html lang="de">

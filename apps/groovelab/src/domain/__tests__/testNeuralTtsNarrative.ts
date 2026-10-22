@@ -238,6 +238,50 @@ function runTests() {
   }
   console.log('✅ Test 12 Passed!\n');
 
+  // Test 13: 0.1% Goldstandard Tri-Category Harmony (Book + Song + MicroScore, e.g. Linus Szenario)
+  const t13 = buildContinuousHomeworkNarrative({
+    studentFirstName: 'Linus',
+    books: [{ title: 'Guitar Fitness', pages: [2], notes: ['Ganze Seite 2 bis zur nächsten Stunde üben & festigen'] }],
+    songs: [{ title: 'Numb', artist: 'Linkin Park' }],
+    microScores: [{ title: 'G-Dur Tonleiter (Auf- & Abwärts)', tempoBpm: 80, barsCount: 2 }]
+  });
+  console.log('Test 13 (Linus Tri-Category Scenario: Book + Song + MicroScore):');
+  console.log(t13);
+  if (!t13.startsWith('Hallo Linus! Hier sind deine Aufgaben für diese Woche.')) {
+    throw new Error('Test 13 Failed: Expected greeting with 3 tasks');
+  }
+  if (!t13.includes('Als Erstes übst du im Lehrwerk Gittahr Fitness auf Seite zwei.')) {
+    throw new Error('Test 13 Failed: Expected first task to be Guitar Fitness');
+  }
+  if (!t13.includes('Als Nächstes übst du beim Song Namm von Linkin Pahrk das Stück weiter.')) {
+    throw new Error('Test 13 Failed: Expected second task to be Numb');
+  }
+  if (!t13.includes('Und zum Schluss übst du beim Notenschnipsel G-Dur Tonleiter (Auf- & Abwärts) mit 80 Schlägen pro Minute über 2 Takte.')) {
+    throw new Error('Test 13 Failed: Expected third task to be MicroScore G-Dur Tonleiter');
+  }
+  if (!t13.includes('Viel Freude beim Üben!')) {
+    throw new Error('Test 13 Failed: Expected closing phrase');
+  }
+  console.log('✅ Test 13 Passed!\n');
+
+  // Test 14: Single MicroScore without Books or Songs (Protected from false empty state)
+  const t14 = buildContinuousHomeworkNarrative({
+    studentFirstName: 'Linus',
+    microScores: [{ title: 'A-Moll Pentatonik', tempoBpm: 90, barsCount: 4 }]
+  });
+  console.log('Test 14 (Single MicroScore Only, Protected Empty State):');
+  console.log(t14);
+  if (!t14.startsWith('Hallo Linus! Hier ist deine Hausaufgabe für diese Woche.')) {
+    throw new Error('Test 14 Failed: Expected single homework greeting for solitary snippet');
+  }
+  if (!t14.includes('Beim Notenschnipsel A-Moll Pentatonik mit 90 Schlägen pro Minute über 4 Takte festigst du die Passage.')) {
+    throw new Error('Test 14 Failed: Expected warm single snippet sentence');
+  }
+  if (t14.includes('noch keine Aufgaben eingetragen')) {
+    throw new Error('Test 14 Failed: Single microScore falsely triggered empty state');
+  }
+  console.log('✅ Test 14 Passed!\n');
+
   console.log('🎉 ALL NEURAL TTS NARRATIVE TESTS PASSED WITH FLYING COLORS!');
 }
 

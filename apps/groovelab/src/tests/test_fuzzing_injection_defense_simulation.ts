@@ -225,11 +225,13 @@ async function runFuzzingSimulation() {
   const insult2 = 'Halt die Fresse du Spast';
   const extremism1 = 'sieg   heil';
   const threat1 = 'ich bring dich um';
+  const threat2 = 'ich will mich umbringen';
 
   const checkInsult1 = validateChatMessageContent(insult1);
   const checkInsult2 = validateChatMessageContent(insult2);
   const checkExtremism = validateChatMessageContent(extremism1);
   const checkThreat = validateChatMessageContent(threat1);
+  const checkThreat2 = validateChatMessageContent(threat2);
 
   assert(
     checkInsult1.isValid === false && checkInsult1.category === 'insult',
@@ -246,6 +248,10 @@ async function runFuzzingSimulation() {
   assert(
     checkThreat.isValid === false && checkThreat.isCrisis === true,
     `Threat & Crisis Pattern Intercepted: "${threat1}" -> blocked & crisis-flagged`
+  );
+  assert(
+    checkThreat2.isValid === false && checkThreat2.isCrisis === true,
+    `Crisis Intervention Intercepted: "${threat2}" -> blocked & crisis-flagged`
   );
 
   // 4.2 Crisis Helpline Presence

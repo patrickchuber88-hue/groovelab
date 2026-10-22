@@ -32,7 +32,7 @@ export interface VdmSortOption {
 export const VDM_SORT_OPTIONS: VdmSortOption[] = [
   {
     id: 'didactic',
-    label: 'Didaktisch (VdM Standard)',
+    label: 'Didaktisch (Stufenplan)',
     shortLabel: 'Didaktisch',
     description: 'Empfohlen: Elementar bis Oberstufe nach didaktischer Komplexität'
   },

@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { 
   X, Check, Copy, ShieldAlert, Clock, 
-  AlertTriangle, CheckCircle2, ChevronRight, Zap 
+  CheckCircle2, ChevronRight, ChevronDown, Zap, FileText, Layers 
 } from 'lucide-react';
 import { generateEpcGiroCodePayload, formatIbanWithSpaces } from '../../utils/epcGiroCode';
-import { SchoolDunningStatus, getDunningVisualConfig } from '../../domain/schoolDunningEngine';
+import { SchoolDunningStatus, getDunningVisualConfig, OverdueInvoiceSummary } from '../../domain/schoolDunningEngine';
 import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../../config/operatorBanking';
 
 export interface SchoolDunningPayModalProps {
@@ -32,6 +32,8 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
   onActivateTrustExtension
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [selectedInvoiceFilter, setSelectedInvoiceFilter] = useState<'all' | string>('all');
+  const [showInvoiceDetails, setShowInvoiceDetails] = useState<boolean>(false);
   const [localTrustActive, setLocalTrustActive] = useState<boolean>(() => {
     const invId = dunningStatus.oldestOverdueInvoice?.id || 'default';
     return Boolean(localStorage.getItem(`groovelab_trust_token_${invId}`));
@@ -41,13 +43,42 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
 
   const visual = getDunningVisualConfig(dunningStatus.level);
   const oldestInv = dunningStatus.oldestOverdueInvoice;
+  const overdueList: OverdueInvoiceSummary[] = Array.isArray(dunningStatus.overdueInvoicesList)
+    ? dunningStatus.overdueInvoicesList
+    : (oldestInv ? [oldestInv] : []);
   const isTrustActive = dunningStatus.isTrustExtended || localTrustActive;
-  
-  // Total includes module dunning fee if level >= level_3_admin_readonly
-  const baseAmount = dunningStatus.totalOverdueAmount;
-  const fee = dunningStatus.isDunningFeeApplied ? dunningStatus.dunningFee : 0;
+
+  // Selected single invoice vs all
+  const activeSingleInv = selectedInvoiceFilter !== 'all'
+    ? overdueList.find(inv => inv.id === selectedInvoiceFilter) || null
+    : null;
+
+  const baseAmount = activeSingleInv
+    ? activeSingleInv.amount
+    : dunningStatus.totalOverdueAmount;
+
+  const shouldIncludeFee = dunningStatus.isDunningFeeApplied && (!activeSingleInv || activeSingleInv.id === oldestInv?.id);
+  const fee = shouldIncludeFee ? dunningStatus.dunningFee : 0;
   const amountToPay = Math.round((baseAmount + fee) * 100) / 100;
-  const referenceCode = oldestInv ? oldestInv.id : `RE-${schoolName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10)}`;
+  const hasOpenBalance = amountToPay > 0 && overdueList.length > 0;
+
+  // Clean, concise reference code (EPC069-12 max 140 chars)
+  const referenceCode = (() => {
+    if (activeSingleInv) {
+      return activeSingleInv.id.slice(0, 140);
+    }
+    if (overdueList.length > 1) {
+      const cleanSchoolCode = schoolName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase();
+      // Concatenate invoice IDs concisely
+      const ids = overdueList.map(inv => inv.id).join(' ');
+      const rawCode = `SAMMEL ${cleanSchoolCode}: ${ids}`;
+      return rawCode.length <= 140 ? rawCode : `SAMMEL ${cleanSchoolCode} (${overdueList.length} BELEGE)`;
+    }
+    if (oldestInv) {
+      return oldestInv.id.slice(0, 140);
+    }
+    return `RE-${schoolName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toUpperCase()}`;
+  })();
 
   const handleTriggerTrustPass = () => {
     const invId = oldestInv?.id || 'default';
@@ -63,7 +94,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
     iban: operatorIban,
     bic: operatorBic,
     recipientName: operatorCompany,
-    amount: amountToPay,
+    amount: amountToPay > 0 ? amountToPay : 0.01,
     referenceCode
   });
 
@@ -81,14 +112,14 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: 'rgba(15, 23, 42, 0.72)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
-        animation: 'fadeIn 0.2s ease-out'
+        padding: '16px',
+        animation: 'fadeIn 0.15s ease-out'
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -96,313 +127,404 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
     >
       <div style={{
         background: '#ffffff',
-        borderRadius: '28px',
-        maxWidth: '560px',
+        borderRadius: '24px',
+        maxWidth: '520px',
         width: '100%',
-        maxHeight: '92vh',
+        maxHeight: '90vh',
         overflowY: 'auto',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0,0,0,0.06)',
+        boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.05)',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif"
+        fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
       }}>
-        {/* Header Bar */}
+        
+        {/* 1. Header (Ruhig & Schlicht) */}
         <div style={{
-          padding: '24px 28px 18px',
+          padding: '20px 24px 16px',
           borderBottom: '1px solid #f1f5f9',
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px'
+          gap: '12px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '16px',
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
               background: visual.badgeBg,
-              border: `1px solid ${visual.badgeBorder}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: visual.badgeColor,
               flexShrink: 0
             }}>
-              {dunningStatus.isSecretaryReadOnly ? <ShieldAlert size={26} /> : <Clock size={26} />}
+              {dunningStatus.isSecretaryReadOnly ? <ShieldAlert size={20} /> : <Clock size={20} />}
             </div>
             <div>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '3px 10px',
-                borderRadius: '100px',
-                background: visual.badgeBg,
-                color: visual.badgeColor,
-                fontSize: '0.74rem',
-                fontWeight: 900,
-                letterSpacing: '0.02em',
-                marginBottom: '4px'
-              }}>
-                {visual.title}
-              </div>
-              <h3 style={{ margin: 0, fontSize: '1.28rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                B2B-Sofortausgleich via EPC-QR
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                B2B-Sofortausgleich
               </h3>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                {schoolName} • SEPA EPC-QR GiroCode
+              </span>
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Schließen"
             style={{
-              background: '#f1f5f9',
+              background: '#f8fafc',
               border: 'none',
               borderRadius: '50%',
-              width: '36px',
-              height: '36px',
+              width: '32px',
+              height: '32px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               color: '#64748b',
-              transition: 'all 0.2s',
+              transition: 'all 0.15s',
               flexShrink: 0
             }}
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+        {/* 2. Content Body (Kompakt & Strukturiert) */}
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* Status Message */}
+          {/* Status-Hinweis (Ruhig & auf den Punkt) */}
           <div style={{
-            background: visual.badgeBg,
-            border: `1px solid ${visual.badgeBorder}`,
-            borderRadius: '18px',
-            padding: '16px 18px',
-            color: '#1e293b',
-            fontSize: '0.88rem',
-            lineHeight: 1.55
+            background: !hasOpenBalance ? '#ecfdf5' : (dunningStatus.isSecretaryReadOnly ? '#fef2f2' : '#f8fafc'),
+            border: !hasOpenBalance ? '1px solid #a7f3d0' : (dunningStatus.isSecretaryReadOnly ? '1px solid #fecaca' : '1px solid #e2e8f0'),
+            borderRadius: '14px',
+            padding: '12px 16px',
+            fontSize: '0.82rem',
+            lineHeight: 1.45,
+            color: !hasOpenBalance ? '#065f46' : (dunningStatus.isSecretaryReadOnly ? '#991b1b' : '#334155')
           }}>
-            {dunningStatus.isSecretaryReadOnly ? (
+            {!hasOpenBalance ? (
+              <strong>Konto ausgeglichen ✓ Keine offenen Rechnungen für diese Musikschule.</strong>
+            ) : dunningStatus.isSecretaryReadOnly ? (
               <>
-                <strong>Administrativer Schreibschutz aktiv:</strong> Für <strong>{schoolName}</strong> liegt ein Zahlungsrückstand von <strong>{amountToPay.toFixed(2)} €</strong> seit {dunningStatus.overdueDays} Tagen vor. Nach erfolgter Überweisung wird der Schreibzugriff für Schüler-, Lehrer- und Raumverwaltung sofort wieder entsperrt.
+                <strong>Administrativer Schreibschutz aktiv:</strong> Offener Gesamtrückstand von <strong>{amountToPay.toFixed(2)} €</strong> ({overdueList.length} {overdueList.length === 1 ? 'Beleg' : 'Belege'}). Nach Überweisung sofort wieder freigeschaltet.
+              </>
+            ) : dunningStatus.adminCountdownDays > 0 ? (
+              <>
+                <strong>Zahlungserinnerung:</strong> In <strong>{dunningStatus.adminCountdownDays} Tagen</strong> wechselt die Verwaltung in den Schreibschutz. Betrag von <strong>{amountToPay.toFixed(2)} €</strong> bitte zeitnah begleichen.
               </>
             ) : (
               <>
-                <strong>Dringende Zahlungserinnerung:</strong> In <strong>{dunningStatus.adminCountdownDays} Tagen</strong> wechselt das System automatisch in den administrativen Schreibschutz. Bitte begleiche den Betrag von <strong>{amountToPay.toFixed(2)} €</strong> zeitnah.
+                <strong>Offener Betrag:</strong> Für die Musikschule {overdueList.length === 1 ? 'ist 1 Beleg' : `sind ${overdueList.length} Belege`} über insgesamt <strong>{amountToPay.toFixed(2)} €</strong> fällig.
               </>
             )}
           </div>
 
-          {/* QR Code & Transfer Details Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '170px 1fr',
-            gap: '20px',
-            alignItems: 'center',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '22px',
-            padding: '20px'
-          }}>
-            {/* QR Code Card */}
+          {/* Hero: GiroCode + Zahlungsdaten (Kompakte 2-Spalten-Karte) */}
+          {hasOpenBalance && (
             <div style={{
+              display: 'grid',
+              gridTemplateColumns: '150px 1fr',
+              gap: '18px',
+              alignItems: 'center',
               background: '#ffffff',
-              padding: '14px',
-              borderRadius: '16px',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
               border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '16px'
+            }}>
+              {/* QR Code */}
+              <div style={{
+                background: '#ffffff',
+                padding: '10px',
+                borderRadius: '12px',
+                border: '1px solid #f1f5f9',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <QRCode 
+                  value={epcPayload}
+                  size={130}
+                  level="M"
+                  style={{ width: '100%', height: 'auto', display: 'block' }}
+                />
+                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b' }}>
+                  Banking-App Scan
+                </span>
+              </div>
+
+              {/* Überweisungs-Attribute */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {activeSingleInv ? 'Einzelbetrag' : (overdueList.length > 1 ? `Sammelbetrag (${overdueList.length} Belege)` : 'Gesamtbetrag')}
+                  </span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                    {amountToPay.toFixed(2)} €
+                  </div>
+                  {shouldIncludeFee && fee > 0 && (
+                    <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
+                      Inkl. {fee.toFixed(2)} € Kulanz-Pauschale
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Empfänger
+                  </span>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                    {operatorCompany}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      IBAN
+                    </span>
+                    <button
+                      onClick={() => handleCopy(operatorIban, 'iban')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copiedField === 'iban' ? '#10b981' : '#2563eb',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: 0
+                      }}
+                    >
+                      {copiedField === 'iban' ? <Check size={11} /> : <Copy size={11} />}
+                      {copiedField === 'iban' ? 'Kopiert' : 'Kopieren'}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
+                    {formatIbanWithSpaces(operatorIban)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Verwendungszweck
+                    </span>
+                    <button
+                      onClick={() => handleCopy(referenceCode, 'ref')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copiedField === 'ref' ? '#10b981' : '#2563eb',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: 0
+                      }}
+                    >
+                      {copiedField === 'ref' ? <Check size={11} /> : <Copy size={11} />}
+                      {copiedField === 'ref' ? 'Kopiert' : 'Kopieren'}
+                    </button>
+                  </div>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    fontWeight: 700, 
+                    color: '#0f172a', 
+                    fontFamily: 'monospace', 
+                    whiteSpace: 'nowrap', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis',
+                    maxWidth: '280px'
+                  }} title={referenceCode}>
+                    {referenceCode}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 3. Belegspiegel & Kämmerei-Filter (Ruhige Quittungs-Zusammenfassung) */}
+          {hasOpenBalance && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '12px 14px',
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
               gap: '8px'
             }}>
-              <QRCode 
-                value={epcPayload}
-                size={142}
-                level="M"
-                style={{ width: '100%', height: 'auto', display: 'block' }}
-              />
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textAlign: 'center' }}>
-                GiroCode (Banking-App)
-              </span>
-            </div>
-
-            {/* Transfer Details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Gesamtbetrag
+              {/* Quittungs-Summenzeile */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                <span style={{ color: '#475569', fontWeight: 600 }}>
+                  {activeSingleInv ? `Einzelbeleg (${activeSingleInv.id})` : `${overdueList.length} offene Belege`}
                 </span>
-                <div style={{ fontSize: '1.45rem', fontWeight: 950, color: '#0f172a' }}>
-                  {amountToPay.toFixed(2)} €
-                </div>
-                {dunningStatus.isDunningFeeApplied && (
-                  <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 750, marginTop: '2px' }}>
-                    Inkl. {dunningStatus.dunningFee.toFixed(2)} € Verzugspauschale (Kulanzsatz statt 40,00 €)
-                  </div>
-                )}
-                {dunningStatus.level === 'level_2_warning' && (
-                  <div style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 750, marginTop: '2px' }}>
-                    ⚡ Bei Zahlung in {dunningStatus.adminCountdownDays} Tagen wird Ihnen die Verzugspauschale ({dunningStatus.dunningFee.toFixed(2)} €) erlassen.
-                  </div>
-                )}
+                <span style={{ color: '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                  {baseAmount.toFixed(2)} €
+                </span>
               </div>
 
-              <div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Empfänger
-                </span>
-                <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#1e293b' }}>
-                  {operatorCompany}
+              {fee > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#b91c1c' }}>
+                  <span>Verzugspauschale (Kulanzsatz)</span>
+                  <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+ {fee.toFixed(2)} €</span>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    IBAN
-                  </span>
-                  <button
-                    onClick={() => handleCopy(operatorIban, 'iban')}
+              <div style={{ height: '1px', background: '#e2e8f0', margin: '2px 0' }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceDetails(prev => !prev)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    color: '#2563eb',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  {showInvoiceDetails ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <span>{showInvoiceDetails ? 'Belegdetails ausblenden' : `Details zu ${overdueList.length} Belegen (für Kämmerei)`}</span>
+                </button>
+
+                {overdueList.length > 1 && showInvoiceDetails && (
+                  <select
+                    value={selectedInvoiceFilter}
+                    onChange={(e) => setSelectedInvoiceFilter(e.target.value)}
                     style={{
-                      background: 'none',
-                      border: 'none',
-                      color: copiedField === 'iban' ? '#10b981' : '#3b82f6',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: 0
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#1e293b',
+                      cursor: 'pointer'
                     }}
                   >
-                    {copiedField === 'iban' ? <Check size={12} /> : <Copy size={12} />}
-                    {copiedField === 'iban' ? 'Kopiert' : 'Kopieren'}
-                  </button>
-                </div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
-                  {formatIbanWithSpaces(operatorIban)}
-                </div>
+                    <option value="all">Alle Belege (Sammelausgleich)</option>
+                    {overdueList.map(inv => (
+                      <option key={inv.id} value={inv.id}>Nur {inv.id} ({inv.amount.toFixed(2)} €)</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    Verwendungszweck
-                  </span>
-                  <button
-                    onClick={() => handleCopy(referenceCode, 'ref')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: copiedField === 'ref' ? '#10b981' : '#3b82f6',
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: 0
-                    }}
-                  >
-                    {copiedField === 'ref' ? <Check size={12} /> : <Copy size={12} />}
-                    {copiedField === 'ref' ? 'Kopiert' : 'Kopieren'}
-                  </button>
+              {/* Detail-Liste nur bei Bedarf eingeblendet */}
+              {showInvoiceDetails && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                  {overdueList.map((inv) => {
+                    const isSelected = selectedInvoiceFilter === 'all' || selectedInvoiceFilter === inv.id;
+                    return (
+                      <div
+                        key={inv.id}
+                        onClick={() => setSelectedInvoiceFilter(prev => prev === inv.id ? 'all' : inv.id)}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          background: isSelected ? '#ffffff' : 'transparent',
+                          border: isSelected ? '1px solid #e2e8f0' : '1px solid transparent',
+                          opacity: isSelected ? 1 : 0.45,
+                          cursor: 'pointer',
+                          fontSize: '0.76rem',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FileText size={12} color="#64748b" />
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>{inv.id}</span>
+                          <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                            ({inv.type === 'AKT' ? 'Schüler' : 'Infrastruktur'})
+                          </span>
+                        </div>
+                        <span style={{ fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                          {inv.amount.toFixed(2)} €
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>
-                  {referenceCode}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 48h Trust Card */}
-          <div style={{
-            background: isTrustActive ? 'rgba(16, 185, 129, 0.08)' : 'rgba(59, 130, 246, 0.06)',
-            border: isTrustActive ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
-            borderRadius: '18px',
-            padding: '16px 18px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={18} color={isTrustActive ? '#10b981' : '#2563eb'} />
-                <span style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a' }}>
-                  {isTrustActive 
-                    ? '48h-Sofort-Freigabe aktiv ⚡' 
-                    : 'Bereits überwiesen? 48h-Sofort-Freigabe aktivieren'}
-                </span>
-              </div>
-              {isTrustActive && (
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#059669', background: '#ecfdf5', padding: '3px 10px', borderRadius: '100px', border: 'none' }}>
-                  Aktiv ({dunningStatus.trustRemainingHours || 48} Std. verbleibend)
-                </span>
               )}
             </div>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#475569', lineHeight: 1.45 }}>
-              {isTrustActive 
-                ? 'Die administrativen Schreibrechte und der Audio-Tresor sind für 48 Stunden temporär entsperrt, während die Banküberweisung verbucht wird.'
-                : 'Haben Sie die Überweisung soeben veranlasst? Mit einem Klick auf diesen Button schalten wir alle Schreibrechte Ihrer Schule sofort für 48 Stunden frei – ganz ohne Medienbruch oder Beleg-Upload.'}
-            </p>
+          )}
+
+          {/* 4. 48h-Sofortfreigabe & Garantien (Schlank & beruhigend) */}
+          <div style={{
+            background: isTrustActive ? '#f0fdf4' : '#eff6ff',
+            border: isTrustActive ? '1px solid #bbf7d0' : '1px solid #bfdbfe',
+            borderRadius: '14px',
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Zap size={16} color={isTrustActive ? '#16a34a' : '#2563eb'} />
+              <div>
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>
+                  {isTrustActive ? '48h-Sofort-Freigabe aktiv ⚡' : 'Bereits überwiesen?'}
+                </span>
+                <span style={{ fontSize: '0.72rem', color: '#475569' }}>
+                  {isTrustActive 
+                    ? `Schreibrechte für ${dunningStatus.trustRemainingHours || 48} Std. entsperrt.` 
+                    : 'Mit 1 Klick alle Schreibrechte während der Banklaufzeit freischalten.'}
+                </span>
+              </div>
+            </div>
+
             {!isTrustActive && (
               <button
+                type="button"
                 onClick={handleTriggerTrustPass}
                 style={{
-                  alignSelf: 'flex-start',
                   background: '#2563eb',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '12px',
-                  padding: '9px 16px',
-                  fontSize: '0.82rem',
-                  fontWeight: 850,
+                  borderRadius: '10px',
+                  padding: '7px 14px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: 'none',
-                  transition: 'all 0.15s'
+                  whiteSpace: 'nowrap'
                 }}
               >
-                <Zap size={14} />
-                <span>⚡ Ich habe soeben überwiesen (48h Sofort-Freigabe)</span>
+                ⚡ 48h Sofort-Freigabe
               </button>
             )}
           </div>
 
-          {/* Guarantee Notices */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            background: '#f8fafc',
-            border: '1px solid #f1f5f9',
-            borderRadius: '16px',
-            padding: '14px 16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#16a34a', fontWeight: 700 }}>
-              <CheckCircle2 size={16} />
-              <span><strong>Axiom der didaktischen Immunität:</strong> Schüler & Lehrkräfte haben weiterhin vollen Zugriff auf Stundenpläne und Repertoire.</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: '#16a34a', fontWeight: 700 }}>
-              <CheckCircle2 size={16} />
-              <span><strong>Zero-Deletion-Garantie:</strong> Bestehende Audio-Tresor-Aufnahmen bleiben dauerhaft erhalten und abspielbar.</span>
-            </div>
+          {/* Garantien-Hinweiszeile */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#16a34a', fontWeight: 600 }}>
+            <CheckCircle2 size={13} />
+            <span><strong>Didaktische Immunität:</strong> Schüler &amp; Lehrkräfte haben uneingeschränkten Unterrichtszugriff.</span>
           </div>
 
         </div>
 
-        {/* Footer Actions */}
+        {/* 5. Footer (Minimalistisch) */}
         <div style={{
-          padding: '16px 28px 24px',
+          padding: '14px 24px 20px',
           borderTop: '1px solid #f1f5f9',
           display: 'flex',
           justifyContent: 'space-between',
@@ -419,17 +541,17 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                 background: 'transparent',
                 border: 'none',
                 color: '#64748b',
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                padding: '8px 0'
+                padding: 0
               }}
             >
-              <span>Zur Abrechnungsübersicht</span>
-              <ChevronRight size={16} />
+              <span>Zur Abrechnungshistorie</span>
+              <ChevronRight size={14} />
             </button>
           )}
 
@@ -439,14 +561,12 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
               background: '#0f172a',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '14px',
-              padding: '12px 24px',
-              fontSize: '0.9rem',
+              borderRadius: '12px',
+              padding: '10px 20px',
+              fontSize: '0.84rem',
               fontWeight: 800,
               cursor: 'pointer',
-              marginLeft: 'auto',
-              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)',
-              transition: 'all 0.2s'
+              marginLeft: 'auto'
             }}
           >
             Schließen

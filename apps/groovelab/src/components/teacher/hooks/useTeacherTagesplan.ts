@@ -297,6 +297,22 @@ const readInitialBriefingTimeline = (teacherId?: string, todayStr?: string, teac
         if (parsed && Array.isArray(parsed.timeline) && parsed.timeline.length > 0) {
           const hasLegacySeed = parsed.timeline.some((t: any) => String(t.id).startsWith('seed-occ-'));
           if (!hasLegacySeed) {
+            // Re-enrich room from todayBoard if cached slots are missing room name
+            const boards = getTeacherActiveBoards(teacherId, teacherObj);
+            if (boards.length > 0) {
+              const now = getSimulatedNow();
+              const jsDay = now.getDay();
+              const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+              const todayBoard = boards.find((b: any) => b.dayOfWeek === dbDayOfWeek);
+              const boardRoom = todayBoard ? ((rooms || []).find((r: any) => r.id === todayBoard.roomId)?.name || todayBoard.roomName) : '';
+              if (boardRoom && typeof boardRoom === 'string' && boardRoom !== 'Raum' && boardRoom !== 'Unbenannter Raum') {
+                parsed.timeline.forEach((slot: any) => {
+                  if (!slot.room || slot.room === 'Raum' || slot.room === 'Unbenannter Raum') {
+                    slot.room = boardRoom;
+                  }
+                });
+              }
+            }
             return parsed;
           }
         }
@@ -570,6 +586,14 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         }
       }
 
+      // Reconcile roomName from loaded rooms if todayBoard has roomId but no roomName
+      if (todayBoard && todayBoard.roomId && !todayBoard.roomName && Array.isArray(curRooms)) {
+        const matched = curRooms.find((r: any) => r.id === todayBoard.roomId);
+        if (matched?.name) {
+          todayBoard.roomName = matched.name;
+        }
+      }
+
       if (todayBoard && Array.isArray(todayBoard.students) && todayBoard.students.length > 0) {
         // Project timeline slots from active designer board
         const projected = projectTimelineFromBoard(todayBoard, todayStr, curStudents, curRooms, occurrences);
@@ -810,6 +834,46 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
       loadBriefingTimeline();
     }
   }, [activeTab, loadBriefingTimeline]);
+
+  // 🏛️ 0,1% Goldstandard: Re-Hydrate Briefing Timeline when school rooms finish loading
+  useEffect(() => {
+    if (!rooms || rooms.length === 0) return;
+    const hasRealRooms = rooms.some(r => r.id && !String(r.id).startsWith('canonical-'));
+    if (!hasRealRooms) return;
+
+    setBriefingData((prev: any) => {
+      if (!prev?.timeline || prev.timeline.length === 0) return prev;
+      const boards = getTeacherActiveBoards(effectiveTeacherId, teacherRef.current);
+      const now = getSimulatedNow();
+      const jsDay = now.getDay();
+      const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+      const todayBoard = boards.find((b: any) => b.dayOfWeek === dbDayOfWeek);
+      const boardRoomName = todayBoard ? ((rooms.find((r: any) => r.id === todayBoard.roomId)?.name) || todayBoard.roomName) : '';
+
+      let hasChanges = false;
+      const updatedTimeline = prev.timeline.map((slot: any) => {
+        if (!slot.room || slot.room === 'Raum' || slot.room === 'Unbenannter Raum') {
+          const slotRoomId = slot.roomId || slot.room_id || slot.room_override_id || slot.template_room_id;
+          const matchedRoom = slotRoomId ? rooms.find((r: any) => r.id === slotRoomId)?.name : null;
+          const resolvedRoom = matchedRoom || boardRoomName;
+          if (resolvedRoom && resolvedRoom !== slot.room && resolvedRoom !== 'Raum' && resolvedRoom !== 'Unbenannter Raum') {
+            hasChanges = true;
+            return { ...slot, room: resolvedRoom };
+          }
+        }
+        return slot;
+      });
+
+      if (!hasChanges) return prev;
+      const updated = { ...prev, timeline: updatedTimeline };
+      try {
+        const todayStr = now.toLocaleDateString('sv-SE');
+        localStorage.setItem(`groovelab_briefing_timeline_${effectiveTeacherId}_${todayStr}`, JSON.stringify(updated));
+        localStorage.setItem(`groovelab_briefing_timeline_${effectiveTeacherId}_latest`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, [rooms, effectiveTeacherId]);
 
   useEffect(() => {
     let syncTimer: ReturnType<typeof setTimeout> | null = activeTabRef.current !== 'live'
@@ -1087,8 +1151,24 @@ const extractOccurrenceDateFromMessage = (msg: any): string | null => {
         set.add(rName);
       }
     });
+
+    // Fallback to today's board room if timeline has no explicit room string yet
+    if (set.size === 0) {
+      const boards = getTeacherActiveBoards(effectiveTeacherId, teacherRef.current);
+      const now = getSimulatedNow();
+      const jsDay = now.getDay();
+      const dbDayOfWeek = jsDay === 0 ? 7 : jsDay;
+      const todayBoard = boards.find((b: any) => b.dayOfWeek === dbDayOfWeek);
+      if (todayBoard) {
+        const bRoom = (roomsRef.current || []).find((r: any) => r.id === todayBoard.roomId)?.name || todayBoard.roomName;
+        if (bRoom && typeof bRoom === 'string' && bRoom.trim() && bRoom !== 'Raum' && bRoom !== 'Unbenannter Raum') {
+          set.add(bRoom.trim());
+        }
+      }
+    }
+
     return Array.from(set);
-  }, [briefingData?.timeline]);
+  }, [briefingData?.timeline, effectiveTeacherId]);
 
   const todayTagesplanStudents = useMemo(() => {
     const set = new Map<string, any>();

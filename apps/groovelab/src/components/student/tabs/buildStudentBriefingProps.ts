@@ -73,7 +73,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     campusFeedAnnouncements: feed.campusFeedAnnouncements,
     cancelJuniorRecording: practice.cancelJuniorRecording,
     checkIsParentUnlockedGlobal: parent.checkIsParentUnlockedGlobal,
-    checkOccurrenceHasMessages: () => false,
+    checkOccurrenceHasMessages: schedule.checkOccurrenceHasMessages || (() => false),
     circleRadius: streaks.circleRadius,
     classFeedInteractions: feed.classFeedInteractions,
     classFeedPosts: feed.classFeedPosts,
@@ -101,7 +101,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
       studentUser: profile.studentUser
     }),
     getOccRoomName: (occ: any) => occ?.room_name || occ?.room || 'Musikraum',
-    getOccurrenceUnreadCount: () => 0,
+    getOccurrenceUnreadCount: schedule.getOccurrenceUnreadCount || (() => 0),
     getTargetMinutes: streaks.getTargetMinutes,
     graceSecondsLeft: practice.graceSecondsLeft,
     handleAcknowledgeCancellation: schedule.handleAcknowledgeCancellation,

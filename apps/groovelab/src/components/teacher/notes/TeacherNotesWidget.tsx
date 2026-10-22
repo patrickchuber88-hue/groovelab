@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { UserNote, maskStudentName } from '../../../services/notesService';
 import { useDictationInput } from '../../../hooks/useVoiceToText';
+import { resolveTeacherCurrentRoom } from '../../../utils/teacherRoomResolver';
 
 export interface TeacherNotesWidgetProps {
   user: any;
@@ -30,6 +31,7 @@ export interface TeacherNotesWidgetProps {
   rooms?: any[];
   currentRoom?: string;
   teacherTodayRooms?: string[];
+  activeTimelineSlot?: any;
   notes: UserNote[];
   onCreateNote: (content: string, options?: any) => Promise<any>;
   onDeleteNote: (id: string) => Promise<any>;
@@ -47,6 +49,7 @@ export const TeacherNotesWidget: React.FC<TeacherNotesWidgetProps> = ({
   rooms = [],
   currentRoom = '',
   teacherTodayRooms = [],
+  activeTimelineSlot,
   notes = [],
   onCreateNote,
   onDeleteNote,
@@ -88,8 +91,16 @@ export const TeacherNotesWidget: React.FC<TeacherNotesWidgetProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showStudentPicker]);
 
-  // Effective room for defects
-  const effectiveRoom = currentRoom || teacherTodayRooms[0] || (rooms[0]?.name) || 'Raum 1';
+  // 🏛️ 0,1% Goldstandard: Autoritativer Lehrerraum (Niemals blindes "Musikzimmer")
+  const effectiveRoom = useMemo(() => {
+    return resolveTeacherCurrentRoom({
+      activeTimelineSlot,
+      teacherTodayRooms,
+      teacher: user,
+      rooms,
+      fallbackRoom: currentRoom || 'Raum 1'
+    });
+  }, [currentRoom, activeTimelineSlot, teacherTodayRooms, user, rooms]);
   const [defectRoom, setDefectRoom] = useState<string>(effectiveRoom);
   const [showAllRoomsPicker, setShowAllRoomsPicker] = useState<boolean>(false);
   const [showDefectModal, setShowDefectModal] = useState<boolean>(false);

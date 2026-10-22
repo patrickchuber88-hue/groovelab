@@ -3,6 +3,7 @@ import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lu
 import { supabase } from '../../lib/supabase';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
 import { toggleStudentAudioShare } from '../../services/studentAudioShareService';
@@ -74,17 +75,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       await stabilizeAudioStream(stream, 300);
       audioStreamRef.current = stream;
 
-      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
-      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-        else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
-      }
-
-      const mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const { recorder: mediaRecorder } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -157,15 +148,8 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   const stopRecording = () => {
     const rec = mediaRecorderRef.current;
     if (rec && isRecording) {
-      try { rec.requestData(); } catch (e) {}
-      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
-      setTimeout(() => {
-        try {
-          if (rec.state !== 'inactive') {
-            rec.stop();
-          }
-        } catch (e) {}
-      }, 500);
+      // 🛡️ 750ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      AudioCaptureEngine.stopRecorderWithTail(rec, 750);
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
     }

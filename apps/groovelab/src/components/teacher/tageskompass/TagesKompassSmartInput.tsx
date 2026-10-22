@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Send, Loader2, Volume2, Check, Music, Sparkles, Plus } from 'lucide-react';
+import { Mic, Square, Send, Loader2, Volume2, Check, Music, Sparkles, Plus, X } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream } from '../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../services/audio/AudioCaptureEngine';
 import { processPureRawBlob } from '../../../utils/audioMasteringEngine';
 import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { saveOfflineAudioRecord } from '../../../utils/offlineAudioVault';
@@ -47,6 +48,17 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
   const [isSchnelltextOpen, setIsSchnelltextOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'rhythm' | 'technique' | 'performance'>('all');
   const [textbausteine, setTextbausteine] = useState<DidacticTextbaustein[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-Expanding Textarea: passt die Höhe dynamisch an (100% Sichtbarkeit ohne horizontalen Cut)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollH = textareaRef.current.scrollHeight;
+      const nextH = Math.min(Math.max(scrollH, 32), 160);
+      textareaRef.current.style.height = `${nextH}px`;
+    }
+  }, [text]);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,13 +82,32 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
     };
   }, [schoolId]);
 
+  // Bidirektionaler Chip-Toggle: Hinzufügen oder sauberes Entfernen mit 1 Klick
   const handleSelectTextbaustein = (item: DidacticTextbaustein) => {
     setText(prev => {
       const trimmed = prev.trim();
       if (!trimmed) return item.text;
-      if (trimmed.includes(item.text)) return trimmed;
+      if (trimmed.includes(item.text)) {
+        // Toggle OFF: sauberes Entfernen des Bausteins inkl. Trennzeichen
+        const escaped = item.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return trimmed
+          .replace(new RegExp(`(^|\\s*•\\s*)${escaped}(\\s*•\\s*|$)`, 'g'), ' ')
+          .replace(/\s*•\s*•\s*/g, ' • ')
+          .replace(/^\s*•\s*|\s*•\s*$/g, '')
+          .trim();
+      }
       return `${trimmed} • ${item.text}`;
     });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleTextSubmit();
+    } else if (e.key === 'Escape' && text.trim()) {
+      e.preventDefault();
+      setText('');
+    }
   };
 
   const handleSaveSnippet = async (snippet: MicroScoreSnippet) => {
@@ -126,16 +157,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
       audioChunksRef.current = [];
       hasFiredOnStopRef.current = false;
 
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-      }
-
-      const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 256000 };
-      if (mimeType) recorderOptions.mimeType = mimeType;
-      const recorder = new MediaRecorder(stream, recorderOptions);
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -161,7 +183,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
             console.warn('[SmartInput] Audio mastering fallback to raw blob:', e);
           }
 
-          const fileExt = mimeType.includes('mp4') ? 'm4a' : 'webm';
+          const fileExt = AudioCaptureEngine.resolveAudioFileExtension(finalBlob, mimeType);
           const fileName = `voice-homework-${studentId}-${Date.now()}.${fileExt}`;
           const filePath = `${studentId}/${fileName}`;
 
@@ -217,11 +239,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
     }
     setIsRecording(false);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (err) {
-        console.warn('[SmartInput] Notice stopping recorder:', err);
-      }
+      AudioCaptureEngine.stopRecorderWithTail(mediaRecorderRef.current, 650);
     }
   };
 
@@ -310,28 +328,31 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
           <span>Sprachmemo wird verarbeitet & zugewiesen...</span>
         </div>
       ) : (
-        // Standard Smart-Input (Text + 1-Click Mic)
+        // Standard Smart-Input mit 100% Text-Sichtbarkeit & Schnell-Löschung
         <form 
           onSubmit={handleTextSubmit}
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: text.length > 40 ? 'flex-end' : 'center',
             background: '#ffffff',
             border: '1.5px solid #cbd5e1',
             borderRadius: '16px',
-            padding: '4px 6px 4px 14px',
+            padding: '6px 8px 6px 14px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            transition: 'border-color 0.2s',
+            transition: 'border-color 0.2s, box-shadow 0.2s',
             minHeight: '48px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            gap: '8px'
           }}
           onFocus={e => e.currentTarget.style.borderColor = '#16a34a'}
           onBlur={e => e.currentTarget.style.borderColor = '#cbd5e1'}
         >
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
+            rows={1}
             value={text}
             onChange={e => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={`Neue Hausaufgabe für ${maskedStudentName} eingeben...`}
             disabled={isSaving || disabled}
             aria-label={`Neue Hausaufgabe für ${maskedStudentName}`}
@@ -341,13 +362,21 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
               outline: 'none',
               fontSize: '0.88rem',
               fontWeight: 600,
+              lineHeight: 1.45,
               color: '#1e293b',
               background: 'transparent',
-              padding: '6px 0'
+              padding: '6px 0',
+              resize: 'none',
+              fontFamily: 'inherit',
+              minHeight: '28px',
+              maxHeight: '160px',
+              overflowY: text.length > 200 ? 'auto' : 'hidden',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
             }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, paddingBottom: text.length > 40 ? '2px' : 0 }}>
             {/* 1-Click Schnipsel Button */}
             <button
               type="button"
@@ -362,9 +391,10 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                border: isScoreDrawerOpen ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
-                background: isScoreDrawerOpen ? '#0f172a' : '#ffffff',
-                color: isScoreDrawerOpen ? '#ffffff' : '#0f172a',
+                border: isScoreDrawerOpen ? '1px solid #4f46e5' : '1px solid #cbd5e1',
+                background: isScoreDrawerOpen ? '#4f46e5' : '#ffffff',
+                color: isScoreDrawerOpen ? '#ffffff' : '#4f46e5',
+                boxShadow: isScoreDrawerOpen ? '0 2px 8px rgba(79, 70, 229, 0.25)' : 'none',
                 cursor: isSaving || disabled ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -398,35 +428,65 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
               <Sparkles size={16} />
             </button>
 
-            {/* 1-Click Sprachmemo Mic Button */}
-            <button
-              type="button"
-              onClick={startAudioRecording}
-              disabled={isSaving || disabled || Boolean(text.trim())}
-              title="1-Klick Sprachmemo aufnehmen"
-              aria-label="1-Klick Sprachmemo aufnehmen"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                border: 'none',
-                background: text.trim() ? '#f1f5f9' : '#f0fdf4',
-                color: text.trim() ? '#94a3b8' : '#16a34a',
-                cursor: text.trim() ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Mic size={17} />
-            </button>
+            {/* 1-Click Sprachmemo Mic Button (wenn kein Text eingegeben ist) */}
+            {!text.trim() && (
+              <button
+                type="button"
+                onClick={startAudioRecording}
+                disabled={isSaving || disabled}
+                title="1-Klick Sprachmemo aufnehmen"
+                aria-label="1-Klick Sprachmemo aufnehmen"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#f0fdf4',
+                  color: '#16a34a',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+              >
+                <Mic size={17} />
+              </button>
+            )}
+
+            {/* 1-Click Schnelles Löschen / Leeren (erscheint sofort bei vorhandenem Text) */}
+            {Boolean(text.trim()) && (
+              <button
+                type="button"
+                onClick={() => setText('')}
+                disabled={isSaving || disabled}
+                title="Text leeren (Esc)"
+                aria-label="Text leeren"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+              >
+                <X size={16} strokeWidth={2.4} />
+              </button>
+            )}
 
             {/* Senden Button */}
             <button
               type="submit"
               disabled={!text.trim() || isSaving || disabled}
-              title="Hausaufgabe zuweisen"
+              title="Hausaufgabe zuweisen (Cmd+Enter)"
               aria-label="Hausaufgabe zuweisen"
               style={{
                 display: 'flex',
@@ -439,8 +499,10 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                 background: text.trim() ? '#34a853' : '#f1f5f9',
                 color: text.trim() ? '#ffffff' : '#94a3b8',
                 cursor: text.trim() ? 'pointer' : 'default',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                boxShadow: text.trim() ? '0 2px 6px rgba(52, 168, 83, 0.25)' : 'none'
               }}
+              className={text.trim() ? 'hover-scale-mini' : ''}
             >
               {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Send size={15} />}
             </button>
@@ -499,7 +561,7 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                     type="button"
                     onClick={() => setSelectedCategory(cat.id as any)}
                     style={{
-                      background: isCatActive ? '#0f172a' : '#f1f5f9',
+                      background: isCatActive ? '#4f46e5' : '#f1f5f9',
                       color: isCatActive ? '#ffffff' : '#64748b',
                       border: 'none',
                       borderRadius: '100px',
@@ -532,11 +594,12 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                     flexShrink: 0,
                     background: isAlreadyInText ? theme.badgeBg : theme.bg,
                     color: theme.text,
-                    border: `1px solid ${theme.border}`,
+                    border: isAlreadyInText ? `1.5px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                    boxShadow: isAlreadyInText ? `0 1px 4px ${theme.glow}` : 'none',
                     borderRadius: '100px',
                     padding: '4px 11px',
                     fontSize: '0.74rem',
-                    fontWeight: 700,
+                    fontWeight: isAlreadyInText ? 800 : 700,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -544,7 +607,9 @@ export const TagesKompassSmartInput: React.FC<TagesKompassSmartInputProps> = ({
                     transition: 'all 0.15s ease'
                   }}
                   className="hover-scale-mini"
-                  title={item.text}
+                  title={isAlreadyInText ? `Klicken zum Entfernen: ${item.text}` : item.text}
+                  aria-label={isAlreadyInText ? `${item.label} entfernen` : `${item.label} hinzufügen`}
+                  aria-pressed={isAlreadyInText}
                 >
                   {isAlreadyInText && <Check size={11} strokeWidth={3} />}
                   <span>{item.label}</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap, Music, Bell, Cloud, CloudOff, RefreshCw, User } from 'lucide-react';
 import { subscribePendingOfflineCount, flushOfflineSyncQueue } from '../../services/offlineSyncService';
+import { purgeParentSessionLease } from '../../services/parentSecurityLeaseService';
 
 interface MobileTopHeaderProps {
   user: any;
@@ -135,13 +136,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
           <button
             type="button"
             onClick={() => {
-              sessionStorage.removeItem('groovelab_parent_unlocked_global');
-              if (user?.id) {
-                sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
-                sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
-              }
+              purgeParentSessionLease(user?.id);
               setParentUnlocked(false);
-              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
             }}
             style={{
               display: 'inline-flex',

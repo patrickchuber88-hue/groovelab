@@ -107,6 +107,7 @@ export interface StudentModalsHubProps {
   studentId: string;
   studentUser: any;
   isParentUnlocked: boolean;
+  isChatAllowed?: boolean;
   onRefreshData?: () => void;
 
   // Reschedule Bottom Sheet
@@ -249,6 +250,7 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
   studentId,
   studentUser,
   isParentUnlocked,
+  isChatAllowed,
   onRefreshData,
   isRescheduleSheetOpen,
   closeRescheduleBottomSheet,
@@ -453,21 +455,40 @@ export const StudentModalsHub: React.FC<StudentModalsHubProps> = ({
       )}
 
       {/* 10. Appointment Quick Chat (Shoutbox) */}
-      {showAppointmentChat && appointmentChatData && (
-        <CampusAppointmentShoutboxModal
-          isOpen={showAppointmentChat}
-          onClose={() => {
-            setShowAppointmentChat(false);
-            setAppointmentChatData(null);
-          }}
-          occurrence={appointmentChatData}
-          currentUserId={studentId}
-          currentUserRole="student"
-          currentUserProfile={studentUser || { id: studentId }}
-          isParentUnlocked={isParentUnlocked}
-          initialDraftMessage={rescheduleChatDraft}
-        />
-      )}
+      {showAppointmentChat && appointmentChatData && (() => {
+        // 🛡️ 0.1% Goldstandard: Fail-Closed Parental Chat Permission Check (DSGVO Art. 8 & BGB § 104)
+        const effectiveChatAllowed = (() => {
+          if (isChatAllowed !== undefined) return isChatAllowed;
+          if (studentUser?.parent_permissions?.allow_chat !== undefined) return Boolean(studentUser.parent_permissions.allow_chat);
+          if (studentUser?.parent_allow_chat !== undefined && studentUser?.parent_allow_chat !== null) {
+            return Boolean(studentUser.parent_allow_chat);
+          }
+          const effectiveUiLevel = studentUiLevel || studentUser?.campus_ui_level || 
+            (typeof window !== 'undefined' ? (localStorage.getItem(`campus_student_ui_level_${studentId}`) || localStorage.getItem('campus_student_ui_level')) : null) || 
+            'junior';
+          if (effectiveUiLevel === 'junior') {
+            return false;
+          }
+          return true;
+        })();
+
+        return (
+          <CampusAppointmentShoutboxModal
+            isOpen={showAppointmentChat}
+            onClose={() => {
+              setShowAppointmentChat(false);
+              setAppointmentChatData(null);
+            }}
+            occurrence={appointmentChatData}
+            currentUserId={studentId}
+            currentUserRole="student"
+            currentUserProfile={studentUser || { id: studentId }}
+            isParentUnlocked={isParentUnlocked}
+            isChatAllowed={effectiveChatAllowed}
+            initialDraftMessage={rescheduleChatDraft}
+          />
+        );
+      })()}
 
       {/* 11. Reschedule Bottom Sheet */}
       {isRescheduleSheetOpen && (

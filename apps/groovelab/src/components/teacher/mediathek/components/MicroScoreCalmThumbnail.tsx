@@ -13,10 +13,11 @@
 
 import React, { useMemo } from 'react';
 import { MicroScoreSnippet } from '../../../student/meisterwerk/microscore/microScore.types';
+import { getPitchColorTheme, getPitchLetter } from '../../../student/meisterwerk/microscore/microScoreGridEngine';
 
 export interface MicroScoreCalmThumbnailProps {
   snippet: MicroScoreSnippet;
-  accentColor: string;
+  accentColor?: string;
   width?: number | string;
   height?: number;
   isPlaying?: boolean;
@@ -38,9 +39,9 @@ function parsePitchDiatonicStep(pitch: string): number | null {
 
 export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = ({
   snippet,
-  accentColor,
+  accentColor = '#4f46e5',
   width = '100%',
-  height = 42,
+  height = 48,
   isPlaying = false
 }) => {
   const barsCount = Math.max(1, snippet.barsCount || 2);
@@ -132,6 +133,11 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
         }
       }
 
+      const pitchTheme = getPitchColorTheme(n.pitch);
+      const letter = getPitchLetter(n.pitch);
+      const noteColor = pitchTheme.border || '#0f172a';
+      const isYellow = (n.pitch || '').toUpperCase().startsWith('E') || pitchTheme.text === '#854d0e';
+
       return {
         id: n.id || `note-${idx}`,
         isRest: false,
@@ -140,7 +146,10 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
         y,
         needsLedgerBelow,
         needsLedgerAbove,
-        stemUp: y >= 22
+        stemUp: y >= 22,
+        noteColor,
+        letter,
+        textColor: isYellow ? '#0f172a' : '#ffffff'
       };
     });
   }, [snippet.notes, barsCount, totalFractions, usableWidth, clefType, startX]);
@@ -152,8 +161,8 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
         height,
         position: 'relative',
         borderRadius: '10px',
-        background: isPlaying ? `${accentColor}0a` : '#f8fafc',
-        border: isPlaying ? `1px solid ${accentColor}30` : '1px solid #f1f5f9',
+        background: isPlaying ? 'rgba(79, 70, 229, 0.04)' : '#fafafa',
+        border: isPlaying ? '1px solid rgba(79, 70, 229, 0.25)' : '1px solid #f1f5f9',
         overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
@@ -184,12 +193,12 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
           />
         ))}
 
-        {/* Notenschlüssel links im System */}
+        {/* Notenschlüssel links im System (Urtext Schiefer #0f172a) */}
         {clefType === 'treble' && (
           // Violinschlüssel (𝄞)
           <path
             d="M14.2 38.5c-1.3 0-2.3-1-2.3-2.3 0-1.4 1.1-2.3 2.3-2.3 1.3 0 2.3 1 2.3 2.3 0 2.2-2 3.8-4.2 3.8-2.7 0-4.6-2-4.6-4.8 0-3.6 3-6.8 6.8-9.8.8-.6 1.2-1.4 1.2-2.3 0-1.8-1.2-3.1-3-3.1-1.4 0-2.6.9-3.1 2.2l-1-.5c.8-1.8 2.4-2.9 4.2-2.9 2.4 0 4.3 1.8 4.3 4.3 0 1.3-.6 2.3-1.6 3.1-3.4 2.9-6.3 5.8-6.3 9.2 0 2.2 1.4 3.7 3.4 3.7 1.8 0 3.4-1.2 3.7-3.1h-2.5v-1.6h4.6v1.4c0 2.5-1.6 4.6-4.2 4.6z"
-            fill="#475569"
+            fill="#0f172a"
           />
         )}
         {clefType === 'bass' && (
@@ -197,25 +206,25 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
           <g>
             <path
               d="M9 16.5c0-3 2.2-5.2 5.2-5.2 3.8 0 6.8 2.6 6.8 6.5 0 4.8-3.5 8.2-7.8 11.6l-1-1c3.8-3 6.8-6 6.8-10.2 0-2.8-1.9-4.8-4.8-4.8-2.4 0-4.1 1.7-4.1 4.1 0 1.5 1 2.6 2.6 2.6 1 0 1.9-.7 1.9-1.9 0-1-.7-1.7-1.7-1.7-.4 0-.8.2-1 .4-.2-.4-.3-.9-.3-1.4z"
-              fill="#475569"
+              fill="#0f172a"
             />
-            <circle cx="21" cy="13" r="1.3" fill="#475569" />
-            <circle cx="21" cy="19" r="1.3" fill="#475569" />
+            <circle cx="21" cy="13" r="1.3" fill="#0f172a" />
+            <circle cx="21" cy="19" r="1.3" fill="#0f172a" />
           </g>
         )}
         {clefType === 'percussion' && (
           // Percussion-Clef (𝄂)
           <g>
-            <rect x="11" y="16" width="2.2" height="12" rx="0.5" fill="#475569" />
-            <rect x="15" y="16" width="2.2" height="12" rx="0.5" fill="#475569" />
+            <rect x="11" y="16" width="2.2" height="12" rx="0.5" fill="#0f172a" />
+            <rect x="15" y="16" width="2.2" height="12" rx="0.5" fill="#0f172a" />
           </g>
         )}
 
         {/* Taktart gestapelt (z. B. 4/4, 3/4) */}
-        <text x="25.5" y="19" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="serif" fill="#475569">
+        <text x="25.5" y="19" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="serif" fill="#0f172a">
           {sigNum}
         </text>
-        <text x="25.5" y="31" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="serif" fill="#475569">
+        <text x="25.5" y="31" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="serif" fill="#0f172a">
           {sigDen}
         </text>
 
@@ -232,7 +241,7 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
               y1={staffLines[0]}
               x2={barDividerX}
               y2={staffLines[staffLines.length - 1]}
-              stroke="#94a3b8"
+              stroke="#cbd5e1"
               strokeWidth={1}
             />
           );
@@ -240,9 +249,9 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
 
         {/* Doppelter Schluss-Taktstrich am Ende */}
         <line x1={endX - 3} y1={staffLines[0]} x2={endX - 3} y2={staffLines[staffLines.length - 1]} stroke="#94a3b8" strokeWidth={1} />
-        <line x1={endX} y1={staffLines[0]} x2={endX} y2={staffLines[staffLines.length - 1]} stroke="#475569" strokeWidth={2.4} />
+        <line x1={endX} y1={staffLines[0]} x2={endX} y2={staffLines[staffLines.length - 1]} stroke="#0f172a" strokeWidth={2.4} />
 
-        {/* Notenelemente & Pausensymbole */}
+        {/* Notenelemente & Pausensymbole in Urtext Schiefer (#0f172a) */}
         {renderedElements.map(el => {
           if (el.isRest) {
             // Echte Viertelpause (𝄽)
@@ -250,11 +259,11 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
               <path
                 key={el.id}
                 d={`M${el.x - 2} 15l4 4-3 3 3 3-4 3`}
-                stroke={accentColor}
+                stroke="#0f172a"
                 strokeWidth={1.8}
                 fill="none"
                 strokeLinecap="round"
-                opacity={0.8}
+                opacity={0.9}
               />
             );
           }
@@ -263,9 +272,9 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
             // Schlagzeug Becken/Hi-Hat (X-Notenkopf)
             return (
               <g key={el.id}>
-                <line x1={el.x - 2.5} y1={el.y - 2.5} x2={el.x + 2.5} y2={el.y + 2.5} stroke={accentColor} strokeWidth={1.4} strokeLinecap="round" />
-                <line x1={el.x + 2.5} y1={el.y - 2.5} x2={el.x - 2.5} y2={el.y + 2.5} stroke={accentColor} strokeWidth={1.4} strokeLinecap="round" />
-                <line x1={el.x + 2.5} y1={el.y} x2={el.x + 2.5} y2={el.y + 13} stroke={accentColor} strokeWidth={1} strokeLinecap="round" />
+                <line x1={el.x - 2.5} y1={el.y - 2.5} x2={el.x + 2.5} y2={el.y + 2.5} stroke="#0f172a" strokeWidth={1.4} strokeLinecap="round" />
+                <line x1={el.x + 2.5} y1={el.y - 2.5} x2={el.x - 2.5} y2={el.y + 2.5} stroke="#0f172a" strokeWidth={1.4} strokeLinecap="round" />
+                <line x1={el.x + 2.5} y1={el.y} x2={el.x + 2.5} y2={el.y + 13} stroke="#0f172a" strokeWidth={1} strokeLinecap="round" />
               </g>
             );
           }
@@ -274,42 +283,60 @@ export const MicroScoreCalmThumbnail: React.FC<MicroScoreCalmThumbnailProps> = (
             <g key={el.id}>
               {/* Hilfslinien außerhalb des Fünfliniensystems */}
               {el.needsLedgerBelow && (
-                <line x1={el.x - 5} y1={40} x2={el.x + 5} y2={40} stroke="#94a3b8" strokeWidth={1} />
+                <line x1={el.x - 5} y1={40} x2={el.x + 5} y2={40} stroke="#94a3b8" strokeWidth={1.1} />
               )}
               {el.needsLedgerAbove && (
-                <line x1={el.x - 5} y1={4} x2={el.x + 5} y2={4} stroke="#94a3b8" strokeWidth={1} />
+                <line x1={el.x - 5} y1={4} x2={el.x + 5} y2={4} stroke="#94a3b8" strokeWidth={1.1} />
               )}
 
-              {/* Urtext-elliptischer Notenkopf (15° Neigung) */}
+              {/* 🎨 Bunte Noten: Didaktischer Boomwhacker-Notenkopf mit Neigung */}
               <ellipse
                 cx={el.x}
                 cy={el.y}
-                rx={3.2}
-                ry={2.2}
+                rx={3.6}
+                ry={2.6}
                 transform={`rotate(-15 ${el.x} ${el.y})`}
-                fill={accentColor}
-                opacity={0.95}
+                fill={el.noteColor}
+                stroke={el.noteColor}
+                strokeWidth={0.5}
+                opacity={1}
               />
 
-              {/* Notenhals (Stem) */}
+              {/* Didaktischer Tonhöhen-Buchstabe (C, D, E...) im Notenkopf */}
+              {el.letter && (
+                <text
+                  x={el.x}
+                  y={el.y + 1.2}
+                  textAnchor="middle"
+                  fontSize="3.4"
+                  fontWeight="900"
+                  fontFamily="system-ui, -apple-system, sans-serif"
+                  fill={el.textColor}
+                  pointerEvents="none"
+                >
+                  {el.letter}
+                </text>
+              )}
+
+              {/* Notenhals (Stem) in Notenfarbe */}
               {el.stemUp ? (
                 <line
-                  x1={el.x + 2.8}
+                  x1={el.x + 3.0}
                   y1={el.y}
-                  x2={el.x + 2.8}
+                  x2={el.x + 3.0}
                   y2={el.y - 13}
-                  stroke={accentColor}
-                  strokeWidth={1}
+                  stroke={el.noteColor}
+                  strokeWidth={1.2}
                   strokeLinecap="round"
                 />
               ) : (
                 <line
-                  x1={el.x - 2.8}
+                  x1={el.x - 3.0}
                   y1={el.y}
-                  x2={el.x - 2.8}
+                  x2={el.x - 3.0}
                   y2={el.y + 13}
-                  stroke={accentColor}
-                  strokeWidth={1}
+                  stroke={el.noteColor}
+                  strokeWidth={1.2}
                   strokeLinecap="round"
                 />
               )}

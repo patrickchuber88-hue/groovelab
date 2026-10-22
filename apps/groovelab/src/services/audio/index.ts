@@ -14,3 +14,4 @@ export * from './YinPitchDetectionEngine';
 export * from './EarSynthEngine';
 export * from './RelationalHarmonicEngine';
 export * from './audioContextPool';
+export * from './audioRetroRemasterService';

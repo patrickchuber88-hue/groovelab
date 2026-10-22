@@ -292,6 +292,8 @@ export function deriveActiveHomeworkSummary({
     if (!item.topic_name || isWeeklySnapshotContainer(item.topic_name)) return;
 
     if (item.topic_name.includes(' - Seite ')) {
+      // 🛡️ 0.1% Goldstandard: Lehrwerkseiten aus progressItems dürfen NUR einfließen, wenn sie aktuelle Hausaufgabe sind
+      if (!item.is_current_homework && item.status !== 'homework') return;
       const parts = item.topic_name.split(' - Seite ');
       const rawBookTitle = cleanTitle(parts[0].trim());
       const pageNum = parseInt(parts[1], 10);
@@ -740,6 +742,8 @@ export function deriveJuniorHomeworkSummary({
   (progressItems || []).forEach(item => {
     if (!item.topic_name || isWeeklySnapshotContainer(item.topic_name) || !item.is_current_homework) return;
     if (item.topic_name.includes(' - Seite ')) {
+      // 🛡️ 0.1% Goldstandard: Lehrwerkseiten aus progressItems dürfen NUR einfließen, wenn sie aktuelle Hausaufgabe sind
+      if (!item.is_current_homework && item.status !== 'homework') return;
       const parts = item.topic_name.split(' - Seite ');
       const rawBookTitle = cleanTitle(parts[0].trim());
       const pageNum = parseInt(parts[1], 10);

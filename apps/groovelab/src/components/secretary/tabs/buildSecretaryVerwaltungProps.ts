@@ -429,6 +429,7 @@ export function buildSecretaryVerwaltungProps(
     setActiveStudentsModalList: licenses.setActiveStudentsModalList,
     dunningStatus: extendedSettings.dunningStatus,
     setShowDunningPayModal: extendedSettings.setShowDunningPayModal,
+    setSchoolInvoices: extendedSettings.setSchoolInvoices,
 
     // Equipment
     schoolEquipment: equipment.schoolEquipment,

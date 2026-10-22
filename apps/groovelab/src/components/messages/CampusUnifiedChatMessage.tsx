@@ -230,12 +230,35 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
         {/* Avatar on the left for incoming messages (only on initial message of cluster) */}
         {!isSelf && (
           !isContinuation ? (
-            <CampusDynamicAvatar
-              user={{ ...senderUser, sender_role: msg.sender_role }}
-              size={32}
-              style={{ marginBottom: '2px' }}
-              customGradient={customGradient}
-            />
+            <div style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+              <CampusDynamicAvatar
+                user={{ ...senderUser, sender_role: msg.sender_role }}
+                size={32}
+                style={{ marginBottom: '2px' }}
+                customGradient={customGradient}
+              />
+              {isParentSender && (
+                <div
+                  title="Erziehungsberechtigte/r"
+                  style={{
+                    position: 'absolute',
+                    bottom: '0px',
+                    right: '-3px',
+                    width: '14px',
+                    height: '14px',
+                    borderRadius: '50%',
+                    background: '#1d4ed8',
+                    border: '1.5px solid #ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+                  }}
+                >
+                  <ShieldCheck size={9} color="#ffffff" strokeWidth={2.5} />
+                </div>
+              )}
+            </div>
           ) : (
             <div style={{ width: '32px', flexShrink: 0 }} />
           )
@@ -251,7 +274,7 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
           }}
         >
           {/* Sender Name & Role Badges above incoming bubble */}
-          {!isSelf && (!isContinuation || (isParentSender && prevMsg?.sender_role !== 'parent')) && (
+          {!isSelf && (!isContinuation || (isParentSender && prevMsg?.sender_role !== 'parent') || (!isParentSender && prevMsg?.sender_role === 'parent')) && (
             <div
               style={{
                 fontSize: '0.72rem',
@@ -285,25 +308,45 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
                   <span>Lehrkraft</span>
                 </span>
               )}
-              {isParentSender && (
+              {isParentSender ? (
                 <span
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '3px',
-                    padding: '1px 6px',
+                    gap: '4px',
+                    padding: '2px 8px',
                     borderRadius: '6px',
                     background: '#eff6ff',
                     border: 'none',
                     color: '#1d4ed8',
-                    fontSize: '0.65rem',
-                    fontWeight: 800,
+                    fontSize: '0.66rem',
+                    fontWeight: 850,
                     lineHeight: 1
                   }}
                 >
                   <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
                   <span>Eltern</span>
                 </span>
+              ) : (
+                !isSenderTeacher && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      padding: '1px 6px',
+                      borderRadius: '6px',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      color: '#475569',
+                      fontSize: '0.65rem',
+                      fontWeight: 750,
+                      lineHeight: 1
+                    }}
+                  >
+                    <span>Schüler</span>
+                  </span>
+                )
               )}
             </div>
           )}
@@ -327,18 +370,18 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '3px',
-                  padding: '1px 6px',
+                  padding: '2px 8px',
                   borderRadius: '6px',
                   background: '#eff6ff',
                   border: 'none',
                   color: '#1d4ed8',
-                  fontSize: '0.65rem',
-                  fontWeight: 800,
+                  fontSize: '0.66rem',
+                  fontWeight: 850,
                   lineHeight: 1
                 }}
               >
                 <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
-                <span>Eltern</span>
+                <span>Als Elternteil gesendet</span>
               </span>
             </div>
           )}
@@ -375,13 +418,20 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
                 ? (isContinuation ? '18px 6px 6px 18px' : '18px 18px 4px 18px')
                 : (isContinuation ? '6px 18px 18px 6px' : '18px 18px 18px 4px'),
               background: isSelf
-                ? 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)'
-                : '#ffffff',
+                ? (isParentSender 
+                    ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)' 
+                    : 'linear-gradient(135deg, #15803d 0%, #16a34a 100%)')
+                : (isParentSender 
+                    ? '#f8faff' 
+                    : '#ffffff'),
               color: isSelf ? '#ffffff' : '#0f172a',
               boxShadow: isSelf
-                ? '0 2px 8px rgba(21, 128, 61, 0.22)'
-                : '0 2px 6px rgba(0,0,0,0.04)',
-              border: isSelf ? 'none' : '1px solid #e2e8f0',
+                ? (isParentSender ? '0 2px 8px rgba(29, 78, 216, 0.22)' : '0 2px 8px rgba(21, 128, 61, 0.22)')
+                : (isParentSender ? '0 2px 8px rgba(37, 99, 235, 0.08)' : '0 2px 6px rgba(0,0,0,0.04)'),
+              border: isSelf 
+                ? 'none' 
+                : (isParentSender ? '1.5px solid #bfdbfe' : '1px solid #e2e8f0'),
+              borderLeft: (!isSelf && isParentSender) ? '3.5px solid #2563eb' : (isSelf ? 'none' : '1px solid #e2e8f0'),
               fontSize: '0.95rem',
               lineHeight: '1.45',
               wordBreak: 'break-word',
@@ -446,14 +496,28 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'flex-end',
-                gap: '4px',
+                gap: '6px',
                 fontSize: '0.72rem',
                 fontWeight: 650,
-                color: isSelf ? 'rgba(255, 255, 255, 0.85)' : '#64748b',
+                color: isSelf ? 'rgba(255, 255, 255, 0.85)' : (isParentSender ? '#2563eb' : '#64748b'),
                 marginTop: '6px',
                 lineHeight: 1
               }}
             >
+              {isParentSender && !isSelf && (
+                <span style={{
+                  fontSize: '0.64rem',
+                  fontWeight: 800,
+                  color: '#1d4ed8',
+                  marginRight: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  <ShieldCheck size={10} color="#1d4ed8" strokeWidth={2.5} />
+                  <span>Erziehungsberechtigte/r</span>
+                </span>
+              )}
               <span>{timeStr}</span>
               <CampusMessageStatusTicks
                 status={msg.status}

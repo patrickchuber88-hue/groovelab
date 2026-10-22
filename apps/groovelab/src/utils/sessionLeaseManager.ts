@@ -91,7 +91,9 @@ export async function registerClientSessionLease(user: { id: string; role?: stri
     if (data?.lease_id) {
       try {
         sessionStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
+        sessionStorage.setItem('gl_active_session_lease_user_id', user.id);
         localStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
+        localStorage.setItem('gl_active_session_lease_user_id', user.id);
       } catch (sessErr) {
         console.warn('[SessionLease] Failed to write active lease ID to storage:', sessErr);
       }

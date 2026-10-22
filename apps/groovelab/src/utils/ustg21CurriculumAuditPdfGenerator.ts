@@ -81,9 +81,9 @@ export async function generateUstg21CurriculumAuditDossier(
   });
 
   const sha256Seal = await computeWebCryptoSha256(canonicalPayload);
-  const dossierId = `USTG21-VDM-${sha256Seal.slice(0, 10).toUpperCase()}`;
+  const dossierId = `USTG21-AUDIT-${sha256Seal.slice(0, 10).toUpperCase()}`;
 
-  const subjectsHtml = (input.activeSubjects.length > 0 ? input.activeSubjects : ['Instrumentalfach (VdM-Stufenplan)'])
+  const subjectsHtml = (input.activeSubjects.length > 0 ? input.activeSubjects : ['Instrumentalfach (Stufenplan)'])
     .map(
       sub =>
         `<span style="display:inline-block;padding:4px 10px;margin:3px;border-radius:8px;background:#f1f5f9;color:#0f172a;font-size:11px;font-weight:700;">${escapeHtml(sub)}</span>`
@@ -101,7 +101,7 @@ export async function generateUstg21CurriculumAuditDossier(
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <title>Bildungsträger- & VdM-Lehrplan-Nachweis – ${escapeHtml(input.schoolName)}</title>
+  <title>Bildungsträger- &amp; Lehrplan-Nachweis – ${escapeHtml(input.schoolName)}</title>
   <style>
     @page { size: A4 portrait; margin: 18mm; }
     body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; color: #0f172a; margin: 0; padding: 0; font-size: 12px; line-height: 1.5; background: #ffffff; }
@@ -117,7 +117,7 @@ export async function generateUstg21CurriculumAuditDossier(
 </head>
 <body>
   <div class="header-box">
-    <span class="badge">Strukturierter Ausbildungs- &amp; Lehrplan-Nachweis (UStG / VdM-Standard)</span>
+    <span class="badge">Strukturierter Ausbildungs- &amp; Lehrplan-Nachweis (UStG-Standard)</span>
     <h1>${escapeHtml(input.schoolName)}</h1>
     <div style="color:#475569;font-size:11px;font-weight:600;">
       ${escapeHtml(addressLine || 'Souveräner Bildungsträger-Mandant (Standort Deutschland)')}
@@ -128,10 +128,10 @@ export async function generateUstg21CurriculumAuditDossier(
     </div>
   </div>
 
-  <h2>1. Geordneter Bildungsgang &amp; VdM-Stufenarchitektur</h2>
+  <h2>1. Geordneter Bildungsgang &amp; Stufenarchitektur</h2>
   <p style="margin:4px 0 10px 0;">
     Die Bildungseinrichtung dokumentiert die musikalische Aus- und Fortbildung über die strukturierte Kompetenzmatrix
-    in Anlehnung an den Rahmenlehrplan des Verbandes deutscher Musikschulen (VdM) sowie die Prüfungsanforderungen
+    in Anlehnung an den amtlichen Rahmenlehrplan sowie die Prüfungsanforderungen
     der Jugendmusikpflege (D1 / D2 / D3 / JSV). Die Ausbildung dient der systematischen Vorbereitung auf musikalische
     Eignungs-, Stufen- und Aufnahmeprüfungen.
   </p>
@@ -139,7 +139,7 @@ export async function generateUstg21CurriculumAuditDossier(
   <table>
     <thead>
       <tr>
-        <th>Ausbildungsstufe (VdM-Strukturplan)</th>
+        <th>Ausbildungsstufe (Strukturplan)</th>
         <th>Curriculare Kompetenzfelder</th>
         <th>Geführte Ausbildungsprofile</th>
       </tr>
@@ -167,7 +167,7 @@ export async function generateUstg21CurriculumAuditDossier(
   <div>${subjectsHtml}</div>
   <ul style="margin:10px 0 0 18px;padding:0;font-size:11px;">
     <li><strong>Lehrwerks- &amp; Literatur-Fortschrittsmatrix:</strong> Dokumentierte Seiten-, Etüden- und Repertoire-Meilensteine je Ausbildungsprofil.</li>
-    <li><strong>Musiktheorie &amp; Gehörbildung (EarLab / MicroScore):</strong> Interaktive Intervall-, Akkord- und Rhythmus-Schulung im VdM-Curriculum.</li>
+    <li><strong>Musiktheorie &amp; Gehörbildung (EarLab / MicroScore):</strong> Interaktive Intervall-, Akkord- und Rhythmus-Schulung im Curriculum.</li>
     <li><strong>Methodenfreiheit &amp; Statusrechtliche Neutralität:</strong> Rein fachlich-didaktische Dokumentation ohne Weisungs-, Arbeitszeit- oder Honorarerfassung.</li>
   </ul>
 

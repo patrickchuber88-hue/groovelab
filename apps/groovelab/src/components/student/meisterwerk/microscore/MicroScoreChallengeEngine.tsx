@@ -12,7 +12,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, MicOff, Play, Square, Award, Volume2, RotateCcw, Circle, Sparkles } from 'lucide-react';
 import { RealtimePitchStream, YinPitchResult, evaluatePitchMatch, freqToMidi } from '../../../../services/audio/YinPitchDetectionEngine';
-import { acquireAudioStream } from '../../../../services/audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../../services/audio/AudioCaptureEngine';
+import { processPureRawBlob } from '../../../../utils/audioMasteringEngine';
 import { MicroScoreChallengeFeedback, MicroScoreNote, MicroScoreSnippet } from './microScore.types';
 import { getPitchHz, getSoundingHz } from './microScoreAudioSynthesizer';
 
@@ -152,17 +154,13 @@ export const MicroScoreChallengeEngine: React.FC<MicroScoreChallengeEngineProps>
     setMatchStatus('silent');
   }, []);
 
-  // Metronom-Only Playalong-Aufnahme (100% lokal im RAM, DSGVO Art. 8 & 9)
+  // Metronom-Only Playalong-Aufnahme (100% lokal im RAM, DSGVO Art. 8 & 9, Pure Natural HD)
   const startRecording = useCallback(async () => {
     try {
-      const stream = await acquireAudioStream({ audio: true });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 250);
       recordedChunksRef.current = [];
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-      }
-      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const { recorder: mr, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
 
       mr.ondataavailable = e => {
         if (e.data && e.data.size > 0) {
@@ -170,11 +168,15 @@ export const MicroScoreChallengeEngine: React.FC<MicroScoreChallengeEngineProps>
         }
       };
 
-      mr.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: mr.mimeType || mimeType || 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        setRecordedAudioUrl(url);
+      mr.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        const rawBlob = new Blob(recordedChunksRef.current, { type: mr.mimeType || mimeType || 'audio/webm' });
+        try {
+          const mastered = await processPureRawBlob(rawBlob);
+          setRecordedAudioUrl(mastered.processedUrl);
+        } catch {
+          setRecordedAudioUrl(URL.createObjectURL(rawBlob));
+        }
       };
 
       mr.start(100);

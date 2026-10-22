@@ -457,7 +457,7 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
       )}
 
       {/* Enterprise B2B Delinquency & Grace Period Escalation Banner */}
-      {!subscriptionBypass && dunningStatus.isDelinquent && (
+      {!subscriptionBypass && dunningStatus.isDelinquent && dunningStatus.totalOverdueAmount > 0 && (
         <div style={{
           background: dunningStatus.isSecretaryReadOnly
             ? '#fef2f2'
@@ -491,7 +491,7 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
                 </>
               ) : dunningStatus.level === 'level_2_warning' ? (
                 <>
-                  <strong>Dringende Mahnung:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz &amp; Audio-Tresor-Uploadstopp.
+                  <strong>Dringende Mahnung:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz im Sekretariat.
                 </>
               ) : (
                 <>

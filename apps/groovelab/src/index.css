@@ -1073,6 +1073,19 @@ body {
   transform: scale(0.97) !important;
 }
 
+/* 🏛️ 0,1% Goldstandard: VdM Notenschnipsel Ordner-Kacheln */
+.vdm-folder-card {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.vdm-folder-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08) !important;
+}
+.vdm-folder-card:active {
+  transform: translateY(0) !important;
+}
+
 /* Premium Cloud Link Buttons in Üben Board */
 .cloud-link-btn {
   display: inline-flex;

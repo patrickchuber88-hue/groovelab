@@ -616,6 +616,8 @@ export const resolveSlotStudent = (slotOrStudent: any, allStudents?: any[]) => {
     slot_id: target.id,
     first_name: matchedFromAll?.first_name || targetFn || 'Schüler',
     last_name: matchedFromAll?.last_name || targetLn || '',
+    school_id: matchedFromAll?.school_id || target.school_id || slotOrStudent.school_id,
+    schoolId: matchedFromAll?.school_id || target.school_id || slotOrStudent.school_id,
     photo_url: (matchedFromAll?.photo_url && !matchedFromAll.photo_url.includes('avatar_ghost')) ? matchedFromAll.photo_url : (target.photo_url && !target.photo_url.includes('avatar_ghost') ? target.photo_url : '/avatars/gitarre_avatar_new.png'),
     is_campus_active: matchedFromAll ? matchedFromAll.is_campus_active : target.is_campus_active,
     canonical_uuid: isUUID(canonicalId) ? canonicalId : (isUUID(matchedFromAll?.id) ? matchedFromAll.id : undefined)
@@ -1199,6 +1201,20 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                       );
                     }
 
+                    const isSlotInteractive = Boolean((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway);
+                    const slotStudentDisplayName = slot.isGroup ? 'die Gruppe' : (slot.student?.first_name || slot.student?.name || 'Schüler');
+
+                    const handleOpenAufgabenheft = () => {
+                      if (!isSlotInteractive) return;
+                      const resolved = resolveSlotStudent(slot, allStudents);
+                      if (resolved) {
+                        const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
+                          ? slot.students.map((s: any) => resolveSlotStudent({ student: s }, allStudents)?.resolvedStudent || s)
+                          : undefined;
+                        setDocStudent({ ...resolved.resolvedStudent, groupStudents: groupStudentsList, initialHubTab: 'protocol', initialModalTab: 'document' });
+                      }
+                    };
+
                     return (
                        <div 
                          key={idx}
@@ -1217,26 +1233,12 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
 
                          {/* Slot card on the right */}
                          <div 
-                           onClick={() => {
-                             if (isCanceled || isRescheduledAway) return;
-                             const resolved = resolveSlotStudent(slot, allStudents);
-                             if (resolved) {
-                               const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
-                                 ? slot.students.map((s: any) => {
-                                     const grpRes = resolveSlotStudent({ student: s }, allStudents);
-                                     return grpRes ? grpRes.resolvedStudent : s;
-                                   })
-                                 : undefined;
-
-                               setDocStudent({
-                                 ...resolved.resolvedStudent,
-                                 groupStudents: groupStudentsList
-                               });
-                             }
-                             const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
-                             if (setAbsenceUntilDate) setAbsenceUntilDate(todayStr);
-                             if (setIsAbsenceWidgetExpanded) setIsAbsenceWidgetExpanded(true);
-                           }}
+                           role={isSlotInteractive ? 'button' : undefined}
+                           tabIndex={isSlotInteractive ? 0 : -1}
+                           aria-label={isSlotInteractive ? `Unterricht ${slot.timeSlot} Uhr mit ${slotStudentDisplayName}: Digitales Aufgabenheft und Wochenplan öffnen` : undefined}
+                           title={isSlotInteractive ? `Digitales Aufgabenheft für ${slotStudentDisplayName} öffnen` : undefined}
+                           onClick={handleOpenAufgabenheft}
+                           onKeyDown={(e) => { if (isSlotInteractive && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleOpenAufgabenheft(); } }}
                            ref={el => {
                              if (isCurrentSlot || (idx === prepIndex && !isFinished)) {
                                activeTimelineSlotRef.current = el;
@@ -1254,13 +1256,14 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                              borderRadius: '12px',
                              border: slotBorder,
                              position: 'relative',
-                             cursor: ((slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway) ? 'pointer' : 'default',
+                             cursor: isSlotInteractive ? 'pointer' : 'default',
                              transition: 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
                              boxShadow: isCurrentSlot && !isFinished ? '0 2px 10px rgba(52, 168, 83, 0.08)' : 'none',
                              minWidth: 0,
                              boxSizing: 'border-box',
                              overflow: 'hidden',
-                             opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1
+                             opacity: ((!slot.student && !slot.isGroup) || isCanceled) ? 0.75 : 1,
+                             outline: 'none'
                            }}
                            className="hover-scale google-timeline-card"
                          >
@@ -1739,7 +1742,8 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           e.stopPropagation();
                                           setQuickAudioStudent(resolvedStudent);
                                         }}
-                                        title={`Hausaufgabe diktieren / Audio aufnehmen für ${resolvedStudent.first_name || 'Schüler'}`}
+                                        title={`Hausaufgaben-Fahrplan (Lehrwerk, Songs & Audio) für ${resolvedStudent.first_name || 'Schüler'} öffnen`}
+                                        aria-label={`Hausaufgaben-Fahrplan für ${resolvedStudent.first_name || 'Schüler'} öffnen`}
                                         style={{
                                           display: 'flex',
                                           alignItems: 'center',

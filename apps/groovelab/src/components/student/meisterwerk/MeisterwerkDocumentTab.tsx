@@ -257,35 +257,27 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setSongSections(parsed);
-          const focusSec = parsed.find(s => s.isHomeworkFocus) || parsed[0];
-          setActiveSectionId(focusSec.id);
-          return;
+          setSongSections(parsed); setActiveSectionId((parsed.find(s => s.isHomeworkFocus) || parsed[0]).id); return;
         }
       }
     } catch {}
-    setSongSections([]);
-    setActiveSectionId('');
+    setSongSections([]); setActiveSectionId('');
   }, [selectedActiveSongId, student?.id]);
 
   useEffect(() => {
     if (!selectedActiveSongId || !student?.id || !activeSectionId) return;
-    const todayStr = new Date().toISOString().split('T')[0];
-    setHasPracticedSectionToday(localStorage.getItem(`song_practiced_${student.id}_${selectedActiveSongId}_${activeSectionId}_${todayStr}`) === 'true');
+    setHasPracticedSectionToday(localStorage.getItem(`song_practiced_${student.id}_${selectedActiveSongId}_${activeSectionId}_${new Date().toISOString().split('T')[0]}`) === 'true');
   }, [selectedActiveSongId, student?.id, activeSectionId]);
 
   const persistSongSections = (updated: SongSection[]) => {
     setSongSections(updated);
-    if (selectedActiveSongId && student?.id) {
-      try { localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated)); } catch {}
-    }
+    if (selectedActiveSongId && student?.id) { try { localStorage.setItem(`song_sections_${student.id}_${selectedActiveSongId}`, JSON.stringify(updated)); } catch {} }
     setHasChanges(true);
   };
 
   const handleAddSongSection = (name: string) => {
     const newSec: SongSection = { id: `sec-${Date.now()}`, name, bars: '8 Takte', barsCount: 8, repetitions: 1, chords: ['Em', 'C', 'G', 'D'], drumFeel: '8tel Beat', drumSurface: 'Geschlossene Hi-Hat' };
-    persistSongSections([...songSections, newSec]);
-    setActiveSectionId(newSec.id);
+    persistSongSections([...songSections, newSec]); setActiveSectionId(newSec.id);
   };
   const handleUpdateSongSection = (updatedSec: SongSection) => persistSongSections(songSections.map(s => s.id === updatedSec.id ? updatedSec : s));
   const handleToggleSectionFocus = (id: string) => persistSongSections(songSections.map(s => ({ ...s, isHomeworkFocus: s.id === id ? !s.isHomeworkFocus : false })));
@@ -305,8 +297,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const handleMoveSongSection = (id: string, direction: 'left' | 'right') => {
     const idx = songSections.findIndex(s => s.id === id);
     if (idx === -1 || (direction === 'left' && idx === 0) || (direction === 'right' && idx === songSections.length - 1)) return;
-    const updated = [...songSections];
-    const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+    const updated = [...songSections], targetIdx = direction === 'left' ? idx - 1 : idx + 1;
     [updated[idx], updated[targetIdx]] = [updated[targetIdx], updated[idx]];
     persistSongSections(updated);
   };
@@ -321,16 +312,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const [mixerState, setMixerState] = useState<AudioMixerState>(DEFAULT_MIXER_STATE);
   const [isLoopingActiveSection, setIsLoopingActiveSection] = useState<boolean>(false);
   const [isSpeedTrainerActive, setIsSpeedTrainerActive] = useState<boolean>(false);
-
   const playAlongTimerRef = useRef<any>(null);
   const tapTimesRef = useRef<number[]>([]);
+  const allSongChords = useMemo(() => Array.from(new Set(songSections.flatMap(s => s.chords))), [songSections]);
 
-  // Unique list of all chords across all sections
-  const allSongChords = useMemo(() => {
-    return Array.from(new Set(songSections.flatMap(s => s.chords)));
-  }, [songSections]);
-
-  // Load BPM from storage when selected song changes
   useEffect(() => {
     if (!selectedActiveSongId || !student?.id) return;
     try {
@@ -342,21 +327,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     setIsPlayingAlong(false);
   }, [selectedActiveSongId, student?.id]);
 
-  // Tap-Tempo Handler
   const handleTapTempo = () => {
-    const now = Date.now();
-    const taps = tapTimesRef.current.filter(t => now - t < 3000);
-    taps.push(now);
+    const now = Date.now(), taps = [...tapTimesRef.current.filter(t => now - t < 3000), now];
     tapTimesRef.current = taps;
     if (taps.length >= 2) {
-      const intervals: number[] = [];
-      for (let i = 1; i < taps.length; i++) intervals.push(taps[i] - taps[i - 1]);
-      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      const calculatedBpm = Math.min(240, Math.max(40, Math.round(60000 / avgInterval)));
+      const intervals = taps.slice(1).map((t, i) => t - taps[i]);
+      const calculatedBpm = Math.min(240, Math.max(40, Math.round(60000 / (intervals.reduce((a, b) => a + b, 0) / intervals.length))));
       setSongBpm(calculatedBpm);
-      if (selectedActiveSongId && student?.id) {
-        try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(calculatedBpm)); } catch {}
-      }
+      if (selectedActiveSongId && student?.id) { try { localStorage.setItem(`song_bpm_${student.id}_${selectedActiveSongId}`, String(calculatedBpm)); } catch {} }
     }
   };
 
@@ -6086,7 +6064,47 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           }
                           const sortedPagesList = Array.from(homeworkPagesSet).sort((a, b) => a - b);
                           const formattedPagesStr = formatPageNumbers(sortedPagesList);
-                          if (sortedPagesList.length === 0) return <div style={{ fontSize: '0.80rem', color: '#64748b', fontStyle: 'italic' }}>Keine Hausaufgabe für dieses Lehrwerk eingetragen.</div>;
+                          if (sortedPagesList.length === 0) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ fontSize: '0.80rem', color: '#64748b', fontStyle: 'italic' }}>
+                                  Keine Hausaufgabe für dieses Lehrwerk eingetragen.
+                                </div>
+                                {(isTeacherMode || isTeacherTools || isTeacherSelf) && !readOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (typeof window !== 'undefined') {
+                                        window.dispatchEvent(new CustomEvent('campus_open_homework_fahrplan', {
+                                          detail: { lehrwerkId: activeLehrwerkId, pageNum: activePageNumber }
+                                        }));
+                                      }
+                                    }}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '5px 12px',
+                                      borderRadius: '9px',
+                                      border: '1.5px solid #f59e0b',
+                                      background: '#fffbeb',
+                                      color: '#92400e',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                    title="Wochen-Fahrplan für dieses Lehrwerk öffnen"
+                                  >
+                                    <Sparkles size={12} color="#d97706" />
+                                    <span>+ Im Wochen-Fahrplan zuweisen</span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          }
 
                           // Extract note info for each page
                           const pagesWithData = sortedPagesList.map(pNum => {
@@ -6226,6 +6244,43 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   </>
                                 )}
                               </div>
+
+                              {/* ⚡ Direkte Übernahme in den Wochen-Fahrplan (0,1% Goldstandard - nur für Lehrkräfte) */}
+                              {(isTeacherMode || isTeacherTools || isTeacherSelf) && !readOnly && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingTop: '10px', marginTop: '6px', borderTop: '1px dashed rgba(251, 191, 36, 0.35)' }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (typeof window !== 'undefined') {
+                                        window.dispatchEvent(new CustomEvent('campus_open_homework_fahrplan', {
+                                          detail: { lehrwerkId: activeLehrwerkId, pageNum: activePageNumber }
+                                        }));
+                                      }
+                                    }}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '6px 14px',
+                                      borderRadius: '10px',
+                                      border: 'none',
+                                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                                      color: '#92400e',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 1px 3px rgba(245, 158, 11, 0.12)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale-mini"
+                                    title="Dieses Lehrwerk und Seiten im universellen Wochen-Fahrplan öffnen"
+                                  >
+                                    <Sparkles size={13} color="#d97706" />
+                                    <span>⚡ Im Wochen-Fahrplan übernehmen & verfeinern →</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })()}
@@ -7938,6 +7993,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             };
                           });
 
+                          const microScoresPayload = microScoresList.map((ms: any) => ({
+                            id: ms.id,
+                            title: ms.title || 'Notenschnipsel',
+                            subtitle: ms.subtitle || `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`,
+                            tempoBpm: ms.tempoBpm || 80,
+                            barsCount: ms.barsCount || 2,
+                            instrument: ms.instrument
+                          }));
+
+                          const worldTourPayload = effectiveWorldTourMasteries.map((wt: any) => ({
+                            stationTitle: wt.stationTitle || wt.stationName || wt.country || 'Weltreise-Station',
+                            instrument: wt.instrument,
+                            level: wt.level
+                          }));
+
                           const audioPayload = audioNotes.map(a => {
                             let durStr: string | undefined = undefined;
                             if (typeof a.duration === 'number' && a.duration > 0) {
@@ -7977,6 +8047,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             appUrl,
                             lehrwerke: lehrwerkePayload,
                             songs: songsPayload,
+                            microScores: microScoresPayload,
+                            worldTourMasteries: worldTourPayload,
                             notes: homeworkNoteItems,
                             studentQuestion: effectiveViewingQuestion?.hasQuestion ? effectiveViewingQuestion.text : undefined,
                             audioRecordings: audioPayload
@@ -8352,6 +8424,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                 note: getCleanPageNotes(s.homework_notes)
                                               };
                                             }),
+                                            microScores: microScoresList.map((ms: any) => ({
+                                              title: ms.title || 'Notenschnipsel',
+                                              subtitle: ms.subtitle || `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`,
+                                              tempoBpm: ms.tempoBpm || 80,
+                                              barsCount: ms.barsCount || 2,
+                                              instrument: ms.instrument
+                                            })),
+                                            worldTourMasteries: effectiveWorldTourMasteries.map((wt: any) => ({
+                                              stationTitle: wt.stationTitle || wt.stationName || wt.country || 'Weltreise-Station',
+                                              instrument: wt.instrument,
+                                              level: wt.level
+                                            })),
                                             audioRecordings: audioNotes.map(a => ({
                                               label: a.label || 'Aufnahme'
                                             })),

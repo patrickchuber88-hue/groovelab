@@ -72,10 +72,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
   const archiveData = useMemo(() => {
     const now = getSimulatedNow();
-    const todayDd = String(now.getDate()).padStart(2, '0');
-    const todayMm = String(now.getMonth() + 1).padStart(2, '0');
-    const todayYy = String(now.getFullYear()).substring(2);
-    const todayDateStr = `${todayDd}.${todayMm}.${todayYy}`;
+    const todayDateStr = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getFullYear()).substring(2)}`;
     const monthNamesShort = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
     const monthNamesFull = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
     const dayNamesFull = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -83,13 +80,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
     const formatFriendlyDate = (dateStr: string) => {
       const parts = dateStr.split('.');
       if (parts.length < 3) return dateStr;
-      const day = parseInt(parts[0], 10);
-      const monthIndex = parseInt(parts[1], 10) - 1;
-      const year = 2000 + parseInt(parts[2], 10);
+      const day = parseInt(parts[0], 10), monthIndex = parseInt(parts[1], 10) - 1, year = 2000 + parseInt(parts[2], 10);
       const d = new Date(year, monthIndex, day);
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const targetStart = new Date(year, monthIndex, day);
-      const diffDays = Math.round((todayStart.getTime() - targetStart.getTime()) / (1000 * 60 * 60 * 24));
+      const diffDays = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
       if (diffDays === 0) return `Heute (${dayNamesFull[d.getDay()]})`;
       if (diffDays === 1) return `Gestern (${dayNamesFull[d.getDay()]})`;
       if (diffDays === 2) return `Vorgestern (${dayNamesFull[d.getDay()]})`;
@@ -104,26 +97,16 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
     const { weekDays } = getDeterministicWeekMetrics();
     weekDays.forEach((d: any) => {
-      if (d.isJoker) {
-        shieldedDaysMap.set(d.dateStr, d.shieldNumber || 1);
-        if (!shieldDatesArr.includes(d.dateStr)) shieldDatesArr.push(d.dateStr);
-      }
+      if (d.isJoker) { shieldedDaysMap.set(d.dateStr, d.shieldNumber || 1); if (!shieldDatesArr.includes(d.dateStr)) shieldDatesArr.push(d.dateStr); }
     });
 
     if (studentUser?.joker_used_at) {
       const jokerIso = toLocalYYYYMMDD(new Date(studentUser.joker_used_at));
-      if (!shieldedDaysMap.has(jokerIso)) {
-        shieldedDaysMap.set(jokerIso, studentUser.weekly_jokers_used || 1);
-        shieldDatesArr.push(jokerIso);
-      }
+      if (!shieldedDaysMap.has(jokerIso)) { shieldedDaysMap.set(jokerIso, studentUser.weekly_jokers_used || 1); shieldDatesArr.push(jokerIso); }
     }
 
     const shieldDatesSet = new Set(shieldDatesArr);
-    const groupedByDate: Record<string, {
-      date: string; focusSeconds: number; extraSeconds: number; hasMasteredSession: boolean;
-      flameLevel: string; isPlaceholder?: boolean; isToday?: boolean; dayState?: string;
-      isShielded?: boolean; shieldNumber?: number; xp_earned?: number;
-    }> = {};
+    const groupedByDate: Record<string, { date: string; focusSeconds: number; extraSeconds: number; hasMasteredSession: boolean; flameLevel: string; isPlaceholder?: boolean; isToday?: boolean; dayState?: string; isShielded?: boolean; shieldNumber?: number; xp_earned?: number; }> = {};
 
     (fokusLogs || []).forEach((log: any) => {
       if (!log.created_at) return;
@@ -131,20 +114,11 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
       const ddMmYy = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getFullYear()).substring(2)}`;
       const secs = log.duration_seconds || ((log.duration_minutes || 0) * 60) || 0;
       const isMastered = !log.is_extra && (secs >= 180 || (log.duration_minutes || 0) >= 3);
-
       if (!groupedByDate[ddMmYy]) {
-        groupedByDate[ddMmYy] = {
-          date: ddMmYy, focusSeconds: log.is_extra ? 0 : secs, extraSeconds: log.is_extra ? secs : 0,
-          hasMasteredSession: isMastered, flameLevel: log.flame_level || (isMastered ? 'Kleine Flamme' : 'Keine Flamme'),
-          isPlaceholder: false, isToday: ddMmYy === todayDateStr
-        };
+        groupedByDate[ddMmYy] = { date: ddMmYy, focusSeconds: log.is_extra ? 0 : secs, extraSeconds: log.is_extra ? secs : 0, hasMasteredSession: isMastered, flameLevel: log.flame_level || (isMastered ? 'Kleine Flamme' : 'Keine Flamme'), isPlaceholder: false, isToday: ddMmYy === todayDateStr };
       } else {
-        if (log.is_extra) groupedByDate[ddMmYy].extraSeconds += secs;
-        else groupedByDate[ddMmYy].focusSeconds += secs;
-        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
-          groupedByDate[ddMmYy].hasMasteredSession = true;
-          groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
-        }
+        if (log.is_extra) groupedByDate[ddMmYy].extraSeconds += secs; else groupedByDate[ddMmYy].focusSeconds += secs;
+        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) { groupedByDate[ddMmYy].hasMasteredSession = true; groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme'; }
       }
     });
 
@@ -155,24 +129,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
       const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
       const isMastered = Boolean(d.hasMastered || d.dayState === 'mastered');
       const isShielded = Boolean(d.isJoker || d.dayState === 'shielded');
-
       if (!groupedByDate[ddMmYy]) {
-        groupedByDate[ddMmYy] = {
-          date: ddMmYy, focusSeconds: d.totalDaySecs || 0, extraSeconds: 0,
-          hasMasteredSession: isMastered || (d.totalDaySecs || 0) >= 180,
-          flameLevel: (isMastered || (d.totalDaySecs || 0) >= 180) ? 'Kleine Flamme' : 'Keine Flamme',
-          isPlaceholder: false, isToday: Boolean(d.isToday), dayState: d.dayState, isShielded, shieldNumber: d.shieldNumber || 0
-        };
+        groupedByDate[ddMmYy] = { date: ddMmYy, focusSeconds: d.totalDaySecs || 0, extraSeconds: 0, hasMasteredSession: isMastered || (d.totalDaySecs || 0) >= 180, flameLevel: (isMastered || (d.totalDaySecs || 0) >= 180) ? 'Kleine Flamme' : 'Keine Flamme', isPlaceholder: false, isToday: Boolean(d.isToday), dayState: d.dayState, isShielded, shieldNumber: d.shieldNumber || 0 };
       } else {
         if ((d.totalDaySecs || 0) > groupedByDate[ddMmYy].focusSeconds) groupedByDate[ddMmYy].focusSeconds = d.totalDaySecs;
-        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) {
-          groupedByDate[ddMmYy].hasMasteredSession = true;
-          groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme';
-        }
-        if (isShielded) {
-          groupedByDate[ddMmYy].isShielded = true;
-          groupedByDate[ddMmYy].shieldNumber = d.shieldNumber || 1;
-        }
+        if (isMastered || groupedByDate[ddMmYy].focusSeconds >= 180) { groupedByDate[ddMmYy].hasMasteredSession = true; groupedByDate[ddMmYy].flameLevel = 'Kleine Flamme'; }
+        if (isShielded) { groupedByDate[ddMmYy].isShielded = true; groupedByDate[ddMmYy].shieldNumber = d.shieldNumber || 1; }
         groupedByDate[ddMmYy].dayState = d.dayState;
       }
     });
@@ -182,11 +144,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
       if (isoParts.length === 3) {
         const ddMmYy = `${isoParts[2]}.${isoParts[1]}.${isoParts[0].substring(2)}`;
         if (!groupedByDate[ddMmYy]) {
-          groupedByDate[ddMmYy] = {
-            date: ddMmYy, focusSeconds: 0, extraSeconds: 0, hasMasteredSession: false, flameLevel: 'Keine Flamme',
-            isPlaceholder: false, isToday: ddMmYy === todayDateStr, isShielded: true,
-            shieldNumber: shieldedDaysMap.get(isoStr) || 1, dayState: 'shielded'
-          };
+          groupedByDate[ddMmYy] = { date: ddMmYy, focusSeconds: 0, extraSeconds: 0, hasMasteredSession: false, flameLevel: 'Keine Flamme', isPlaceholder: false, isToday: ddMmYy === todayDateStr, isShielded: true, shieldNumber: shieldedDaysMap.get(isoStr) || 1, dayState: 'shielded' };
         } else {
           groupedByDate[ddMmYy].isShielded = true;
           if (!groupedByDate[ddMmYy].shieldNumber) groupedByDate[ddMmYy].shieldNumber = shieldedDaysMap.get(isoStr) || 1;
@@ -205,61 +163,33 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
     });
 
     allMeaningfulLogs.sort((a, b) => {
-      const parseDateStr = (s: string) => {
-        const parts = s.split('.');
-        return new Date(2000 + parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
-      };
+      const parseDateStr = (s: string) => { const parts = s.split('.'); return new Date(2000 + parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime(); };
       return parseDateStr(b.date) - parseDateStr(a.date);
     });
 
-    interface MonthArchive {
-      label: string; key: string; entries: typeof allMeaningfulLogs;
-      totalMins: number; totalSecs: number; activePracticeDays: number; shieldedDays: number;
-    }
-
+    interface MonthArchive { label: string; key: string; entries: typeof allMeaningfulLogs; totalMins: number; totalSecs: number; activePracticeDays: number; shieldedDays: number; }
     const monthsMap: Record<string, MonthArchive> = {};
     const currentMonthKey = `${now.getMonth()}-${now.getFullYear()}`;
-    monthsMap[currentMonthKey] = {
-      label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`, key: currentMonthKey,
-      entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0
-    };
+    monthsMap[currentMonthKey] = { label: `${monthNamesFull[now.getMonth()]} ${now.getFullYear()}`, key: currentMonthKey, entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0 };
 
     allMeaningfulLogs.forEach(entry => {
       const parts = entry.date.split('.');
       if (parts.length < 3) return;
-      const monthIndex = parseInt(parts[1], 10) - 1;
-      const yearFull = 2000 + parseInt(parts[2], 10);
-      const key = `${monthIndex}-${yearFull}`;
-      if (!monthsMap[key]) {
-        monthsMap[key] = {
-          label: `${monthNamesFull[monthIndex]} ${yearFull}`, key,
-          entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0
-        };
-      }
+      const monthIndex = parseInt(parts[1], 10) - 1, yearFull = 2000 + parseInt(parts[2], 10), key = `${monthIndex}-${yearFull}`;
+      if (!monthsMap[key]) monthsMap[key] = { label: `${monthNamesFull[monthIndex]} ${yearFull}`, key, entries: [], totalMins: 0, totalSecs: 0, activePracticeDays: 0, shieldedDays: 0 };
       monthsMap[key].entries.push(entry);
       const totalSecs = (entry.focusSeconds || 0) + (entry.extraSeconds || 0);
       const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
-      const isShielded = Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-      if (totalSecs > 0) {
-        monthsMap[key].totalSecs += totalSecs;
-        monthsMap[key].totalMins += Math.floor(totalSecs / 60);
-        monthsMap[key].activePracticeDays += 1;
-      }
-      if (isShielded) monthsMap[key].shieldedDays += 1;
+      if (totalSecs > 0) { monthsMap[key].totalSecs += totalSecs; monthsMap[key].totalMins += Math.floor(totalSecs / 60); monthsMap[key].activePracticeDays += 1; }
+      if (shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr)) monthsMap[key].shieldedDays += 1;
     });
 
     const sortedMonths = Object.values(monthsMap).sort((a, b) => {
-      const [aMonth, aYear] = a.key.split('-').map(Number);
-      const [bMonth, bYear] = b.key.split('-').map(Number);
+      const [aMonth, aYear] = a.key.split('-').map(Number), [bMonth, bYear] = b.key.split('-').map(Number);
       return aYear !== bYear ? bYear - aYear : bMonth - aMonth;
     });
-
     const totalActivePracticeDays = allMeaningfulLogs.filter(e => ((e.focusSeconds || 0) + (e.extraSeconds || 0)) > 0).length;
-    const totalShieldedDaysCount = allMeaningfulLogs.filter(e => {
-      const parts = e.date.split('.');
-      const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : '';
-      return Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr));
-    }).length;
+    const totalShieldedDaysCount = allMeaningfulLogs.filter(e => { const parts = e.date.split('.'); const isoDateStr = parts.length === 3 ? `20${parts[2]}-${parts[1]}-${parts[0]}` : ''; return Boolean(shieldedDaysMap.has(isoDateStr) || shieldDatesSet.has(isoDateStr)); }).length;
 
     return { sortedMonths, totalActivePracticeDays, totalShieldedDaysCount, shieldedDaysMap, shieldDatesSet, shieldDatesArr, formatFriendlyDate };
   }, [studentUiLevel, fokusLogs, studentUser?.joker_used_at, studentUser?.weekly_jokers_used, effectivePracticeMinutes]);
@@ -1612,8 +1542,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               justifyContent: 'space-between',
                               width: '100%',
                               gap: '10px',
-                              paddingBottom: (missionInfo.books?.length || missionInfo.songs?.length || missionInfo.teacherNote) ? '8px' : '0',
-                              borderBottom: (missionInfo.books?.length || missionInfo.songs?.length || missionInfo.teacherNote) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
+                              paddingBottom: (missionInfo.books?.length || missionInfo.songs?.length || missionInfo.microScores?.length || missionInfo.teacherNote) ? '8px' : '0',
+                              borderBottom: (missionInfo.books?.length || missionInfo.songs?.length || missionInfo.microScores?.length || missionInfo.teacherNote) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none'
                             }}>
                               {/* Left: 🟢 Fokus-Zeit Badge mit zartem Glow */}
                               <div style={{
@@ -1796,8 +1726,23 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                                    {pageNums.map((pNum: any) => (
-                                      <span key={`p-${pNum}`} style={{
+                                    {pageNums.length <= 2 ? (
+                                      pageNums.map((pNum: any) => (
+                                        <span key={`p-${pNum}`} style={{
+                                          background: '#e6f4ea',
+                                          color: '#137333',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 900,
+                                          padding: '2px 7px',
+                                          borderRadius: '6px',
+                                          border: 'none',
+                                          flexShrink: 0
+                                        }}>
+                                          S. {pNum}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span style={{
                                         background: '#e6f4ea',
                                         color: '#137333',
                                         fontSize: '0.76rem',
@@ -1807,9 +1752,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         border: 'none',
                                         flexShrink: 0
                                       }}>
-                                        S. {pNum}
+                                        S. {pageNums[0]}–{pageNums[pageNums.length - 1]}
                                       </span>
-                                    ))}
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -1817,7 +1762,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                             {/* Songs-Liste (Offen, freie Typografie, keine Kasten-in-Kasten Rahmen) */}
                             {missionInfo.songs && missionInfo.songs.length > 0 && missionInfo.songs.map((s: any, sIdx: number) => {
-                              const songTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                              const rawSongTitle = (s.topic_name || s.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+                              const songTitle = rawSongTitle.replace(/linken park/gi, 'Linkin Park');
                               return (
                                 <div key={`zen-s-${sIdx}`} style={{
                                   display: 'flex',
@@ -1857,12 +1803,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   {s.homework_notes && (
                                     <span style={{
                                       fontSize: '0.74rem',
-                                      color: '#64748b',
+                                      color: '#94a3b8',
                                       fontWeight: 650,
                                       whiteSpace: 'nowrap',
                                       textOverflow: 'ellipsis',
                                       overflow: 'hidden',
-                                      maxWidth: '130px'
+                                      maxWidth: '160px'
                                     }}>
                                       {s.homework_notes}
                                     </span>
@@ -1871,8 +1817,60 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               );
                             })}
 
+                            {/* 🎼 MicroScores-Liste (Notenschnipsel wie z. B. G-Dur Tonleiter - 100% Parität) */}
+                            {missionInfo.microScores && missionInfo.microScores.length > 0 && missionInfo.microScores.map((ms: any, msIdx: number) => {
+                              const msTitle = ms.title || 'Notenschnipsel';
+                              return (
+                                <div key={`zen-ms-${msIdx}`} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: '10px',
+                                  padding: '3px 2px',
+                                  background: 'transparent',
+                                  border: 'none'
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                    <div style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '7px',
+                                      background: '#e0f2fe',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#0284c7',
+                                      flexShrink: 0
+                                    }}>
+                                      <Music size={13} strokeWidth={2.4} />
+                                    </div>
+                                    <span style={{
+                                      fontSize: '0.90rem',
+                                      fontWeight: 850,
+                                      color: '#f8fafc',
+                                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                      whiteSpace: 'nowrap',
+                                      textOverflow: 'ellipsis',
+                                      overflow: 'hidden'
+                                    }}>
+                                      {msTitle}
+                                    </span>
+                                  </div>
+                                  <span style={{
+                                    fontSize: '0.74rem',
+                                    color: '#94a3b8',
+                                    fontWeight: 650,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}>
+                                    {ms.tempoBpm || 80} BPM · {ms.barsCount || 2} Takte
+                                  </span>
+                                </div>
+                              );
+                            })}
+
                             {/* Fallback bei freiem Üben */}
-                            {(!missionInfo.books || missionInfo.books.length === 0) && (!missionInfo.songs || missionInfo.songs.length === 0) && (
+                            {(!missionInfo.books || missionInfo.books.length === 0) && (!missionInfo.songs || missionInfo.songs.length === 0) && (!missionInfo.microScores || missionInfo.microScores.length === 0) && (
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1909,7 +1907,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   alignItems: 'center',
                                   gap: '6px',
                                   padding: '4px 2px 2px 2px',
-                                  borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
+                                  borderTop: (missionInfo.books?.length || missionInfo.songs?.length || missionInfo.microScores?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
                                   fontSize: '0.78rem',
                                   color: '#94a3b8',
                                   fontWeight: 600,

@@ -53,6 +53,11 @@ import { WebMidiEngine } from '../../services/audio/WebMidiEngine';
 import { AudioSettingsSheet } from '../student/meisterwerk/AudioSettingsSheet';
 import { StudioSoundEngine, SoundKitType } from '../../utils/StudioSoundEngine';
 import { linearToDawMeterPercent } from '../../utils/audioVuMeterHelper';
+import { GrooveBpmControlDeck } from './groove/GrooveBpmControlDeck';
+import { GrooveDualBarRadar } from './groove/GrooveDualBarRadar';
+import { GrooveSoundRack } from './groove/GrooveSoundRack';
+import { GroovePerformancePad } from './groove/GroovePerformancePad';
+import { GrooveCalmStudioDock } from './groove/GrooveCalmStudioDock';
 
 export interface GrooveTrainerProps {
   student?: any;
@@ -1705,10 +1710,26 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
   const isNotebook = Boolean(useNotebookLayout || embedded);
 
+  // 🌟 0,1% Didaktische Progression: Automatische Vorbereitung des nächsten VdM-Levels
+  const currentLevelIdx = RHYTHM_LEVELS.findIndex(l => l.id === selectedLevel);
+  const nextLevelConfig = currentLevelIdx >= 0 && currentLevelIdx < RHYTHM_LEVELS.length - 1
+    ? RHYTHM_LEVELS[currentLevelIdx + 1]
+    : null;
+
+  const handleNextLevel = useCallback(() => {
+    if (!nextLevelConfig) return;
+    setShowCelebrationModal(false);
+    setRadarLevelUpCelebration(null);
+    setSessionCompleted(false);
+    setSelectedLevel(nextLevelConfig.id);
+    setBpm(nextLevelConfig.defaultBpm);
+    setTimeout(() => handleTogglePlay(), 120);
+  }, [nextLevelConfig, handleTogglePlay]);
+
   const studioCard = (
     <div style={{
       width: '100%',
-      maxWidth: isNotebook ? '860px' : '490px',
+      maxWidth: isNotebook ? '1180px' : '490px',
       height: '100%',
       maxHeight: '100%',
       margin: '0 auto',
@@ -1716,11 +1737,11 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       borderRadius: isNotebook ? '24px' : '20px',
       border: '1.5px solid #e2e8f0',
       boxShadow: isNotebook ? '0 10px 30px -5px rgba(0, 0, 0, 0.05)' : '0 10px 25px rgba(0,0,0,0.04)',
-      padding: isNotebook ? '12px 18px 12px 18px' : (embedded ? '10px 12px' : '12px 14px'),
+      padding: isNotebook ? '14px 20px 14px 20px' : (embedded ? '10px 12px' : '12px 14px'),
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
-      gap: isNotebook ? '8px' : '6px',
+      gap: isNotebook ? '12px' : '6px',
       fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       position: 'relative',
       userSelect: 'none',
@@ -2374,514 +2395,81 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         </div>
       </div>
 
-      {/* Die Magische Beat-Bühne (Visual Metronome Pulse & Step Sequencer) */}
-      <div style={{
-        background: '#f8fafc',
-        borderRadius: isNotebook ? '20px' : '18px',
-        padding: isNotebook ? '10px 14px' : '8px 12px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-        border: '1px solid #e2e8f0',
-        position: 'relative',
-        flexShrink: 0
-      }}>
-        {/* Signal-Pill & Streak */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '26px', gap: '8px' }}>
-          <span style={{
-            background: isCountingIn || (isPlaying && (!isCallPhase || trainingMode === 'ghost'))
-              ? '#0f172a'
-              : '#ffffff',
-            color: isCountingIn || (isPlaying && (!isCallPhase || trainingMode === 'ghost'))
-              ? '#ffffff'
-              : '#475569',
-            border: isCountingIn || (isPlaying && (!isCallPhase || trainingMode === 'ghost'))
-              ? '1px solid #0f172a'
-              : '1px solid #cbd5e1',
-            fontSize: '0.74rem',
-            fontWeight: 950,
-            padding: '3px 12px',
-            borderRadius: '100px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.15s ease'
-          }}>
-            {isCountingIn ? (
-              <><Activity size={12} color="#ffffff" className="animate-pulse" /> Einzähler läuft • Schlag {countInBeat > 0 ? countInBeat : 1} von 4</>
-            ) : !isPlaying ? (
-              trainingMode === 'echo'
-                ? <><Headphones size={12} color="#64748b" strokeWidth={2.5} /> Echo-Modus bereit (1 Takt Groove · 1 Takt Echo)</>
-                : <><Clock size={12} color="#64748b" strokeWidth={2.5} /> Geister-Beat bereit (100% stumm nach Einzähler)</>
-            ) : trainingMode === 'echo' ? (
-              isCallPhase 
-                ? <><Headphones size={12} color="#64748b" strokeWidth={2.5} /> Takt {currentBar + 1}: HÖR GUT ZU! (Audio an · Eingrooven)</> 
-                : <><Target size={12} color="#ffffff" strokeWidth={2.4} /> Takt {currentBar + 1}: JETZT KLATSCHEN! (Stumm · Wertung aktiv)</>
-            ) : (
-              <><Clock size={12} color="#ffffff" strokeWidth={2.5} /> Takt {currentBar + 1}: GEISTER-BEAT (Stumm · Halte das Tempo!)</>
-            )}
-          </span>
+      {/* 🌟 2026/2027 0,1% GOLDSTANDARD STUDIO-DECK (2-Säulen Layout auf Desktop/Notebook) */}
+      <div
+        className="groove-studio-deck-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isNotebook ? 'minmax(0, 1.7fr) minmax(310px, 1fr)' : '1fr',
+          gap: isNotebook ? '16px' : '10px',
+          alignItems: 'start',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        {/* SÄULE 1: DIE MASTER-GROOVE-BÜHNE */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: isNotebook ? '10px' : '8px', minWidth: 0 }}>
+          {/* Dual-Bar Radar mit echten VdM-Noten & Sprechsilben */}
+          <GrooveDualBarRadar
+            subdivisions={activeLevelConfig.subdivisions}
+            currentStep={currentStep}
+            isPlaying={isPlaying}
+            isCountingIn={isCountingIn}
+            countInBeat={countInBeat}
+            trainingMode={trainingMode}
+            isCallPhase={isCallPhase}
+            currentBar={currentBar}
+            activeSyllables={activeSyllables}
+            activeTargetPattern={activeTargetPattern}
+            anticipatingStep={anticipatingStep}
+            isNotebook={isNotebook}
+          />
 
-          {/* Streak & Combo Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            {pocketStreak >= 4 && (
-              <span style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                color: '#0f172a',
-                fontSize: '0.66rem',
-                fontWeight: 950,
-                padding: '2px 8px',
-                borderRadius: '100px'
-              }}>
-                COMBO x{comboMultiplier}
-              </span>
-            )}
-            <span style={{
-              fontSize: '0.74rem',
-              fontWeight: 950,
-              color: '#0f172a',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              background: '#ffffff',
-              padding: '2px 8px',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0'
-            }}>
-              <Flame size={12} color="#ea580c" /> Streak: {pocketStreak}
-            </span>
-          </div>
+          {/* Haptisches MPC-Style Performance-Pad & Transport */}
+          <GroovePerformancePad
+            isPlaying={isPlaying}
+            isCountingIn={isCountingIn}
+            countInBeat={countInBeat}
+            inputMode={inputMode}
+            micLevel={micLevel}
+            micShockwave={micShockwave}
+            isPadPressed={isPadPressed}
+            lastRating={lastRating}
+            playDrumSoundOnClap={playDrumSoundOnClap}
+            onTogglePlayDrumSound={() => setPlayDrumSoundOnClap(!playDrumSoundOnClap)}
+            onTogglePlay={handleTogglePlay}
+            onUserTap={handleUserTap}
+            currentBar={currentBar}
+            totalBars={16}
+            trainingMode={trainingMode}
+            isCallPhase={isCallPhase}
+            isNotebook={isNotebook}
+          />
         </div>
 
-        {/* Call-Phase visueller Takt-Fortschrittsbalken */}
-        {trainingMode === 'echo' && isCallPhase && isPlaying && (
-          <div style={{
-            width: '100%',
-            height: '3px',
-            background: '#f1f5f9',
-            borderRadius: '100px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${((currentStep + 1) / activeLevelConfig.subdivisions) * 100}%`,
-              height: '100%',
-              background: '#ea580c',
-              transition: 'width 0.08s linear'
-            }} />
-          </div>
-        )}
-
-        {/* Die dynamischen Beat-Pads mit DIN-Viertel-Gliederung (Musikalische 4er-Beams) */}
-        <div 
-          className={`groove-beat-pads-grid ${activeSyllables.length >= 12 ? 'groove-subdivisions-dense' : ''}`}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: isNotebook ? '8px' : '5px',
-            padding: '2px 0',
-            minHeight: isNotebook ? '78px' : '68px',
-            boxSizing: 'border-box'
-          }}
-        >
-          {[0, 1, 2, 3].map(quarterIdx => {
-            const subsPerBeat = Math.max(1, Math.round(activeLevelConfig.subdivisions / 4));
-            const startIdx = quarterIdx * subsPerBeat;
-            const quarterSyllables = activeSyllables.slice(startIdx, startIdx + subsPerBeat);
-
-            const isQuarterActiveInPlayback = isPlaying && Math.floor(currentStep / subsPerBeat) === quarterIdx;
-            const isQuarterCountInActive = isCountingIn && (countInBeat === (quarterIdx + 1));
-
-            return (
-              <div
-                key={quarterIdx}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  background: isQuarterCountInActive
-                    ? '#fff7ed'
-                    : (isQuarterActiveInPlayback ? '#ffffff' : '#f8fafc'),
-                  border: isQuarterCountInActive
-                    ? '1.5px solid #ea580c'
-                    : (isQuarterActiveInPlayback ? '1.5px solid #fdba74' : '1px solid #e2e8f0'),
-                  borderRadius: isNotebook ? '14px' : '11px',
-                  padding: isNotebook ? '4px 6px 6px 6px' : '3px 4px 5px 4px',
-                  boxShadow: isQuarterCountInActive || isQuarterActiveInPlayback
-                    ? '0 2px 8px rgba(234, 88, 12, 0.10)'
-                    : 'none',
-                  transition: 'all 0.08s ease'
-                }}
-              >
-                {/* Viertel-Puls Kopfzeile: Beat 1, 2, 3, 4 */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 2px'
-                }}>
-                  <span style={{
-                    fontSize: '0.62rem',
-                    fontWeight: 950,
-                    color: isQuarterCountInActive
-                      ? '#ea580c'
-                      : (isQuarterActiveInPlayback ? '#0f172a' : '#94a3b8'),
-                    letterSpacing: '0.04em'
-                  }}>
-                    Beat {quarterIdx + 1}
-                  </span>
-                  {isQuarterCountInActive && (
-                    <span style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: '#ea580c'
-                    }} />
-                  )}
-                </div>
-
-                {/* Subdivisions innerhalb des Viertels */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${subsPerBeat}, 1fr)`,
-                  gap: '3px',
-                  alignItems: 'center'
-                }}>
-                  {quarterSyllables.map((syl, localIdx) => {
-                    const sIdx = startIdx + localIdx;
-                    // 🎯 0,1% Goldstandard Einzähler: Nur die 1. Note des Viertels leuchtet beim Vorzählen!
-                    // Niemals 4 Blöcke gleichzeitig!
-                    const isQuarterDownbeat = localIdx === 0;
-                    const isCountInStep = isCountingIn && isQuarterDownbeat && (quarterIdx === (countInBeat - 1));
-
-                    const isCurrent = (isPlaying && currentStep === sIdx) || isCountInStep;
-                    const isAnticipating = isPlaying && anticipatingStep === sIdx;
-                    const isTarget = activeTargetPattern[sIdx];
-
-                    return (
-                      <div
-                        key={sIdx}
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '2px',
-                          height: '100%',
-                          justifyContent: 'center',
-                          minWidth: 0
-                        }}
-                      >
-                        <span style={{
-                          fontSize: activeSyllables.length > 8 ? '0.68rem' : '0.80rem',
-                          fontWeight: 950,
-                          color: isCurrent ? '#ea580c' : (isTarget ? '#0f172a' : '#94a3b8'),
-                          letterSpacing: '0.01em',
-                          transition: 'all 0.08s ease',
-                          height: '15px',
-                          minHeight: '15px',
-                          maxHeight: '15px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {syl}
-                        </span>
-
-                        <div style={{
-                          width: '100%',
-                          height: isNotebook ? '44px' : '38px',
-                          minHeight: isNotebook ? '44px' : '38px',
-                          maxHeight: isNotebook ? '44px' : '38px',
-                          borderRadius: isNotebook ? '10px' : '8px',
-                          background: isCurrent 
-                            ? '#ea580c'
-                            : (isAnticipating ? '#fff7ed' : (isTarget ? '#ffffff' : '#f8fafc')),
-                          border: isCurrent 
-                            ? '2px solid #ea580c' 
-                            : (isAnticipating ? '1.5px solid #ea580c' : (isTarget ? '1.5px solid #cbd5e1' : '1px dashed #e2e8f0')),
-                          boxShadow: isCurrent 
-                            ? '0 4px 12px rgba(234, 88, 12, 0.35)' 
-                            : (isAnticipating 
-                              ? '0 0 8px rgba(234, 88, 12, 0.25)' 
-                              : (isTarget 
-                                ? '0 1px 3px rgba(0,0,0,0.03)' 
-                                : 'none')),
-                          transform: isCurrent ? 'scale(1.05)' : (isAnticipating ? 'scale(1.02)' : 'scale(1)'),
-                          transformOrigin: 'center center',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxSizing: 'border-box'
-                        }}>
-                          {isTarget && (
-                            <div style={{
-                              width: isCurrent ? '11px' : '8px',
-                              height: isCurrent ? '11px' : '8px',
-                              borderRadius: '50%',
-                              background: isCurrent ? '#ffffff' : (isAnticipating ? '#ea580c' : '#94a3b8'),
-                              transition: 'all 0.08s ease'
-                            }} />
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+        {/* SÄULE 2: 0,1% CALM STUDIO-DOCK (Ruhiges, monolithisches Kontrolldeck ohne Überladung) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 }}>
+          <GrooveCalmStudioDock
+            bpm={bpm}
+            onBpmChange={(newBpm) => setBpm(newBpm)}
+            soundKit={soundKit}
+            onSoundKitChange={(kit) => setSoundKit(kit)}
+            isBassEnabled={isBassEnabled}
+            onToggleBass={() => setIsBassEnabled(!isBassEnabled)}
+            onOpenAudioSettings={() => setShowAudioSettingsSheet(true)}
+            pocketStreak={pocketStreak}
+            comboMultiplier={comboMultiplier}
+            timingOffsetMs={timingOffsetMs}
+            lastRating={lastRating}
+            pedagogicalCoachingTip={pedagogicalCoachingTip}
+            gaugeNeedlePercent={gaugeNeedlePercent}
+            disabled={isPlaying || isCountingIn}
+            isNotebook={isNotebook}
+          />
         </div>
-
-        {/* Profi-Modus: Millisekunden-Gauge (nur wenn aktiv) */}
-        {isProMode && (
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            height: '8px',
-            background: '#f1f5f9',
-            borderRadius: '5px',
-            overflow: 'hidden',
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ position: 'absolute', left: '15%', width: '22%', top: 0, bottom: 0, background: '#dbeafe' }} />
-            <div style={{ position: 'absolute', left: '37%', width: '26%', top: 0, bottom: 0, background: '#dcfce7' }} />
-            <div style={{ position: 'absolute', left: '63%', width: '22%', top: 0, bottom: 0, background: '#fef3c7' }} />
-            <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#f59e0b', transform: 'translateX(-50%)' }} />
-            {timingOffsetMs !== null && (
-              <div style={{
-                position: 'absolute',
-                left: `${gaugeNeedlePercent}%`,
-                top: '1px',
-                bottom: '1px',
-                width: '6px',
-                borderRadius: '3px',
-                background: lastRating === 'pocket' ? '#d97706' : (lastRating === 'good' ? '#16a34a' : (lastRating === 'rush' ? '#2563eb' : (lastRating === 'drag' ? '#b45309' : '#dc2626'))),
-                transform: 'translateX(-50%)',
-                transition: 'left 0.12s ease'
-              }} />
-            )}
-          </div>
-        )}
       </div>
 
-      {/* 🌟 FOKUS-ZONE 3: DIE MULTI-MODALE TRIGGER-BÜHNE (AKUSTISCH / TOUCH / MIDI) */}
-      <button
-        type="button"
-        aria-label={!isPlaying && !isCountingIn ? "Groove-Trainer starten" : (isCountingIn ? "Einzähler läuft" : "Im Rhythmus mitmachen")}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          handleUserTap();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleUserTap();
-          }
-        }}
-        style={{
-          width: '100%',
-          height: isNotebook ? '92px' : '84px',
-          minHeight: isNotebook ? '92px' : '84px',
-          maxHeight: isNotebook ? '92px' : '84px',
-          boxSizing: 'border-box',
-          borderRadius: isNotebook ? '22px' : '18px',
-          border: '1px solid rgba(255, 255, 255, 0.25)',
-          background: (micShockwave || isPadPressed)
-            ? '#c2410c'
-            : '#ea580c',
-          color: '#ffffff',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px',
-          cursor: 'pointer',
-          boxShadow: (micShockwave || isPadPressed)
-            ? '0 0 20px rgba(194, 65, 12, 0.4), inset 0 2px 4px rgba(0, 0, 0, 0.25)' 
-            : '0 6px 18px rgba(234, 88, 12, 0.35)',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-          touchAction: 'manipulation',
-          transform: micShockwave || isPadPressed ? 'scale(0.985)' : 'scale(1)',
-          transition: 'transform 0.06s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.12s ease, box-shadow 0.12s ease',
-          outline: 'none',
-          position: 'relative',
-          overflow: 'hidden',
-          flexShrink: 0
-        }}
-        className="hover-scale-mini"
-      >
-        {isCountingIn ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={isNotebook ? 22 : 18} color="#ffffff" className="animate-pulse" />
-              <span style={{
-                fontSize: isNotebook ? '1.24rem' : '1.10rem',
-                fontWeight: 950,
-                letterSpacing: '-0.01em',
-                color: '#ffffff'
-              }}>
-                EINZÄHLER: SCHLAG {countInBeat > 0 ? countInBeat : 1} VON 4
-              </span>
-            </div>
-            <div style={{
-              height: '20px',
-              minHeight: '20px',
-              maxHeight: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap'
-            }}>
-              {countInOffsetsRef.current.length > 0 ? (
-                <span style={{ fontSize: '0.80rem', color: '#ffedd5', fontWeight: 900 }}>
-                  Pre-Roll kalibriert: {countInOffsetsRef.current[countInOffsetsRef.current.length - 1]} ms
-                </span>
-              ) : (
-                <span style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 750 }}>
-                  Im Takt mitklatschen zur Fein-Kalibrierung
-                </span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {inputMode === 'acoustic' ? (
-                <Mic size={isNotebook ? 20 : 18} color="#ffffff" strokeWidth={2.8} className={micLevel > 0.12 ? 'animate-pulse' : ''} />
-              ) : (
-                <Target size={isNotebook ? 20 : 18} color="#ffffff" strokeWidth={2.8} />
-              )}
-              <span style={{
-                fontSize: isNotebook ? '1.18rem' : '1.04rem',
-                fontWeight: 950,
-                letterSpacing: '-0.01em',
-                color: '#ffffff'
-              }}>
-                {!isPlaying && !isCountingIn ? (
-                  inputMode === 'acoustic' ? 'JETZT STARTEN (KLATSCHEN ODER TASTE)' : 'STARTEN (PAD TIPPEN)'
-                ) : (
-                  trainingMode === 'echo' && isCallPhase 
-                    ? 'NUR ZUHÖREN & GROOVEN...' 
-                    : (inputMode === 'acoustic' ? 'JETZT IM TAKT KLATSCHEN' : (inputMode === 'midi' ? 'E-DRUM / TASTE ANSCHLAGEN' : 'HIER IM TAKT TROMMELN'))
-                )}
-              </span>
-            </div>
 
-            {/* Live-Feedback Slot */}
-            <div style={{
-              height: '20px',
-              minHeight: '20px',
-              maxHeight: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap'
-            }}>
-              {lastRating === 'pocket' && (
-                <span style={{ fontSize: '0.84rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Sparkles size={14} color="#ffffff" /> GENAU! VOLL IM POCKET!
-                </span>
-              )}
-              {lastRating === 'good' && (
-                <span style={{ fontSize: '0.84rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Check size={14} color="#ffffff" /> GUT IM PULS!
-                </span>
-              )}
-              {lastRating === 'rush' && (
-                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={13} color="#fee2e2" /> ETWAS FRÜH • Nicht hetzen!
-                </span>
-              )}
-              {lastRating === 'drag' && (
-                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={13} color="#fef3c7" /> ETWAS SPÄT • Entspannt mit dem Beat!
-                </span>
-              )}
-              {lastRating === 'miss' && (
-                <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <RotateCcw size={13} color="#f1f5f9" /> DANEBEN • Lausche auf den Beat!
-                </span>
-              )}
-              {!lastRating && (
-                <span style={{ fontSize: '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 750 }}>
-                  {!isPlaying && !isCountingIn ? (
-                    inputMode === 'acoustic' ? 'Klatsche in die Hände oder drücke die Leertaste zum Starten' : 'Tippe auf das Pad oder drücke die Leertaste'
-                  ) : (
-                    trainingMode === 'echo' && isCallPhase 
-                      ? 'Groove hören • Freies Mitgrooven ohne Wertung' 
-                      : (trainingMode === 'ghost' 
-                        ? 'Geister-Beat: Halte das Tempo nach Sicht!' 
-                        : (inputMode === 'acoustic' ? 'Klatsche synchron mit den Beat-Punkten' : 'Tippe im Rhythmus der Beats'))
-                  )}
-                </span>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Live-Akustik VU-Pegelbalken & Sound-Toggle */}
-        {inputMode === 'acoustic' && (
-          <div style={{
-            position: 'absolute',
-            bottom: '3px',
-            left: '12px',
-            right: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '8px'
-          }}>
-            <div style={{
-              flex: 1,
-              height: '3px',
-              background: 'rgba(255, 255, 255, 0.25)',
-              borderRadius: '2px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${linearToDawMeterPercent(micLevel)}%`,
-                height: '100%',
-                background: '#ffffff',
-                transition: 'width 0.05s linear'
-              }} />
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPlayDrumSoundOnClap(!playDrumSoundOnClap);
-              }}
-              style={{
-                background: playDrumSoundOnClap ? 'rgba(255, 255, 255, 0.28)' : 'rgba(0, 0, 0, 0.35)',
-                border: '1px solid rgba(255, 255, 255, 0.35)',
-                color: '#ffffff',
-                borderRadius: '6px',
-                padding: '1px 7px',
-                fontSize: '0.62rem',
-                fontWeight: 850,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.12s ease'
-              }}
-              title={playDrumSoundOnClap 
-                ? "Lautsprecher-Sound ist AN (Achtung: Nur mit Kopfhörern empfohlen, da sonst ein Latenz-Echo entsteht)" 
-                : "Lautsprecher-Sound ist STUMM (Empfohlen: Dein reales Klatschen ist die natürliche Klangquelle, kein Latenz-Versatz)"}
-            >
-              {playDrumSoundOnClap ? <Volume2 size={11} /> : <VolumeX size={11} />}
-              <span>{playDrumSoundOnClap ? 'Sound An (Kopfhörer)' : 'Stumm (Echtes Klatschen)'}</span>
-            </button>
-          </div>
-        )}
-      </button>
 
       {/* 4. Minimaler Fußbereich: 3 Sterne & dezenter Stop-Button */}
       <div style={{
@@ -2948,19 +2536,19 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             </button>
           ) : (
             <span style={{
-              fontSize: isNotebook ? '0.80rem' : '0.74rem',
+              fontSize: isNotebook ? '0.78rem' : '0.72rem',
               color: '#64748b',
-              fontWeight: 900,
+              fontWeight: 850,
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              padding: isNotebook ? '6px 12px' : '4px 9px',
-              borderRadius: isNotebook ? '12px' : '10px',
-              letterSpacing: '0.02em',
+              padding: isNotebook ? '5px 12px' : '4px 9px',
+              borderRadius: '10px',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '5px'
+              gap: '6px'
             }}>
-              ♩ = {bpm} BPM
+              <Target size={12} color="#ea580c" />
+              <span>{isJunior ? activeLevelConfig.titleJunior : activeLevelConfig.titlePro}</span>
             </span>
           )}
         </div>
@@ -2994,7 +2582,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         className="groove-zen-focus-container"
         style={{
           width: '100%',
-          maxWidth: isNotebook ? '860px' : '620px',
+          maxWidth: isNotebook ? '1180px' : '620px',
           height: '100%',
           maxHeight: '100%',
           margin: '0 auto',
@@ -3031,6 +2619,12 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       />
 
       <style>{`
+        @media (max-width: 1023px) {
+          .groove-studio-deck-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+        }
         @media (max-width: 640px) {
           .groove-beat-pads-grid.groove-subdivisions-dense {
             grid-template-columns: repeat(8, 1fr) !important;
@@ -3048,6 +2642,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           setShowCelebrationModal(false);
           setIsLeaderboardOpen(true);
         }}
+        onNextLevel={nextLevelConfig ? handleNextLevel : undefined}
+        nextLevelName={nextLevelConfig ? (isJunior ? nextLevelConfig.titleJunior : nextLevelConfig.titlePro) : undefined}
         xpEarned={sessionAccumulatedXp > 0 ? sessionAccumulatedXp : awardedRoundXp}
         practiceSeconds={sessionActiveSecondsRef.current > 0 ? sessionActiveSecondsRef.current : 60}
         accuracy={totalHits > 0 ? Math.round(scoreSum / totalHits) : 0}
@@ -3075,6 +2671,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         onClose={() => {
           setShowCelebrationModal(false);
           setRadarLevelUpCelebration(null);
+          setSessionCompleted(false);
         }}
       />
     </div>

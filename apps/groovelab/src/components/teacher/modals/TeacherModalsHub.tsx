@@ -4,6 +4,7 @@ import { AvatarImage } from '../../common/AvatarImage';
 import { normalizeInstrument, INSTRUMENT_COLORS, TEACHER_INSTRUMENT_ICONS } from '../utils/teacherDashboardUtils';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { deleteStudentFully } from '../../../utils/studentDeletionService';
+import { resolveTeacherCurrentRoom } from '../../../utils/teacherRoomResolver';
 import { checkIsAudioTresorActive } from '../../../domain/stickersAndTresor';
 import { queryCache } from '../../../lib/supabase';
 import { TourStartButton } from '../../PremiumOnboardingTour';
@@ -817,7 +818,12 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
         allStudents={allStudents}
         todayStudents={todayTagesplanStudents}
         rooms={rooms}
-        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
+        currentRoom={resolveTeacherCurrentRoom({
+          activeTimelineSlot,
+          teacherTodayRooms,
+          teacher,
+          rooms
+        })}
         teacherTodayRooms={teacherTodayRooms}
         onOpenHomeworkModal={(stud) => {
           const sId = stud.id || stud.user_id;

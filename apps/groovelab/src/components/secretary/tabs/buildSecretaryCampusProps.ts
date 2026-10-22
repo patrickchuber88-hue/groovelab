@@ -160,7 +160,6 @@ export function buildSecretaryCampusProps(
     setCampusSubTab: navigation.setCampusSubTab,
     setSecretarySubTab: navigation.setSecretarySubTab,
     setActiveTab: navigation.setActiveTab,
-    setShowDunningPayModal: extendedSettings?.setShowDunningPayModal,
     activePlatform,
     schoolId,
     userId,

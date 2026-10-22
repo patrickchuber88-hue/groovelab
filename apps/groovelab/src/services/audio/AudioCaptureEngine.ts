@@ -251,7 +251,7 @@ export class AudioCaptureEngine {
 
       this.sourceNode.connect(this.workletNode);
       this.setState('idle');
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.setState('error');
       console.error('[AudioCaptureEngine] Initialization failed:', err);
       throw err;
@@ -410,5 +410,242 @@ export class AudioCaptureEngine {
     this.recordedChunksR = [];
     this.totalRecordedSamples = 0;
     this.setState('idle');
+  }
+
+  private static registeredContexts: WeakSet<AudioContext> = new WeakSet();
+
+  /**
+   * 🎙️ UNIFIED REAL-TIME PCM CAPTURE TAP (AudioWorklet First, ScriptProcessor Fallback)
+   * Provides lock-free, real-time Float32 PCM capture in the dedicated AudioWorklet thread
+   * for Aufnahmestudio, Loopstation Auto-Sequence, and Studio Recorders.
+   */
+  public static async createRealtimePcmCaptureTap(
+    audioCtx: AudioContext,
+    stream: MediaStream,
+    options?: {
+      channelCount?: 1 | 2;
+      enableSubsonicHpf?: boolean;
+      onChunk?: (chunkL: Float32Array, chunkR: Float32Array) => void;
+    }
+  ): Promise<{
+    start: () => void;
+    stopAndFlush: () => Promise<{ chunksL: Float32Array[]; chunksR: Float32Array[]; totalSamples: number }>;
+    getLiveChunks: () => { chunksL: Float32Array[]; chunksR: Float32Array[]; totalSamples: number };
+    disconnect: () => void;
+    workletOrProcessorNode: AudioNode | null;
+  }> {
+    const channelCount = options?.channelCount ?? 2;
+    const enableSubsonicHpf = options?.enableSubsonicHpf ?? false;
+    const chunksL: Float32Array[] = [];
+    const chunksR: Float32Array[] = [];
+    let totalSamples = 0;
+    let isCapturing = false;
+
+    let sourceNode: MediaStreamAudioSourceNode | null = null;
+    let workletNode: AudioWorkletNode | null = null;
+    let fallbackProcessor: ScriptProcessorNode | null = null;
+    let silentGain: GainNode | null = null;
+
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume().catch(() => {});
+    }
+
+    sourceNode = audioCtx.createMediaStreamSource(stream);
+    silentGain = audioCtx.createGain();
+    silentGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+    const pushStereoChunk = (inL: Float32Array, rawR?: Float32Array) => {
+      let inR = inL;
+      if (rawR && rawR.length === inL.length) {
+        let hasSignal = false;
+        for (let i = 0; i < rawR.length; i += 16) {
+          if (Math.abs(rawR[i]) > 0.0001) {
+            hasSignal = true;
+            break;
+          }
+        }
+        if (hasSignal) {
+          inR = rawR;
+        }
+      }
+      const copyL = new Float32Array(inL);
+      const copyR = channelCount > 1 ? new Float32Array(inR) : copyL;
+      chunksL.push(copyL);
+      chunksR.push(copyR);
+      totalSamples += copyL.length;
+      options?.onChunk?.(copyL, copyR);
+    };
+
+    let workletReady = false;
+    if (typeof AudioWorkletNode !== 'undefined' && audioCtx.audioWorklet) {
+      try {
+        if (!AudioCaptureEngine.registeredContexts.has(audioCtx)) {
+          const workletUrl = getInstrumentWorkletBlobUrl();
+          if (workletUrl) {
+            await audioCtx.audioWorklet.addModule(workletUrl);
+            AudioCaptureEngine.registeredContexts.add(audioCtx);
+          }
+        }
+        workletNode = new AudioWorkletNode(audioCtx, INSTRUMENT_WORKLET_PROCESSOR_NAME, {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          channelCount
+        });
+        workletNode.port.postMessage({
+          type: 'SET_CONFIG',
+          config: {
+            enableTruePeakDetection: false,
+            enableSubsonicHpf
+          }
+        });
+        workletNode.port.onmessage = (event: MessageEvent) => {
+          const msg = event.data;
+          if (msg && msg.type === 'BUFFER_READY' && msg.bufferL instanceof Float32Array) {
+            if (isCapturing) {
+              pushStereoChunk(
+                msg.bufferL,
+                msg.bufferR instanceof Float32Array ? msg.bufferR : undefined
+              );
+            }
+          }
+        };
+        sourceNode.connect(workletNode);
+        workletNode.connect(silentGain);
+        silentGain.connect(audioCtx.destination);
+        workletReady = true;
+      } catch (workletErr) {
+        console.warn('[AudioCaptureEngine] Worklet init notice, using PCM fallback:', workletErr);
+      }
+    }
+
+    if (!workletReady) {
+      fallbackProcessor = audioCtx.createScriptProcessor(4096, channelCount, channelCount);
+      fallbackProcessor.onaudioprocess = (e: AudioProcessingEvent) => {
+        if (!isCapturing) return;
+        const inL = e.inputBuffer.getChannelData(0);
+        const inR = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : undefined;
+        pushStereoChunk(inL, inR);
+      };
+      sourceNode.connect(fallbackProcessor);
+      fallbackProcessor.connect(silentGain);
+      silentGain.connect(audioCtx.destination);
+    }
+
+    const disconnect = () => {
+      isCapturing = false;
+      try {
+        if (workletNode) {
+          workletNode.port.onmessage = null;
+          workletNode.disconnect();
+        }
+      } catch {}
+      try {
+        if (fallbackProcessor) {
+          fallbackProcessor.onaudioprocess = null;
+          fallbackProcessor.disconnect();
+        }
+      } catch {}
+      try {
+        silentGain?.disconnect();
+      } catch {}
+      try {
+        sourceNode?.disconnect();
+      } catch {}
+    };
+
+    return {
+      start: () => {
+        isCapturing = true;
+        if (workletNode) {
+          workletNode.port.postMessage({ type: 'START_RECORDING' });
+        }
+      },
+      stopAndFlush: async () => {
+        if (workletNode) {
+          workletNode.port.postMessage({ type: 'STOP_RECORDING' });
+          await new Promise((resolve) => setTimeout(resolve, 35));
+        }
+        disconnect();
+        return { chunksL, chunksR, totalSamples };
+      },
+      getLiveChunks: () => ({ chunksL, chunksR, totalSamples }),
+      disconnect,
+      workletOrProcessorNode: workletNode || fallbackProcessor
+    };
+  }
+
+  /**
+   * 🎙️ UNIFIED HIGH-BITRATE MEDIARECORDER FACTORY
+   * Guarantees consistent 256-320 kbps Opus/AAC recording across all dashboards and boards.
+   */
+  public static createHighResMediaRecorder(
+    stream: MediaStream,
+    targetBitrateBps = 256000
+  ): { recorder: MediaRecorder; mimeType: string } {
+    let mimeType = '';
+    if (typeof MediaRecorder !== 'undefined') {
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+        mimeType = 'audio/aac';
+      }
+    }
+
+    try {
+      const options: MediaRecorderOptions = { audioBitsPerSecond: targetBitrateBps };
+      if (mimeType) options.mimeType = mimeType;
+      const recorder = new MediaRecorder(stream, options);
+      return { recorder, mimeType: recorder.mimeType || mimeType || 'audio/webm' };
+    } catch {
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      return { recorder, mimeType: recorder.mimeType || mimeType || 'audio/webm' };
+    }
+  }
+
+  /**
+   * Resolves the canonical file extension for a processed or raw audio Blob.
+   * Ensures 24-bit WAV Blobs returned by processPureRawBlob are never mislabeled as .webm.
+   */
+  public static resolveAudioFileExtension(
+    blob: Blob,
+    fallbackMime = ''
+  ): 'wav' | 'mp3' | 'm4a' | 'mp4' | 'webm' {
+    const mime = (blob.type || fallbackMime || '').toLowerCase();
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+    if (mime.includes('mp4') || mime.includes('aac') || mime.includes('m4a')) return 'm4a';
+    return 'webm';
+  }
+
+  /**
+   * 🎧 Stops a MediaRecorder after a natural acoustic tail decay delay (Default: 900ms),
+   * ensuring the last note/chord rings out naturally after pressing "Beenden" instead of cutting off abruptly.
+   */
+  public static stopRecorderWithTail(
+    recorder: MediaRecorder | null | undefined,
+    tailDelayMs = 900,
+    onAfterStop?: () => void
+  ): ReturnType<typeof setTimeout> | null {
+    if (!recorder || recorder.state === 'inactive') {
+      if (onAfterStop) onAfterStop();
+      return null;
+    }
+
+    try {
+      recorder.requestData();
+    } catch {}
+
+    return setTimeout(() => {
+      try {
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+      } catch {}
+      if (onAfterStop) onAfterStop();
+    }, Math.max(0, tailDelayMs));
   }
 }

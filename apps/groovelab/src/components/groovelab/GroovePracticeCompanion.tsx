@@ -15,6 +15,7 @@ import {
 } from '../../utils/audioMasteringEngine';
 import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 import { supabase } from '../../lib/supabase';
 import { validateMediaBlob, stripAudioMetadata } from '../../utils/mediaSecurityValidator';
 import { getSecureAudioUrl, buildCanonicalAudioStoragePath, computeBlobSha256 } from '../../utils/audioStorageHelper';
@@ -23,6 +24,12 @@ import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
 import { extractWaveformPeaks } from '../../utils/waveformHelper';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
+import {
+  STYLE_TEMPO_PRESETS,
+  getDidacticInitialBpm,
+  getDidacticTempoZone,
+  DIDACTIC_QUICK_PRESETS
+} from './companion/GrooveTempoPedagogy';
 
 // Helper to decode Base64 WAV into AudioBuffer with true header sample rate
 const decodeBase64Wav = (ctx: AudioContext | BaseAudioContext, b64Uri: string): AudioBuffer => {
@@ -672,9 +679,22 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   }, []);
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(activeSongContext?.targetBpm || targetBpm || 120);
+  const [bpm, setBpm] = useState(() => getDidacticInitialBpm(effectiveUiLevel, activeSongContext?.targetBpm, targetBpm, 'metronome'));
   const [selectedStyle, setSelectedStyle] = useState<'metronome' | 'rock' | 'hiphop' | 'swing' | 'latin' | 'funk' | 'reggae' | 'walzer' | 'ballad68' | 'disco' | 'singersongwriter'>('metronome');
+  const [audioFocusMode, setAudioFocusMode] = useState<boolean>(false);
   const [selectedVariation, setSelectedVariation] = useState<'A' | 'B' | 'C'>('A');
+
+  // 🎯 Musikpädagogischer Stil-Wechsel (Sweet-Spot Tempo-Übernahme)
+  const handleSelectStyle = (styleId: typeof selectedStyle) => {
+    setSelectedStyle(styleId);
+    if (!activeSongContext?.targetBpm && STYLE_TEMPO_PRESETS[styleId]) {
+      setBpm(STYLE_TEMPO_PRESETS[styleId].defaultBpm);
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume();
+    }
+    setIsPlaying(true);
+  };
   const [metronomeMeter, setMetronomeMeter] = useState<'4/4' | '3/4' | '2/4' | '6/8'>('4/4');
   const metronomeMeterRef = useRef(metronomeMeter);
   useEffect(() => { metronomeMeterRef.current = metronomeMeter; }, [metronomeMeter]);
@@ -800,7 +820,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
   // ⚡ Speed-Trainer States
   const [speedTrainerActive, setSpeedTrainerActive] = useState(false);
-  const [speedTrainerTargetBpm, setSpeedTrainerTargetBpm] = useState(Math.min(240, (activeSongContext?.targetBpm || targetBpm || 120) + 20));
+  const [speedTrainerTargetBpm, setSpeedTrainerTargetBpm] = useState(Math.min(240, (activeSongContext?.targetBpm || targetBpm || (effectiveUiLevel === 'junior' ? 72 : effectiveUiLevel === 'pro' ? 88 : 80)) + 20));
   const [speedTrainerIntervalBars, setSpeedTrainerIntervalBars] = useState(4);
   const [speedTrainerStep, setSpeedTrainerStep] = useState(2);
   const [speedTrainerBarsUntilNext, setSpeedTrainerBarsUntilNext] = useState(4);
@@ -1280,16 +1300,18 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
     if (isRecordingRef.current) {
       setIsRecording(false);
+      isRecordingRef.current = false;
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        // 🎧 900ms Nachklang-Puffer: Drum-Beat stoppt sofort, aber das Instrument klingt noch natürlich aus
+        // (recordAudioCtxRef & recordingStreamRef werden im recorder.onstop geschlossen)
+        AudioCaptureEngine.stopRecorderWithTail(mediaRecorderRef.current, 900);
+      } else if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
         try {
-          mediaRecorderRef.current.stop();
-        } catch (err) {
-          console.warn('[GroovePracticeCompanion] Error stopping mediaRecorder:', err);
-        }
+          recordAudioCtxRef.current.close();
+        } catch {}
+        recordAudioCtxRef.current = null;
       }
-    }
-
-    if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
+    } else if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
       try {
         recordAudioCtxRef.current.close();
       } catch {}
@@ -1344,19 +1366,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const startCountInAndRecord = async () => {
     try {
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       recordingStreamRef.current = stream;
 
-      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
-      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-        else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
-      }
-
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const { recorder } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -3488,12 +3501,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 transition: 'all 0.12s ease'
               }} />
               <span>
-                {bpm < 60 ? 'Largo' :
-                 bpm < 76 ? 'Adagio' :
-                 bpm < 108 ? 'Andante' :
-                 bpm < 120 ? 'Moderato' :
-                 bpm < 156 ? 'Allegro' :
-                 bpm < 176 ? 'Vivace' : 'Presto'}
+                {getDidacticTempoZone(bpm).name}
               </span>
             </div>
 
@@ -3677,6 +3685,57 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 <span style={{ letterSpacing: '0.04em' }}>TAP</span>
               </button>
             </div>
+
+            {/* 🎓 Didaktische Tempo-Orientierung & Handlungsanweisung */}
+            {(() => {
+              const zone = getDidacticTempoZone(bpm);
+              return (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '0.72rem',
+                  color: '#475569',
+                  fontWeight: 750,
+                  textAlign: 'center',
+                  marginTop: '1px',
+                  padding: '3px 10px',
+                  background: '#f8fafc',
+                  borderRadius: '8px',
+                  border: '1px solid #f1f5f9'
+                }}>
+                  <span>{zone.icon}</span>
+                  <span>{zone.subTitle}</span>
+                </div>
+              );
+            })()}
+
+            {/* 🎯 Stil-Sweet-Spot Übernahme-Pill (wenn abweichend & kein fester Song-Kontext) */}
+            {STYLE_TEMPO_PRESETS[selectedStyle] && bpm !== STYLE_TEMPO_PRESETS[selectedStyle].defaultBpm && !activeSongContext?.targetBpm && (
+              <button
+                type="button"
+                onClick={() => setBpm(STYLE_TEMPO_PRESETS[selectedStyle].defaultBpm)}
+                style={{
+                  background: '#fef9c3',
+                  border: '1px solid #fde047',
+                  color: '#854d0e',
+                  padding: '3px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.68rem',
+                  fontWeight: 850,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  marginTop: '1px',
+                  transition: 'all 0.12s ease'
+                }}
+                title={`Auf das genre-authentische Groove-Tempo von ${STYLE_TEMPO_PRESETS[selectedStyle].label} (${STYLE_TEMPO_PRESETS[selectedStyle].defaultBpm} BPM) setzen`}
+              >
+                <span>🎯 Stil-Tempo ({STYLE_TEMPO_PRESETS[selectedStyle].defaultBpm} BPM) übernehmen</span>
+              </button>
+            )}
 
               {/* Apple-Grade Floating Tempo-Popover Deck */}
               {showTempoDeck && (
@@ -3885,6 +3944,38 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       </button>
                     </div>
 
+                    {/* 🎓 Didaktische Schnellauswahl-Pills (Lernen, Üben, Ziel) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', width: '100%' }}>
+                      {DIDACTIC_QUICK_PRESETS.map((preset) => {
+                        const isCur = bpm === preset.bpm;
+                        return (
+                          <button
+                            key={preset.bpm}
+                            type="button"
+                            onClick={() => setBpm(preset.bpm)}
+                            style={{
+                              padding: '6px 4px',
+                              borderRadius: '10px',
+                              border: isCur ? '1.5px solid #eab308' : '1px solid #cbd5e1',
+                              background: isCur ? '#fef9c3' : '#f8fafc',
+                              color: isCur ? '#854d0e' : '#334155',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '2px',
+                              transition: 'all 0.1s ease'
+                            }}
+                            title={`${preset.bpm} BPM: ${preset.tag}`}
+                          >
+                            <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>{preset.label}</span>
+                            <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700 }}>{preset.tag}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     {/* Precision Slider with 40 / 240 BPM limits */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '0 2px' }}>
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>40</span>
@@ -3953,7 +4044,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           )}
 
-          {/* Zählzeiten Header */}
+          {/* Zählzeiten Header mit Hör-Fokus (Blind Üben) Schalter */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -3976,9 +4067,56 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               <Clock size={13} />
               Zählzeiten & Akzente
             </span>
+
+            {/* 🎧 Hör-Fokus (Blind Üben) Toggle */}
+            <button
+              type="button"
+              onClick={() => setAudioFocusMode(prev => !prev)}
+              style={{
+                background: audioFocusMode ? '#ecfdf5' : '#f8fafc',
+                border: audioFocusMode ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+                color: audioFocusMode ? '#047857' : '#64748b',
+                padding: '3px 9px',
+                borderRadius: '8px',
+                fontSize: '0.68rem',
+                fontWeight: 850,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                transition: 'all 0.12s ease'
+              }}
+              title={audioFocusMode ? 'Visuelles Beat-Feedback wieder einschalten' : 'Hör-Fokus (Blind Üben): Schaltet optisches Blinken stumm, schärft das Gehör'}
+            >
+              <Headphones size={12} color={audioFocusMode ? '#047857' : '#64748b'} />
+              <span>{audioFocusMode ? '🎧 Hör-Fokus aktiv' : 'Blind Üben'}</span>
+            </button>
           </div>
 
-          {/* Dynamische Interaktive Beat-Pads je Taktart (4-Stufen-Zyklus: Akzent, Normal, Ghost, Mute) */}
+          {/* Hör-Fokus Hinweisbanner */}
+          {audioFocusMode && (
+            <div style={{
+              width: '100%',
+              maxWidth: '460px',
+              background: '#f0fdf4',
+              border: 'none',
+              color: '#166534',
+              padding: '6px 12px',
+              borderRadius: '12px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              margin: '2px 0 6px 0'
+            }}>
+              <Headphones size={13} />
+              <span>Hör-Fokus (Blind Üben) aktiv • Kein Flackern, 100% Ohren-Konzentration</span>
+            </div>
+          )}
+
+          {/* Dynamische Interaktive Beat-Pads je Taktart (Entschärft: Ruhe auf Neben-Schlägen, Akzent auf Eins) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${activeMeterInfo.beats}, 1fr)`,
@@ -3988,7 +4126,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             margin: '2px 0 6px 0'
           }}>
             {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
-              const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % activeMeterInfo.beats === idx) : false;
+              const isActive = (!audioFocusMode && activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % activeMeterInfo.beats === idx) : false;
               const accentState = beatAccents[idx] || (idx === 0 ? 'accent' : 'normal');
               const isAccent = accentState === 'accent';
               const isGhost = accentState === 'ghost';
@@ -4004,22 +4142,24 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     height: activeMeterInfo.beats > 4 ? '50px' : '62px',
                     borderRadius: '16px',
                     background: isActive 
-                      ? (isAccent ? '#facc15' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
-                      : (isAccent ? '#fef9c3' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#f8fafc'))),
+                      ? (isAccent ? '#facc15' : (isGhost ? '#e2e8f0' : (isMute ? '#cbd5e1' : '#334155'))) 
+                      : (isAccent ? '#fef9c3' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#ffffff'))),
                     border: isActive 
-                      ? 'none' 
-                      : (isAccent ? 'none' : '1px solid #e2e8f0'),
-                    boxShadow: 'none',
+                      ? (isAccent ? '2px solid #eab308' : '2px solid #1e293b') 
+                      : (isAccent ? '1.5px solid #fde047' : '1px solid #e2e8f0'),
+                    boxShadow: isActive && isAccent ? '0 2px 10px rgba(234, 179, 8, 0.3)' : 'none',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: isActive ? (isAccent ? '#0f172a' : '#ffffff') : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
+                    color: isActive 
+                      ? (isAccent ? '#0f172a' : (isGhost ? '#334155' : '#ffffff')) 
+                      : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
                     fontSize: activeMeterInfo.beats > 4 ? '0.92rem' : '1.1rem',
                     fontWeight: 950,
                     cursor: 'pointer',
-                    transform: isActive ? 'scale(1.06)' : 'scale(1)',
-                    transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                    transform: isActive && isAccent ? 'scale(1.03)' : 'scale(1)',
+                    transition: 'all 0.08s ease-out',
                     position: 'relative'
                   }}
                   title={`Schlag ${idx + 1}: ${isAccent ? 'Akzent (Betont)' : isGhost ? 'Gedämpft' : isMute ? 'Stumm' : 'Normal'} – Antippen zum Wechseln`}
@@ -4823,13 +4963,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 <button
                   key={styleOpt.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedStyle(styleOpt.id as any);
-                    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-                      audioCtxRef.current.resume();
-                    }
-                    setIsPlaying(true);
-                  }}
+                  onClick={() => handleSelectStyle(styleOpt.id as any)}
                   className="tactile-btn"
                   style={{
                     background: isSelected ? '#facc15' : '#ffffff',
@@ -4917,13 +5051,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <button
                     key={styleOpt.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedStyle(styleOpt.id as any);
-                      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
-                        audioCtxRef.current.resume();
-                      }
-                      setIsPlaying(true);
-                    }}
+                    onClick={() => handleSelectStyle(styleOpt.id as any)}
                     style={{
                       gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
                       background: isSelected ? '#facc15' : '#ffffff',

@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, Star, Sparkles, Clock, Flame, Play, X, CheckCircle2 } from 'lucide-react';
+import { Trophy, Star, Sparkles, Clock, Flame, Play, X, CheckCircle2, RotateCcw } from 'lucide-react';
 
 export interface GrooveSessionCelebrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPlayAgain: () => void;
+  onNextLevel?: () => void;
+  nextLevelName?: string;
   onCompleteAndExit?: () => void;
   onOpenLeaderboard?: () => void;
   xpEarned: number;
@@ -25,6 +27,8 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
   isOpen,
   onClose,
   onPlayAgain,
+  onNextLevel,
+  nextLevelName,
   onCompleteAndExit,
   onOpenLeaderboard,
   xpEarned,
@@ -87,10 +91,10 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           position: 'relative'
         }}
       >
-        {/* Close Button top-right */}
+        {/* Close Button top-right (schließt nur das Overlay, kein Rauswurf!) */}
         <button
           type="button"
-          onClick={onCompleteAndExit || onClose}
+          onClick={onClose}
           aria-label="Modal schließen"
           style={{
             position: 'absolute',
@@ -281,46 +285,76 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
           </div>
         </div>
 
-        {/* 5. 1% Goldstandard Action Buttons */}
+        {/* 5. 1% Goldstandard Non-Intrusive Action Flow (Übe-Schleife statt Rauswurf) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', marginTop: '6px' }}>
-          <button
-            type="button"
-            onClick={onPlayAgain}
-            style={{
-              width: '100%',
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '14px 20px',
-              color: '#ffffff',
-              fontSize: '1.02rem',
-              fontWeight: 950,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: 'none',
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-scale"
-          >
-            <Play size={18} fill="#ffffff" color="#ffffff" />
-            <span>Nochmal spielen ➔</span>
-          </button>
-
-          {onOpenLeaderboard && (
+          {/* Primär: Nächstes Level (falls vorhanden) */}
+          {onNextLevel ? (
             <button
               type="button"
-              onClick={onOpenLeaderboard}
+              onClick={onNextLevel}
               style={{
                 width: '100%',
-                background: '#fffbeb',
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                 border: 'none',
                 borderRadius: '16px',
-                padding: '13px 20px',
-                color: '#92400e',
-                fontSize: '0.96rem',
+                padding: '14px 20px',
+                color: '#ffffff',
+                fontSize: '1.02rem',
+                fontWeight: 950,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Play size={18} fill="#ffffff" color="#ffffff" />
+              <span>Nächstes Level ({nextLevelName || 'Weiter'}) starten ▶</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onPlayAgain}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '14px 20px',
+                color: '#ffffff',
+                fontSize: '1.02rem',
+                fontWeight: 950,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Play size={18} fill="#ffffff" color="#ffffff" />
+              <span>Nochmal spielen ➔</span>
+            </button>
+          )}
+
+          {/* Sekundär: Dieses Level noch einmal üben (oder im Studio bleiben) */}
+          {onNextLevel && (
+            <button
+              type="button"
+              onClick={onPlayAgain}
+              style={{
+                width: '100%',
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                borderRadius: '16px',
+                padding: '12px 20px',
+                color: '#334155',
+                fontSize: '0.94rem',
                 fontWeight: 950,
                 cursor: 'pointer',
                 display: 'flex',
@@ -332,36 +366,61 @@ export const GrooveSessionCelebrationModal: React.FC<GrooveSessionCelebrationMod
               }}
               className="hover-scale"
             >
-              <Trophy size={18} color="#d97706" />
-              <span>In Hall of Groove eintragen ➔</span>
+              <RotateCcw size={16} />
+              <span>Dieses Level noch einmal üben ↺</span>
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onCompleteAndExit || onClose}
-            style={{
-              width: '100%',
-              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              border: 'none',
-              borderRadius: '16px',
-              padding: '13px 20px',
-              color: '#ffffff',
-              fontSize: '0.94rem',
-              fontWeight: 950,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              boxShadow: 'none',
-              transition: 'all 0.15s ease'
-            }}
-            className="hover-scale"
-          >
-            <CheckCircle2 size={18} color="#ffffff" />
-            <span>Abschließen & Beenden (+{xpEarned} XP) ➔</span>
-          </button>
+          {onOpenLeaderboard && (
+            <button
+              type="button"
+              onClick={onOpenLeaderboard}
+              style={{
+                width: '100%',
+                background: '#fffbeb',
+                border: '1px solid #fef08a',
+                borderRadius: '14px',
+                padding: '10px 18px',
+                color: '#92400e',
+                fontSize: '0.86rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                boxShadow: 'none',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Trophy size={16} color="#d97706" />
+              <span>In Hall of Groove ansehen</span>
+            </button>
+          )}
+
+          {/* Tertiär: Training beenden (Zurück zum Aufgabenheft) */}
+          {onCompleteAndExit && (
+            <button
+              type="button"
+              onClick={onCompleteAndExit}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                padding: '6px 12px',
+                marginTop: '4px',
+                textDecoration: 'underline',
+                transition: 'color 0.12s ease'
+              }}
+              title="Groove-Trainer verlassen und zum Aufgabenheft zurückkehren"
+            >
+              Rhythmus-Training für heute beenden & schließen ➔
+            </button>
+          )}
         </div>
       </div>
     </div>,

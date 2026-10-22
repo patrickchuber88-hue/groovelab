@@ -186,9 +186,18 @@ export function useCampusSecurityGuards({
 
       // 3. Await authoritative database role update via RPC (Fail-Closed, no client table update)
       try {
-        const activeLeaseId = typeof window !== 'undefined' 
-          ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+        const currentUid = typeof window !== 'undefined' 
+          ? (sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id'))
           : null;
+        let activeLeaseId = typeof window !== 'undefined' 
+          ? sessionStorage.getItem('gl_active_session_lease_id')
+          : null;
+        if (!activeLeaseId && typeof window !== 'undefined') {
+          const localOwner = localStorage.getItem('gl_active_session_lease_user_id') || localStorage.getItem('groovelab_user_id');
+          if (!currentUid || !localOwner || localOwner === currentUid) {
+            activeLeaseId = localStorage.getItem('gl_active_session_lease_id');
+          }
+        }
         
         let rpcErr: any = null;
 
@@ -202,10 +211,10 @@ export function useCampusSecurityGuards({
         }
 
         // Graceful Degradation / Fallback: Wenn keine Lease-ID vorhanden ist oder das Backend
-        // die 2-Parameter-Signatur noch nicht im PostgREST-Schema-Cache geladen hat (PGRST202)
-        if (!activeLeaseId || (rpcErr && (rpcErr.message?.includes('schema cache') || rpcErr.code === 'PGRST202'))) {
+        // die 2-Parameter-Signatur noch nicht im PostgREST-Schema-Cache geladen hat (PGRST202 / PGRST203)
+        if (!activeLeaseId || (rpcErr && (rpcErr.message?.includes('schema cache') || rpcErr.code === 'PGRST202' || rpcErr.code === 'PGRST203'))) {
           if (rpcErr) {
-            console.warn('[Role Switch] 2-Parameter RPC nicht im Schema Cache, Fallback auf Basis-Signatur:', rpcErr.message);
+            console.warn('[Role Switch] 2-Parameter RPC Fallback auf Basis-Signatur:', rpcErr.message);
           }
           const fallbackRes = await supabase.rpc('switch_user_active_role', {
             p_target_role: newRole

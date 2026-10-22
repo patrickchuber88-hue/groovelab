@@ -135,11 +135,14 @@ function testStudentMinorProtection() {
   const toxicCheck = validateChatMessageContent('Du bist so ein Arschloch');
   const musicCheck = validateChatMessageContent('Bitte übe den Tastenanschlag auf dem Fagott und bring den Notenständer mit.');
   const crisisCheck = validateChatMessageContent('Ich will sterben');
+  const umbringenCheck = validateChatMessageContent('ich will mich umbringen');
 
   assert(
     !toxicCheck.isValid &&
     musicCheck.isValid &&
     crisisCheck.isCrisis === true &&
+    umbringenCheck.isCrisis === true &&
+    !umbringenCheck.isValid &&
     CRISIS_HELPLINE_INFO.phone === '116 111',
     'Rolle 1 (Schüler)',
     '1.6 Kinderschutz § 8a SGB VIII / DSA Art. 16: Schimpfwörter werden gefiltert, Fagott-Regel schützt Musikbegriffe, Notruf 116 111 greift'

@@ -87,7 +87,7 @@ BEGIN
             SELECT sl.user_id INTO v_resolved_id
             FROM public.session_leases sl
             INNER JOIN public.users_raw u ON u.id = sl.user_id
-            WHERE id = v_token::uuid
+            WHERE sl.id = v_token::uuid
               AND sl.is_revoked = FALSE
               AND u.is_active = TRUE
               AND (
@@ -119,6 +119,40 @@ END;
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.get_current_authenticated_user_id() TO anon, authenticated, service_role;
+
+-- 1-Argument Overloads für ReBAC-Prüfungen auf impliziten Caller-Kontext
+CREATE OR REPLACE FUNCTION public.is_assigned_teacher_of_student(
+    p_student_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET row_security TO 'off'
+SET search_path = public, pg_temp
+STABLE
+AS $$
+BEGIN
+    RETURN public.is_assigned_teacher_of_student(public.get_current_authenticated_user_id(), p_student_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_parent_of_student(
+    p_student_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET row_security TO 'off'
+SET search_path = public, pg_temp
+STABLE
+AS $$
+BEGIN
+    RETURN public.is_parent_of_student(public.get_current_authenticated_user_id(), p_student_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_assigned_teacher_of_student(UUID) TO authenticated, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.is_parent_of_student(UUID) TO authenticated, anon, service_role;
 
 -- ------------------------------------------------------------------------------
 -- 1. [VEKTOR 1 - P0] SERVER-PINNED WEBAUTHN PUBLIC KEY LOOKUP FOR BFF VERIFIER

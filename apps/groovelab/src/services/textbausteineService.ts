@@ -78,28 +78,28 @@ export type DidacticTextbaustein = Textbaustein;
 
 export const DEFAULT_TEXTBAUSTEINE: Textbaustein[] = [
   // Rhythmus & Timing (Puls & Grooves)
-  { id: 'r1', label: 'Puls-Master', text: 'Klopfe den Puls mit dem Fuß und klatsche den Rhythmus im Vorfeld. Spreche die Notenwerte laut mit – dein innerer Puls ist das Fundament jedes Grooves!', type: 'both', category: 'rhythm', active: true },
-  { id: 'r2', label: 'Metronom-Buddy', text: 'Starte mit dem Metronom bei einem entspannten Entschleunigungs-Tempo. Erhöhe das Tempo erst in 5er-Schritten, wenn die Passage 3-mal in Folge makellos im Takt lag.', type: 'both', category: 'rhythm', active: true },
-  { id: 'r3', label: 'Schnecken-Tempo', text: 'Zerlege die schwierige Stelle in echtes Lupen-Tempo. Wenn du jede Bewegung extrem langsam und präzise ausführst, schaltet dein Gehirn automatisch in den Turbo-Modus!', type: 'both', category: 'rhythm', active: true },
-  { id: 'r4', label: 'Puzzle-Taktik', text: 'Verbinde Mikromodule: Übe nicht das ganze Stück auf einmal, sondern isoliere genau einen Takt. Erst wenn dieses Puzzleteil perfekt sitzt, baust du die Brücke zum nächsten Takt.', type: 'both', category: 'rhythm', active: true },
-  { id: 'r5', label: 'Klatsch-Gehen', text: 'Bewege deinen Körper im gleichmäßigen Gehtakt durch den Raum und klatsche die Melodie synchron dazu. So verankerst du das Rhythmusgefühl im ganzen Körper!', type: 'both', category: 'rhythm', active: true },
-  { id: 'r6', label: 'Dehnungs-Übung', text: 'Spiele den Bewegungsablauf in doppelter Notenlänge vollkommen gedehnt durch. Spüre genau, wie deine Finger oder Hände den nächsten Ton vorausschauend vorbereiten.', type: 'both', category: 'rhythm', active: true },
+  { id: 'r1', label: 'Puls-Master', text: 'Klopfe den Puls gleichmäßig mit dem Fuß und klatsche den Rhythmus. Sprich die Notenwerte laut mit – dein stabiler Puls ist das Fundament für jeden Groove!', type: 'both', category: 'rhythm', active: true },
+  { id: 'r2', label: 'Metronom-Buddy', text: 'Starte mit dem Metronom in einem ganz entspannten Wohlfühltempo. Erhöhe erst um 4–5 BPM, wenn du die Stelle dreimal hintereinander fehlerfrei im Takt gespielt hast.', type: 'both', category: 'rhythm', active: true },
+  { id: 'r3', label: 'Schnecken-Tempo', text: 'Spiele die knifflige Stelle in Zeitlupe bei halbem Tempo. Wenn du jede Bewegung ganz bewusst und fehlerfrei ausführst, lernt dein Muskelgedächtnis doppelt so schnell!', type: 'both', category: 'rhythm', active: true },
+  { id: 'r4', label: 'Puzzle-Taktik', text: 'Übe nicht das ganze Stück auf einmal, sondern isoliere genau einen einzelnen Takt oder Übergang. Erst wenn dieses Puzzleteil sitzt, baust du die Brücke zum nächsten Takt.', type: 'both', category: 'rhythm', active: true },
+  { id: 'r5', label: 'Klatsch-Gehen', text: 'Gehe im gleichmäßigen Puls durch den Raum und klatsche den Rhythmus dazu. Die Verbindung von Schritten und Klatschen verankert den Groove fest im ganzen Körper!', type: 'both', category: 'rhythm', active: true },
+  { id: 'r6', label: 'Zeitlupen-Fluss', text: 'Halte jeden Ton doppelt so lang wie notiert. Nutze die gewonnene Zeit, um deine Finger und Hände völlig entspannt auf den nächsten Griff oder Anschlag vorzubereiten.', type: 'both', category: 'rhythm', active: true },
 
   // Technik & Bewegungsökonomie
-  { id: 't1', label: 'Ritter-Dreierspiel', text: 'Mastery-Regel: Wiederhole den kniffligen Übergang exakt dreimal hintereinander ohne den kleinsten Fehler. Das brennt die Bewegung direkt ins Muskelgedächtnis ein!', type: 'both', category: 'technique', active: true },
-  { id: 't2', label: 'Blind-Flug', text: 'Schließe beim Spielen bewusst die Augen und aktiviere deine innere Klangvorstellung. Vertraue deinem Tastsinn und dem Raumgefühl deiner Hände!', type: 'both', category: 'technique', active: true },
-  { id: 't3', label: 'Fokus-Gym', text: 'Führe die Bewegungsabläufe in Zeitlupe bei minimalem Kraftaufwand aus. Achte auf maximale Lockerheit in Schultern, Handgelenken und Fingern.', type: 'both', category: 'technique', active: true },
-  { id: 't4', label: 'Detail-Detektiv', text: 'Verfolge das Notenbild mit geschärftem Blick: Prüfe Vorzeichen, Artikulation (Staccato/Legato) und Fingersätze haargenau. Kein akustisches Detail bleibt unentdeckt!', type: 'lehrwerke', category: 'technique', active: true },
-  { id: 't5', label: 'Hürden-Sprung', text: 'Isoliere die kritische Bewegungsschnittstelle: Übe gezielt nur den Zielwechsel vom letzten Ton des alten Taktes auf den ersten Ton des neuen Taktes.', type: 'both', category: 'technique', active: true },
-  { id: 't6', label: 'Relax-Übung', text: 'Scanne deinen Körper während des Spiels auf unnötige Spannung. Lass alle Muskeln, die gerade nicht aktiv gebraucht werden, völlig entspannt und gelöst.', type: 'both', category: 'technique', active: true },
+  { id: 't1', label: 'Ritter-Dreierspiel', text: 'Die 3er-Meisterregel: Spiele den kniffligen Übergang dreimal hintereinander ohne den kleinsten Wackler. Bei einem Fehler startet der Zähler wieder bei 1!', type: 'both', category: 'technique', active: true },
+  { id: 't2', label: 'Blind-Flug', text: 'Schließe für einen Durchgang die Augen oder schaue bewusst weg vom Instrument. Vertraue ganz deinem Tastsinn, deinen Ohren und der inneren Klangvorstellung!', type: 'both', category: 'technique', active: true },
+  { id: 't3', label: 'Lockerheits-Check', text: 'Spiele die Passage mit minimalem Kraftaufwand. Prüfe bewusst: Sind Schultern, Nacken und Handgelenke gelöst? Nur die Finger arbeiten aktiv – der Rest bleibt federleicht.', type: 'both', category: 'technique', active: true },
+  { id: 't4', label: 'Detail-Detektiv', text: 'Gehe als Noten-Detektiv durch den Takt: Sitzen alle Vorzeichen, die richtige Artikulation (Legato, Staccato) und die Fingersätze? Entdecke jedes noch so kleine Detail!', type: 'lehrwerke', category: 'technique', active: true },
+  { id: 't5', label: 'Hürden-Sprung', text: 'Übe gezielt nur den Nahtstellen-Wechsel: Spiele die letzte Note des alten Taktes und lande punktgenau auf der Eins des neuen Taktes. Wiederhole nur diesen Sprung!', type: 'both', category: 'technique', active: true },
+  { id: 't6', label: 'Daumen-Freiheit', text: 'Achte besonders auf den Stützdaumen oder deine Spielhaltung: Kein Zupressen oder Festhalten! Lass die Finger frei, locker und beweglich schwingen.', type: 'both', category: 'technique', active: true },
 
   // Ausdruck, Klangkultur & Performance
-  { id: 'p1', label: 'Laut-Leise-Zauber', text: 'Erschaffe dramaturgische Kontraste! Gestalte den dynamischen Bogen spürbar zwischen zartem Pianissimo und kraftvollem Forte – gib den Tönen Raum zum Atmen.', type: 'both', category: 'performance', active: true },
-  { id: 'p2', label: 'Eigener Remix', text: 'Kreativitäts-Challenge: Überlege dir eine eigene stilistische Variation, ein cooles Lick oder eine kleine Verzierung für diesen Abschnitt. Bring deine eigene musikalische Handschrift ein!', type: 'songs', category: 'performance', active: true },
-  { id: 'p3', label: 'Storyteller', text: 'Welche Emotion oder Geschichte steckt in diesen Takten? Forme jeden Ton so, als würdest du einer Zuhörerschaft ein spannendes oder berührendes Abenteuer erzählen.', type: 'both', category: 'performance', active: true },
-  { id: 'p4', label: 'Atem-Fluss', text: 'Forme Phrasen wie ein erfahrener Sänger: Atme vor dem Phrasenbeginn ein und führe den Bogen organisch bis zum Entspannungspunkt der Phrase.', type: 'both', category: 'performance', active: true },
-  { id: 'p5', label: 'Echo-Spiel', text: 'Spiel mit Klangschattierungen: Gestalte die Phrasenwiederholung als zartes, fernes Echo aus den Bergen mit reduzierter Anschlagsintensität.', type: 'both', category: 'performance', active: true },
-  { id: 'p6', label: 'Scheinwerfer-An', text: 'Bühnen-Simulation: Spiele das Stück ohne Unterbrechung von Anfang bis Ende durch. Wenn ein kleiner Wackler passiert, spiele unbeeindruckt im Puls weiter – wie ein echter Profi auf der Bühne!', type: 'both', category: 'performance', active: true }
+  { id: 'p1', label: 'Laut-Leise-Zauber', text: 'Zaubere spürbare Kontraste in die Musik! Gestalte den Unterschied zwischen zartem Pianissimo und kraftvollem Forte deutlich hörbar – lass die Töne atmen und strahlen.', type: 'both', category: 'performance', active: true },
+  { id: 'p2', label: 'Eigener Remix', text: 'Kreativ-Challenge: Erfinde eine eigene kleine Variation, einen neuen Rhythmus oder eine Verzierung für diesen Abschnitt. Bring deine persönliche Handschrift ins Stück!', type: 'songs', category: 'performance', active: true },
+  { id: 'p3', label: 'Storyteller', text: 'Erzähle eine Geschichte mit deinem Instrument: Welche Stimmung oder welches Bild siehst du vor dir? Forme jeden Ton so, dass dein Publikum diese Emotion spüren kann.', type: 'both', category: 'performance', active: true },
+  { id: 'p4', label: 'Atem-Fluss', text: 'Phrasiere wie beim Singen: Atme vor dem Beginn der Phrase bewusst ein und führe den musikalischen Bogen in einem einzigen Atemzug bis zum Zielton.', type: 'both', category: 'performance', active: true },
+  { id: 'p5', label: 'Echo-Spiel', text: 'Spiele mit Klangfarben: Gestalte eine Wiederholung wie ein fernes Echo – gleicher Rhythmus, aber zarter, feiner und geheimnisvoller im Klang!', type: 'both', category: 'performance', active: true },
+  { id: 'p6', label: 'Scheinwerfer-An', text: 'Bühnen-Modus: Spiele das Stück ohne anzuhalten komplett durch! Wenn ein kleiner Wackler passiert, bleib einfach im Puls und spiele souverän weiter wie auf der Bühne.', type: 'both', category: 'performance', active: true }
 ];
 
 /**
@@ -139,11 +139,26 @@ export function fetchSchoolTextbausteine(schoolId?: string | number): Textbauste
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length >= 10) {
-        // Auto-Healing: Emojis aus bestehenden Cache-Einträgen säubern
-        return parsed.map((item: any) => ({
-          ...item,
-          label: (item.label || '').replace(/^[\p{Emoji}\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '').trim()
-        }));
+        const defaultMap = new Map(DEFAULT_TEXTBAUSTEINE.map(d => [d.id, d]));
+        // Auto-Healing: Emojis säubern und Standard-Bausteine auf 0,1% Goldstandard aktualisieren
+        return parsed.map((item: any) => {
+          const cleanLabel = (item.label || '').replace(/^[\p{Emoji}\p{Extended_Pictographic}\uFE0F\u200D]+\s*/u, '').trim();
+          const defaultItem = defaultMap.get(item.id);
+          if (defaultItem && !item.isCustom) {
+            return {
+              ...item,
+              label: cleanLabel === 'Dehnungs-Übung' ? 'Zeitlupen-Fluss' : 
+                     cleanLabel === 'Fokus-Gym' ? 'Lockerheits-Check' : 
+                     cleanLabel === 'Relax-Übung' ? 'Daumen-Freiheit' : cleanLabel || defaultItem.label,
+              text: defaultItem.text,
+              category: defaultItem.category
+            };
+          }
+          return {
+            ...item,
+            label: cleanLabel
+          };
+        });
       }
     }
   } catch (e) {

@@ -44,7 +44,32 @@ export function useStudentParentControls({
 }: UseStudentParentControlsProps) {
   // Enterprise PIN & Session Lease
   const inMemoryParentPinRef = useRef<string>('');
-  const [isParentUnlocked, setIsParentUnlocked] = useState<boolean>(false);
+  const [isParentUnlocked, setIsParentUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return (
+        sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+        (studentId ? sessionStorage.getItem(`groovelab_parent_unlocked_${studentId}`) === 'true' : false)
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  // 🛡️ Cross-Component Realtime Parent Mode Synchronization
+  useEffect(() => {
+    const handleParentModeChange = (e: any) => {
+      if (typeof e?.detail === 'boolean') {
+        setIsParentUnlocked(e.detail);
+        if (!e.detail) {
+          inMemoryParentPinRef.current = '';
+        }
+      }
+    };
+    window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+    return () => window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
+  }, []);
+
   const [showParentGateModal, setShowParentGateModal] = useState<boolean>(false);
   const [parentGatePinInput, setParentGatePinInput] = useState('');
   const [parentGateError, setParentGateError] = useState('');

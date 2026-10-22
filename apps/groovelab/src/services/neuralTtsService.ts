@@ -561,6 +561,8 @@ export function buildContinuousHomeworkNarrative(options: {
   instrument?: string;
   books?: { title: string; formattedPages?: string; pageNums?: number[]; pages?: number[]; notes?: string[] | string }[];
   songs?: { title: string; artist?: string; note?: string; notes?: string }[];
+  microScores?: Array<{ title: string; subtitle?: string; tempoBpm?: number; barsCount?: number; instrument?: string }>;
+  worldTourMasteries?: Array<{ stationTitle?: string; stationName?: string; instrument?: string; level?: string }>;
   audioCount?: number;
   audioRecordings?: Array<{ label?: string; title?: string; duration?: string }>;
   generalNotes?: string;
@@ -570,14 +572,19 @@ export function buildContinuousHomeworkNarrative(options: {
 
   const booksList = options.books || [];
   const songsList = options.songs || [];
+  const microScoresList = options.microScores || [];
+  const worldTourList = options.worldTourMasteries || [];
   const audioList = options.audioRecordings || [];
+
   const hasBooks = booksList.length > 0;
   const hasSongs = songsList.length > 0;
+  const hasMicroScores = microScoresList.length > 0;
+  const hasWorldTour = worldTourList.length > 0;
   const hasAudio = audioList.length > 0 || Boolean(options.audioCount && options.audioCount > 0);
   const hasGeneralNotes = Boolean(options.generalNotes && options.generalNotes.trim().length > 0);
   const hasStudentQuestion = Boolean(options.studentQuestion && options.studentQuestion.trim().length > 0);
 
-  const totalTasks = booksList.length + songsList.length;
+  const totalTasks = booksList.length + songsList.length + microScoresList.length + worldTourList.length;
 
   // 1. Leerzustand (Ferien / Keine Aufgaben)
   if (totalTasks === 0 && !hasAudio && !hasGeneralNotes && !hasStudentQuestion) {
@@ -709,6 +716,56 @@ export function buildContinuousHomeworkNarrative(options: {
       }
 
       parts.push(songSentence);
+      currentIndex++;
+    });
+  }
+
+  // 5b. Notenschnipsel & MicroScores (1–4 Takte / Eigenständige didaktische Aufgabenkategorie)
+  if (hasMicroScores) {
+    microScoresList.forEach((ms) => {
+      const cleanMsTitle = (ms.title || 'Notenschnipsel').replace(/\s*\(Notenschnipsel\)/i, '').trim();
+      const connector = getTaskConnector(currentIndex, totalTasks);
+
+      let tempoPhrase = '';
+      if (ms.tempoBpm) {
+        tempoPhrase = ` mit ${ms.tempoBpm} Schlägen pro Minute`;
+      }
+      let barsPhrase = '';
+      if (ms.barsCount) {
+        barsPhrase = ` über ${ms.barsCount} ${ms.barsCount === 1 ? 'Takt' : 'Takte'}`;
+      }
+
+      let msSentence = '';
+      if (totalTasks === 1) {
+        msSentence = `Beim Notenschnipsel ${cleanMsTitle}${tempoPhrase}${barsPhrase} festigst du die Passage.`;
+      } else {
+        msSentence = `${connector} beim Notenschnipsel ${cleanMsTitle}${tempoPhrase}${barsPhrase}.`;
+      }
+
+      if (ms.subtitle && !tempoPhrase && !barsPhrase) {
+        const cleanSub = cleanTeacherNoteForSpeech(ms.subtitle);
+        if (cleanSub) {
+          msSentence += ` Hinweis: ${cleanSub}.`;
+        }
+      }
+
+      parts.push(msSentence);
+      currentIndex++;
+    });
+  }
+
+  // 5c. Musik-Weltreise Meilensteine (Gamifizierte Aufgabenkategorie)
+  if (hasWorldTour) {
+    worldTourList.forEach((wt) => {
+      const station = wt.stationTitle || wt.stationName || 'deine nächste Station';
+      const connector = getTaskConnector(currentIndex, totalTasks);
+      let wtSentence = '';
+      if (totalTasks === 1) {
+        wtSentence = `In der Musik-Weltreise spielst du ${station}.`;
+      } else {
+        wtSentence = `${connector} in der Musik-Weltreise die Station ${station}.`;
+      }
+      parts.push(wtSentence);
       currentIndex++;
     });
   }

@@ -62,9 +62,9 @@ export function computeB2BPricingMetrics({
   bookedExtraUsers
 }: B2BPricingParams) {
   const rates = {
-    priceCampus: Number(effectiveSchoolRates?.priceCampus) || 14.9,
-    priceGroovelab: Number(effectiveSchoolRates?.priceGroovelab) || 9.9,
-    priceKombi: Number(effectiveSchoolRates?.priceKombi) || 19.9,
+    priceCampus: Number(effectiveSchoolRates?.priceCampus) || 19.90,
+    priceGroovelab: Number(effectiveSchoolRates?.priceGroovelab) || 12.90,
+    priceKombi: Number(effectiveSchoolRates?.priceKombi) || 24.90,
     priceTeacher: Number(effectiveSchoolRates?.priceTeacher) || 0.49,
     priceStudent: Number(effectiveSchoolRates?.priceStudent) || 0.49,
   };
@@ -253,7 +253,7 @@ export const useSecretaryLicenses = ({
   const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const gb = Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0);
-    return gb === 5 ? 1.49 : gb === 10 ? 1.99 : gb === 20 ? 3.99 : gb === 25 ? 3.99 : gb === 50 ? 6.99 : gb === 100 ? 11.99 : gb === 250 ? 24.99 : 0;
+    return gb === 10 ? 2.90 : gb === 25 ? 4.90 : gb === 50 ? 8.90 : gb === 100 ? 14.90 : gb === 250 ? 19.90 : 0;
   });
 
   const [showStorageManagerModal, setShowStorageManagerModal] = useState<boolean>(false);

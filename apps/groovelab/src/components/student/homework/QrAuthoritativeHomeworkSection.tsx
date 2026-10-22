@@ -23,13 +23,7 @@ import {
 } from '../meisterwerk/utils/meisterwerkSongHelpers';
 
 // ─── Archive Audio Player Row ───────────────────────────────────────────────
-export interface ArchiveAudioTrackItem {
-  url: string;
-  label: string;
-  duration?: number;
-  author?: string;
-  date?: string;
-}
+export interface ArchiveAudioTrackItem { url: string; label: string; duration?: number; author?: string; date?: string; }
 
 export const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aIdx: number }> = ({ track, aIdx }) => {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
@@ -45,140 +39,70 @@ export const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aId
       if (track.date.includes('T') || (track.date.includes('-') && track.date.length > 8)) {
         const d = new Date(track.date);
         if (!isNaN(d.getTime())) {
-          const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
-          const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-          return `${dateStr} · ${timeStr} Uhr`;
+          return `${d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} · ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
         }
       }
       return track.date;
-    } catch {
-      return track.date;
-    }
+    } catch { return track.date; }
   }, [track.date]);
 
   useEffect(() => {
     let isCancelled = false;
-
     const resolve = async () => {
       try {
-        let src: string | null = null;
-        let cleanup: (() => void) | undefined = undefined;
-
+        let src: string | null = null, cleanup: (() => void) | undefined = undefined;
         if (track.url.startsWith('blob:') || track.url.startsWith('data:') || track.url.startsWith('http://') || track.url.startsWith('https://')) {
           src = track.url;
         } else {
           const res = await resolvePlayableAudioSource(track.url, 'campus-assets', 1800);
-          if (res && res.src) {
-            src = res.src;
-            cleanup = res.cleanup;
-          } else {
+          if (res?.src) { src = res.src; cleanup = res.cleanup; }
+          else {
             const resGroove = await resolvePlayableAudioSource(track.url, 'groovelab-assets', 1800);
-            if (resGroove && resGroove.src) {
-              src = resGroove.src;
-              cleanup = resGroove.cleanup;
-            }
+            if (resGroove?.src) { src = resGroove.src; cleanup = resGroove.cleanup; }
           }
         }
-
-        if (isCancelled) {
-          if (cleanup) cleanup();
-          return;
-        }
-
+        if (isCancelled) { if (cleanup) cleanup(); return; }
         if (src) {
-          if (cleanupRef.current && cleanupRef.current !== cleanup) {
-            cleanupRef.current();
-          }
+          if (cleanupRef.current && cleanupRef.current !== cleanup) cleanupRef.current();
           cleanupRef.current = cleanup || null;
           setResolvedUrl(src);
         }
-      } catch (err) {
-        console.warn('[ArchiveAudioPlayerRow] Resolution error:', err);
-      }
+      } catch (err) { console.warn('[ArchiveAudioPlayerRow] Resolution error:', err); }
     };
-
     resolve();
-
-    return () => {
-      isCancelled = true;
-      if (cleanupRef.current) {
-        cleanupRef.current();
-        cleanupRef.current = null;
-      }
-    };
+    return () => { isCancelled = true; if (cleanupRef.current) { cleanupRef.current(); cleanupRef.current = null; } };
   }, [track.url]);
 
   const togglePlay = () => {
     if (!audioRef.current || !resolvedUrl) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play()
-        .then(() => setIsPlaying(true))
-        .catch(err => {
-          console.warn('[ArchiveAudioPlayerRow] Play error:', err);
-          setIsPlaying(false);
-        });
-    }
+    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
+    else { audioRef.current.play().then(() => setIsPlaying(true)).catch(err => { console.warn('[ArchiveAudioPlayerRow] Play error:', err); setIsPlaying(false); }); }
   };
 
   const formatSecs = (sec: number) => {
     if (isNaN(sec) || sec <= 0) return '0:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '12px',
-      padding: '10px 14px',
-      background: '#f8fafc',
-      border: '1px solid #e2e8f0',
-      borderRadius: '12px'
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
       {resolvedUrl && (
         <audio
-          ref={audioRef}
-          src={resolvedUrl}
-          preload="metadata"
+          ref={audioRef} src={resolvedUrl} preload="metadata"
           onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
           onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)}
-          onEnded={() => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-          }}
+          onEnded={() => { setIsPlaying(false); setCurrentTime(0); }}
         />
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
         <button
-          type="button"
-          onClick={togglePlay}
-          aria-label={isPlaying ? 'Audio pausieren' : 'Audio abspielen'}
-          style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '50%',
-            background: isPlaying ? '#16a34a' : '#ffffff',
-            color: isPlaying ? '#ffffff' : '#16a34a',
-            border: '1.5px solid #bbf7d0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            flexShrink: 0,
-            boxShadow: 'none',
-            transition: 'all 0.15s ease'
-          }}
+          type="button" onClick={togglePlay} aria-label={isPlaying ? 'Audio pausieren' : 'Audio abspielen'}
+          style={{ width: '34px', height: '34px', borderRadius: '50%', background: isPlaying ? '#16a34a' : '#ffffff', color: isPlaying ? '#ffffff' : '#16a34a', border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: 'none', transition: 'all 0.15s ease' }}
           className="hover-scale-mini"
         >
           {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" style={{ marginLeft: '2px' }} />}
         </button>
-
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {track.label || `Aufnahme #${aIdx + 1}`}
@@ -188,16 +112,7 @@ export const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aId
           </span>
         </div>
       </div>
-
-      <span style={{
-        fontSize: '0.68rem',
-        fontWeight: 800,
-        color: '#15803d',
-        background: '#dcfce7',
-        padding: '2px 8px',
-        borderRadius: '100px',
-        flexShrink: 0
-      }}>
+      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '100px', flexShrink: 0 }}>
         {track.author || 'Lehrkraft'}
       </span>
     </div>
@@ -206,40 +121,17 @@ export const ArchiveAudioPlayerRow: React.FC<{ track: ArchiveAudioTrackItem; aId
 
 // ─── Main Component Props ───────────────────────────────────────────────────
 export interface QrAuthoritativeHomeworkSectionProps {
-  profile: any;
-  progressItems: any[];
-  localProgress?: any[];
-  lehrwerke?: any[];
-  activeSongSkills?: any[];
-  assignedCampusSongs?: any[];
-  teachers?: any[];
-  compressed?: boolean;
-  onOpenFullArchive?: () => void;
-  isArchiveUnlocked?: boolean;
+  profile: any; progressItems: any[]; localProgress?: any[]; lehrwerke?: any[]; activeSongSkills?: any[];
+  assignedCampusSongs?: any[]; teachers?: any[]; compressed?: boolean; onOpenFullArchive?: () => void; isArchiveUnlocked?: boolean;
 }
 
 export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSectionProps> = ({
-  profile,
-  progressItems = [],
-  localProgress = [],
-  lehrwerke = [],
-  activeSongSkills = [],
-  assignedCampusSongs = [],
-  teachers = [],
-  compressed = false,
-  onOpenFullArchive,
-  isArchiveUnlocked = false
+  profile, progressItems = [], localProgress = [], lehrwerke = [], activeSongSkills = [],
+  assignedCampusSongs = [], teachers = [], compressed = false, onOpenFullArchive, isArchiveUnlocked = false
 }) => {
   const studentId = profile?.id;
   const studentFirstName = profile?.first_name || 'Schüler';
-
-  const {
-    isTtsSpeaking,
-    activeTtsKey,
-    handleSpeakText,
-    handleStopSpeaking,
-    buildCompleteWeeklyHomeworkSpeechPhrases
-  } = useMeisterwerkTts();
+  const { isTtsSpeaking, activeTtsKey, handleSpeakText, handleStopSpeaking, buildCompleteWeeklyHomeworkSpeechPhrases } = useMeisterwerkTts();
 
   const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
@@ -1043,6 +935,13 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                       title: s.cleanTitle + (s.artist ? ` von ${s.artist}` : ''),
                       note: s.notes
                     })),
+                    microScores: (currentWeekData.microScores || []).map((ms: any) => ({
+                      title: ms.title || 'Notenschnipsel',
+                      subtitle: ms.subtitle || `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`,
+                      tempoBpm: ms.tempoBpm || 80,
+                      barsCount: ms.barsCount || 2,
+                      instrument: ms.instrument
+                    })),
                     audioRecordings: currentWeekData.audioTracks.map(a => ({
                       label: a.label || 'Aufnahme'
                     })),
@@ -1662,6 +1561,8 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
               const msId = ms.id || `ms-${msIdx}`;
               const msTitle = ms.title || 'Notenschnipsel';
               const msSubtitle = `${ms.tempoBpm || 80} BPM · ${ms.barsCount || 2} Takte Notenschnipsel`;
+              const isSpeakingThisMs = isTtsSpeaking && activeTtsKey === `qr_ms_${msIdx}`;
+              const msSpeechText = `Notenschnipsel: ${msTitle}. ${msSubtitle}.`;
               return (
                 <div
                   key={`qr-ms-${msId}-${msIdx}`}
@@ -1693,12 +1594,55 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
                       </span>
                     </div>
                   </div>
-                  <StudentHomeworkStatusButton
-                    studentId={studentId}
-                    taskId={msId}
-                    label={msTitle}
-                    variant="standard"
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <StudentHomeworkStatusButton
+                      studentId={studentId}
+                      taskId={msId}
+                      label={msTitle}
+                      variant="standard"
+                    />
+                    <button
+                      type="button"
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isSpeakingThisMs) {
+                          handleStopSpeaking();
+                        } else {
+                          handleSpeakText(msSpeechText, `qr_ms_${msIdx}`);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (isSpeakingThisMs) {
+                            handleStopSpeaking();
+                          } else {
+                            handleSpeakText(msSpeechText, `qr_ms_${msIdx}`);
+                          }
+                        }
+                      }}
+                      style={{
+                        border: isSpeakingThisMs ? '1px solid #10b981' : '1px solid #cbd5e1',
+                        background: isSpeakingThisMs ? '#dcfce7' : '#ffffff',
+                        color: isSpeakingThisMs ? '#15803d' : '#64748b',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                      className="hover-scale-mini"
+                      title={isSpeakingThisMs ? "Vorlesen stoppen" : `Notenschnipsel ${msTitle} vorlesen`}
+                      aria-label={isSpeakingThisMs ? "Vorlesen stoppen" : `Notenschnipsel ${msTitle} vorlesen`}
+                    >
+                      {isSpeakingThisMs ? <VolumeX size={13} strokeWidth={2.4} /> : <Volume2 size={13} strokeWidth={2.2} />}
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -35,6 +35,7 @@ export interface SecretaryInvoiceHistorySectionProps {
   setExpandedYears: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   setActiveStudentsModalList: (val: any) => void;
   onOpenDunningPayModal?: (inv: any) => void;
+  onSyncComputedInvoices?: (invoices: any[]) => void;
   setSelectedInvoice: (inv: any) => void;
   agreedToSepa?: boolean;
   supabase?: any;
@@ -77,6 +78,7 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
   setExpandedYears,
   setActiveStudentsModalList,
   onOpenDunningPayModal,
+  onSyncComputedInvoices,
   setSelectedInvoice,
   agreedToSepa = false,
   supabase
@@ -314,6 +316,7 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
         date: invoiceDateStr,
         dueDateStr: dueDateStr,
         dueDateObj: dueDateObj,
+        due_date: dueDateObj.toISOString(),
         countdownStr: infCountdownStr,
         isCurrentMonth: isCurrent,
         b2b: infPureAmount,
@@ -348,6 +351,7 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
         date: invoiceDateStr,
         dueDateStr: dueDateStr,
         dueDateObj: dueDateObj,
+        due_date: dueDateObj.toISOString(),
         countdownStr: aktCountdownStr,
         isCurrentMonth: isCurrent,
         b2b: 0,
@@ -445,6 +449,13 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
     billingPayer,
     agreedToSepa
   ]);
+
+  useEffect(() => {
+    if (onSyncComputedInvoices && Array.isArray(invoicesData)) {
+      const finalizedInvoices = invoicesData.filter((inv: any) => inv && inv.status !== 'Vorschau' && Number(inv.amount) > 0);
+      onSyncComputedInvoices(finalizedInvoices);
+    }
+  }, [invoicesData, onSyncComputedInvoices]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

@@ -22,11 +22,13 @@ import {
   Shield,
   QrCode,
   Compass,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { CampusSidebarRailItem } from '../layout/CampusSidebarRailItem';
 import { CampusSidebarUserHub } from '../layout/CampusSidebarUserHub';
 import { CampusRibbonNoteIcon } from '../CampusGroovelabBrand';
+import { isCampusBoardAllowedForChild } from '../../services/campusBoardPermissions';
 
 export interface CampusMobileSidebarDrawerProps {
   isOpen: boolean;
@@ -587,37 +589,39 @@ export const CampusMobileSidebarDrawer: React.FC<CampusMobileSidebarDrawerProps>
                     window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
                   }}
                 />
-                {(parentUnlocked || (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_practice_board') !== 'false' : true)) && (
-                  <CampusSidebarRailItem
-                    icon={<Zap size={20} />}
-                    label="Übe-Pfad"
-                    isActive={activeTab === 'practice_board'}
-                    isCollapsed={false}
-                    platform={activePlatform}
-                    onClick={() => handleSelectTab('practice_board')}
-                  />
-                )}
-                {(parentUnlocked || (typeof window !== 'undefined' ? localStorage.getItem('campus_board_override_events') !== 'false' : true)) && (
-                  <CampusSidebarRailItem
-                    icon={<Calendar size={20} />}
-                    label="Termine"
-                    isActive={activeTab === 'events'}
-                    isCollapsed={false}
-                    platform={activePlatform}
-                    onClick={() => handleSelectTab('events')}
-                  />
-                )}
-                {(parentUnlocked || (typeof window !== 'undefined' ? (localStorage.getItem('campus_board_override_messages') !== 'false' && localStorage.getItem('campus_allow_chat') !== 'false') : true)) && (
-                  <CampusSidebarRailItem
-                    icon={<Mail size={20} />}
-                    label="Nachrichten"
-                    isActive={activeTab === 'messages'}
-                    isCollapsed={false}
-                    platform={activePlatform}
-                    badgeCount={unreadCount}
-                    onClick={() => handleSelectTab('messages')}
-                  />
-                )}
+                <CampusSidebarRailItem
+                  icon={<Zap size={20} />}
+                  label="Übe-Pfad"
+                  isActive={activeTab === 'practice_board'}
+                  isCollapsed={false}
+                  platform={activePlatform}
+                  onClick={() => handleSelectTab('practice_board')}
+                  rightSlot={!parentUnlocked && !isCampusBoardAllowedForChild('practice_board', user, false) ? <Lock size={12} color="#94a3b8" /> : undefined}
+                  style={{ opacity: !parentUnlocked && !isCampusBoardAllowedForChild('practice_board', user, false) ? 0.65 : 1 }}
+                />
+
+                <CampusSidebarRailItem
+                  icon={<Calendar size={20} />}
+                  label="Termine"
+                  isActive={activeTab === 'events'}
+                  isCollapsed={false}
+                  platform={activePlatform}
+                  onClick={() => handleSelectTab('events')}
+                  rightSlot={!parentUnlocked && !isCampusBoardAllowedForChild('events', user, false) ? <Lock size={12} color="#94a3b8" /> : undefined}
+                  style={{ opacity: !parentUnlocked && !isCampusBoardAllowedForChild('events', user, false) ? 0.65 : 1 }}
+                />
+
+                <CampusSidebarRailItem
+                  icon={<Mail size={20} />}
+                  label="Nachrichten"
+                  isActive={activeTab === 'messages'}
+                  isCollapsed={false}
+                  platform={activePlatform}
+                  badgeCount={unreadCount}
+                  onClick={() => handleSelectTab('messages')}
+                  rightSlot={!parentUnlocked && !isCampusBoardAllowedForChild('messages', user, false) ? <Lock size={12} color="#94a3b8" /> : undefined}
+                  style={{ opacity: !parentUnlocked && !isCampusBoardAllowedForChild('messages', user, false) ? 0.65 : 1 }}
+                />
                 <CampusSidebarRailItem
                   icon={!parentUnlocked ? <ShieldCheck size={20} /> : <Settings size={20} />}
                   label={!parentUnlocked ? 'Elternbereich' : 'Einstellungen'}

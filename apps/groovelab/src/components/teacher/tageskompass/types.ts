@@ -53,6 +53,7 @@ export interface TagesKompassStudent {
   schoolId?: string;
   schools?: { name?: string; id?: string };
   school_name?: string;
+  startTime?: string;
 }
 
 export interface TagesKompassHomeworkItem {

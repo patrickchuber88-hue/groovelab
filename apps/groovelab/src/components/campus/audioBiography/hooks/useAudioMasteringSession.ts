@@ -7,6 +7,7 @@ import {
 } from '../../../../utils/audioMasteringEngine';
 import { reportAudioError } from '../../../../lib/errorTelemetry';
 import { acquireAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../../services/audio/AudioCaptureEngine';
 import { fixWebmDuration } from '../../../../utils/webmDurationPatcher';
 import { StudioMasterClock } from '../../../../utils/studioMasterClock';
 
@@ -65,57 +66,26 @@ export function useAudioMasteringSession(_instrument?: string) {
       timerIntervalRef.current = null;
     }
     setIsRecording(false);
+    setIsProcessingMastering(true);
     if (isAutoStopped) {
       setRecordingAutoStoppedInfo(true);
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (e) {
-        console.warn('Could not stop recorder:', e);
-      }
+      AudioCaptureEngine.stopRecorderWithTail(mediaRecorderRef.current, 900);
+    } else {
+      setIsProcessingMastering(false);
     }
   }, []);
 
   const triggerRecordingCountIn = useCallback(async () => {
     try {
       const stream = await acquireAudioStream({
-        audio: {
-          ...PURE_RAW_AUDIO_CONSTRAINTS,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          voiceIsolation: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: { ideal: 2 },
-          sampleRate: { ideal: 48000 }
-        } as any
+        audio: PURE_RAW_AUDIO_CONSTRAINTS
       });
       activeMicStreamRef.current = stream;
       await stabilizeAudioStream(stream, 400);
 
-      let mimeType = 'audio/webm;codecs=opus';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          if (MediaRecorder.isTypeSupported('audio/webm')) {
-            mimeType = 'audio/webm';
-          } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-            mimeType = 'audio/mp4';
-          } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-            mimeType = 'audio/aac';
-          } else {
-            mimeType = '';
-          }
-        }
-      }
-
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 256000 })
-        : new MediaRecorder(stream, { audioBitsPerSecond: 256000 });
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -126,7 +96,7 @@ export function useAudioMasteringSession(_instrument?: string) {
       };
 
       recorder.onstop = async () => {
-        const actualMime = recorder.mimeType || (audioChunksRef.current[0]?.type) || 'audio/webm';
+        const actualMime = recorder.mimeType || (audioChunksRef.current[0]?.type) || mimeType || 'audio/webm';
         let audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
 
         if (actualMime.includes('webm') && recordSeconds > 0) {

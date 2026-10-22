@@ -852,23 +852,35 @@ export const AuthoritativeHomeworkWidget: React.FC<AuthoritativeHomeworkWidgetPr
           title={onOpenQuestionModal ? "Klicken, um deine Frage an die Lehrkraft zu bearbeiten" : undefined}
           aria-label={onOpenQuestionModal ? "Deine Frage an die Lehrkraft bearbeiten" : undefined}
           style={{
-            display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.88rem', padding: '10px 14px',
+            display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.88rem', padding: '11px 14px',
             borderRadius: '14px', background: '#fef3c7', border: 'none', boxShadow: 'none',
-            cursor: onOpenQuestionModal ? 'pointer' : 'default', transition: 'all 0.15s ease'
+            cursor: onOpenQuestionModal ? 'pointer' : 'default', transition: 'all 0.15s ease',
+            minWidth: 0, boxSizing: 'border-box'
           }}
           className={onOpenQuestionModal ? "hover-scale-mini" : undefined}
         >
-          <HelpCircle size={16} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-              <span style={{ color: '#854d0e', fontWeight: 900, fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                FRAGE an Lehrkraft · Für deine nächste Stunde vorgemerkt
-              </span>
+          <HelpCircle size={18} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} strokeWidth={2.5} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1, lineHeight: 1.35 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
+                <span style={{ color: '#854d0e', fontWeight: 900, fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  FRAGE AN LEHRKRAFT
+                </span>
+                <span style={{ color: '#92400e', fontWeight: 650, fontSize: '0.72rem', whiteSpace: 'nowrap' }}>
+                  · Für deine nächste Stunde
+                </span>
+              </div>
               {onOpenQuestionModal && (
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ca8a04' }}>Bearbeiten →</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  Bearbeiten →
+                </span>
               )}
             </div>
-            <span style={{ color: '#713f12', fontWeight: 750, fontSize: '0.90rem', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            <span style={{
+              color: '#713f12', fontWeight: 750, fontSize: '0.90rem',
+              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'anywhere'
+            }}>
               „{studentQuestion}“
             </span>
           </div>

@@ -34,17 +34,33 @@
  * - Pure RAW: -14.5 LUFS / -1.0 dBTP (Exakt 0.5 LUFS subtiler, satter Master-Vergleich)
  * ==============================================================================
  */
-import { reportAudioError } from '../lib/errorTelemetry';
 import { SharedAudioEngine } from './sharedAudioEngine';
+import {
+  safeDecodeAudioData,
+  audioBufferToWavBlob,
+  audioBufferToStreamingBlob,
+  sliceAudioBlobForPreview,
+  ensureWavBlob
+} from './audioWavStreamingEncoder';
+
+// LEG-36 Audio-Codec Supply-Chain Reference: Lazy-loaded via await import('@breezystack/lamejs') in audioWavStreamingEncoder.ts
+export {
+  safeDecodeAudioData,
+  audioBufferToWavBlob,
+  audioBufferToStreamingBlob,
+  sliceAudioBlobForPreview,
+  ensureWavBlob
+};
 
 // 🌟 CENTRAL PLATFORM-WIDE LOUDNESS & PEAK STANDARDS
 export const TARGET_STUDIO_LUFS = -14.0;
 export const TARGET_LOOP_TRACK_LUFS = -16.0; // 🏛️ 0,1% Loopstation Goldstandard: -16.0 LUFS Einzelspur-Präsenz, summiert sich bei 4 Spuren perfekt auf -13.5 bis -14.0 LUFS Master-Punch
 export const TARGET_LOOP_TRACK_PEAK_DBTP = -1.5; // 🏛️ Multi-Track Headroom (-1.5 dBTP): Verhindert Clipping beim 4-Spur-Summieren
-export const TARGET_PURE_RAW_LUFS = -18.5; // 🏛️ Musikschul-Goldstandard (-18.5 LUFS): EBU R128 Musik-Referenz, volle Akustik-Dynamik & perfekte Durchsetzungsfähigkeit auf mobilen Geräten
+export const TARGET_PURE_RAW_LUFS = -16.0; // 🏛️ 0,1% Gesunde Referenz-Lautheit (-16.0 LUFS Gated nach EBU R128 / AES TD1004): Klar, voll, gehörschonend & 100% natürliche Dynamik
 export const TARGET_PEAK_DBTP = -1.0;      // 🏛️ Broadcast-Headroom (-1.0 dBTP): Zero Intersample Clipping nach EBU R128
 export const TARGET_PURE_RAW_PEAK_DBTP = -1.0;
-export const MAX_PURE_RAW_LIMITER_GR_DB = 0.0; // 🏛️ Pure RAW Doktrin: Zero Limiter Gain Reduction (0.0 dB)
+export const MAX_PURE_RAW_LIMITER_GR_DB = 3.5; // 🏛️ Schutz vor der Single-Transient-Falle: Bis zu 3.5 dB transparenter Lookahead-True-Peak-Catcher gegen isolierte 1ms-Klicks
+export const CURRENT_MASTERING_VERSION = 'v3.1_hd_natural_16lufs_tail';
 
 export type MasteringProfile = 
   | 'acoustic_audiophile' 
@@ -368,14 +384,14 @@ export function createTubeWarmthCurve(amount = 1.05, wetMix = 0.05, samples = 44
 }
 
 // ==============================================================================
-// 📊 ITU-R BS.1770-4 / EBU R128 INTEGRATED LOUDNESS (LUFS) METERING
+// 📊 ITU-R BS.1770-4 / EBU R128 GATED INTEGRATED LOUDNESS (LUFS) METERING
 // ==============================================================================
 export function calculateIntegratedLufs(audioBuffer: AudioBuffer): number {
   const sampleRate = audioBuffer.sampleRate;
   const numChannels = audioBuffer.numberOfChannels;
   const length = audioBuffer.length;
 
-  if (length === 0) return -70;
+  if (length === 0 || sampleRate <= 0) return -70;
 
   // Stage 1: High-Shelf Pre-Filter Coefficients (ITU-R BS.1770-4)
   const dbGain = 3.999843853973347;
@@ -404,8 +420,13 @@ export function calculateIntegratedLufs(audioBuffer: AudioBuffer): number {
   const a1_2 = (2 * (K_hp * K_hp - 1)) / a0_2;
   const a2_2 = (1 - K_hp / Q_hp + K_hp * K_hp) / a0_2;
 
-  let totalWeightedSum = 0;
   const channelWeights = [1.0, 1.0, 1.0, 1.0, 1.0];
+
+  // Use 50ms sub-blocks (400ms gating window = 8 sub-blocks, 100ms hop = 2 sub-blocks)
+  const subBlockSamples = Math.max(1, Math.floor(sampleRate * 0.05));
+  const numSubBlocks = Math.max(1, Math.ceil(length / subBlockSamples));
+  const subBlockMeanSquare = new Float64Array(numSubBlocks);
+  let totalUngatedWeightedSum = 0;
 
   for (let c = 0; c < numChannels; c++) {
     const channelData = audioBuffer.getChannelData(c);
@@ -415,27 +436,88 @@ export function calculateIntegratedLufs(audioBuffer: AudioBuffer): number {
     let y1_2 = 0, y2_2 = 0, x1_2 = 0, x2_2 = 0;
     let channelEnergy = 0;
 
-    for (let i = 0; i < length; i++) {
-      const x = channelData[i];
+    for (let sb = 0; sb < numSubBlocks; sb++) {
+      const start = sb * subBlockSamples;
+      const end = Math.min(length, start + subBlockSamples);
+      const count = end - start;
+      if (count <= 0) continue;
 
-      // Stage 1 filter (High-Shelf)
-      const y_stage1 = b0_1 * x + b1_1 * x1_1 + b2_1 * x2_1 - a1_1 * y1_1 - a2_1 * y2_1;
-      x2_1 = x1_1; x1_1 = x;
-      y2_1 = y1_1; y1_1 = y_stage1;
+      let sbEnergy = 0;
+      for (let i = start; i < end; i++) {
+        const x = channelData[i];
 
-      // Stage 2 filter (RLB High-Pass)
-      const y_stage2 = b0_2 * y_stage1 + b1_2 * x1_2 + b2_2 * x2_2 - a1_2 * y1_2 - a2_2 * y2_2;
-      x2_2 = x1_2; x1_2 = y_stage1;
-      y2_2 = y1_2; y1_2 = y_stage2;
+        // Stage 1 filter (High-Shelf)
+        const y_stage1 = b0_1 * x + b1_1 * x1_1 + b2_1 * x2_1 - a1_1 * y1_1 - a2_1 * y2_1;
+        x2_1 = x1_1; x1_1 = x;
+        y2_1 = y1_1; y1_1 = y_stage1;
 
-      channelEnergy += y_stage2 * y_stage2;
+        // Stage 2 filter (RLB High-Pass)
+        const y_stage2 = b0_2 * y_stage1 + b1_2 * x1_2 + b2_2 * x2_2 - a1_2 * y1_2 - a2_2 * y2_2;
+        x2_2 = x1_2; x1_2 = y_stage1;
+        y2_2 = y1_2; y1_2 = y_stage2;
+
+        const sq = y_stage2 * y_stage2;
+        sbEnergy += sq;
+        channelEnergy += sq;
+      }
+
+      subBlockMeanSquare[sb] += weight * (sbEnergy / count);
     }
 
-    totalWeightedSum += weight * (channelEnergy / Math.max(1, length));
+    totalUngatedWeightedSum += weight * (channelEnergy / Math.max(1, length));
   }
 
-  if (totalWeightedSum <= 1e-12) return -70;
-  return -0.691 + 10 * Math.log10(totalWeightedSum);
+  if (totalUngatedWeightedSum <= 1e-12) return -70;
+
+  // ITU-R BS.1770-4 / EBU R128 2-Stage Gating (400ms blocks = 8 sub-blocks, 75% overlap = step 2)
+  const absGateThresholdEnergy = Math.pow(10, (-70.0 + 0.691) / 10);
+  const blockEnergies: number[] = [];
+
+  if (numSubBlocks >= 8) {
+    for (let sb = 0; sb <= numSubBlocks - 8; sb += 2) {
+      let sum8 = 0;
+      for (let k = 0; k < 8; k++) {
+        sum8 += subBlockMeanSquare[sb + k];
+      }
+      const blockMeanEnergy = sum8 / 8;
+      if (blockMeanEnergy > absGateThresholdEnergy) {
+        blockEnergies.push(blockMeanEnergy);
+      }
+    }
+  } else {
+    for (let sb = 0; sb < numSubBlocks; sb++) {
+      if (subBlockMeanSquare[sb] > absGateThresholdEnergy) {
+        blockEnergies.push(subBlockMeanSquare[sb]);
+      }
+    }
+  }
+
+  if (blockEnergies.length === 0) {
+    return -0.691 + 10 * Math.log10(totalUngatedWeightedSum);
+  }
+
+  // Stage 1: Average of blocks above -70 LUFS absolute gate
+  let absGatedSum = 0;
+  for (let i = 0; i < blockEnergies.length; i++) {
+    absGatedSum += blockEnergies[i];
+  }
+  const absGatedMean = absGatedSum / blockEnergies.length;
+  const relGateLufs = (-0.691 + 10 * Math.log10(absGatedMean)) - 10.0;
+  const relGateThresholdEnergy = Math.pow(10, (relGateLufs + 0.691) / 10);
+
+  // Stage 2: Average of blocks above -10 LU relative gate
+  let relGatedSum = 0;
+  let relGatedCount = 0;
+  for (let i = 0; i < blockEnergies.length; i++) {
+    if (blockEnergies[i] >= relGateThresholdEnergy) {
+      relGatedSum += blockEnergies[i];
+      relGatedCount++;
+    }
+  }
+
+  const finalMeanEnergy = relGatedCount > 0 ? (relGatedSum / relGatedCount) : absGatedMean;
+  if (finalMeanEnergy <= 1e-12) return -70;
+  return -0.691 + 10 * Math.log10(finalMeanEnergy);
 }
 
 export function calculateIntegratedRms(audioBuffer: AudioBuffer): number {
@@ -1267,56 +1349,81 @@ export function applyStereoDimensionAndMonoMaker(audioBuffer: AudioBuffer): Audi
 }
 
 // ==============================================================================
-// 🎙️ SAFE AUDIO BUFFER DECODER (Universal Safari, WebKit, Chrome & Firefox)
-// ==============================================================================
-export async function safeDecodeAudioData(audioContext: BaseAudioContext, arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
-  if (!arrayBuffer || arrayBuffer.byteLength < 128) {
-    return Promise.reject(new Error('Audio buffer too small or empty to decode'));
+// 🎙️ STAGE 0: PURE RAW AUDIO BUFFER DSP ENGINE (The Calibrated Single Source)
+/**
+ * 🌟 HIGH-RESOLUTION NATURAL CLARITY & SILK-AIR EQ (Transposed Direct Form II)
+ * Befreit eingebaute Tablet-/Laptop-/Smartphone-Mikrofone von dumpfer Tisch-Resonanz
+ * und stellt die natürliche, seidige Hochton-Offenheit wieder her, ohne das Instrument
+ * künstlich zu verfärben:
+ * 1. De-Mud Peaking: 255 Hz, -1.0 dB, Q = 1.8 (entfernt hohle Kasten-/Tisch-Resonanz)
+ * 2. Natural Presence Peaking: 3500 Hz, +0.8 dB, Q = 0.85 (klare Artikulation & Greifbarkeit)
+ * 3. Silk-Air High-Shelf: 10500 Hz, +1.1 dB, Q = 0.707 (seidige Brillianz & Oberton-Luft)
+ */
+export function applyNaturalClarityEq(audioBuffer: AudioBuffer): void {
+  const sampleRate = audioBuffer.sampleRate;
+  const numChannels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  if (length === 0 || sampleRate <= 0) return;
+
+  // Helper to apply a single Biquad stage in-place (Transposed Direct Form II)
+  const applyBiquadStage = (b0: number, b1: number, b2: number, a0: number, a1: number, a2: number) => {
+    const nb0 = b0 / a0;
+    const nb1 = b1 / a0;
+    const nb2 = b2 / a0;
+    const na1 = a1 / a0;
+    const na2 = a2 / a0;
+
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      let s1 = 0;
+      let s2 = 0;
+      for (let i = 0; i < length; i++) {
+        const x = data[i];
+        const y = nb0 * x + s1;
+        s1 = nb1 * x - na1 * y + s2;
+        s2 = nb2 * x - na2 * y;
+        data[i] = y;
+      }
+    }
+  };
+
+  // Band 1: 255 Hz De-Mud Peaking (-1.0 dB, Q = 1.8)
+  {
+    const A = Math.pow(10, -1.0 / 40.0);
+    const omega = (2.0 * Math.PI * 255.0) / sampleRate;
+    const cosW = Math.cos(omega);
+    const alpha = Math.sin(omega) / (2.0 * 1.8);
+    applyBiquadStage(1 + alpha * A, -2 * cosW, 1 - alpha * A, 1 + alpha / A, -2 * cosW, 1 - alpha / A);
   }
 
-  return new Promise<AudioBuffer>((resolve, reject) => {
-    let settled = false;
+  // Band 2: 3500 Hz Natural Presence Peaking (+0.8 dB, Q = 0.85)
+  if (sampleRate > 8000) {
+    const A = Math.pow(10, 0.8 / 40.0);
+    const omega = (2.0 * Math.PI * 3500.0) / sampleRate;
+    const cosW = Math.cos(omega);
+    const alpha = Math.sin(omega) / (2.0 * 0.85);
+    applyBiquadStage(1 + alpha * A, -2 * cosW, 1 - alpha * A, 1 + alpha / A, -2 * cosW, 1 - alpha / A);
+  }
 
-    const timeout = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        const timeoutErr = new Error('Audio decoding timed out in browser engine');
-        reportAudioError(timeoutErr, 'safeDecodeAudioData', { tag: 'AUDIO_DECODE_TIMEOUT', severity: 'WARNING' });
-        reject(timeoutErr);
-      }
-    }, 8000);
+  // Band 3: 10500 Hz Silk-Air High-Shelf (+1.1 dB, Q = 0.707)
+  if (sampleRate > 22050) {
+    const A = Math.pow(10, 1.1 / 40.0);
+    const omega = (2.0 * Math.PI * 10500.0) / sampleRate;
+    const cosW = Math.cos(omega);
+    const sinW = Math.sin(omega);
+    const alpha = (sinW / 2.0) * Math.sqrt((A + 1.0 / A) * (1.0 / 0.707 - 1.0) + 2.0);
+    const twoSqrtAAlpha = 2.0 * Math.sqrt(A) * alpha;
 
-    const onSuccess = (buffer: AudioBuffer) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        resolve(buffer);
-      }
-    };
-
-    const onError = (error: any) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        const decodeErr = error || new Error('Audio decoding failed');
-        reportAudioError(decodeErr, 'safeDecodeAudioData', { tag: 'AUDIO_DECODE_FAILED', severity: 'WARNING' });
-        reject(decodeErr);
-      }
-    };
-
-    try {
-      const res = audioContext.decodeAudioData(arrayBuffer.slice(0), onSuccess, onError);
-      if (res && typeof res.then === 'function') {
-        res.then(onSuccess).catch(onError);
-      }
-    } catch (err) {
-      onError(err);
-    }
-  });
+    const b0 = A * ((A + 1.0) + (A - 1.0) * cosW + twoSqrtAAlpha);
+    const b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cosW);
+    const b2 = A * ((A + 1.0) + (A - 1.0) * cosW - twoSqrtAAlpha);
+    const a0 = (A + 1.0) - (A - 1.0) * cosW + twoSqrtAAlpha;
+    const a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cosW);
+    const a2 = (A + 1.0) - (A - 1.0) * cosW - twoSqrtAAlpha;
+    applyBiquadStage(b0, b1, b2, a0, a1, a2);
+  }
 }
 
-// ==============================================================================
-// 🎙️ STAGE 0: PURE RAW AUDIO BUFFER DSP ENGINE (The Calibrated Single Source)
 // ==============================================================================
 export function processPureRawAudioBuffer(
   audioBuffer: AudioBuffer,
@@ -1329,6 +1436,8 @@ export function processPureRawAudioBuffer(
     applyDeBoxNotch?: boolean;
     applySlapNotch?: boolean;
     applyLookaheadLeveler?: boolean;
+    applyNaturalClarity?: boolean;
+    applyOptoLeveler?: boolean;
     padActive?: boolean;
     padDb?: number;
   }
@@ -1338,15 +1447,13 @@ export function processPureRawAudioBuffer(
   const length = audioBuffer.length;
   if (length === 0) return audioBuffer;
 
-  const targetLufs = options?.targetLufs ?? TARGET_PURE_RAW_LUFS; // Default: -14.5 LUFS
+  const targetLufs = options?.targetLufs ?? TARGET_PURE_RAW_LUFS; // Default: -16.0 LUFS (Gesunde Lautheit)
   const targetPeakDb = options?.targetPeakDb ?? TARGET_PEAK_DBTP;  // Default: -1.0 dBTP
-  const maxLimiterGrDb = options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB; // Default: 3.0 dB
+  const maxLimiterGrDb = options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB; // Default: 3.5 dB
   const isLoop = options?.isLoop ?? false;
   const preserveDynamics = options?.preserveDynamics ?? false;
 
   // 0. 🎛️ INSTRUMENTEN-PAD (Headroom Dämpfung für dynamikstarke Instrumente / Slap-Transienten)
-  // Senkt den Eingangspegel um -6 dB (oder definiertes padDb) ab, um internen Headroom zu schaffen.
-  // Der nachfolgende EBU R128 Linear Normalizer hebt den Pegel anschließend verlustfrei auf -1.0 dBTP an.
   const padDb = options?.padDb ?? (options?.padActive ? -6.0 : 0);
   if (padDb < 0) {
     const padGain = Math.pow(10, padDb / 20);
@@ -1358,24 +1465,29 @@ export function processPureRawAudioBuffer(
     }
   }
 
-  // 1. Transparenter 18 Hz Subsonic Shield (DC-Offset Schutz ohne hörbare Phasenverschiebung im Bassbereich)
-  apply30HzSubsonicHighpass(audioBuffer, 18.0);
+  // 1. Adaptiver Subsonic High-Pass Shield (für Loops 18 Hz, für Solo-/Übe-Takes adaptiv 28-40 Hz unterhalb f0_min)
+  if (isLoop) {
+    apply30HzSubsonicHighpass(audioBuffer, 18.0);
+  } else {
+    const { hpfFreqHz } = detectAdaptiveHpfFrequency(audioBuffer, false);
+    const safeHpfHz = Math.max(24.0, Math.min(40.0, hpfFreqHz));
+    apply30HzSubsonicHighpass(audioBuffer, safeHpfHz);
+  }
 
-  // 2. Optional: Chirurgischer De-Box Resonance Notch (260 Hz, Q = 1.8)
-  // Standardmäßig in Pure RAW deaktiviert (false), um die volle akustische Wärme & den natürlichen Korpusklang zu bewahren
-  if (options?.applyDeBoxNotch === true) {
+  // 2. High-Resolution Natural Clarity EQ (De-Mud 255 Hz, Natural Presence 3.5 kHz, Silk-Air 10.5 kHz)
+  if (!isLoop && !preserveDynamics && options?.applyNaturalClarity !== false) {
+    applyNaturalClarityEq(audioBuffer);
+  } else if (options?.applyDeBoxNotch === true) {
     applyDeBoxResonanceNotch(audioBuffer, 260.0, -1.0, 1.8);
   }
 
   // 3. Optional: Chirurgischer Slap-Transient Tamer (3.400 Hz, Q = 2.4)
-  // Bei aktivem Instrumenten-PAD automatisch aktiv (-1.5 dB), um aggressive Nahbesprechungs-Klicks abzufangen
   const applySlapNotch = options?.applySlapNotch === true || (options?.padActive === true && options?.applySlapNotch !== false);
   if (applySlapNotch) {
     applySlapTransientNotch(audioBuffer, 3400.0, -1.5, 2.4);
   }
 
   // 4. 5ms Equal-Power Micro-Fades (Click/Pop prevention at boundaries for non-looping audio)
-  // For cyclic loops (isLoop === true), boundary zero-muting is skipped to preserve seamless seam continuity without volume dips.
   if (!isLoop) {
     const fadeSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(length * 0.05));
     if (fadeSamples > 0) {
@@ -1392,23 +1504,22 @@ export function processPureRawAudioBuffer(
   }
 
   // 4b. 🎛️ ZERO-PHASE LOOKAHEAD LOUDNESS LEVELER (Sample-0 Onset Adaptation Guard)
-  // Beseitigt Lautheitssprünge in den ersten Sekunden (verursacht durch träge Hardware-AGC
-  // des Mikrofons/Betriebssystems). Gleicht Dips bereits ab Sekunde 0.00 sanft und musikalisch
-  // an das mittlere Niveau an (max. 3.5 dB), ohne Transienten zu verwaschen oder Pumping zu erzeugen.
-  if (options?.applyLookaheadLeveler === true && !preserveDynamics) {
+  // Standardmäßig aktiv für alle Nicht-Loop-Aufnahmen, um OS-AGC-Anfangslöcher auszugleichen.
+  if (!isLoop && !preserveDynamics && options?.applyLookaheadLeveler !== false) {
     applyLookaheadLoudnessLeveler(audioBuffer, {
-      maxBoostDb: 3.5,
+      maxBoostDb: 3.0,
       targetPeakDb
     });
   }
 
-  // 5. 🏛️ HEADROOM-SAFE EBU R128 LINEAR NORMALIZER (100% Linear, 0% Distortion, 0% Pumping)
-  // Hebt leise Passagen nach EBU R128 an, deckelt den Gain-Faktor jedoch mathematisch strikt
-  // am physikalischen Headroom bis targetPeakDb (-1.0 dBTP).
-  // Dadurch wird KEIN EINZIGER SAMPLE über die Decke geschoben!
-  // Keine tanh-Sättigung, kein Limiter-Ducking, kein Klirrfaktor – 100% reine, offene Akustik.
+  // 4c. 🌟 AUDIOPHILE OPTO-LEVELER (Sanftes LA-2A-artiges Makro-Leveling bis max. 1.2 dB)
+  if (!isLoop && !preserveDynamics && options?.applyOptoLeveler !== false) {
+    applyAudiophileOptoLeveler(audioBuffer, 1.2);
+  }
+
+  // 5. 🏛️ EBU R128 GATED LOUDNESS NORMALIZER & SINGLE-TRANSIENT-TRAP GUARD (-16.0 LUFS / -1.0 dBTP)
   if (!preserveDynamics) {
-    const ceilingLinear = Math.pow(10, targetPeakDb / 20); // z.B. 0.89125 für -1.0 dBTP
+    const ceilingLinear = Math.pow(10, targetPeakDb / 20); // 0.89125 für -1.0 dBTP
 
     // 5a. Globalen Maximalpeak über alle Kanäle inklusive Intersample-Interpolation ermitteln
     let globalMaxPeak = 0;
@@ -1425,8 +1536,31 @@ export function processPureRawAudioBuffer(
     }
 
     if (globalMaxPeak > 0) {
-      if (globalMaxPeak > ceilingLinear) {
-        // Fall 1: Signal übersteuert bereits ab Hardware -> 100% rein linear absenken
+      const currentLufs = calculateIntegratedLufs(audioBuffer);
+      const maxPureLinearGainDb = 20 * Math.log10(ceilingLinear / globalMaxPeak);
+      const effectiveLimiterAllowanceDb = isLoop ? 0 : Math.max(0, maxLimiterGrDb);
+      const maxAllowedGainDb = maxPureLinearGainDb + effectiveLimiterAllowanceDb;
+
+      if (currentLufs > -70 && currentLufs < 5) {
+        const lufsDeltaDb = targetLufs - currentLufs;
+        const effectiveGainDb = Math.max(-12.0, Math.min(20.0, Math.min(lufsDeltaDb, maxAllowedGainDb)));
+
+        if (Math.abs(effectiveGainDb) > 0.05) {
+          const linearGain = Math.pow(10, effectiveGainDb / 20);
+          for (let c = 0; c < numChannels; c++) {
+            const data = audioBuffer.getChannelData(c);
+            for (let i = 0; i < length; i++) {
+              data[i] *= linearGain;
+            }
+          }
+        }
+
+        // Wenn für die gesunde Lautheit ein einzelner Transient-Peak über ceilingLinear geschoben wurde,
+        // fängt der transparente Lookahead-True-Peak-Limiter (2ms Attack, 60ms Release) nur diese Spitze ab!
+        if (!isLoop && effectiveGainDb > maxPureLinearGainDb) {
+          applyLookaheadTruePeakLimiter(audioBuffer, targetPeakDb);
+        }
+      } else if (globalMaxPeak > ceilingLinear) {
         const attenuationFactor = ceilingLinear / globalMaxPeak;
         for (let c = 0; c < numChannels; c++) {
           const data = audioBuffer.getChannelData(c);
@@ -1434,32 +1568,11 @@ export function processPureRawAudioBuffer(
             data[i] *= attenuationFactor;
           }
         }
-      } else {
-        // Fall 2: Signal hat Headroom -> Linear anheben, aber NIEMALS höher als maxSafeGainDb
-        const maxSafeGainDb = 20 * Math.log10(ceilingLinear / globalMaxPeak);
-        const currentLufs = calculateIntegratedLufs(audioBuffer);
-
-        if (currentLufs > -70 && currentLufs < 5) {
-          const lufsDeltaDb = targetLufs - currentLufs;
-          // Strikte physikalische Deckelung: Gain darf nicht höher sein als der Headroom bis -1.0 dBTP!
-          const effectiveGainDb = Math.max(0, Math.min(lufsDeltaDb, maxSafeGainDb));
-
-          if (effectiveGainDb > 0.05) {
-            const linearGain = Math.pow(10, effectiveGainDb / 20);
-            for (let c = 0; c < numChannels; c++) {
-              const data = audioBuffer.getChannelData(c);
-              for (let i = 0; i < length; i++) {
-                data[i] *= linearGain;
-              }
-            }
-          }
-        }
       }
     }
   }
 
   // 6. Pre-Calculated Static Ceiling Guard (100% Bit-Pure Linear Safety)
-  // Mathematische Absicherung: Garantiert bit-genau, dass kein Sample über targetPeakDb liegt
   applyPreCalculatedStaticCeiling(audioBuffer, targetPeakDb);
 
   return audioBuffer;
@@ -1943,11 +2056,10 @@ export async function processStudioMastering(
   const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
   const decodedBuffer: AudioBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawDecoded);
 
-  // 🌟 BASELINE CALIBRATION: Apply Stage 0 Pure RAW baseline before applying mastering plugins
-  processPureRawAudioBuffer(decodedBuffer, {
-    targetLufs: TARGET_PURE_RAW_LUFS,
-    targetPeakDb: TARGET_PEAK_DBTP
-  });
+  // 🌟 Kaskadierungsfreie Vorstufe für Stage 1: Nur 18 Hz DC-Blocker + AGC-Onset-Leveler
+  // (Kein doppelter Stage-0 EQ oder Limiter vor dem OfflineAudioContext Studio-Master!)
+  apply30HzSubsonicHighpass(decodedBuffer, 18.0);
+  applyLookaheadLoudnessLeveler(decodedBuffer, { maxBoostDb: 3.0, targetPeakDb: TARGET_PEAK_DBTP });
 
   const result = await processStudioMasteringAudioBuffer(decodedBuffer, {
     ...options,
@@ -1962,7 +2074,7 @@ export async function processStudioMastering(
 }
 
 // ==============================================================================
-// 🌟 DUAL-MASTERING ENGINE (Synchronized Pure RAW & Studio Master with -0.5 LUFS Wow Offset)
+// 🌟 DUAL-MASTERING ENGINE (Parallel Pure Natural HD -16.0 LUFS & Studio Master -14.0 LUFS)
 // ==============================================================================
 export async function processDualMastering(
   audioInput: Blob | File,
@@ -1983,7 +2095,7 @@ export async function processDualMastering(
   const decodedBuffer = ensureCenteredStereoAudioBuffer(audioCtx, rawDecoded);
   const originalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
 
-  // 1. Generate Pure RAW Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -14.5 LUFS)
+  // 1. Branch A: Generate Stage-0 Pure Natural HD Buffer (Calibrated to TARGET_PURE_RAW_LUFS = -16.0 LUFS, 0% Reverb)
   const rawBuffer = audioCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
   rawBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
   rawBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
@@ -2005,8 +2117,15 @@ export async function processDualMastering(
   });
   const rawStreamingUrl = URL.createObjectURL(rawStreamingRes.blob);
 
-  // 2. Generate Studio Master (DIRECTLY from Pure RAW Buffer, calibrated to TARGET_STUDIO_LUFS = -14.0 LUFS)
-  const masterRes = await processStudioMasteringAudioBuffer(rawBuffer, {
+  // 2. Branch B: Generate Stage-1 Studio Master in parallel from clean centered decodedBuffer
+  // (Eliminates double EQ/Limiter cascading while applying 5-Band Profile EQ, Parallel Glue & Room Reverb to -14.0 LUFS)
+  const studioSourceBuffer = audioCtx.createBuffer(2, decodedBuffer.length, decodedBuffer.sampleRate);
+  studioSourceBuffer.getChannelData(0).set(decodedBuffer.getChannelData(0));
+  studioSourceBuffer.getChannelData(1).set(decodedBuffer.getChannelData(1));
+  apply30HzSubsonicHighpass(studioSourceBuffer, 18.0);
+  applyLookaheadLoudnessLeveler(studioSourceBuffer, { maxBoostDb: 3.0, targetPeakDb: TARGET_PEAK_DBTP });
+
+  const masterRes = await processStudioMasteringAudioBuffer(studioSourceBuffer, {
     ...mergedOptions,
     targetLufs: TARGET_STUDIO_LUFS,
     targetPeakDb: TARGET_PEAK_DBTP
@@ -2034,279 +2153,4 @@ export async function processDualMastering(
     masterBlob: masterRes.masteredBlob,
     duration: masterRes.durationSec
   };
-}
-
-// ==============================================================================
-// 💾 24-BIT LOSSLESS PCM WAV ENCODER (Broadcast Format & TPDF Dithering)
-// ==============================================================================
-export function audioBufferToWavBlob(buffer: AudioBuffer, metadata?: { title?: string; artist?: string }): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 24;
-  const bytesPerSample = 3; // 24-bit
-  const blockAlign = numChannels * bytesPerSample;
-
-  const length = buffer.length;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = length * blockAlign;
-
-  const titleText = metadata?.title || 'Campus-Groovelab Master Track';
-  const artistText = metadata?.artist || 'Campus-Groovelab Artist';
-  const softwareText = 'Campus-Groovelab 24-Bit Audiophile DSP Engine';
-
-  function createInfoSubChunk(tag: string, text: string): Uint8Array {
-    const textBytes = new TextEncoder().encode(text + '\0');
-    const chunkSize = textBytes.length;
-    const paddedSize = chunkSize + (chunkSize % 2);
-    const res = new Uint8Array(8 + paddedSize);
-    for (let i = 0; i < 4; i++) res[i] = tag.charCodeAt(i);
-    const dv = new DataView(res.buffer);
-    dv.setUint32(4, chunkSize, true);
-    res.set(textBytes, 8);
-    return res;
-  }
-
-  const inamChunk = createInfoSubChunk('INAM', titleText);
-  const iartChunk = createInfoSubChunk('IART', artistText);
-  const isftChunk = createInfoSubChunk('ISFT', softwareText);
-  const listDataSize = 4 + inamChunk.length + iartChunk.length + isftChunk.length;
-  const listChunkTotalSize = 8 + listDataSize;
-
-  const headerSize = 44;
-  const totalSize = headerSize + dataSize + listChunkTotalSize;
-
-  const arrayBuffer = new ArrayBuffer(totalSize);
-  const view = new DataView(arrayBuffer);
-  const uint8 = new Uint8Array(arrayBuffer);
-
-  function writeString(view: DataView, offset: number, string: string) {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  }
-
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, totalSize - 8, true);
-  writeString(view, 8, 'WAVE');
-
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  const channelData: Float32Array[] = [];
-  for (let c = 0; c < numChannels; c++) {
-    channelData.push(buffer.getChannelData(c));
-  }
-
-  let byteOffset = 44;
-  const invScale = 1.0 / 8388608.0;
-
-  if (numChannels === 2) {
-    const left = channelData[0];
-    const right = channelData[1];
-    for (let i = 0; i < length; i++) {
-      let sL = left[i] + (Math.random() - Math.random()) * invScale;
-      if (sL > 1.0) sL = 1.0;
-      else if (sL < -1.0) sL = -1.0;
-      const pcmL = sL < 0 ? (sL * 8388608) | 0 : (sL * 8388607) | 0;
-      const cL = pcmL < -8388608 ? -8388608 : pcmL > 8388607 ? 8388607 : pcmL;
-      uint8[byteOffset] = cL & 0xff;
-      uint8[byteOffset + 1] = (cL >> 8) & 0xff;
-      uint8[byteOffset + 2] = (cL >> 16) & 0xff;
-
-      let sR = right[i] + (Math.random() - Math.random()) * invScale;
-      if (sR > 1.0) sR = 1.0;
-      else if (sR < -1.0) sR = -1.0;
-      const pcmR = sR < 0 ? (sR * 8388608) | 0 : (sR * 8388607) | 0;
-      const cR = pcmR < -8388608 ? -8388608 : pcmR > 8388607 ? 8388607 : pcmR;
-      uint8[byteOffset + 3] = cR & 0xff;
-      uint8[byteOffset + 4] = (cR >> 8) & 0xff;
-      uint8[byteOffset + 5] = (cR >> 16) & 0xff;
-
-      byteOffset += 6;
-    }
-  } else {
-    for (let i = 0; i < length; i++) {
-      for (let c = 0; c < numChannels; c++) {
-        let sample = channelData[c][i] + (Math.random() - Math.random()) * invScale;
-        if (sample > 1.0) sample = 1.0;
-        else if (sample < -1.0) sample = -1.0;
-        const pcm = sample < 0 ? (sample * 8388608) | 0 : (sample * 8388607) | 0;
-        const clamped = pcm < -8388608 ? -8388608 : pcm > 8388607 ? 8388607 : pcm;
-
-        uint8[byteOffset++] = clamped & 0xff;
-        uint8[byteOffset++] = (clamped >> 8) & 0xff;
-        uint8[byteOffset++] = (clamped >> 16) & 0xff;
-      }
-    }
-  }
-
-  writeString(view, byteOffset, 'LIST');
-  view.setUint32(byteOffset + 4, listDataSize, true);
-  writeString(view, byteOffset + 8, 'INFO');
-  byteOffset += 12;
-
-  uint8.set(inamChunk, byteOffset);
-  byteOffset += inamChunk.length;
-  uint8.set(iartChunk, byteOffset);
-  byteOffset += iartChunk.length;
-  uint8.set(isftChunk, byteOffset);
-
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
-}
-
-// ==============================================================================
-// 📦 TIER-1 AUDIOPHILE STREAMING ENCODER (192-256 kbit/s Transparent Quality)
-// ==============================================================================
-export async function audioBufferToStreamingBlob(
-  buffer: AudioBuffer,
-  options?: {
-    bitrateKbps?: number;
-    title?: string;
-    artist?: string;
-  }
-): Promise<{ blob: Blob; mimeType: string; fileNameExt: string }> {
-  const bitrate = options?.bitrateKbps || 256;
-  const channels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-
-  try {
-    const lamejs = await import('@breezystack/lamejs');
-    const Mp3EncoderClass = (lamejs as any).Mp3Encoder || (lamejs as any).default?.Mp3Encoder || (window as any).lamejs?.Mp3Encoder;
-    if (Mp3EncoderClass) {
-      const mp3encoder = new Mp3EncoderClass(channels, sampleRate, bitrate);
-      const mp3Data: any[] = [];
-      const sampleBlockSize = 1152;
-
-      const samplesL = buffer.getChannelData(0);
-      const int16L = new Int16Array(samplesL.length);
-      for (let i = 0; i < samplesL.length; i++) {
-        const s = Math.max(-1, Math.min(1, samplesL[i]));
-        int16L[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-      }
-
-      if (channels >= 2) {
-        const samplesR = buffer.getChannelData(1);
-        const int16R = new Int16Array(samplesR.length);
-        for (let i = 0; i < samplesR.length; i++) {
-          const s = Math.max(-1, Math.min(1, samplesR[i]));
-          int16R[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-
-        for (let i = 0; i < int16L.length; i += sampleBlockSize) {
-          const chunkL = int16L.subarray(i, i + sampleBlockSize);
-          const chunkR = int16R.subarray(i, i + sampleBlockSize);
-          const mp3buf = mp3encoder.encodeBuffer(chunkL, chunkR);
-          if (mp3buf.length > 0) mp3Data.push(mp3buf);
-        }
-      } else {
-        for (let i = 0; i < int16L.length; i += sampleBlockSize) {
-          const chunk = int16L.subarray(i, i + sampleBlockSize);
-          const mp3buf = mp3encoder.encodeBuffer(chunk);
-          if (mp3buf.length > 0) mp3Data.push(mp3buf);
-        }
-      }
-
-      const mp3buf = mp3encoder.flush();
-      if (mp3buf.length > 0) mp3Data.push(mp3buf);
-
-      const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
-      return { blob: mp3Blob, mimeType: 'audio/mp3', fileNameExt: 'mp3' };
-    }
-  } catch (encErr) {
-    console.warn('[audioMasteringEngine] Streaming MP3 compression fallback to WAV:', encErr);
-  }
-
-  // Safe fallback to 24-bit WAV if MP3 encoder unavailable
-  const wavBlob = audioBufferToWavBlob(buffer, { title: options?.title, artist: options?.artist });
-  return { blob: wavBlob, mimeType: 'audio/wav', fileNameExt: 'wav' };
-}
-
-// ==============================================================================
-// ⚡ PREVIEW SLICE GENERATOR (Ultra-Fast 20-second center slice for Instant A/B)
-// ==============================================================================
-export async function sliceAudioBlobForPreview(
-  audioBlobOrFile: Blob | File,
-  sliceDurationSec = 20
-): Promise<Blob> {
-  const arrayBuffer = await audioBlobOrFile.arrayBuffer();
-  const audioCtx = SharedAudioEngine.getContext();
-  
-  const rawDecoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
-  const totalDuration = rawDecoded.duration;
-  
-  if (totalDuration <= sliceDurationSec) {
-    return audioBlobOrFile instanceof Blob ? audioBlobOrFile : new Blob([audioBlobOrFile], { type: 'audio/wav' });
-  }
-
-  // 🏛️ Goldstandard: Vorschau startet ab Sekunde 0.00 (ab der ersten gespielten Note)
-  const startSec = 0;
-  const sampleRate = rawDecoded.sampleRate;
-  const startSample = 0;
-  const lengthSamples = Math.min(rawDecoded.length, Math.floor(sliceDurationSec * sampleRate));
-
-  const numChannels = rawDecoded.numberOfChannels;
-  const slicedBuffer = audioCtx.createBuffer(numChannels, lengthSamples, sampleRate);
-
-  for (let ch = 0; ch < numChannels; ch++) {
-    const srcData = rawDecoded.getChannelData(ch);
-    const dstData = slicedBuffer.getChannelData(ch);
-    dstData.set(srcData.subarray(startSample, startSample + lengthSamples));
-  }
-
-  if (lengthSamples > sampleRate * 0.1) {
-    const fadeSamples = Math.min(Math.floor(sampleRate * 0.01), Math.floor(lengthSamples * 0.05));
-    for (let ch = 0; ch < numChannels; ch++) {
-      const dstData = slicedBuffer.getChannelData(ch);
-      for (let i = 0; i < fadeSamples; i++) {
-        const factor = Math.sin((i / fadeSamples) * (Math.PI / 2));
-        dstData[i] *= factor;
-        dstData[lengthSamples - 1 - i] *= factor;
-      }
-    }
-  }
-
-  const wavBlob = audioBufferToWavBlob(slicedBuffer, {
-    title: 'Campus-Groovelab Preview Slice',
-    artist: 'Campus-Groovelab Studio'
-  });
-  return wavBlob;
-}
-
-/**
- * 🎵 UNIVERSAL 24-BIT LOSSLESS PCM WAV CONVERTER
- * Ensures that any audio blob (already WAV, or legacy WebM, MP4, MP3) is delivered
- * as a pristine, uncompressed 24-bit PCM WAV file (.wav) with native sample rate.
- */
-export async function ensureWavBlob(
-  blob: Blob | File,
-  metadata?: { title?: string; artist?: string }
-): Promise<Blob> {
-  if (!blob) return blob;
-  const mime = (blob.type || '').toLowerCase();
-  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave') {
-    return blob;
-  }
-
-  try {
-    const arrayBuffer = await blob.arrayBuffer();
-    const audioCtx = SharedAudioEngine.getContext();
-    const decoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
-    return audioBufferToWavBlob(decoded, {
-      title: metadata?.title || 'Campus-Groovelab Audio',
-      artist: metadata?.artist || 'Campus-Groovelab'
-    });
-  } catch (err) {
-    console.warn('[ensureWavBlob] Transcode fallback note:', err);
-    return blob instanceof Blob ? blob : new Blob([blob], { type: 'audio/wav' });
-  }
 }

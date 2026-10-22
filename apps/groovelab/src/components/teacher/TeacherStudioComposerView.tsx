@@ -15,7 +15,8 @@ import {
   TeacherMediaAssets
 } from '../../services/teacherStudioService';
 import { TeacherMediaPickerDrawer } from './TeacherMediaPickerDrawer';
-import { requestMicrophonePermissionOnce, acquireAudioStream } from '../../services/audioPermissionService';
+import { requestMicrophonePermissionOnce, acquireAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 import { buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
 import { storeBlob } from '../../utils/blobStorage';
 import { supabase } from '../../lib/supabase';
@@ -315,14 +316,9 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
     }
 
     try {
-      const stream = await acquireAudioStream();
-      let mimeType = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-        else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-        else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-      }
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -367,7 +363,8 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
         setRecordedAudioUrl(finalUrl);
 
         // Offline-Safe Local Caching
-        const localKey = `studio_ref_${Date.now()}.mp3`;
+        const ext = AudioCaptureEngine.resolveAudioFileExtension(finalBlob, mimeType);
+        const localKey = `studio_ref_${Date.now()}.${ext}`;
         await storeBlob(localKey, finalBlob).catch(() => {});
 
         // Background Cloud Upload
@@ -392,15 +389,17 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      try {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
-      } catch {}
-    }
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     setIsRecording(false);
     setRecordedAudioDuration(Math.max(1, recordingSeconds));
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      AudioCaptureEngine.stopRecorderWithTail(rec, 850, () => {
+        try {
+          rec.stream.getTracks().forEach(t => t.stop());
+        } catch {}
+      });
+    }
   };
 
   const togglePlayback = () => {

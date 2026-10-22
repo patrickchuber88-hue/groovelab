@@ -311,6 +311,7 @@ export interface SecretaryVerwaltungTabProps {
   setActiveStudentsModalList: React.Dispatch<React.SetStateAction<any>>;
   dunningStatus: SchoolDunningStatus;
   setShowDunningPayModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setSchoolInvoices?: React.Dispatch<React.SetStateAction<any[]>>;
 
   // Equipment Props
   schoolEquipment: any[];
@@ -756,6 +757,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     setActiveStudentsModalList,
     dunningStatus,
     setShowDunningPayModal,
+    setSchoolInvoices,
 
     // Equipment
     schoolEquipment,
@@ -1047,6 +1049,9 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             handleConfirmBooking={handleConfirmBooking}
             handleRejectBooking={handleRejectBooking}
             getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
+            dunningStatus={dunningStatus}
+            onOpenDunningPayModal={() => setShowDunningPayModal(true)}
+            subscriptionBypass={subscriptionBypass}
           />
         </Suspense>
       )}
@@ -1269,6 +1274,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
             isSecretaryReadOnly={dunningStatus?.isSecretaryReadOnly || false}
             onOpenDunningPayModal={() => setShowDunningPayModal(true)}
+            onSyncComputedInvoices={setSchoolInvoices}
           />
         </Suspense>
       )}

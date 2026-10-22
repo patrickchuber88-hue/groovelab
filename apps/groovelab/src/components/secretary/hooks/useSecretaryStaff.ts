@@ -36,17 +36,24 @@ export function useSecretaryStaff({
   const [employees, setEmployees] = useState<any[]>([]);
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
 
-  // RBAC Master-Standard: Check if the logged-in user possesses an active teacher role (Dual Role)
+  // 🏛️ 0,1% Goldstandard: Strikte Autorisierungs-Parität gegen die autoritative Single Source of Truth (Poka-Yoke)
   const isCurrentUserTeacher = useMemo(() => {
     const currentEmp = employees.find(e => e.id === userId);
-    const roles = Array.isArray(currentEmp?.roles) 
-      ? currentEmp.roles 
-      : Array.isArray(currentUserProfile?.roles) 
-        ? currentUserProfile.roles 
-        : Array.isArray(userRoles) 
-          ? userRoles 
-          : [];
-    return roles.includes('teacher') || currentEmp?.role === 'teacher' || currentUserProfile?.role === 'teacher';
+    
+    // Sobald ein autoritativer Datensatz aus der Datenbank geladen ist, gilt ausschließlich dessen Stand:
+    if (currentEmp) {
+      const empRoles = Array.isArray(currentEmp.roles) ? currentEmp.roles : [];
+      return empRoles.includes('teacher') || currentEmp.role === 'teacher';
+    }
+
+    if (currentUserProfile) {
+      const profileRoles = Array.isArray(currentUserProfile.roles) ? currentUserProfile.roles : [];
+      return profileRoles.includes('teacher') || currentUserProfile.role === 'teacher';
+    }
+
+    // Kaltstart-Fallback vor Abschluss des ersten DB-Ladevorgangs:
+    const fallbackRoles = Array.isArray(userRoles) ? userRoles : [];
+    return fallbackRoles.includes('teacher');
   }, [employees, userId, currentUserProfile, userRoles]);
 
   // Employee Form States

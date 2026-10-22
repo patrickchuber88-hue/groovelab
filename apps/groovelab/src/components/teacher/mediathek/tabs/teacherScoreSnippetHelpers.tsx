@@ -224,7 +224,7 @@ export const TeacherScoreSnippetListRow: React.FC<TeacherScoreSnippetListRowProp
       style={{
         background: '#ffffff',
         border: isPlaying ? `1.5px solid ${catMeta.color.activeBg}` : '1px solid #e2e8f0',
-        borderLeft: `3.5px solid ${catMeta.color.activeBg}`,
+        borderLeft: `4px solid ${catMeta.color.activeBg}`,
         borderRadius: '12px',
         padding: '8px 12px',
         display: 'flex',
@@ -338,9 +338,9 @@ export const TeacherScoreSnippetListRow: React.FC<TeacherScoreSnippetListRowProp
         {!isOwn && (
           <span style={{
             fontSize: '0.64rem',
-            fontWeight: 800,
-            background: levelMeta.bg,
-            color: levelMeta.text,
+            fontWeight: 700,
+            background: '#f1f5f9',
+            color: '#475569',
             padding: '2px 7px',
             borderRadius: '5px',
             border: 'none',
@@ -383,8 +383,8 @@ export const TeacherScoreSnippetListRow: React.FC<TeacherScoreSnippetListRowProp
           aria-label="Als Hausaufgabe zuweisen"
           style={{
             height: '28px',
-            background: catMeta.color.bg,
-            color: catMeta.color.text,
+            background: '#4f46e5',
+            color: '#ffffff',
             border: 'none',
             borderRadius: '7px',
             padding: '0 10px',
@@ -395,7 +395,14 @@ export const TeacherScoreSnippetListRow: React.FC<TeacherScoreSnippetListRowProp
             alignItems: 'center',
             gap: '4px',
             whiteSpace: 'nowrap',
+            boxShadow: '0 2px 5px rgba(79, 70, 229, 0.2)',
             transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = '#4338ca';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = '#4f46e5';
           }}
         >
           <Share2 size={11} strokeWidth={2.2} />

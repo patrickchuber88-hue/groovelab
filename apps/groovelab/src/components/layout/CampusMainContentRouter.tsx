@@ -1,7 +1,9 @@
 import React, { lazy, Suspense } from 'react';
-import { ShieldCheck, User } from 'lucide-react';
+import { ShieldCheck, User, Lock, ArrowLeft } from 'lucide-react';
 import { ErrorBoundary, DashboardLoader } from '../ui/ErrorBoundary';
 import { generateRandomBandName } from '../../utils/bandNameGenerator';
+import { isCampusBoardAllowedForChild, toggleCampusBoardPermission } from '../../services/campusBoardPermissions';
+import { purgeParentSessionLease } from '../../services/parentSecurityLeaseService';
 
 const EnsembleDashboard = lazy(() => import('../EnsembleDashboard').then(m => ({ default: m.EnsembleDashboard })));
 const TeacherDashboard = lazy(() => import('../TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
@@ -14,6 +16,7 @@ const StudentPracticeRepertoireTabs = lazy(() => import('../groovelab/StudentPra
 const StudentBandMatchingSuite = lazy(() => import('../groovelab/StudentBandMatchingSuite').then(m => ({ default: m.StudentBandMatchingSuite })));
 const StudentLibraryTab = lazy(() => import('../groovelab/StudentLibraryTab').then(m => ({ default: m.StudentLibraryTab })));
 const StudentTeamTab = lazy(() => import('../groovelab/StudentTeamTab').then(m => ({ default: m.StudentTeamTab })));
+const CampusPinUnlockModal = lazy(() => import('../CampusPinUnlockModal').then(m => ({ default: m.CampusPinUnlockModal })));
 
 export interface CampusMainContentRouterProps {
   windowWidth: number;
@@ -221,6 +224,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
   const isStudent = user?.role?.toLowerCase() === 'student';
   const isLiveLabActive = isStudent && activePlatform === 'groovelab' && activeStudentTab === 'live';
   const [hasVisitedLiveLab, setHasVisitedLiveLab] = React.useState(isLiveLabActive);
+  const [showParentPinUnlockModal, setShowParentPinUnlockModal] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     if (isLiveLabActive && !hasVisitedLiveLab) {
@@ -358,50 +362,13 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                 events: 'Termine',
                 messages: 'Nachrichten'
               };
-              let allowed = true;
-              if (campusStudentUiLevel === 'junior') {
-                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
-                allowed = juniorAllowed.includes(activeStudentTab);
-              }
-              const override = typeof window !== 'undefined' ? localStorage.getItem(`campus_board_override_${activeStudentTab}`) : null;
-              if (override === 'true') allowed = true;
-              if (override === 'false') allowed = false;
+              const allowed = isCampusBoardAllowedForChild(activeStudentTab, user, false);
 
-              const toggleActiveBoard = () => {
-                const next = !allowed;
-                localStorage.setItem(`campus_board_override_${activeStudentTab}`, String(next));
-                if (activeStudentTab === 'messages') {
-                  localStorage.setItem('campus_allow_chat', String(next));
+              const toggleActiveBoard = async () => {
+                const res = await toggleCampusBoardPermission(activeStudentTab, user, allowed);
+                if (res.success) {
+                  setParentPermissionsVersion(v => v + 1);
                 }
-                if (user?.id) {
-                  const nextPerms = {
-                    ...(user?.parent_permissions || {}),
-                    [`board_${activeStudentTab}`]: next
-                  };
-                  (async () => {
-                    try {
-                      const activeLeaseToken = typeof window !== 'undefined'
-                        ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
-                        : null;
-                      const { error } = await supabase.rpc('save_parent_controls', {
-                        p_student_id: user.id,
-                        p_settings: {
-                          parent_permissions: nextPerms,
-                          ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {})
-                        }
-                      });
-                      if (error) throw error;
-                    } catch {
-                      try {
-                        await supabase.from('users').update({
-                          parent_permissions: nextPerms
-                        }).eq('id', user.id);
-                      } catch (err) {}
-                    }
-                  })();
-                }
-                window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: activeStudentTab, allowed: next } }));
-                setParentPermissionsVersion(v => v + 1);
               };
 
               return (
@@ -437,13 +404,8 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           <button
             type="button"
             onClick={() => {
-              sessionStorage.removeItem('groovelab_parent_unlocked_global');
-              if (user?.id) {
-                sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
-                sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
-              }
+              purgeParentSessionLease(user?.id);
               setParentUnlocked(false);
-              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
               setActiveStudentTab('briefing');
             }}
             style={{
@@ -537,10 +499,109 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
         </div>
       )}
 
+      {/* 🛡️ 0,1% Goldstandard Router-Guard: Blockiert gesperrte Boards gegen Deep-Links & Shortcuts */}
+      {user.role?.toLowerCase() === 'student' && !parentUnlocked && activePlatform === 'campus' && ['practice_board', 'events'].includes(activeStudentTab) && !isCampusBoardAllowedForChild(activeStudentTab, user, false) && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          minHeight: '400px',
+          padding: '32px 20px',
+          textAlign: 'center',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            maxWidth: '460px',
+            width: '100%',
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '24px',
+            padding: '32px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '18px',
+              background: '#fef2f2',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none'
+            }}>
+              <Lock size={28} strokeWidth={2.2} />
+            </div>
+            <div>
+              <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a' }}>
+                Board aktuell pausiert
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', fontWeight: 550, lineHeight: 1.45 }}>
+                Deine Eltern haben diesen Bereich vorübergehend im Elternbereich pausiert. Wende dich an deine Eltern, wenn du dieses Board nutzen möchtest.
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setActiveStudentTab('briefing')}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '12px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <ArrowLeft size={16} />
+                <span>Zurück zum Briefing</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowParentPinUnlockModal(true)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  background: '#0ea5e9',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 8px rgba(14, 165, 233, 0.25)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <ShieldCheck size={16} />
+                <span>Eltern-PIN eingeben & freischalten</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
       {user.role?.toLowerCase() === 'student' && (
         <div style={{ 
-          display: (activePlatform === 'campus' && activeStudentTab !== 'messages') ? (['homework', 'homework_book'].includes(activeStudentTab) ? 'flex' : 'block') : 'none',
+          display: (activePlatform === 'campus' && activeStudentTab !== 'messages' && (parentUnlocked || !(['practice_board', 'events'].includes(activeStudentTab) && !isCampusBoardAllowedForChild(activeStudentTab, user, false)))) ? (['homework', 'homework_book'].includes(activeStudentTab) ? 'flex' : 'block') : 'none',
           flexDirection: 'column',
           flex: 1,
           minHeight: 0,
@@ -627,7 +688,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           display: (isAdminTeacherSuiteActive && activeStudentTab !== 'profile' && activeStudentTab !== 'messages') ? 'block' : 'none',
           width: '100%'
         }}>
-          <ErrorBoundary key={`admin-teacher-suite-${activeWorkspace || user?.role || 'default'}`}>
+          <ErrorBoundary key={`admin-teacher-suite-${activePlatform}-${activeWorkspace || user?.role || 'default'}`}>
             <Suspense fallback={<DashboardLoader />}>
               <AdminDashboard 
                 key={`admin-dashboard-${activeWorkspace || user?.role || 'default'}`}
@@ -658,38 +719,142 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
 
       {/* Messages Tab (Preserved for 0ms Tab-Switching) */}
       {(hasVisitedMessages || isMessagesActive) && (
-        <div style={{
-          display: activeStudentTab === 'messages' ? 'block' : 'none',
-          width: '100%',
-          height: '100%'
-        }}>
-          <Suspense fallback={<DashboardLoader />}>
-            <MessagesTabContainer
-              user={user}
-              activePlatform={activePlatform}
-              schoolUsers={schoolUsers}
-              campusMessages={campusMessages}
-              announcements={announcements}
-              studentMessages={studentMessages}
-              selectedCampusRecipient={selectedCampusRecipient}
-              setSelectedCampusRecipient={setSelectedCampusRecipient}
-              onSendCampusMessage={handleSendCampusMessage}
-              onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
-              onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
-              onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
-              onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
-                setAnnouncementTitle(title);
-                setAnnouncementMessage(message);
-                setAnnouncementTarget(targetType as any);
-                setSelectedTargetUserIds(targetUserIds);
-                await handlePostAnnouncement({ preventDefault: () => {} } as any);
-              }}
-              onDeleteAnnouncement={handleDeleteAnnouncement}
-              onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-              onNavigateToSchedule={handleNavigateToSchedule}
-            />
-          </Suspense>
-        </div>
+        user.role?.toLowerCase() === 'student' && !parentUnlocked && !(() => {
+          const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+          if (campusStudentUiLevel === 'junior' && !juniorAllowed.includes('messages') && !isCampusBoardAllowedForChild('messages', user, false)) {
+            return false;
+          }
+          return isCampusBoardAllowedForChild('messages', user, false);
+        })() ? (
+          <div style={{
+            display: activeStudentTab === 'messages' ? 'flex' : 'none',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flex: 1,
+            minHeight: '400px',
+            padding: '32px 20px',
+            textAlign: 'center',
+            boxSizing: 'border-box'
+          }}>
+            <div style={{
+              maxWidth: '460px',
+              width: '100%',
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '24px',
+              padding: '32px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)'
+            }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '18px',
+                background: '#fef2f2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: 'none'
+              }}>
+                <Lock size={28} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 6px 0', fontSize: '1.25rem', fontWeight: 950, color: '#0f172a' }}>
+                  Nachrichten aktuell pausiert
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', fontWeight: 550, lineHeight: 1.45 }}>
+                  Der Direkt-Chat mit Lehrkräften ist im Elternbereich deaktiviert. Wende dich an deine Eltern, um die Chat-Funktion freizuschalten.
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveStudentTab('briefing')}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Zurück zum Briefing</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowParentPinUnlockModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '12px',
+                    background: '#0ea5e9',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    boxShadow: '0 2px 8px rgba(14, 165, 233, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  <ShieldCheck size={16} />
+                  <span>Eltern-PIN eingeben & freischalten</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            display: activeStudentTab === 'messages' ? 'block' : 'none',
+            width: '100%',
+            height: '100%'
+          }}>
+            <Suspense fallback={<DashboardLoader />}>
+              <MessagesTabContainer
+                user={user}
+                activePlatform={activePlatform}
+                schoolUsers={schoolUsers}
+                campusMessages={campusMessages}
+                announcements={announcements}
+                studentMessages={studentMessages}
+                selectedCampusRecipient={selectedCampusRecipient}
+                setSelectedCampusRecipient={setSelectedCampusRecipient}
+                onSendCampusMessage={handleSendCampusMessage}
+                onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
+                onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
+                onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
+                onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
+                  setAnnouncementTitle(title);
+                  setAnnouncementMessage(message);
+                  setAnnouncementTarget(targetType as any);
+                  setSelectedTargetUserIds(targetUserIds);
+                  await handlePostAnnouncement({ preventDefault: () => {} } as any);
+                }}
+                onDeleteAnnouncement={handleDeleteAnnouncement}
+                onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+                onNavigateToSchedule={handleNavigateToSchedule}
+              />
+            </Suspense>
+          </div>
+        )
       )}
 
       {/* Practice & Repertoire Tabs */}
@@ -800,6 +965,25 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
             brandColor={brandColor}
             onSelectTeacher={(t: any) => setSelectedTeacher(t)}
             isMobile={isMobile}
+          />
+        </Suspense>
+      )}
+      {/* 🛡️ Universal Parental PIN Step-Up Modal on Locked Board Access */}
+      {showParentPinUnlockModal && (
+        <Suspense fallback={null}>
+          <CampusPinUnlockModal
+            user={user}
+            supabase={supabase}
+            schoolData={school || user?.schools || user?.school}
+            mode="parent_only"
+            title="Elternbereich freischalten"
+            subtitle="Gib deine 6-stellige Eltern-Master-PIN ein, um dieses Board zu öffnen und zu verwalten."
+            onUnlock={() => {
+              setShowParentPinUnlockModal(false);
+              setParentUnlocked(true);
+              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+            }}
+            onClose={() => setShowParentPinUnlockModal(false)}
           />
         </Suspense>
       )}

@@ -37,7 +37,7 @@ const TeacherSettingsView = lazy(() => import('./teacher/TeacherSettingsView').t
 const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 // Pure utilities re-export for backwards compatibility
 export * from './teacher/utils/teacherDashboardUtils';
-import { cleanRoomName } from './teacher/utils/teacherDashboardUtils';
+import { cleanRoomName, resolveTeacherViewportWidth, resolveTeacherViewportHeight } from './teacher/utils/teacherDashboardUtils';
 import { useSimulatedTime } from '../hooks/useSimulatedTime';
 export interface TeacherDashboardProps {
   userId: string;
@@ -65,54 +65,17 @@ export interface TeacherDashboardProps {
 }
 
 export function TeacherDashboard({ 
-  userId, 
-  initialTeacher,
-  onLogout, 
-  locationMode = 'lab', 
-  onLocationModeChange,
-  session,
-  onSessionChange,
-  hideHeader = false,
-  hideSidebar = false,
-  viewMode = 'admin', 
-  initialTab,
-  onTabChange, 
-  onOpenBandProfile, 
-  onFoundBand,
-  isSidebarCollapsed: propsIsSidebarCollapsed,
-  setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
-  onSidebarNotificationsChange,
-  activePlatform: propsActivePlatform,
-  onSwitchPlatform,
-  wallSongs: propsWallSongs,
-  rehearsalSuggestions: propsRehearsalSuggestions,
-  onLockRoom
+  userId, initialTeacher, onLogout, locationMode = 'lab', onLocationModeChange,
+  session, onSessionChange, hideHeader = false, hideSidebar = false, viewMode = 'admin',
+  initialTab, onTabChange, onOpenBandProfile, onFoundBand,
+  isSidebarCollapsed: propsIsSidebarCollapsed, setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
+  onSidebarNotificationsChange, activePlatform: propsActivePlatform, onSwitchPlatform,
+  wallSongs: propsWallSongs, rehearsalSuggestions: propsRehearsalSuggestions, onLockRoom
 }: TeacherDashboardProps) {
   const activePlatform: 'campus' | 'groovelab' = propsActivePlatform
     ? (propsActivePlatform === 'groovelab' ? 'groovelab' : 'campus')
     : ((typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab') ? 'groovelab' : 'campus');
   
-  // Layout & Viewport state (Simulator-aware for In-DOM & Iframe modes)
-  const resolveTeacherViewportWidth = () => {
-    if (typeof window === 'undefined') return 1200;
-    if (typeof document !== 'undefined') {
-      const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
-      if (simWidth > 0) return simWidth;
-      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
-      if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
-    }
-    return window.innerWidth;
-  };
-  const resolveTeacherViewportHeight = () => {
-    if (typeof window === 'undefined') return 800;
-    if (typeof document !== 'undefined') {
-      const simHeight = Number(document.documentElement.getAttribute('data-sim-height'));
-      if (simHeight > 0) return simHeight;
-      const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
-      if (simEl && simEl.clientHeight > 0) return simEl.clientHeight;
-    }
-    return window.innerHeight;
-  };
   const [windowWidth, setWindowWidth] = useState(resolveTeacherViewportWidth);
   const [windowHeight, setWindowHeight] = useState(resolveTeacherViewportHeight);
   const [containerWidth, setContainerWidth] = useState(1000);

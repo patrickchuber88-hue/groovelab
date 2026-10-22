@@ -89,6 +89,8 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
   (progressItems || []).forEach((item: any) => {
     if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
     if (item.topic_name.includes(' - Seite ')) {
+      // 🛡️ 0.1% Goldstandard: Lehrwerkseiten aus progressItems dürfen NUR einfließen, wenn sie aktuelle Hausaufgabe sind
+      if (!item.is_current_homework && item.status !== 'homework') return;
       const parts = item.topic_name.split(' - Seite ');
       const rawBookTitle = cleanTitle(parts[0].trim());
       const pageNum = parseInt(parts[1], 10);
@@ -169,8 +171,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
       songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
       if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
       const cleanSongTitle = cleanTitle(songTitle);
-      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
-        ? `${songArtist} - ${cleanSongTitle}`
+      const cleanArtist = cleanTitle(songArtist);
+      const fullTitle = cleanArtist && !cleanSongTitle.toLowerCase().includes(cleanArtist.toLowerCase())
+        ? `${cleanArtist} - ${cleanSongTitle}`
         : `${cleanSongTitle}`;
       const cleanT = cleanTitle(fullTitle);
 
@@ -192,8 +195,8 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
         otherActiveSongs.push({
           id: skill.id,
           song_id: skill.song_id || skill.songs?.id,
-          topic_name: fullTitle,
-          title: fullTitle,
+          topic_name: cleanT,
+          title: cleanT,
           is_current_homework: true,
           status: 'IN_PROGRESS',
           homework_notes: cleanNote
@@ -221,8 +224,9 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
       songTitle = songTitle.replace(/^campus[- ]song\s*[-–:]\s*/i, '').replace(/^campus[- ]song\s+/i, '').trim();
       if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
       const cleanSongTitle = cleanTitle(songTitle);
-      const fullTitle = songArtist && !cleanSongTitle.toLowerCase().includes(songArtist.toLowerCase())
-        ? `${songArtist} - ${cleanSongTitle}`
+      const cleanArtist = cleanTitle(songArtist);
+      const fullTitle = cleanArtist && !cleanSongTitle.toLowerCase().includes(cleanArtist.toLowerCase())
+        ? `${cleanArtist} - ${cleanSongTitle}`
         : `${cleanSongTitle}`;
       const cleanT = cleanTitle(fullTitle);
 
@@ -244,8 +248,8 @@ export function resolveJuniorWeeklyHomeworkSummary(params: JuniorHomeworkResolve
         otherActiveSongs.push({
           id: cSong.id,
           song_id: cSong.song_id || cSong.songs?.id,
-          topic_name: fullTitle,
-          title: fullTitle,
+          topic_name: cleanT,
+          title: cleanT,
           is_current_homework: true,
           status: 'IN_PROGRESS',
           homework_notes: cleanNote

@@ -18,6 +18,7 @@ import { SharedAudioEngine } from './sharedAudioEngine';
 import { 
   processPureRawAudioBuffer, 
   safeDecodeAudioData,
+  audioBufferToWavBlob as encode24BitWavBlob,
   TARGET_STUDIO_LUFS, 
   TARGET_PEAK_DBTP, 
   TARGET_PURE_RAW_LUFS 
@@ -26,10 +27,9 @@ import { applyBufferTailFadeOut } from './audioTailEngine';
 import { getBlob } from './blobStorage';
 import { getOfflineAudioRecord } from './offlineAudioVault';
 
-// 🏛️ 2027 Duett Master Goldstandard: EBU R128 Chamber Music (-18.0 LUFS, -1.5 dBTP)
-// Beseitigt das "zu heiße"/übersteuerte Klangbild beim Zusammenmischen beider Spuren
-export const TARGET_DUETT_MIX_LUFS = -18.0;
-export const TARGET_DUETT_PEAK_DBTP = -1.5;
+// 🏛️ 2027 Duett Master Goldstandard: EBU R128 Chamber Music (-16.0 LUFS, -1.0 dBTP)
+export const TARGET_DUETT_MIX_LUFS = -16.0;
+export const TARGET_DUETT_PEAK_DBTP = -1.0;
 
 // Shared AudioContext Singleton via Campus-Groovelab SharedAudioEngine
 export function getSharedAudioContext(): AudioContext {
@@ -508,78 +508,11 @@ export async function renderDuettMixdown(params: {
 }
 
 /**
- * Converts an AudioBuffer to a standard 16-bit PCM WAV Blob with soft-knee saturator.
+ * Converts an AudioBuffer to a lossless 24-bit PCM WAV Blob with TPDF Dithering.
  */
 export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numChannels * bytesPerSample;
-
-  const left = buffer.getChannelData(0);
-  const right = numChannels > 1 ? buffer.getChannelData(1) : left;
-  const numSamples = buffer.length;
-
-  const dataSize = numSamples * blockAlign;
-  const bufferLength = 44 + dataSize;
-  const arrayBuffer = new ArrayBuffer(bufferLength);
-  const view = new DataView(arrayBuffer);
-
-  // RIFF Chunk
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(view, 8, 'WAVE');
-
-  // fmt Subchunk
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-
-  // data Subchunk
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataSize, true);
-
-  // Soft-knee saturation guard to mathematically prevent square-wave clipping
-  const softSaturate = (val: number): number => {
-    if (val > 1.0) return 1.0;
-    if (val < -1.0) return -1.0;
-    if (val > 0.95) {
-      const excess = val - 0.95;
-      return 0.95 + 0.05 * Math.tanh(excess / 0.05);
-    }
-    if (val < -0.95) {
-      const excess = val + 0.95;
-      return -0.95 + 0.05 * Math.tanh(excess / 0.05);
-    }
-    return val;
-  };
-
-  // Interleave and scale float samples to 16-bit PCM
-  let offset = 44;
-  for (let i = 0; i < numSamples; i++) {
-    // Left channel
-    const sampleL = softSaturate(left[i]);
-    view.setInt16(offset, sampleL < 0 ? sampleL * 0x8000 : sampleL * 0x7FFF, true);
-    offset += 2;
-
-    // Right channel
-    const sampleR = softSaturate(right[i]);
-    view.setInt16(offset, sampleR < 0 ? sampleR * 0x8000 : sampleR * 0x7FFF, true);
-    offset += 2;
-  }
-
-  return new Blob([arrayBuffer], { type: 'audio/wav' });
-}
-
-function writeString(view: DataView, offset: number, string: string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
+  return encode24BitWavBlob(buffer, {
+    title: 'Campus Duett Studio Aufnahme',
+    artist: 'Campus-Groovelab'
+  });
 }

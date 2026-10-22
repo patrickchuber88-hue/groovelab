@@ -328,12 +328,12 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
               width: '44px',
               height: '44px',
               borderRadius: '14px',
-              background: '#0f172a',
+              background: '#4f46e5',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.2)'
+              boxShadow: '0 4px 14px rgba(79, 70, 229, 0.25)'
             }}>
               <BookOpen size={22} />
             </div>
@@ -420,7 +420,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                   <span>{tab.label}</span>
                   <span style={{
                     fontSize: '0.7rem',
-                    background: isActive ? '#0f172a' : '#cbd5e1',
+                    background: isActive ? '#4f46e5' : '#cbd5e1',
                     color: isActive ? '#ffffff' : '#475569',
                     padding: '1px 6px',
                     borderRadius: '6px',
@@ -442,7 +442,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                 setShowStudioModal(true);
               }}
               style={{
-                background: '#0f172a',
+                background: '#4f46e5',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
@@ -465,7 +465,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
               type="button"
               onClick={() => setShowNewSnippetModal(true)}
               style={{
-                background: '#0f172a',
+                background: '#4f46e5',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
@@ -533,7 +533,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                   type="button"
                   onClick={() => setSelectedInstrumentFilter(inst)}
                   style={{
-                    background: isSelected ? '#0f172a' : '#f1f5f9',
+                    background: isSelected ? '#4f46e5' : '#f1f5f9',
                     color: isSelected ? '#ffffff' : '#475569',
                     border: 'none',
                     borderRadius: '8px',
@@ -642,12 +642,12 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                       )}
                     </div>
 
-                    {/* Monochromer 1-Tap Teilen-Button */}
+                    {/* Freundlicher Campus-Indigo 1-Tap Teilen-Button */}
                     <button
                       type="button"
                       onClick={() => setSharingItem({ item: snip, type: 'snippet' })}
                       style={{
-                        background: '#0f172a',
+                        background: '#4f46e5',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '10px',
@@ -661,7 +661,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                         gap: '6px',
                         width: '100%',
                         marginTop: '10px',
-                        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.1)'
+                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)'
                       }}
                       title="Aufgabe einem Schüler für diese Woche zuweisen"
                     >
@@ -746,7 +746,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                         type: 'lehrwerk'
                       })}
                       style={{
-                        background: '#0f172a',
+                        background: '#4f46e5',
                         color: '#ffffff',
                         border: 'none',
                         borderRadius: '10px',
@@ -804,7 +804,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                               width: '38px',
                               height: '38px',
                               borderRadius: '10px',
-                              background: '#0f172a',
+                              background: '#4f46e5',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -828,8 +828,8 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                               type="button"
                               onClick={() => togglePlayAudio(song.audio_url!)}
                               style={{
-                                background: isPlaying ? '#0f172a' : '#f1f5f9',
-                                color: isPlaying ? '#ffffff' : '#0f172a',
+                                background: isPlaying ? '#4f46e5' : '#f1f5f9',
+                                color: isPlaying ? '#ffffff' : '#4f46e5',
                                 border: 'none',
                                 borderRadius: '50%',
                                 width: '32px',
@@ -853,12 +853,12 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                         </div>
                       </div>
 
-                      {/* Monochromer 1-Tap Teilen-Button */}
+                      {/* Freundlicher Campus-Indigo 1-Tap Teilen-Button */}
                       <button
                         type="button"
                         onClick={() => setSharingItem({ item: song, type: 'song' })}
                         style={{
-                          background: '#0f172a',
+                          background: '#4f46e5',
                           color: '#ffffff',
                           border: 'none',
                           borderRadius: '10px',
@@ -1097,7 +1097,7 @@ export const TeacherUnifiedMediaLibraryModal: React.FC<TeacherUnifiedMediaLibrar
                   onClick={handleSaveCustomSnippet}
                   disabled={!newSnippetTitle.trim() || !newSnippetNotes.trim()}
                   style={{
-                    background: '#0f172a',
+                    background: '#4f46e5',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',

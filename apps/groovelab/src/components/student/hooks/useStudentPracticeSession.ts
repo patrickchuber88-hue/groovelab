@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { storeBlob, getBlob, deleteBlob } from '../../../utils/blobStorage';
 import { computePeaksFromArrayBuffer } from '../../../utils/waveformHelper';
-import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../../utils/audioMasteringEngine';
-import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB, CURRENT_MASTERING_VERSION } from '../../../utils/audioMasteringEngine';
+import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../services/audio/AudioCaptureEngine';
+import { fixWebmDuration } from '../../../utils/webmDurationPatcher';
 import { toLocalYYYYMMDD, getSimulatedNow, getDaysBetweenLocal, getISOWeek } from '../studentDateUtils';
 import { MIN_PRACTICE_SECONDS } from '../utils/studentAvatarDashboardUtils';
 import { useDeviceAntiCheatGuard, DeviceAntiCheatAbortReason } from '../../../hooks/useDeviceAntiCheatGuard';
@@ -50,6 +52,7 @@ export interface JuniorLocalRecording {
   date: string;
   blobKey?: string;
   recordedAt?: string;
+  masteringVersion?: string;
 }
 
 export interface JuniorTeacherRecording {
@@ -402,23 +405,34 @@ export function useStudentPracticeSession({
     try {
       setShowJuniorRecordModal(true);
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       juniorAudioStreamRef.current = stream;
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       juniorMediaRecorderRef.current = recorder;
 
       const chunks: Blob[] = [];
+      const startedAtMs = Date.now();
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunks.push(e.data);
       };
 
-      recorder.onstop = () => {
-        const finalBlob = new Blob(chunks, { type: mimeType || 'audio/webm' });
-        setJuniorRecordedBlob(finalBlob);
-        setJuniorRecordedUrl(URL.createObjectURL(finalBlob));
+      recorder.onstop = async () => {
+        const rawBlob = new Blob(chunks, { type: mimeType || 'audio/webm' });
+        const elapsedSec = Math.max(1, (Date.now() - startedAtMs) / 1000);
+        try {
+          const patched = await fixWebmDuration(rawBlob, elapsedSec).catch(() => rawBlob);
+          const mastered = await processPureRawBlob(patched, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            targetPeakDb: TARGET_PEAK_DBTP,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+          });
+          setJuniorRecordedBlob(mastered.processedBlob);
+          setJuniorRecordedUrl(mastered.processedUrl);
+        } catch {
+          setJuniorRecordedBlob(rawBlob);
+          setJuniorRecordedUrl(URL.createObjectURL(rawBlob));
+        }
       };
 
       recorder.start(200);
@@ -440,16 +454,19 @@ export function useStudentPracticeSession({
       clearInterval(juniorRecordTimerRef.current);
       juniorRecordTimerRef.current = null;
     }
-    if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
-      try {
-        juniorMediaRecorderRef.current.stop();
-      } catch {}
-    }
-    if (juniorAudioStreamRef.current) {
+    setJuniorIsRecording(false);
+    const rec = juniorMediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      AudioCaptureEngine.stopRecorderWithTail(rec, 800, () => {
+        if (juniorAudioStreamRef.current) {
+          releaseAudioStream(juniorAudioStreamRef.current);
+          juniorAudioStreamRef.current = null;
+        }
+      });
+    } else if (juniorAudioStreamRef.current) {
       releaseAudioStream(juniorAudioStreamRef.current);
       juniorAudioStreamRef.current = null;
     }
-    setJuniorIsRecording(false);
   };
 
   const cancelJuniorRecording = () => {
@@ -474,7 +491,8 @@ export function useStudentPracticeSession({
         url: localBlobKey,
         duration: juniorRecordDuration,
         date: new Date().toISOString(),
-        blobKey: localBlobKey
+        blobKey: localBlobKey,
+        masteringVersion: CURRENT_MASTERING_VERSION
       };
 
       const localKey = `campus_junior_recordings_${studentId}`;
@@ -496,7 +514,7 @@ export function useStudentPracticeSession({
     if (!recording?.url) return;
     const a = document.createElement('a');
     a.href = recording.url;
-    a.download = `${recording.title || 'Aufnahme'}.webm`;
+    a.download = `${recording.title || 'Aufnahme'}.wav`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

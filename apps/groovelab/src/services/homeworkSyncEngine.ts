@@ -20,8 +20,25 @@ import {
   buildHomeworkNotesPayload,
   parseHomeworkNotesPayload,
   cleanHomeworkTitle,
-  formatPageRangeString
+  formatPageRangeString,
+  parsePageRangeString
 } from '../utils/homeworkSnapshotHelper';
+
+export interface AuthoritativeBookProgress {
+  lastPracticedPage: number;
+  lastMasteredPage: number;
+  highestConsecutiveMasteredPage: number;
+  currentHomeworkPages: number[];
+  defaultSelectedPages: number[];
+  masteredPages: number[];
+  pageStatesMap: Record<number, { status: 'locked' | 'homework' | 'mastered' | 'purple'; isHomework: boolean; studentFocus?: boolean; notes?: string }>;
+  proposals: {
+    single: number;
+    double: [number, number];
+    repeatAndAdvance: [number, number];
+    block3: [number, number, number];
+  };
+}
 
 export interface SyncBookPagesParams {
   studentId: string;
@@ -75,6 +92,128 @@ export function getCurrentHomeworkWeekInfo(date?: Date): { topicName: string; we
     topicName: `Hausaufgabe KW ${weekNumStr}`,
     weekNum: weekNumStr,
     currentWeek: `${yearStr}-W${weekNumStr}`
+  };
+}
+
+/**
+ * 0,1% Goldstandard: Berechnet den didaktischen Übestand eines Lehrwerks autoritativ
+ * aus DB (progress_matrix) und lokalem Fortschritt (student_lehrwerke_progress).
+ *
+ * Findet die höchste gemeisterte Seite und schlägt nahtlos fortlaufende Seiten vor:
+ * - Single (z. B. S. 7)
+ * - Doppelseite (z. B. S. 7–8)
+ * - Wiederholen & Weiter (z. B. S. 6–7)
+ * - 3-Seiten-Block (z. B. S. 7–9)
+ */
+export function calculateAuthoritativeBookProgress(params: {
+  bookTitle: string;
+  totalPages?: number;
+  pmRows?: any[];
+  localAssignment?: any;
+}): AuthoritativeBookProgress {
+  const { bookTitle, totalPages = 50, pmRows = [], localAssignment } = params;
+  const cleanTitle = cleanHomeworkTitle(bookTitle).toLowerCase().trim();
+  const maxP = Math.max(1, totalPages);
+
+  const pageStatesMap: Record<number, { status: 'locked' | 'homework' | 'mastered' | 'purple'; isHomework: boolean; studentFocus?: boolean; notes?: string }> = {};
+  const masteredPagesSet = new Set<number>();
+  const homeworkPagesSet = new Set<number>();
+
+  // 1. Aus progress_matrix (DB = SSOT)
+  pmRows.forEach((row: any) => {
+    if (row.topic_name && row.topic_name.includes(' - Seite ')) {
+      const [rawTitle, pStr] = row.topic_name.split(' - Seite ');
+      const bTitle = cleanHomeworkTitle(rawTitle).toLowerCase().trim();
+      if (bTitle === cleanTitle) {
+        const pNum = parseInt(pStr, 10);
+        if (!isNaN(pNum) && pNum >= 1 && pNum <= maxP) {
+          const isMastered = row.status === 'MASTERED' || row.status === 'mastered';
+          const isHw = Boolean(row.is_current_homework);
+          pageStatesMap[pNum] = {
+            status: isMastered ? 'mastered' : (isHw ? 'homework' : 'locked'),
+            isHomework: isHw,
+            notes: row.notes || row.homework_notes
+          };
+          if (isMastered) masteredPagesSet.add(pNum);
+          if (isHw) homeworkPagesSet.add(pNum);
+        }
+      }
+    }
+  });
+
+  // 2. Aus localAssignment (student_lehrwerke_progress)
+  if (localAssignment?.pageStates) {
+    Object.keys(localAssignment.pageStates).forEach((pStr) => {
+      const pNum = parseInt(pStr, 10);
+      if (!isNaN(pNum) && pNum >= 1 && pNum <= maxP) {
+        const ps = localAssignment.pageStates[pNum] || {};
+        const isMastered = ps.status === 'mastered' || ps.status === 'MASTERED';
+        const isHw = ps.status === 'homework' || Boolean(ps.isCurrentHomework);
+        const isFocus = Boolean(ps.studentFocus);
+        const existing = pageStatesMap[pNum];
+
+        pageStatesMap[pNum] = {
+          status: isMastered ? 'mastered' : (existing?.status === 'mastered' ? 'mastered' : (isHw ? 'homework' : (isFocus ? 'purple' : 'locked'))),
+          isHomework: isHw || Boolean(existing?.isHomework),
+          studentFocus: isFocus,
+          notes: ps.homeworkNotes || ps.notes || existing?.notes || ''
+        };
+        if (isMastered) masteredPagesSet.add(pNum);
+        if (isHw) homeworkPagesSet.add(pNum);
+      }
+    });
+  }
+
+  const masteredPages = Array.from(masteredPagesSet).sort((a, b) => a - b);
+  const currentHomeworkPages = Array.from(homeworkPagesSet).sort((a, b) => a - b);
+
+  // Höchste gemeisterte Seite
+  const lastMasteredPage = masteredPages.length > 0 ? Math.max(...masteredPages) : 0;
+
+  // Höchste fortlaufend gemeisterte Seite von Beginn an
+  let highestConsecutiveMasteredPage = 0;
+  for (let p = 1; p <= maxP; p++) {
+    if (masteredPagesSet.has(p)) {
+      highestConsecutiveMasteredPage = p;
+    } else {
+      break;
+    }
+  }
+
+  // Didaktische Basis für die nächsten Vorschläge:
+  // Wenn Seiten gemeistert sind, knüpfe an der höchsten gemeisterten Seite an!
+  // Andernfalls an aktiven Hausaufgaben oder Seite 1
+  let basePage = lastMasteredPage;
+  if (basePage === 0 && currentHomeworkPages.length > 0) {
+    basePage = Math.max(...currentHomeworkPages);
+  }
+
+  const nextSingle = Math.min(maxP, basePage + 1);
+  const nextDoubleStart = Math.min(maxP, basePage + 1);
+  const nextDoubleEnd = Math.min(maxP, nextDoubleStart + 1);
+  const repStart = Math.max(1, basePage);
+  const repEnd = Math.min(maxP, repStart + 1);
+  const blkStart = Math.min(maxP, basePage + 1);
+  const blkEnd = Math.min(maxP, blkStart + 2);
+
+  const defaultSelected = currentHomeworkPages.length > 0
+    ? currentHomeworkPages
+    : (nextSingle === nextDoubleEnd ? [nextSingle] : [nextDoubleStart, nextDoubleEnd]);
+
+  return {
+    lastPracticedPage: basePage > 0 ? basePage : 1,
+    lastMasteredPage,
+    highestConsecutiveMasteredPage,
+    currentHomeworkPages,
+    defaultSelectedPages: defaultSelected,
+    masteredPages,
+    pageStatesMap,
+    proposals: {
+      single: nextSingle,
+      double: [nextDoubleStart, nextDoubleEnd],
+      repeatAndAdvance: [repStart, repEnd],
+      block3: [blkStart, Math.min(maxP, blkStart + 1), blkEnd]
+    }
   };
 }
 

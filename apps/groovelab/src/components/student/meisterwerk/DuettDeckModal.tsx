@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../../utils/blobStorage';
 import { acquireAudioStream, releaseAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../../services/audio/AudioCaptureEngine';
 import { applyBufferTailFadeOut } from '../../../utils/audioTailEngine';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../../utils/audioMasteringEngine';
 import { 
@@ -1029,19 +1030,6 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       studentAudioElRef.current.pause();
     }
 
-    if (sourceNodeRef.current) {
-      try { sourceNodeRef.current.disconnect(); } catch (e) {}
-      sourceNodeRef.current = null;
-    }
-    if (analyserRef.current) {
-      try { analyserRef.current.disconnect(); } catch (e) {}
-      analyserRef.current = null;
-    }
-    if (activeStreamRef.current) {
-      releaseAudioStream(activeStreamRef.current);
-      activeStreamRef.current = null;
-    }
-
     if (recordIntervalRef.current) {
       clearInterval(recordIntervalRef.current);
       recordIntervalRef.current = null;
@@ -1057,17 +1045,22 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
-      try { rec.requestData(); } catch (e) {}
       setIsSyncingBuffer(true);
-      // 300ms Safety Buffer for natural room decay
-      setTimeout(() => {
-        try {
-          if (rec.state !== 'inactive') {
-            rec.stop();
-          }
-        } catch (e) {}
-      }, 300);
+      // 🎧 800ms Safety Buffer for natural room & string decay (activeStreamRef is released in recorder.onstop)
+      AudioCaptureEngine.stopRecorderWithTail(rec, 800);
     } else {
+      if (sourceNodeRef.current) {
+        try { sourceNodeRef.current.disconnect(); } catch (e) {}
+        sourceNodeRef.current = null;
+      }
+      if (analyserRef.current) {
+        try { analyserRef.current.disconnect(); } catch (e) {}
+        analyserRef.current = null;
+      }
+      if (activeStreamRef.current) {
+        releaseAudioStream(activeStreamRef.current);
+        activeStreamRef.current = null;
+      }
       setIsRecording(false);
       setIsSyncingBuffer(false);
     }
@@ -1133,13 +1126,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       }
 
       audioChunksRef.current = [];
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus' 
-        : MediaRecorder.isTypeSupported('audio/mp4') 
-          ? 'audio/mp4' 
-          : 'audio/webm';
-
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const { recorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, 256000);
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
           audioChunksRef.current.push(e.data);

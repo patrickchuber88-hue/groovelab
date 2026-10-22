@@ -45,7 +45,6 @@ export interface SecretaryCampusTabProps {
   setCampusSubTab: React.Dispatch<React.SetStateAction<any>> | ((tab: any) => void);
   setSecretarySubTab: React.Dispatch<React.SetStateAction<any>> | ((subTab: any) => void);
   setActiveTab?: (tab: 'groovelab' | 'campus' | 'secretary') => void;
-  setShowDunningPayModal?: React.Dispatch<React.SetStateAction<boolean>> | ((show: boolean) => void);
   activePlatform?: string;
   schoolId: string;
   userId?: string;
@@ -295,7 +294,6 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
   setCampusSubTab,
   setSecretarySubTab,
   setActiveTab,
-  setShowDunningPayModal,
   activePlatform,
   schoolId,
   userId,
@@ -683,114 +681,6 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                       </div>
                     </div>
                   )}
-
-                  {/* Overdue Activation Invoice Alerts */}
-                  {(() => {
-                    const today = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
-                    const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-                    const diffDays = Math.floor((today.getTime() - prevMonthEnd.getTime()) / (1000 * 60 * 60 * 24));
-                    const isSchoolPaid = billingPayer === 'school' && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2');
-                    
-                    if (isSchoolPaid && diffDays >= 11 && diffDays <= 20) {
-                      return (
-                        <div style={{
-                          background: '#fffbeb',
-                          border: 'none',
-                          borderRadius: '20px',
-                          padding: '16px 20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          boxShadow: 'none'
-                        }}>
-                          <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                            <strong style={{ fontSize: '0.85rem', color: '#78350f', fontFamily: 'Urbanist' }}>
-                              Zahlungserinnerung: Aktivierungs-Rechnung ausstehend
-                            </strong>
-                            <span style={{ fontSize: '0.78rem', color: '#b45309', fontFamily: 'Inter', lineHeight: '1.4' }}>
-                              Die monatliche Aktivierungs-Rechnung ist seit über 10 Tagen überfällig. Bitte begleichen Sie den ausstehenden Betrag in den nächsten Tagen, um eine automatische Deaktivierung der betroffenen Schüler-Profile zu vermeiden.
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (setShowDunningPayModal) {
-                                setShowDunningPayModal(true);
-                              } else {
-                                if (setActiveTab) setActiveTab('secretary');
-                                setSecretarySubTab('licenses');
-                              }
-                            }}
-                            style={{
-                              background: '#f59e0b',
-                              color: 'white',
-                              border: 'none',
-                              padding: '8px 14px',
-                              borderRadius: '10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              fontFamily: 'Urbanist',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Jetzt begleichen
-                          </button>
-                        </div>
-                      );
-                    }
-                    
-                    if (isSchoolPaid && diffDays > 20) {
-                      return (
-                        <div style={{
-                          background: '#fef2f2',
-                          border: 'none',
-                          borderRadius: '20px',
-                          padding: '16px 20px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          boxShadow: 'none'
-                        }}>
-                          <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-                            <strong style={{ fontSize: '0.85rem', color: '#991b1b', fontFamily: 'Urbanist' }}>
-                              Zahlungsverzug: Schüler-Profile deaktiviert
-                            </strong>
-                            <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontFamily: 'Inter', lineHeight: '1.4' }}>
-                              Aufgrund des anhaltenden Zahlungsverzugs (über 20 Tage) wurden die betroffenen Schüler-Accounts temporär in den inaktiven Modus versetzt. Nach Begleichung der Rechnung werden alle Profile sofort wieder freigeschaltet.
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (setShowDunningPayModal) {
-                                setShowDunningPayModal(true);
-                              } else {
-                                if (setActiveTab) setActiveTab('secretary');
-                                setSecretarySubTab('licenses');
-                              }
-                            }}
-                            style={{
-                              background: '#ef4444',
-                              color: 'white',
-                              border: 'none',
-                              padding: '8px 14px',
-                              borderRadius: '10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              fontFamily: 'Urbanist',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Rechnung ausgleichen
-                          </button>
-                        </div>
-                      );
-                    }
-                    
-                    return null;
-                  })()}
 
                   {(() => {
                     const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {

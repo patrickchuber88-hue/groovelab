@@ -237,7 +237,8 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
       'src/components/CampusEventsBoard.tsx',
       'src/components/CampusAppointmentShoutboxModal.tsx',
       'src/components/QRLandingPage.tsx',
-      'src/components/teacher/hooks/useTeacherTagesplan.ts'
+      'src/components/teacher/hooks/useTeacherTagesplan.ts',
+      'src/components/student/hooks/useStudentSchedule.ts'
     ],
     isViolation: (content) => {
       const sensitiveTables = [

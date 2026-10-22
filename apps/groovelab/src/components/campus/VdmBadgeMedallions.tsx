@@ -326,7 +326,7 @@ export const VdmCertificateModal: React.FC<{
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="VdM Prüfungsurkunde"
+      aria-label="Prüfungsurkunde"
       style={{
         position: 'fixed',
         inset: 0,

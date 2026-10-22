@@ -22,6 +22,7 @@ import {
   BarChart2,
   QrCode
 } from 'lucide-react';
+import { isCampusBoardAllowedForChild } from '../../services/campusBoardPermissions';
 
 interface MobileBottomNavProps {
   activeTab: string;
@@ -41,28 +42,12 @@ interface MenuItem {
   badge?: number;
 }
 
-const isBoardAllowedForStudent = (boardId: string, level: string, isParentUnlocked: boolean): boolean => {
+const isBoardAllowedForStudent = (boardId: string, level: string, isParentUnlocked: boolean, cachedUser?: any): boolean => {
   if (isParentUnlocked) return true;
-  if (level === 'pro') return true;
 
-  // Custom parent override from localStorage if set
-  if (typeof window !== 'undefined') {
-    const override = localStorage.getItem(`campus_board_override_${boardId}`);
-    if (override === 'true') return true;
-    if (override === 'false') return false;
-  }
-
-  if (level === 'junior') {
-    // Junior defaults: Campus (Briefing, Aufgaben, Übe-Pfad, Termine, Settings) + GrooveLab (Live Lab, Üben, Bibliothek, Repertoire)
-    const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings', 'live', 'practice', 'library', 'repertoire'];
-    return juniorAllowed.includes(boardId);
-  }
-
-  if (level === 'teen') {
-    return true;
-  }
-
-  return true;
+  // Autoritativer SSOT Check (Zero Pro-Bypass)
+  const userContext = cachedUser ? { ...cachedUser, campus_ui_level: level } : { campus_ui_level: level };
+  return isCampusBoardAllowedForChild(boardId, userContext, isParentUnlocked);
 };
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -182,14 +167,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   // Define 1:1 menu items matching Desktop Left Sidebar in exact order
   const getMenuItems = (): MenuItem[] => {
     if (userRole === 'student') {
+      const cachedUser = (() => {
+        try {
+          const raw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
+          if (raw) return JSON.parse(raw);
+        } catch {}
+        return null;
+      })();
       if (activePlatform === 'campus') {
-        const cachedUser = (() => {
-          try {
-            const raw = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user');
-            if (raw) return JSON.parse(raw);
-          } catch {}
-          return null;
-        })();
 
         const isAdultStudent = (() => {
           if (cachedUser?.is_adult === true) return true;
@@ -220,7 +205,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             icon: isParentProtected ? ShieldCheck : Settings 
           },
         ];
-        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked));
+        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked, cachedUser));
       } else {
         const allItems: MenuItem[] = [
           { id: 'live', label: 'Live Lab', icon: Monitor },
@@ -231,7 +216,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           { id: 'bands', label: 'Bands', icon: Box },
           { id: 'messages', label: 'Nachrichten', icon: Megaphone },
         ];
-        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked));
+        return allItems.filter(item => isBoardAllowedForStudent(item.id, campusStudentUiLevel, parentUnlocked, cachedUser));
       }
     } else {
       // Teacher / Admin / Secretary

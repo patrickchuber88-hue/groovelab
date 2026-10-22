@@ -447,7 +447,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                   type="button"
                   onClick={() => setInstFilter(inst.id)}
                   style={{
-                    background: isActive ? '#0f172a' : '#ffffff',
+                    background: isActive ? '#4f46e5' : '#ffffff',
                     color: isActive ? '#ffffff' : '#475569',
                     border: isActive ? 'none' : '1px solid #cbd5e1',
                     borderRadius: '10px',
@@ -459,7 +459,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    boxShadow: isActive ? '0 2px 8px rgba(15, 23, 42, 0.18)' : 'none',
+                    boxShadow: isActive ? '0 2px 8px rgba(79, 70, 229, 0.25)' : 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -550,7 +550,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             setSelectedSubFolder('all');
           }}
           style={{
-            background: selectedCategory === 'Alle' ? '#0f172a' : '#f1f5f9',
+            background: selectedCategory === 'Alle' ? '#4f46e5' : '#f1f5f9',
             color: selectedCategory === 'Alle' ? '#ffffff' : '#475569',
             border: selectedCategory === 'Alle' ? 'none' : '1px solid #cbd5e1',
             borderRadius: '10px',
@@ -559,7 +559,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
             fontWeight: 800,
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            boxShadow: selectedCategory === 'Alle' ? '0 3px 12px rgba(15, 23, 42, 0.25)' : 'none',
+            boxShadow: selectedCategory === 'Alle' ? '0 3px 12px rgba(79, 70, 229, 0.25)' : 'none',
             transition: 'all 0.15s ease'
           }}
         >
@@ -730,7 +730,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
               type="button"
               onClick={onNewSnippet}
               style={{
-                background: '#0f172a',
+                background: '#4f46e5',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
@@ -852,7 +852,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                   style={{
                     background: '#ffffff',
                     border: isPlaying ? `1.5px solid ${catMeta.color.activeBg}` : '1px solid #e2e8f0',
-                    borderLeft: `3.5px solid ${catMeta.color.activeBg}`,
+                    borderLeft: `4px solid ${catMeta.color.activeBg}`,
                     borderRadius: '14px',
                     padding: '12px 14px',
                     display: 'flex',
@@ -871,7 +871,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                   onMouseEnter={e => {
                     if (!isPlaying) {
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+                      e.currentTarget.style.boxShadow = '0 6px 18px rgba(15, 23, 42, 0.06)';
                       e.currentTarget.style.borderColor = '#cbd5e1';
                       e.currentTarget.style.borderLeftColor = catMeta.color.activeBg;
                     }
@@ -885,16 +885,16 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                     }
                   }}
                 >
-                  {/* 1. Header: Kategorie-Badge + Stufe + Metadaten inline + Admin-Aktionen */}
+                  {/* 1. Header: Kategorie-Badge + Stufe (neutral) + Metadaten inline + Admin-Aktionen */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
-                      {/* Kategorie-Pill: Soft-Tinted (Apple 2-Farben-Doktrin, border: none) */}
+                      {/* Kategorie-Pill: Soft-Tinted als primärer Fachbereichs-Akzent */}
                       <span style={{
                         fontSize: '0.68rem',
                         fontWeight: 800,
                         background: catMeta.color.bg,
                         color: catMeta.color.text,
-                        padding: '2px 7px',
+                        padding: '2px 8px',
                         borderRadius: '6px',
                         border: 'none',
                         whiteSpace: 'nowrap'
@@ -905,9 +905,9 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                       {!isOwn && (
                         <span style={{
                           fontSize: '0.64rem',
-                          fontWeight: 800,
-                          background: levelMeta.bg,
-                          color: levelMeta.text,
+                          fontWeight: 700,
+                          background: '#f1f5f9',
+                          color: '#475569',
                           padding: '2px 7px',
                           borderRadius: '5px',
                           border: 'none',
@@ -1077,17 +1077,17 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                   </h3>
                 </div>
 
-                {/* 3. 🏛️ Minimalistische Notenminiatur (MicroScoreCalmThumbnail in Kategorie-Farbe) */}
-                <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+                {/* 3. 🏛️ Minimalistische Urtext-Notenminiatur (Bunte Noten mit Boomwhacker-Farben) */}
+                <div style={{ marginTop: '2px', marginBottom: '2px' }}>
                   <MicroScoreCalmThumbnail
                     snippet={resolvedForCard}
                     accentColor={catMeta.color.activeBg}
-                    height={44}
+                    height={48}
                     isPlaying={isPlaying}
                   />
                 </div>
 
-                {/* 4. Beruhigtes Action-Dock: Vorhören + Zuweisen (Nur 2 Aktionen) */}
+                {/* 4. Beruhigtes Action-Dock: Vorhören + Zuweisen (Konsistente System-Aktionsfarbe) */}
                 <div
                   style={{
                     display: 'flex',
@@ -1152,7 +1152,7 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                     )}
                   </button>
 
-                  {/* 2. Zuweisen CTA (Soft-Tinted in Kategorie-Farbe, border: none) */}
+                  {/* 2. Zuweisen CTA (Freundliches Campus Indigo #4f46e5) */}
                   <button
                     type="button"
                     onClick={e => {
@@ -1163,8 +1163,8 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                     aria-label="Als Hausaufgabe zuweisen"
                     style={{
                       height: '30px',
-                      background: catMeta.color.bg,
-                      color: catMeta.color.text,
+                      background: '#4f46e5',
+                      color: '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
                       padding: '0 12px',
@@ -1175,15 +1175,16 @@ export const TeacherLibraryScoreSnippetsTab: React.FC<TeacherLibraryScoreSnippet
                       alignItems: 'center',
                       gap: '5px',
                       whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 6px rgba(79, 70, 229, 0.22)',
                       transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = catMeta.color.badgeBg;
-                      e.currentTarget.style.color = catMeta.color.badgeText;
+                      e.currentTarget.style.background = '#4338ca';
+                      e.currentTarget.style.boxShadow = '0 3px 10px rgba(79, 70, 229, 0.32)';
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = catMeta.color.bg;
-                      e.currentTarget.style.color = catMeta.color.text;
+                      e.currentTarget.style.background = '#4f46e5';
+                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(79, 70, 229, 0.22)';
                     }}
                   >
                     <Share2 size={12} strokeWidth={2.2} />

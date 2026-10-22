@@ -164,6 +164,7 @@ export interface SecretaryLicensesViewProps {
   getEffectiveStorageUsedBytes: (profile: any) => number;
   isSecretaryReadOnly?: boolean;
   onOpenDunningPayModal?: (inv?: any) => void;
+  onSyncComputedInvoices?: (invoices: any[]) => void;
 }
 
 export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
@@ -314,22 +315,23 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
     setActiveStudentsModalList,
     getEffectiveStorageUsedBytes,
     isSecretaryReadOnly = false,
-    onOpenDunningPayModal
+    onOpenDunningPayModal,
+    onSyncComputedInvoices
   } = props;
 
   const formattedSchoolNumericId = String(schoolNumericId || '1').padStart(3, '0');
 
   const effectiveSchoolRates = {
-    priceCampus: Number(rawEffectiveSchoolRates?.priceCampus ?? rawMasterRates?.campus ?? 14.9),
-    priceGroovelab: Number(rawEffectiveSchoolRates?.priceGroovelab ?? rawMasterRates?.groovelab ?? 9.9),
-    priceKombi: Number(rawEffectiveSchoolRates?.priceKombi ?? rawMasterRates?.kombi ?? 19.9),
+    priceCampus: Number(rawEffectiveSchoolRates?.priceCampus ?? rawMasterRates?.campus ?? 19.90),
+    priceGroovelab: Number(rawEffectiveSchoolRates?.priceGroovelab ?? rawMasterRates?.groovelab ?? 12.90),
+    priceKombi: Number(rawEffectiveSchoolRates?.priceKombi ?? rawMasterRates?.kombi ?? 24.90),
     priceTeacher: Number(rawEffectiveSchoolRates?.priceTeacher ?? rawMasterRates?.teacher ?? 0.49),
     priceStudent: Number(rawEffectiveSchoolRates?.priceStudent ?? rawMasterRates?.student ?? 0.49)
   };
   const masterRates = {
-    campus: Number(rawMasterRates?.campus ?? 14.9),
-    groovelab: Number(rawMasterRates?.groovelab ?? 9.9),
-    kombi: Number(rawMasterRates?.kombi ?? 19.9),
+    campus: Number(rawMasterRates?.campus ?? 19.90),
+    groovelab: Number(rawMasterRates?.groovelab ?? 12.90),
+    kombi: Number(rawMasterRates?.kombi ?? 24.90),
     teacher: Number(rawMasterRates?.teacher ?? 0.49),
     student: Number(rawMasterRates?.student ?? 0.49)
   };
@@ -3749,6 +3751,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             setExpandedYears={setExpandedYears}
                             setActiveStudentsModalList={setActiveStudentsModalList}
                             onOpenDunningPayModal={onOpenDunningPayModal}
+                            onSyncComputedInvoices={onSyncComputedInvoices}
                             setSelectedInvoice={setSelectedInvoice}
                             agreedToSepa={agreedToSepa}
                             supabase={supabase}

@@ -16,13 +16,20 @@ import {
   Lock,
   User,
   Fingerprint,
-  Moon
+  Moon,
+  AlertTriangle,
+  Phone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { isWebAuthnSupported, getSanitizedRpId, extractWebAuthnAssertionPayload } from '../utils/webauthn';
-import { isQuietHoursActive } from '../utils/chatRespectGuard';
+import { 
+  validateChatMessageContent, 
+  ChatRespectValidationResult, 
+  isQuietHoursActive, 
+  CRISIS_HELPLINE_INFO 
+} from '../utils/chatRespectGuard';
 import { CampusDynamicAvatar } from './CampusDirectMessages';
 import { CampusUnifiedChatMessage, isChatMessageSystem } from './messages/CampusUnifiedChatMessage';
 
@@ -59,10 +66,40 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     if (currentUserRole !== 'student') return true;
     if (propIsChatAllowed !== undefined) return propIsChatAllowed;
     const profile = currentUserProfile || occurrence?.student || occurrence?.student_user;
+    
+    // Volljährige Schüler sind ausgenommen (BGB § 2)
+    const birthdate = profile?.birthdate || profile?.date_of_birth;
+    if (birthdate) {
+      const birth = new Date(birthdate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      if (age >= 18) return true;
+    }
+
     if (profile?.parent_permissions?.allow_chat !== undefined) return Boolean(profile.parent_permissions.allow_chat);
-    if (profile?.parent_allow_chat !== undefined) return Boolean(profile.parent_allow_chat);
+    if (profile?.parent_allow_chat !== undefined && profile?.parent_allow_chat !== null) return Boolean(profile.parent_allow_chat);
+    
+    // LocalStorage Fallbacks
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('campus_allow_chat') === 'false') return false;
+      const targetId = currentUserId || profile?.id;
+      if (targetId && localStorage.getItem(`groovelab_parent_allow_chat_${targetId}`) === 'false') return false;
+      if (targetId && localStorage.getItem(`groovelab_parent_allow_chat_${targetId}`) === 'true') return true;
+      if (localStorage.getItem('campus_allow_chat') === 'true') return true;
+    }
+
+    // Didactic Junior Mode: In Junior mode, chat is default locked unless explicitly enabled by parent
+    const targetId = currentUserId || profile?.id;
+    const uiLevel = profile?.campus_ui_level || 
+      (typeof window !== 'undefined' ? (localStorage.getItem(`campus_student_ui_level_${targetId}`) || localStorage.getItem('campus_student_ui_level')) : null) || 
+      'junior';
+    if (uiLevel === 'junior') {
+      return false;
+    }
     return true;
-  }, [currentUserRole, propIsChatAllowed, currentUserProfile, occurrence]);
+  }, [currentUserRole, propIsChatAllowed, currentUserProfile, occurrence, currentUserId]);
 
   const isAbsenceAllowed = useMemo(() => {
     if (currentUserRole !== 'student') return true;
@@ -76,6 +113,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatTypedMessage, setChatTypedMessage] = useState(initialDraftMessage || '');
   const [isSending, setIsSending] = useState(false);
+  const [sendErrorMessage, setSendErrorMessage] = useState<string | null>(null);
+  const [respectWarning, setRespectWarning] = useState<ChatRespectValidationResult | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,7 +125,15 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     setLocalParentUnlocked(isParentUnlocked);
   }, [isParentUnlocked]);
 
-  const effectiveIsParentUnlocked = Boolean(isParentUnlocked || localParentUnlocked);
+  const effectiveIsParentUnlocked = Boolean(
+    isParentUnlocked || 
+    localParentUnlocked ||
+    (typeof sessionStorage !== 'undefined' && (
+      sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+      Boolean(sessionStorage.getItem('gl_parent_session_lease')) ||
+      Boolean(sessionStorage.getItem('campus_parent_session_lease'))
+    ))
+  );
 
   const [showPinDialog, setShowPinDialog] = useState<boolean>(false);
   const [pinInput, setPinInput] = useState<string>('');
@@ -151,8 +198,10 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
   if (!isOpen || !occurrence) return null;
 
   // Extract core occurrence identifiers
-  const targetOccId = occurrence.id ? String(occurrence.id) : null;
-  const targetScheduleId = occurrence.schedule_id || occurrence.schedule?.id || null;
+  const targetOccId = occurrence.id 
+    ? String(occurrence.id) 
+    : (occurrence.occurrenceId ? String(occurrence.occurrenceId) : (occurrence.occurrence_id ? String(occurrence.occurrence_id) : null));
+  const targetScheduleId = occurrence.schedule_id || occurrence.schedule?.id || occurrence.scheduleId || null;
   const targetDate: string = occurrence.date || (occurrence.start_date ? String(occurrence.start_date).split('T')[0] : '');
   const startTimeRaw: string = occurrence.start_time || occurrence.time || '15:00';
   const timeLabel = startTimeRaw.includes(':') ? startTimeRaw.slice(0, 5) : `${startTimeRaw.slice(0, 2)}:${startTimeRaw.slice(2, 4)}`;
@@ -174,6 +223,8 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     || occurrence.teacherId 
     || teacherObj?.id 
     || (currentUserRole === 'teacher' ? currentUserId : (currentUserProfile?.teacher_id || studentObj?.teacher_id || null));
+
+  const occRefId = targetOccId || (targetScheduleId ? `virtual-${targetScheduleId}-${targetDate}` : (targetDate ? `virtual-${studentId}-${targetDate}` : null));
 
   useEffect(() => {
     if (currentUserRole === 'student' && !teacherObj && teacherId) {
@@ -300,6 +351,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         // Filter strictly for this appointment slot (by occurrence_id, virtual-id, or extracted date)
         const filtered = data.filter((m: any) => {
           if (targetOccId && String(m.occurrence_id) === targetOccId) return true;
+          if (occRefId && String(m.occurrence_id) === occRefId) return true;
           if (targetScheduleId && targetDate && String(m.occurrence_id) === `virtual-${targetScheduleId}-${targetDate}`) return true;
           if (targetDate && String(m.occurrence_id).includes(targetDate)) return true;
           if (targetDate) {
@@ -679,6 +731,14 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     const text = (textToSend || chatTypedMessage).trim();
     if (!text || !studentId || !teacherId || isSending) return;
 
+    // 🛡️ 0.1% Goldstandard: Pre-Flight Respect Guard Check
+    const validation = validateChatMessageContent(text);
+    if (!validation.isValid) {
+      setRespectWarning(validation);
+      return;
+    }
+    setRespectWarning(null);
+
     if (currentUserRole === 'student' && !isChatAllowed && !effectiveIsParentUnlocked) {
       if (onRequestPinGate) {
         onRequestPinGate(async () => {
@@ -692,11 +752,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     }
 
     setIsSending(true);
+    setSendErrorMessage(null);
     const recipientId = currentUserRole === 'student' ? teacherId : studentId;
-    const occRefId = targetOccId || (targetScheduleId ? `virtual-${targetScheduleId}-${targetDate}` : null);
 
     // Optimistic message
-    const isParentSender = Boolean(effectiveIsParentUnlocked);
+    const isParentSender = Boolean(effectiveIsParentUnlocked) || (currentUserRole as string) === 'parent' || currentUserProfile?.role === 'parent';
     const optimisticMessage = {
       id: `temp-${Date.now()}`,
       sender_id: currentUserId,
@@ -712,44 +772,96 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     setChatTypedMessage('');
     setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 40);
 
+    const effectiveSchoolId = currentUserProfile?.school_id || 
+      (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
+      occurrence?.school_id ||
+      (typeof window !== 'undefined' ? (localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id')) : null);
+
     try {
-      let data, error;
-      if (isParentSender) {
-        const leaseToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_parent_session_lease') : null;
-        if (!leaseToken) {
-          throw new Error('Lease-Token abgelaufen oder nicht gefunden. Bitte PIN erneut eingeben.');
+      let data: any = null;
+      const leaseToken = typeof sessionStorage !== 'undefined' 
+        ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('campus_parent_session_lease')) 
+        : null;
+      if (isParentSender && leaseToken) {
+        try {
+          const res = await supabase.rpc('send_campus_message_as_parent', {
+            p_recipient_id: recipientId,
+            p_content: text,
+            p_occurrence_id: occRefId,
+            p_lease_token: leaseToken
+          });
+          if (!res.error && res.data) {
+            data = res.data;
+          }
+        } catch (rpcErr) {
+          console.warn('[CampusAppointmentShoutboxModal] send_campus_message_as_parent fallback to insert:', rpcErr);
         }
-        const res = await supabase.rpc('send_campus_message_as_parent', {
-          p_recipient_id: recipientId,
-          p_content: text,
-          p_occurrence_id: occRefId,
-          p_lease_token: leaseToken
-        });
-        if (res.error) throw res.error;
-      } else {
-        const res = await supabase.from('campus_direct_messages').insert({
+      }
+
+      if (!data) {
+        const payload: any = {
           sender_id: currentUserId,
           recipient_id: recipientId,
           content: text,
           occurrence_id: occRefId,
           is_read: false,
           is_system: false,
-          sender_role: currentUserRole === 'teacher' ? 'teacher' : 'student'
-        }).select().single();
-        data = res.data;
-        error = res.error;
-        if (error) throw error;
+          sender_role: isParentSender ? 'parent' : (currentUserRole === 'teacher' ? 'teacher' : 'student'),
+          school_id: effectiveSchoolId
+        };
+        const res = await supabase.from('campus_direct_messages').insert(payload).select().single();
+        if (res.error) {
+          const errorStr = String(res.error.message || (res.error as any).details || (res.error as any).hint || '');
+          if (res.error.code === '42703' || res.error.code === 'PGRST204' || errorStr.includes('sender_role') || errorStr.includes('schema cache')) {
+            delete payload.sender_role;
+            const retryRes = await supabase.from('campus_direct_messages').insert(payload).select().single();
+            if (retryRes.error) throw retryRes.error;
+            data = retryRes.data;
+          } else {
+            throw res.error;
+          }
+        } else {
+          data = res.data;
+        }
       }
       
-      const effectiveSchoolId = currentUserProfile?.school_id || 
-        (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
-        occurrence?.school_id;
       if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
         primeDecryptedCache(effectiveSchoolId, data.content, text);
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_direct_messages_updated', { detail: { occurrenceId: occRefId, recipientId } }));
+      }
       await fetchMessages();
-    } catch (err) {
+    } catch (err: any) {
       console.error('[CampusAppointmentShoutboxModal] Error sending message:', err);
+      // Rollback optimistic message so the chat UI isn't misleading
+      setChatMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
+      // Restore typed text so the user's input isn't lost
+      setChatTypedMessage(text);
+      
+      const errMsg = String(err?.message || err?.details || '');
+      if (errMsg.includes('TOXIC_CONTENT') || errMsg.includes('CHAT_RESPECT_VIOLATION') || errMsg.includes('Community-Richtlinien')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'insult',
+          reason: 'Diese Nachricht verstößt gegen die Richtlinien für einen respektvollen Umgang. Bitte formuliere deine Nachricht freundlich.'
+        });
+      } else if (errMsg.includes('CRISIS_DETECTED') || errMsg.includes('CHAT_CRISIS_INTERVENTION_REQUIRED')) {
+        setRespectWarning({
+          isValid: false,
+          isCrisis: true,
+          category: 'threat',
+          reason: 'Wir sind für dich da. Du bist nicht allein. Bitte wende dich an eine Vertrauensperson oder die kostenlose Nummer gegen Kummer (116 111).'
+        });
+      } else if (errMsg.includes('user_role') || errMsg.includes('enum')) {
+        setSendErrorMessage('Nachricht konnte wegen eines Systemfehlers nicht zugestellt werden. Bitte erneut versuchen.');
+      } else if (errMsg.includes('PARENTAL_CHAT_LOCK') || errMsg.includes('JUNIOR_DEFAULT_CHAT_DISABLED')) {
+        setSendErrorMessage('Chat ist im geschützten Junior-Bereich deaktiviert. Bitte mit Eltern-PIN freischalten.');
+      } else if (errMsg.includes('RATE_LIMIT')) {
+        setSendErrorMessage('Spamschutz aktiv: Zu viele Nachrichten gesendet. Bitte kurz warten.');
+      } else {
+        setSendErrorMessage('Nachricht konnte nicht gesendet werden. Bitte überprüfe deine Verbindung.');
+      }
     } finally {
       setIsSending(false);
     }
@@ -1609,6 +1721,120 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                 </div>
               )}
 
+              {/* 🚨 Pre-Flight Respect Guard Warning & Crisis Intervention Card */}
+              {respectWarning && (
+                <div 
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    background: respectWarning.isCrisis ? '#fee2e2' : '#fef9c3',
+                    border: respectWarning.isCrisis ? '1px solid #fecaca' : '1px solid #fde047',
+                    borderRadius: '14px',
+                    padding: '10px 14px',
+                    marginBottom: '8px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: respectWarning.isCrisis ? '#991b1b' : '#92400e', fontWeight: 800, fontSize: '0.80rem' }}>
+                      <AlertTriangle size={16} color={respectWarning.isCrisis ? '#dc2626' : '#d97706'} style={{ flexShrink: 0 }} />
+                      <span>{respectWarning.isCrisis ? 'Wichtiger Hinweis & Hilfeangebot' : 'Respektvoller Umgang im Schul-Chat'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRespectWarning(null)}
+                      aria-label="Warnung schließen"
+                      style={{ background: 'none', border: 'none', color: respectWarning.isCrisis ? '#991b1b' : '#92400e', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: respectWarning.isCrisis ? '#7f1d1d' : '#78350f', lineHeight: 1.4, fontWeight: 550 }}>
+                    {respectWarning.reason}
+                  </div>
+                  {respectWarning.isCrisis && (
+                    <div style={{
+                      background: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      fontSize: '0.72rem',
+                      color: '#991b1b',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginTop: '2px'
+                    }}>
+                      <span>Kostenlose & anonyme Nummer gegen Kummer:</span>
+                      <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
+                        <span>116 111</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error Message Toast / Alert */}
+              {sendErrorMessage && (
+                <div 
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    background: '#fef2f2',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '8px 12px',
+                    color: '#b91c1c',
+                    fontSize: isMobile ? '0.76rem' : '0.82rem',
+                    fontWeight: 700,
+                    marginBottom: '8px',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>{sendErrorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSendErrorMessage(null)}
+                    aria-label="Fehlermeldung schließen"
+                    style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Active Parent Sender Mode Pill */}
+              {effectiveIsParentUnlocked && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '3px 10px',
+                  borderRadius: '100px',
+                  background: '#eff6ff',
+                  border: 'none',
+                  color: '#1d4ed8',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  marginBottom: '2px',
+                  alignSelf: 'flex-start'
+                }}>
+                  <ShieldCheck size={12} color="#1d4ed8" strokeWidth={2.5} />
+                  <span>Senden als Erziehungsberechtigte/r (Eltern-PIN verifiziert)</span>
+                </div>
+              )}
+
               <form
                 onSubmit={e => {
                   e.preventDefault();
@@ -1632,7 +1858,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                   }
                   disabled={isFrozen || isSending}
                   value={chatTypedMessage}
-                  onChange={e => setChatTypedMessage(e.target.value)}
+                  onChange={e => {
+                    setChatTypedMessage(e.target.value);
+                    if (respectWarning) setRespectWarning(null);
+                    if (sendErrorMessage) setSendErrorMessage(null);
+                  }}
                   style={{
                     flex: 1,
                     minWidth: 0,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, CheckCircle2, AlertTriangle, Calendar, ChevronRight, Check, Zap } from 'lucide-react';
+import { Moon, CheckCircle2, Calendar, ChevronRight, Check, Zap, Sparkles, Mic, ArrowRight } from 'lucide-react';
 import { TagesKompassTeacher, TagesKompassStudent, NextTeachingDaySummary, formatTagesKompassStudentName } from './types';
 import { TagesKompassSmartInput } from './TagesKompassSmartInput';
 
@@ -9,6 +9,7 @@ interface TagesKompassWrapUpProps {
   unfinishedStudents: TagesKompassStudent[];
   nextDaySummary?: NextTeachingDaySummary | null;
   onSaveHomeworkForStudent: (studentId: string, textOrAudio: string, isAudio?: boolean) => Promise<void>;
+  onDismissAllRemaining?: () => void;
   onOpenQuickModal?: (student?: any) => void;
 }
 
@@ -18,13 +19,15 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
   unfinishedStudents = [],
   nextDaySummary,
   onSaveHomeworkForStudent,
+  onDismissAllRemaining,
   onOpenQuickModal
 }) => {
   const [activeCatchUpStudentId, setActiveCatchUpStudentId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDismissedForSession, setIsDismissedForSession] = useState(false);
 
   const teacherName = teacher?.first_name || teacher?.name || 'Lehrkraft';
-  const hasUnfinished = unfinishedStudents.length > 0;
+  const hasUnfinished = unfinishedStudents.length > 0 && !isDismissedForSession;
   const activeStudentObj = unfinishedStudents.find(s => s.id === activeCatchUpStudentId || s.studentId === activeCatchUpStudentId);
 
   const handleSaveText = async (text: string) => {
@@ -49,91 +52,103 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
     }
   };
 
+  const handleDismissAll = () => {
+    setIsDismissedForSession(true);
+    if (onDismissAllRemaining) {
+      onDismissAllRemaining();
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-      {/* 1. Header: Feierabend-Gruß */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* 1. Header: Warmer, eleganter Feierabend-Gruß (Tone-in-Tone, kein Alarm) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div 
             style={{
-              width: '36px',
-              height: '36px',
+              width: '40px',
+              height: '40px',
               borderRadius: '12px',
-              background: '#fef3c7',
-              color: '#d97706',
+              background: '#4f46e5',
+              color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)'
             }}
           >
-            <Moon size={20} />
+            <Moon size={20} strokeWidth={2.2} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+            <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
               Schönen Feierabend, {teacherName}!
             </h3>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-              Heute alle {totalSlots} Unterrichtseinheiten abgeschlossen
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
+              Heute alle {totalSlots} Unterrichtseinheiten erfolgreich abgeschlossen
             </p>
           </div>
         </div>
 
-        <span
+        {/* Status-Badge: Uni-farbenes Slate / Smaragd */}
+        <div
           style={{
-            fontSize: '0.70rem',
-            fontWeight: 800,
-            color: hasUnfinished ? '#854d0e' : '#15803d',
-            background: hasUnfinished ? '#ffffff' : '#dcfce7',
-            border: `1px solid ${hasUnfinished ? '#facc15' : '#bbf7d0'}`,
-            padding: '3px 10px',
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            color: hasUnfinished ? '#334155' : '#15803d',
+            background: hasUnfinished ? '#f1f5f9' : '#dcfce7',
+            border: `1px solid ${hasUnfinished ? '#e2e8f0' : '#bbf7d0'}`,
+            padding: '4px 12px',
             borderRadius: '100px',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '5px'
+            gap: '6px'
           }}
         >
           {hasUnfinished ? (
             <>
-              <AlertTriangle size={12} color="#ca8a04" />
-              <span>{unfinishedStudents.length} {unfinishedStudents.length === 1 ? 'OFFENE HAUSAUFGABE' : 'OFFENE HAUSAUFGABEN'}</span>
+              <Sparkles size={12} color="#64748b" />
+              <span>{unfinishedStudents.length} {unfinishedStudents.length === 1 ? 'Notiz offen' : 'Notizen offen'}</span>
             </>
           ) : (
             <>
               <CheckCircle2 size={12} color="#15803d" />
-              <span>100% DOKUMENTIERT</span>
+              <span>100% Dokumentiert</span>
             </>
           )}
-        </span>
+        </div>
       </div>
 
-      {/* 2. Nachhol-Pille bei fehlender Hausaufgabe (Simple, schlicht, kompakt) */}
+      {/* 2. Soft-Surface Container (Schluss mit Box-in-Box Rahmen) */}
       {hasUnfinished ? (
         <div 
           style={{
-            background: '#ffffff',
-            border: '1.5px solid #facc15',
+            background: '#fafaf9',
+            border: '1px solid #f5f5f4',
             borderRadius: '18px',
-            padding: '14px 16px',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '14px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#854d0e', textTransform: 'uppercase' }}>
-              Noch keine Hausaufgabe erfasst für:
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#292524' }}>
+              Noch etwas für die Stunde festhalten?
             </span>
-            <span style={{ fontSize: '0.70rem', fontWeight: 600, color: '#854d0e' }}>
-              Kurz 5s-Sprachmemo oder Notiz nachtragen
+            <span style={{ fontSize: '0.72rem', fontWeight: 500, color: '#78716c' }}>
+              5s-Sprachmemo oder Vorwoche übernehmen
             </span>
           </div>
 
-          {/* Horizontale Schüler-Pillen */}
+          {/* Schüler-Kacheln mit Zeit & Instrumenten-Kontext (Uni-farbene Buttons) */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {unfinishedStudents.map(std => {
               const stdId = std.id || std.studentId || '';
               const isSelected = activeCatchUpStudentId === stdId;
               const name = formatTagesKompassStudentName(std);
+              const instrument = std.instrument || std.fach || null;
+              const startTime = std.startTime || null;
 
               return (
                 <button
@@ -141,23 +156,50 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
                   type="button"
                   onClick={() => setActiveCatchUpStudentId(isSelected ? null : stdId)}
                   style={{
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    background: isSelected ? '#facc15' : '#ffffff',
-                    color: isSelected ? '#0f172a' : '#854d0e',
-                    border: isSelected ? '1.5px solid #ca8a04' : '1px solid #facc15',
-                    padding: '6px 12px',
-                    borderRadius: '10px',
+                    gap: '8px',
+                    background: isSelected ? '#4f46e5' : '#ffffff',
+                    color: isSelected ? '#ffffff' : '#1e293b',
+                    border: isSelected ? '1px solid #4f46e5' : '1px solid #e2e8f0',
+                    padding: '8px 14px',
+                    borderRadius: '12px',
                     fontSize: '0.80rem',
-                    fontWeight: 800,
+                    fontWeight: 700,
                     cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    boxShadow: isSelected ? '0 4px 14px rgba(79, 70, 229, 0.25)' : '0 1px 2px rgba(0,0,0,0.03)',
                     transition: 'all 0.15s ease'
                   }}
+                  className="hover-scale-mini"
                 >
-                  <span>{name}</span>
-                  <ChevronRight size={13} style={{ transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+                  {startTime && (
+                    <span 
+                      style={{ 
+                        fontSize: '0.70rem', 
+                        fontWeight: 700, 
+                        color: isSelected ? '#ffffff' : '#64748b',
+                        background: isSelected ? 'rgba(255, 255, 255, 0.18)' : '#f1f5f9',
+                        padding: '1px 6px',
+                        borderRadius: '5px'
+                      }}
+                    >
+                      {startTime}
+                    </span>
+                  )}
+                  <span style={{ fontWeight: isSelected ? 800 : 700, color: isSelected ? '#ffffff' : '#0f172a' }}>
+                    {name}
+                  </span>
+                  {instrument && (
+                    <span style={{ fontSize: '0.70rem', fontWeight: 600, color: isSelected ? '#94a3b8' : '#64748b' }}>
+                      • {instrument}
+                    </span>
+                  )}
+                  <Mic size={12} color={isSelected ? '#cbd5e1' : '#94a3b8'} style={{ marginLeft: '2px' }} />
+                  <ChevronRight 
+                    size={13} 
+                    color={isSelected ? '#ffffff' : '#94a3b8'}
+                    style={{ transform: isSelected ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} 
+                  />
                 </button>
               );
             })}
@@ -165,11 +207,11 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
 
           {/* Aufgeklapptes Smart-Input für den ausgewählten Schüler */}
           {activeCatchUpStudentId && activeStudentObj && (
-            <div style={{ marginTop: '4px', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginTop: '2px', animation: 'fadeIn 0.2s ease' }}>
               <TagesKompassSmartInput
                 studentId={activeCatchUpStudentId}
                 studentName={formatTagesKompassStudentName(activeStudentObj)}
-                studentInstrument={activeStudentObj?.instrument}
+                studentInstrument={activeStudentObj?.instrument || activeStudentObj?.fach}
                 schoolId={teacher?.school_id}
                 isSaving={isSaving}
                 onSaveText={handleSaveText}
@@ -185,43 +227,68 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
                     justifyContent: 'center',
                     gap: '6px',
                     width: '100%',
-                    marginTop: '6px',
+                    marginTop: '8px',
                     background: 'transparent',
-                    border: '1px dashed #facc15',
+                    border: '1px dashed #cbd5e1',
                     borderRadius: '10px',
-                    padding: '6px 10px',
+                    padding: '7px 10px',
                     fontSize: '0.74rem',
-                    fontWeight: 800,
-                    color: '#854d0e',
+                    fontWeight: 700,
+                    color: '#475569',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Zap size={12} color="#ca8a04" />
+                  <Zap size={12} color="#4f46e5" />
                   <span>Im Schnellmodal (mit Metronom & Didaktik-Chips) öffnen</span>
                 </button>
               )}
             </div>
           )}
+
+          {/* Didaktischer Feierabend-Bypass: Wenn bewusst keine Notizen nötig sind */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '2px' }}>
+            <button
+              type="button"
+              onClick={handleDismissAll}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#78716c',
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 6px',
+                transition: 'color 0.15s ease'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#1c1917')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#78716c')}
+            >
+              <span>Keine Notizen nötig • Jetzt Feierabend machen</span>
+              <ArrowRight size={12} />
+            </button>
+          </div>
         </div>
       ) : (
-        // 100% Vollständig (Belohnend & Ruhig)
+        /* Belohnender 100%-Zustand (Ruhig, befreiend & wertschätzend) */
         <div 
           style={{
             background: '#f0fdf4',
-            border: 'none',
-            borderRadius: '18px',
-            padding: '14px 16px',
+            borderRadius: '16px',
+            padding: '16px 18px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            gap: '14px'
           }}
         >
           <div 
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
               background: '#dcfce7',
               color: '#15803d',
               display: 'flex',
@@ -233,24 +300,24 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
             <Check size={20} strokeWidth={2.8} />
           </div>
           <div>
-            <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#166534' }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#166534' }}>
               Alle heutigen Unterrichtsstunden sind dokumentiert.
             </div>
             <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#15803d' }}>
-              Alle Schüler und Eltern haben ihre Aufgaben erhalten.
+              Schüler & Eltern sind versorgt. Hab einen wohlverdienten Feierabend!
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. Ausblick auf den nächsten Unterrichtstag */}
+      {/* 3. Bereinigte Vorschau nächster Unterrichtstag */}
       {nextDaySummary && (
         <div 
           style={{
             background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 16px',
+            border: '1px solid #f1f5f9',
+            borderRadius: '14px',
+            padding: '11px 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -258,14 +325,17 @@ export const TagesKompassWrapUp: React.FC<TagesKompassWrapUpProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={16} color="#64748b" />
-            <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#1e293b' }}>
+            <Calendar size={15} color="#64748b" />
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e293b' }}>
               Nächster Unterricht: {nextDaySummary.dayName || 'Nächster Unterrichtstag'}
             </span>
           </div>
 
-          <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#64748b' }}>
-            {nextDaySummary.totalAppointments} Einheiten ab {nextDaySummary.firstStartTime} Uhr ({nextDaySummary.firstRoom})
+          <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b' }}>
+            {nextDaySummary.totalAppointments} Einheiten ab {nextDaySummary.firstStartTime} Uhr
+            {nextDaySummary.firstRoom && nextDaySummary.firstRoom.trim() !== 'Raum' && nextDaySummary.firstRoom.trim() !== ''
+              ? ` • ${nextDaySummary.firstRoom}`
+              : ''}
           </span>
         </div>
       )}

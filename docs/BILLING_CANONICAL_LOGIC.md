@@ -189,9 +189,11 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
    - **EPC-QR-Code (European Payments Council):** Jede Rechnung enthält den offiziellen EPC-QR-Code zur fehlerfreien 1-Scan-Zahlung in allen europäischen Banking-Apps (Sparkasse, Volksbank, Commerzbank etc.) mit vorausgefüllter IBAN, Betrag und Rechnungsnummer (`RE-2026-MUSA-XXXX`).
    - **Bankverbindung des Plattformbetriebs:** Gesteuert über die Single Source of Truth `OPERATOR_BANKING_CONFIG` (`apps/groovelab/src/config/operatorBanking.ts`). Solange das Geschäftskonto in Einrichtung ist, wird ein neutraler Platzhalter ohne Dummy-IBAN ausgegeben.
 8. **Didaktische Immunität & Schonfristen (§ 242 BGB):**
-   - Musikschulen erhalten nach Fälligkeit eine reale **Schonfrist von weiteren 30 Tagen (Stufe 1 & 2 als Ambient-Hinweise)** und in den Sommermonaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
-   - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).
-   - Erst ab Tag 61 greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
+   - Musikschulen erhalten nach Fälligkeit eine reale **Schonfrist von weiteren 28 Tagen (4 volle Wochen kommunale Karenzphase)** und in den Sommermonaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
+   - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität). Auch der Audio-Tresor bleibt dauerhaft erreichbar und abspielbar.
+   - B2B-Mahn- und Zahlungshinweise werden strikt im **Verwaltungs-Modul (`secretary`)** ausgespielt und erscheinen niemals im pädagogischen Campus-Modul.
+   - Im `SchoolDunningPayModal` werden mehrere überfällige Rechnungen (`INF` / `AKT`) transparent aufgeschlüsselt und wahlweise als **1-Scan-Sammelausgleich** (verketteter 140-Zeichen SEPA-Verwendungszweck `SAMMEL: ...`) oder als **Einzelbeleg-Überweisung** (für kommunale Kämmereien mit getrennten Haushaltsstellen) im EPC-QR-Code bereitgestellt.
+   - Ab Tag 44 nach Fälligkeit greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
 
 ---
 

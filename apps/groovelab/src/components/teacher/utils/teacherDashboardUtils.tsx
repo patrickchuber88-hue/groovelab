@@ -218,3 +218,25 @@ export const resolveStudentInstrument = (slotInst?: string | null, studentInst?:
   if (!isInvalid(teacherInst)) return teacherInst!.trim();
   return '';
 };
+
+export const resolveTeacherViewportWidth = (): number => {
+  if (typeof window === 'undefined') return 1200;
+  if (typeof document !== 'undefined') {
+    const simWidth = Number(document.documentElement.getAttribute('data-sim-width'));
+    if (simWidth > 0) return simWidth;
+    const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+    if (simEl && simEl.clientWidth > 0) return simEl.clientWidth;
+  }
+  return window.innerWidth;
+};
+
+export const resolveTeacherViewportHeight = (): number => {
+  if (typeof window === 'undefined') return 800;
+  if (typeof document !== 'undefined') {
+    const simHeight = Number(document.documentElement.getAttribute('data-sim-height'));
+    if (simHeight > 0) return simHeight;
+    const simEl = document.querySelector('.sim-viewport-mobile, .sim-viewport-tablet') as HTMLElement | null;
+    if (simEl && simEl.clientHeight > 0) return simEl.clientHeight;
+  }
+  return window.innerHeight;
+};

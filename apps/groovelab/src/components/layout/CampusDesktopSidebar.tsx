@@ -34,6 +34,7 @@ import { CampusSidebarUserHub } from './CampusSidebarUserHub';
 import { CampusRibbonNoteIcon } from '../CampusGroovelabBrand';
 import { StudioAvatar } from '../StudioAvatar';
 import { formatTeacherFullName } from '../../utils/nameHelper';
+import { isCampusBoardAllowedForChild, toggleCampusBoardPermission } from '../../services/campusBoardPermissions';
 
 export interface CampusDesktopSidebarProps {
   user: any;
@@ -440,62 +441,16 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
             const flamesActive = campusSettings.flames_active !== false;
 
             const isBoardAllowedForChild = (boardId: string) => {
-              if (campusStudentUiLevel === 'pro') return true;
-
-              // Local override if parent configured it
-              if (typeof window !== 'undefined') {
-                const override = localStorage.getItem(`campus_board_override_${boardId}`);
-                if (override === 'true') return true;
-                if (override === 'false') return false;
-              }
-
-              if (campusStudentUiLevel === 'junior') {
-                const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'messages', 'settings'];
-                return juniorAllowed.includes(boardId);
-              }
-              return true;
+              return isCampusBoardAllowedForChild(boardId, user, false);
             };
 
-            const toggleBoardForChild = (boardId: string, e?: React.MouseEvent) => {
+            const toggleBoardForChild = async (boardId: string, e?: React.MouseEvent) => {
               if (e) e.stopPropagation();
-              const current = isBoardAllowedForChild(boardId);
-              const next = !current;
-              localStorage.setItem(`campus_board_override_${boardId}`, String(next));
-              if (boardId === 'messages') {
-                localStorage.setItem('campus_allow_chat', String(next));
+              const current = isCampusBoardAllowedForChild(boardId, user, false);
+              const result = await toggleCampusBoardPermission(boardId, user, current);
+              if (result.success) {
+                setParentPermissionsVersion(v => v + 1);
               }
-              if (boardId === 'campus_cup') {
-                localStorage.setItem('campus_allow_leaderboard', String(next));
-              }
-              if (user?.id) {
-                const nextPerms = {
-                  ...(user?.parent_permissions || {}),
-                  [`board_${boardId}`]: next
-                };
-                (async () => {
-                  try {
-                    const activeLeaseToken = typeof window !== 'undefined'
-                      ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
-                      : null;
-                    const { error } = await supabase.rpc('save_parent_controls', {
-                      p_student_id: user.id,
-                      p_settings: {
-                        parent_permissions: nextPerms,
-                        ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {})
-                      }
-                    });
-                    if (error) throw error;
-                  } catch {
-                    try {
-                      await supabase.from('users').update({
-                        parent_permissions: nextPerms
-                      }).eq('id', user.id);
-                    } catch (err) {}
-                  }
-                })();
-              }
-              window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId, allowed: next } }));
-              setParentPermissionsVersion(v => v + 1);
             };
 
             const renderParentStatusPill = (boardId: string) => {
@@ -558,7 +513,7 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }}
                   />
                 )}
-                {(parentUnlocked || (flamesActive && isBoardAllowedForChild('practice_board'))) && (
+                {flamesActive && (
                   <CampusSidebarRailItem
                     icon={<Zap size={20} />}
                     label="Übe-Pfad"
@@ -566,38 +521,58 @@ export const CampusDesktopSidebar: React.FC<CampusDesktopSidebarProps> = ({
                     isCollapsed={isCollapsed}
                     platform={activePlatform}
                     onClick={() => setActiveStudentTab('practice_board')}
-                    rightSlot={renderParentStatusPill('practice_board')}
-                    style={{ opacity: parentUnlocked && !isBoardAllowedForChild('practice_board') ? 0.72 : 1 }}
+                    rightSlot={
+                      parentUnlocked
+                        ? renderParentStatusPill('practice_board')
+                        : (!isBoardAllowedForChild('practice_board') ? <Lock size={12} color="#94a3b8" /> : undefined)
+                    }
+                    style={{
+                      opacity: (!parentUnlocked && !isBoardAllowedForChild('practice_board'))
+                        ? 0.65
+                        : (parentUnlocked && !isBoardAllowedForChild('practice_board') ? 0.72 : 1)
+                    }}
                   />
                 )}
 
-                {(parentUnlocked || isBoardAllowedForChild('events')) && (
-                  <CampusSidebarRailItem
-                    icon={<Calendar size={20} />}
-                    label="Termine"
-                    isActive={activeStudentTab === 'events'}
-                    isCollapsed={isCollapsed}
-                    platform={activePlatform}
-                    onClick={() => setActiveStudentTab('events')}
-                    onMouseEnter={() => { import('../CampusEventsBoard'); }}
-                    rightSlot={renderParentStatusPill('events')}
-                    style={{ opacity: parentUnlocked && !isBoardAllowedForChild('events') ? 0.72 : 1 }}
-                  />
-                )}
+                <CampusSidebarRailItem
+                  icon={<Calendar size={20} />}
+                  label="Termine"
+                  isActive={activeStudentTab === 'events'}
+                  isCollapsed={isCollapsed}
+                  platform={activePlatform}
+                  onClick={() => setActiveStudentTab('events')}
+                  onMouseEnter={() => { import('../CampusEventsBoard'); }}
+                  rightSlot={
+                    parentUnlocked
+                      ? renderParentStatusPill('events')
+                      : (!isBoardAllowedForChild('events') ? <Lock size={12} color="#94a3b8" /> : undefined)
+                  }
+                  style={{
+                    opacity: (!parentUnlocked && !isBoardAllowedForChild('events'))
+                      ? 0.65
+                      : (parentUnlocked && !isBoardAllowedForChild('events') ? 0.72 : 1)
+                  }}
+                />
 
-                {(parentUnlocked || isBoardAllowedForChild('messages')) && (
-                  <CampusSidebarRailItem
-                    icon={<Mail size={20} />}
-                    label="Nachrichten"
-                    isActive={activeStudentTab === 'messages'}
-                    isCollapsed={isCollapsed}
-                    platform={activePlatform}
-                    badgeCount={!parentUnlocked ? campusUnreadCount : 0}
-                    onClick={() => setActiveStudentTab('messages')}
-                    rightSlot={renderParentStatusPill('messages')}
-                    style={{ opacity: parentUnlocked && !isBoardAllowedForChild('messages') ? 0.72 : 1 }}
-                  />
-                )}
+                <CampusSidebarRailItem
+                  icon={<Mail size={20} />}
+                  label="Nachrichten"
+                  isActive={activeStudentTab === 'messages'}
+                  isCollapsed={isCollapsed}
+                  platform={activePlatform}
+                  badgeCount={!parentUnlocked ? campusUnreadCount : 0}
+                  onClick={() => setActiveStudentTab('messages')}
+                  rightSlot={
+                    parentUnlocked
+                      ? renderParentStatusPill('messages')
+                      : (!isBoardAllowedForChild('messages') ? <Lock size={12} color="#94a3b8" /> : undefined)
+                  }
+                  style={{
+                    opacity: (!parentUnlocked && !isBoardAllowedForChild('messages'))
+                      ? 0.65
+                      : (parentUnlocked && !isBoardAllowedForChild('messages') ? 0.72 : 1)
+                  }}
+                />
 
                 {(() => {
                   const isAdult = Boolean(

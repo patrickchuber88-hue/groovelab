@@ -32,6 +32,7 @@ import {
 } from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { AudioCaptureEngine } from '../../services/audio/AudioCaptureEngine';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 import { announceA11y } from '../common/A11yLiveAnnouncer';
 import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
@@ -1803,33 +1804,25 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       masterLoopDurationRef.current = trackDurationMs;
 
       const ctx = audioContextRef.current!;
-      const sourceNode = ctx.createMediaStreamSource(stream);
-
-      // 🎙️ Universal Web Audio PCM Capture (100% Safari WebKit & Chromium kompatibel gem. useMeisterwerkAudioRecording.ts & phasengleich mit audioLatencyService.ts)
-      const processorNode = ctx.createScriptProcessor(4096, 1, 1);
-      processorNodeRef.current = processorNode;
-
-      const muteNode = ctx.createGain();
-      muteNode.gain.setValueAtTime(0, ctx.currentTime);
-
       const continuousPCMData: Float32Array[] = [];
       let totalSamplesRecorded = 0;
       let isFirstBlock = true;
 
-      processorNode.onaudioprocess = (e) => {
-        if (!isCapturingContinuousAudioRef.current) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        if (isFirstBlock) {
-          const bufferDuration = inputData.length / e.inputBuffer.sampleRate;
-          continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
-          isFirstBlock = false;
+      const pcmTap = await AudioCaptureEngine.createRealtimePcmCaptureTap(ctx, stream, {
+        channelCount: 1,
+        onChunk: (inputData) => {
+          if (!isCapturingContinuousAudioRef.current) return;
+          if (isFirstBlock) {
+            const bufferDuration = inputData.length / ctx.sampleRate;
+            continuousRecordStartTimeRef.current = ctx.currentTime - bufferDuration;
+            isFirstBlock = false;
+          }
+          continuousPCMData.push(inputData);
+          totalSamplesRecorded += inputData.length;
         }
-        continuousPCMData.push(new Float32Array(inputData));
-        totalSamplesRecorded += inputData.length;
-
-        const outputData = e.outputBuffer.getChannelData(0);
-        outputData.fill(0);
-      };
+      });
+      processorNodeRef.current = pcmTap.workletOrProcessorNode;
+      pcmTap.start();
 
       const getFullPCMBuffer = (): AudioBuffer | null => {
         if (totalSamplesRecorded === 0) return null;
@@ -1904,10 +1897,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
       const cleanupContinuousRecording = () => {
         isCapturingContinuousAudioRef.current = false;
-        try { (processorNode as any).onaudioprocess = null; } catch (e) {}
-        try { processorNode.disconnect(); } catch (e) {}
-        try { sourceNode.disconnect(); } catch (e) {}
-        try { muteNode.disconnect(); } catch (e) {}
+        pcmTap.disconnect();
         processorNodeRef.current = null;
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach(track => track.stop());
@@ -2079,11 +2069,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
           }
       };
 
-      // 🏛️ Full-Range Studio Capture (18 Hz – 24 kHz) exakt wie in der Audio-Biografie (kein dumpfer 8 kHz Lowpass!)
-      sourceNode.connect(processorNode);
-      processorNode.connect(muteNode);
-      muteNode.connect(ctx.destination);
-
+      // 🏛️ Full-Range Studio Capture (18 Hz – 24 kHz) läuft bereits phasenstarr über AudioCaptureEngine.createRealtimePcmCaptureTap (pcmTap)
       setIsMetronomeActive(true);
 
       const highlightTrackRecording = (trackId: number) => {
@@ -2361,10 +2347,21 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       scheduler();
       syncUI();
 
-    } catch (err) {
-      console.error(err);
-      alert('Mikrofonfehler.');
-      setIsAutoSequenceActive(false);
+    } catch (err: unknown) {
+      console.error('[CampusLoopstation] Auto-Sequence Error:', err);
+      isCapturingContinuousAudioRef.current = false;
+      isAutoSequenceActiveRef.current = false;
+      setIsAutoSequenceActive(false); setAutoSequenceStatus(''); setCountInBeats(null);
+      if (lookaheadTimerRef.current) { clearTimeout(lookaheadTimerRef.current); lookaheadTimerRef.current = null; }
+      if (uiSyncFrameRef.current) { cancelAnimationFrame(uiSyncFrameRef.current); uiSyncFrameRef.current = null; }
+      if (processorNodeRef.current) { try { processorNodeRef.current.disconnect(); } catch (_) {} processorNodeRef.current = null; }
+      if (mediaStreamRef.current) { releaseAudioStream(mediaStreamRef.current); mediaStreamRef.current = null; }
+      if (!tracksRef.current.some(t => t.url)) { setMasterLoopDuration(null); masterLoopDurationRef.current = null; }
+      setTracks(prev => prev.map(t => ({ ...t, isRecording: false, isWaiting: false })));
+      const errName = err instanceof Error ? err.name : '';
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') alert('Mikrofonzugriff wurde im Browser verweigert. Bitte gib das Mikrofon in der Adressleiste frei.');
+      else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') alert('Kein aktives Mikrofon gefunden. Bitte prüfe deine Audio-Eingabegeräte.');
+      else alert('Mikrofon- oder Audio-Initialisierungsfehler. Bitte versuche es erneut.');
     } finally {
       isPermissionPendingRef.current = false;
       setIsPermissionPending(false);
@@ -2715,25 +2712,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
       // 🎙️ 1% Goldstandard Adaptive Bitrate (320 kbps Studio / 128 kbps Mobile Smart-Audio / 80 kbps Saver)
       const targetBitrate = getEffectiveNetworkProfile().targetAudioBitrate || 320000;
-      let mimeType = 'audio/webm;codecs=opus';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-          else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
-          else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
-          else mimeType = '';
-        }
-      }
-
-      // 🛡️ Hardware Direct Stream: Direct connection to stream avoids WebKit/Safari destination node mute/drift bugs
-      let mediaRecorder: MediaRecorder;
-      try {
-        mediaRecorder = mimeType 
-          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
-          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
-      } catch (recInitErr) {
-        mediaRecorder = new MediaRecorder(stream);
-      }
+      const { recorder: mediaRecorder, mimeType } = AudioCaptureEngine.createHighResMediaRecorder(stream, targetBitrate);
       const chunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (e: any) => {
@@ -2889,9 +2868,12 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
         }, totalDelay);
       }
-    } catch (err) {
-      console.error('Mic error:', err);
-      alert('Mikrofonzugriff verweigert.');
+    } catch (err: unknown) {
+      console.error('[CampusLoopstation] Mic error:', err);
+      if (mediaStreamRef.current) { releaseAudioStream(mediaStreamRef.current); mediaStreamRef.current = null; }
+      setTracks((prev) => prev.map((t) => (t.id === trackId ? { ...t, isRecording: false, isWaiting: false } : t)));
+      const errName = err instanceof Error ? err.name : '';
+      alert(errName === 'NotAllowedError' || errName === 'PermissionDeniedError' ? 'Mikrofonzugriff wurde im Browser verweigert. Bitte gib das Mikrofon in der Adressleiste frei.' : 'Mikrofonzugriff fehlgeschlagen.');
     } finally {
       isPermissionPendingRef.current = false;
       setIsPermissionPending(false);
@@ -3445,23 +3427,18 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
 
   // 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter: Aufnahme sofort abbrechen & verwerfen
   const discardActiveRecording = () => {
+    isCapturingContinuousAudioRef.current = false;
+    isAutoSequenceActiveRef.current = false;
+    if (lookaheadTimerRef.current) { clearTimeout(lookaheadTimerRef.current); lookaheadTimerRef.current = null; }
+    if (uiSyncFrameRef.current) { cancelAnimationFrame(uiSyncFrameRef.current); uiSyncFrameRef.current = null; }
+    if (processorNodeRef.current) { try { processorNodeRef.current.disconnect(); } catch (_) {} processorNodeRef.current = null; }
     Object.values(mediaRecordersRef.current).forEach((rec: any) => {
-      if (rec && rec.state !== 'inactive') {
-        rec.onstop = null; // Neutralisiert onstop, damit kein Fragment-Blob erzeugt wird
-        try { rec.stop(); } catch (e) {}
-      }
+      if (rec && rec.state !== 'inactive') { rec.onstop = null; try { rec.stop(); } catch (e) {} }
     });
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-    setTracks(prev => prev.map(t => ({
-      ...t,
-      isRecording: false,
-      isWaiting: false
-    })));
-    setIsAutoSequenceActive(false);
-    setCountInBeats(null);
+    if (mediaStreamRef.current) { releaseAudioStream(mediaStreamRef.current); mediaStreamRef.current = null; }
+    if (!tracksRef.current.some(t => t.url)) { setMasterLoopDuration(null); masterLoopDurationRef.current = null; }
+    setTracks(prev => prev.map(t => ({ ...t, isRecording: false, isWaiting: false })));
+    setIsAutoSequenceActive(false); setAutoSequenceStatus(''); setCountInBeats(null);
   };
 
   const focusGuard = useFocusInterruptionGuard({
@@ -3628,105 +3605,30 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
       `}} />
 
       {/* Sub-Tab Navigation Header */}
-      <div style={{
-        display: 'flex',
-        background: '#e5e5ea',
-        borderRadius: '12px',
-        padding: '3px',
-        width: '100%',
-        maxWidth: '560px',
-        marginBottom: '20px',
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none'
-      }}>
+      <div role="tablist" aria-label="Loopstation Ansichten" style={{ display: 'flex', background: '#e5e5ea', borderRadius: '12px', padding: '3px', width: '100%', maxWidth: '560px', marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
         <button
-          type="button"
-          onClick={() => {
-            if (playingSavedLoopUrl) {
-              stopSavedLoopPlayback();
-            }
-            setActiveSubTab('studio');
-          }}
+          type="button" role="tab" id="loopstation-tab-studio" aria-selected={activeSubTab === 'studio'} aria-controls="loopstation-panel-studio"
+          onClick={() => { if (playingSavedLoopUrl) stopSavedLoopPlayback(); setActiveSubTab('studio'); }}
           className="tactile-btn"
-          style={{
-            flex: 1,
-            background: activeSubTab === 'studio' ? '#ffffff' : 'transparent',
-            color: activeSubTab === 'studio' ? '#1d1d1f' : '#86868b',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '8px 14px',
-            fontSize: '0.74rem',
-            fontWeight: activeSubTab === 'studio' ? 800 : 600,
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'studio' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.15s ease',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
+          style={{ flex: 1, background: activeSubTab === 'studio' ? '#ffffff' : 'transparent', color: activeSubTab === 'studio' ? '#1d1d1f' : '#86868b', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '0.74rem', fontWeight: activeSubTab === 'studio' ? 800 : 600, cursor: 'pointer', boxShadow: activeSubTab === 'studio' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s ease', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          <Sliders size={14} />
-          <span>Studio</span>
+          <Sliders size={14} /><span>Studio</span>
         </button>
         <button
-          type="button"
+          type="button" role="tab" id="loopstation-tab-saved" aria-selected={activeSubTab === 'saved'} aria-controls="loopstation-panel-saved"
           onClick={() => setActiveSubTab('saved')}
           className="tactile-btn"
-          style={{
-            flex: 1,
-            background: activeSubTab === 'saved' ? '#ffffff' : 'transparent',
-            color: activeSubTab === 'saved' ? '#1d1d1f' : '#86868b',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '8px 14px',
-            fontSize: '0.74rem',
-            fontWeight: activeSubTab === 'saved' ? 800 : 600,
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'saved' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.15s ease',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
+          style={{ flex: 1, background: activeSubTab === 'saved' ? '#ffffff' : 'transparent', color: activeSubTab === 'saved' ? '#1d1d1f' : '#86868b', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '0.74rem', fontWeight: activeSubTab === 'saved' ? 800 : 600, cursor: 'pointer', boxShadow: activeSubTab === 'saved' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s ease', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          <Music size={14} />
-          <span>Gespeicherte Loops</span>
+          <Music size={14} /><span>Gespeicherte Loops</span>
         </button>
         <button
-          type="button"
-          onClick={() => {
-            if (playingSavedLoopUrl) {
-              stopSavedLoopPlayback();
-            }
-            setActiveSubTab('guide');
-          }}
+          type="button" role="tab" id="loopstation-tab-guide" aria-selected={activeSubTab === 'guide'} aria-controls="loopstation-panel-guide"
+          onClick={() => { if (playingSavedLoopUrl) stopSavedLoopPlayback(); setActiveSubTab('guide'); }}
           className="tactile-btn"
-          style={{
-            flex: 1,
-            background: activeSubTab === 'guide' ? '#ffffff' : 'transparent',
-            color: activeSubTab === 'guide' ? '#1d1d1f' : '#86868b',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '8px 14px',
-            fontSize: '0.74rem',
-            fontWeight: activeSubTab === 'guide' ? 800 : 600,
-            cursor: 'pointer',
-            boxShadow: activeSubTab === 'guide' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-            transition: 'all 0.15s ease',
-            whiteSpace: 'nowrap',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px'
-          }}
+          style={{ flex: 1, background: activeSubTab === 'guide' ? '#ffffff' : 'transparent', color: activeSubTab === 'guide' ? '#1d1d1f' : '#86868b', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '0.74rem', fontWeight: activeSubTab === 'guide' ? 800 : 600, cursor: 'pointer', boxShadow: activeSubTab === 'guide' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s ease', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          <BookOpen size={14} />
-          <span>Anleitung & Pro-Tipps</span>
+          <BookOpen size={14} /><span>Anleitung & Pro-Tipps</span>
         </button>
       </div>
 
@@ -3822,10 +3724,10 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         <div style={{
           width: '300px',
           height: '460px',
-          background: '#0f172a',
+          background: 'linear-gradient(135deg, #3c3c3e 0%, #1c1c1e 100%)',
           borderRadius: '38px',
-          border: 'none',
-          boxShadow: 'none',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.35), inset 0 1.5px 0 rgba(255, 255, 255, 0.15), inset 0 -2px 5px rgba(0,0,0,0.5)',
           padding: '20px 16px',
           display: 'flex',
           flexDirection: 'column',
@@ -3838,17 +3740,17 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             position: 'absolute',
             inset: '1px',
             borderRadius: '37px',
-            border: 'none',
+            border: '1px solid rgba(255, 255, 255, 0.04)',
             pointerEvents: 'none'
           }} />
 
           <div style={{
             width: '266px',
             height: '180px',
-            background: '#0f172a',
+            background: 'linear-gradient(180deg, #18202c 0%, #0d1218 100%)',
             borderRadius: '20px',
-            border: 'none',
-            boxShadow: 'none',
+            border: '2.5px solid #111112',
+            boxShadow: 'inset 0 6px 12px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3861,7 +3763,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
               left: 0,
               width: '100%',
               height: '100%',
-              background: 'transparent',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0) 41%, rgba(255,255,255,0) 100%)',
               pointerEvents: 'none',
               zIndex: 10
             }} />
@@ -3884,7 +3786,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   bottom: '-8px',
                   borderRadius: '50%',
                   border: activeBeatPulse === 'downbeat' ? '3.5px solid #ea4335' : '2.5px solid #34a853',
-                  boxShadow: 'none',
+                  boxShadow: activeBeatPulse === 'downbeat'
+                    ? '0 0 16px #ea4335, inset 0 0 10px #ea4335'
+                    : '0 0 12px #34a853, inset 0 0 8px #34a853',
                   opacity: 0.95,
                   pointerEvents: 'none',
                   zIndex: 25,
@@ -3936,12 +3840,18 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   width: '124px',
                   height: '124px',
                   borderRadius: '50%',
-                  background: '#0f172a',
+                  background: activeSubTab === 'saved'
+                    ? (isSavedLoopPlaying ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)' : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)')
+                    : (isAutoSequenceActive
+                      ? 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, rgba(13,18,24,0.98) 100%)'
+                      : isPlaying
+                        ? 'radial-gradient(circle, rgba(52,168,83,0.12) 0%, rgba(13,18,24,0.98) 100%)'
+                        : 'radial-gradient(circle, rgba(40,48,64,0.9) 0%, rgba(13,18,24,0.98) 100%)'),
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: 'none',
+                  boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.08)',
                   transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)'
                 }}
               >
@@ -4044,8 +3954,8 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             width: '210px',
             height: '210px',
             borderRadius: '50%',
-            background: '#0f172a',
-            boxShadow: 'none',
+            background: 'linear-gradient(135deg, #2d2d30 0%, #1e1e20 100%)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 -1.5px 3px rgba(0,0,0,0.4)',
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
@@ -4053,21 +3963,10 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             userSelect: 'none'
           }}>
             <div
-              onClick={() => {
-                if (activeSubTab === 'studio') {
-                  setShowAdvancedSettings(!showAdvancedSettings);
-                }
-              }}
-              style={{
-                position: 'absolute',
-                top: '18px',
-                fontSize: '0.62rem',
-                fontWeight: 900,
-                color: activeSubTab === 'saved' ? '#555558' : '#a1a1a6',
-                letterSpacing: '0.08em',
-                transition: 'color 0.2s ease',
-                cursor: activeSubTab === 'saved' ? 'default' : 'pointer'
-              }}
+              role="button" tabIndex={activeSubTab === 'saved' ? -1 : 0} aria-label="Menü & Erweiterte Einstellungen umschalten"
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && activeSubTab === 'studio') { e.preventDefault(); setShowAdvancedSettings(!showAdvancedSettings); } }}
+              onClick={() => { if (activeSubTab === 'studio') setShowAdvancedSettings(!showAdvancedSettings); }}
+              style={{ position: 'absolute', top: '18px', fontSize: '0.62rem', fontWeight: 900, color: activeSubTab === 'saved' ? '#555558' : '#a1a1a6', letterSpacing: '0.08em', transition: 'color 0.2s ease', cursor: activeSubTab === 'saved' ? 'default' : 'pointer' }}
               onMouseEnter={(e) => { if (activeSubTab === 'studio') e.currentTarget.style.color = '#ffffff'; }}
               onMouseLeave={(e) => { if (activeSubTab === 'studio') e.currentTarget.style.color = '#a1a1a6'; }}
             >
@@ -4075,25 +3974,15 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             </div>
 
             <div
-              onClick={() => {
-                if (activeSubTab === 'saved') {
-                  if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url);
-                } else {
-                  handlePlayToggle();
+              role="button" tabIndex={0} aria-label="Wiedergabe starten oder pausieren"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (activeSubTab === 'saved') { if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url); } else handlePlayToggle();
                 }
               }}
-              style={{
-                position: 'absolute',
-                bottom: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.56rem',
-                fontWeight: 900,
-                color: '#a1a1a6',
-                transition: 'color 0.2s ease',
-                cursor: 'pointer'
-              }}
+              onClick={() => { if (activeSubTab === 'saved') { if (selectedSavedLoop) handlePlaySavedLoop(selectedSavedLoop.url); } else handlePlayToggle(); }}
+              style={{ position: 'absolute', bottom: '18px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.56rem', fontWeight: 900, color: '#a1a1a6', transition: 'color 0.2s ease', cursor: 'pointer' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
@@ -4104,27 +3993,19 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             </div>
 
             <div
+              role="button" tabIndex={0} aria-label="Loop zurücksetzen"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }}
               onClick={() => {
                 if (activeSubTab === 'saved') {
-                  if (savedLoopAudioRef.current) {
-                    savedLoopAudioRef.current.currentTime = 0;
-                    setPlaybackProgress(0);
-                  }
+                  if (savedLoopAudioRef.current) { savedLoopAudioRef.current.currentTime = 0; setPlaybackProgress(0); }
                 } else {
                   const hasRecordedTracks = tracks.some(t => t.url);
                   if (hasRecordedTracks) {
                     const wasPlaying = isPlayingRef.current;
-                    if (wasPlaying) {
-                      stopAll();
-                    }
+                    if (wasPlaying) stopAll();
                     setTimeout(() => {
                       const confirmReset = window.confirm("Möchtest du deinen aktuellen Loop wirklich löschen und neu aufnehmen?");
-                      if (!confirmReset) {
-                        if (wasPlaying) {
-                          playAll();
-                        }
-                        return;
-                      }
+                      if (!confirmReset) { if (wasPlaying) playAll(); return; }
                       handleReset();
                     }, 50);
                     return;
@@ -4132,18 +4013,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   handleReset();
                 }
               }}
-              style={{
-                position: 'absolute',
-                left: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '3px',
-                fontSize: '0.56rem',
-                fontWeight: 900,
-                color: '#a1a1a6',
-                transition: 'color 0.2s ease',
-                cursor: 'pointer'
-              }}
+              style={{ position: 'absolute', left: '20px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.56rem', fontWeight: 900, color: '#a1a1a6', transition: 'color 0.2s ease', cursor: 'pointer' }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = '#a1a1a6'; }}
             >
@@ -4196,34 +4066,36 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                 borderRadius: '50%',
                 background: (() => {
                   if (activeSubTab === 'saved') {
-                    return isSavedLoopPlaying ? '#34a853' : '#e2e8f0';
+                    return isSavedLoopPlaying ? 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)' : 'linear-gradient(135deg, #e5e5ea 0%, #d1d1d6 100%)';
                   }
-                  if (isPause) return '#facc15';
+                  if (isPause) return 'linear-gradient(135deg, #facc15 0%, #eab308 100%)';
                   if (isAutoSequenceActive || tracks.some(t => t.isRecording || t.isWaiting)) {
-                    return '#ef4444';
+                    return 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
                   }
-                  if (isPlaying) return '#ef4444';
+                  if (isPlaying) return 'linear-gradient(135deg, #f87171 0%, #ef4444 100%)';
 
                   const hasBouncedOverdubAvailable = useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url);
                   if (hasBouncedOverdubAvailable) {
-                    return '#ef4444';
+                    return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
                   }
 
                   const hasRecordedTracks = tracks.some(t => t.url);
                   if (hasRecordedTracks) {
-                    return '#34a853';
+                    return 'linear-gradient(135deg, #6ee7b7 0%, #34a853 100%)';
                   }
-                  return '#ef4444';
+                  return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
                 })(),
                 border: 'none',
-                boxShadow: 'none',
+                boxShadow: (activeSubTab === 'studio' && (isAutoSequenceActive || (useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url))))
+                  ? '0 0 16px rgba(239, 68, 68, 0.45)'
+                  : 'inset 0 1.5px 2px rgba(255,255,255,0.6), 0 4px 8px rgba(0,0,0,0.25)',
                 cursor: (activeSubTab === 'studio' && isAutoSequenceActive) ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '0.72rem',
                 fontWeight: 900,
-                color: (activeSubTab === 'saved' ? !isSavedLoopPlaying : isPause) ? '#0f172a' : '#ffffff',
+                color: (activeSubTab === 'saved' ? isSavedLoopPlaying : (isAutoSequenceActive || isPause || isPlaying || (useHeadphones && !!tracks[0]?.url && tracks.slice(1).every(t => !t.url)))) ? '#ffffff' : '#3a3a3c',
                 textTransform: 'uppercase',
                 transition: 'all 0.25s ease'
               }}
@@ -4249,7 +4121,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
         </div>
 
         {activeSubTab === 'studio' ? (
-          masterLoopDuration ? (
+          (masterLoopDuration && tracks.some(t => t.url)) ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '300px', marginTop: '4px' }}>
               <button
                 type="button"
@@ -4318,7 +4190,7 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
                   Bereit zum Recorden
                 </span>
                 <span style={{ fontSize: '0.54rem', color: '#86868b', lineHeight: 1.3 }}>
-                  Klicke die mittlere Taste <strong>START</strong> am iPod, um den automatischen Aufnahmezyklus zu starten.
+                  Klicke die mittlere Taste <strong>RECORD</strong> am iPod, um den automatischen Aufnahmezyklus zu starten.
                 </span>
               </div>
             </div>
@@ -4599,12 +4471,9 @@ export const CampusLoopstation: React.FC<CampusLoopstationProps> = ({
             boxSizing: 'border-box'
           }} className="loopstation-top-controls">
             <div
-              onClick={() => {
-                if (!isAutoSequenceActive) {
-                  isManualHeadphonesRef.current = true;
-                  setUseHeadphones(!useHeadphones);
-                }
-              }}
+              role="switch" aria-checked={useHeadphones} aria-label="Kopfhörer-Modus umschalten" tabIndex={isAutoSequenceActive ? -1 : 0}
+              onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !isAutoSequenceActive) { e.preventDefault(); isManualHeadphonesRef.current = true; setUseHeadphones(!useHeadphones); } }}
+              onClick={() => { if (!isAutoSequenceActive) { isManualHeadphonesRef.current = true; setUseHeadphones(!useHeadphones); } }}
               style={{
                 flex: isMobileView ? '1 1 calc(50% - 4px)' : 1.3,
                 minWidth: isMobileView ? '130px' : 'auto',

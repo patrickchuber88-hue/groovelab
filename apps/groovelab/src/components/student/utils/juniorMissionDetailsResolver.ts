@@ -48,11 +48,16 @@ export function resolveJuniorMissionDetails({
   const songs = summary.otherActiveSongs;
   const microScores = summary.microScores || [];
   const audioTracks = summary.audioTracks;
-  const teacherNote = summary.specificTeacherNote || 'Spiele die ersten Takte ganz ruhig & entspannt!';
-  const hasSpecificNote = Boolean(summary.specificTeacherNote);
+  
+  // 🛡️ 0.1% Goldstandard: Reale Aufgaben-Notizen (Lehrwerk-Seitennotizen oder Songnotizen) haben Vorrang vor generischen Fallbacks
+  const pageNote = books[0]?.notesList?.[0]?.text;
+  const songNote = songs[0]?.homework_notes;
+  const firstRealNote = summary.specificTeacherNote || pageNote || songNote || (summary.allTeacherNotes && summary.allTeacherNotes[0]);
+  const teacherNote = firstRealNote || 'Spiele die ersten Takte ganz ruhig & entspannt!';
+  const hasSpecificNote = Boolean(summary.specificTeacherNote || pageNote || songNote);
   const teacherNotes = summary.allTeacherNotes && summary.allTeacherNotes.length > 0
     ? summary.allTeacherNotes
-    : (summary.specificTeacherNote ? [summary.specificTeacherNote] : []);
+    : (firstRealNote ? [firstRealNote] : []);
   const isCarriedOver = Boolean(summary.isCarriedOverPlan);
   const carriedOverWeek = summary.carriedOverWeek;
 
@@ -60,7 +65,8 @@ export function resolveJuniorMissionDetails({
     const b0 = books[0];
     const s0 = songs[0];
     const bPages = b0.pageNums.length === 1 ? `S. ${b0.pageNums[0]}` : `S. ${b0.pageNums[0]}–${b0.pageNums[b0.pageNums.length - 1]}`;
-    const songTitle = (s0.topic_name || s0.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+    const rawSongTitle = (s0.topic_name || s0.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+    const songTitle = rawSongTitle.replace(/linken park/gi, 'Linkin Park');
     return {
       type: 'composite',
       title: `${b0.title} & ${songTitle}`,
@@ -73,6 +79,7 @@ export function resolveJuniorMissionDetails({
       carriedOverWeek,
       books,
       songs,
+      microScores,
       audioTracks
     };
   }
@@ -94,13 +101,15 @@ export function resolveJuniorMissionDetails({
       carriedOverWeek,
       books,
       songs,
+      microScores,
       audioTracks
     };
   }
 
   if (songs.length > 0) {
     const s0 = songs[0];
-    const songTitle = (s0.topic_name || s0.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+    const rawSongTitle = (s0.topic_name || s0.title || '').replace(/\s*\([^)]*\)\s*$/, '');
+    const songTitle = rawSongTitle.replace(/linken park/gi, 'Linkin Park');
     const extraCount = songs.length - 1;
     const extraLabel = extraCount > 0 ? ` (+${extraCount})` : '';
     return {

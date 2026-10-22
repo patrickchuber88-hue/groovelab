@@ -12,6 +12,7 @@ import { TeacherMakeupRadarWidget } from '../TeacherMakeupRadarWidget';
 import { formatAbsenceEndDate } from '../../../utils/teacherAbsenceHelper';
 import { cleanRoomName, getSimulatedNow, resolveStudentInstrument, splitAndNormalizeStudents } from '../utils/teacherDashboardUtils';
 import { isInstrumentAvatar, resolveCampusStudentAvatar } from '../../../utils/avatarResolutionEngine';
+import { resolveTeacherCurrentRoom } from '../../../utils/teacherRoomResolver';
 
 const TeacherFeedWidget = lazy(() => import('../TeacherFeedWidget').then(m => ({ default: m.TeacherFeedWidget })));
 import { TeacherHausaufgabenWidget } from '../TeacherHausaufgabenWidget';
@@ -107,6 +108,15 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     }
     return teacherBriefingAvatarSrc;
   }, [avatarLoadError, teacherBriefingAvatarSrc, teacher]);
+
+  const effectiveTeacherRoom = useMemo(() => {
+    return resolveTeacherCurrentRoom({
+      activeTimelineSlot,
+      teacherTodayRooms,
+      teacher,
+      rooms
+    });
+  }, [activeTimelineSlot, teacherTodayRooms, teacher, rooms]);
 
   const { activeLessonsCount, totalActiveStudentsToday } = useMemo(() => {
     if (!briefingData?.timeline) return { activeLessonsCount: 0, totalActiveStudentsToday: 0 };
@@ -1404,8 +1414,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         allStudents={allStudents}
                         todayStudents={todayTagesplanStudents}
                         rooms={rooms}
-                        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
+                        currentRoom={effectiveTeacherRoom}
                         teacherTodayRooms={teacherTodayRooms}
+                        activeTimelineSlot={activeTimelineSlot}
                         onOpenDrawer={() => setShowNotesDrawer(true)}
                         onOpenHomeworkModal={(stud) => {
                           setDocStudent(stud);
@@ -1802,8 +1813,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                             allStudents={allStudents}
                             todayStudents={todayTagesplanStudents}
                             rooms={rooms}
-                            currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
+                            currentRoom={effectiveTeacherRoom}
                             teacherTodayRooms={teacherTodayRooms}
+                            activeTimelineSlot={activeTimelineSlot}
                             onOpenDrawer={() => setShowNotesDrawer(true)}
                             onOpenHomeworkModal={(stud) => {
                               setDocStudent(stud);

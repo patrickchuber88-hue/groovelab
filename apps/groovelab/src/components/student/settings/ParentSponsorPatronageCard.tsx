@@ -25,9 +25,10 @@ import type { SchoolSponsorSettings, SchoolSponsorItem } from '../../secretary/s
 
 export interface ParentSponsorPatronageCardProps {
   schoolId?: string;
+  variant?: 'hero' | 'sidebar';
 }
 
-export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProps> = ({ schoolId }) => {
+export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProps> = ({ schoolId, variant = 'hero' }) => {
   const [sponsors, setSponsors] = useState<SchoolSponsorItem[]>([]);
   const [schoolName, setSchoolName] = useState<string>('Musikschule');
 
@@ -110,12 +111,15 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
 
         {/* HEADER: SCHULLIZENZ */}
         <div style={{
-          padding: '22px 20px 16px 20px',
+          padding: variant === 'hero' ? '20px 24px 16px 24px' : '22px 20px 16px 20px',
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: variant === 'hero' ? 'row' : 'column',
+          alignItems: variant === 'hero' ? 'center' : 'stretch',
+          justifyContent: variant === 'hero' ? 'space-between' : 'flex-start',
           gap: '12px',
           borderBottom: '1px solid #f1f5f9',
-          textAlign: 'left'
+          textAlign: 'left',
+          flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
@@ -193,7 +197,7 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
         </div>
 
         {/* BODY: TRÄGERSCHAFT (MONOLITHISCH, KEINE KISTEN) */}
-        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+        <div style={{ padding: variant === 'hero' ? '0 24px' : '0 20px', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
           <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{
               display: 'flex',
@@ -242,10 +246,13 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
         <div style={{
           background: '#fafafc',
           borderTop: '1px solid #f1f5f9',
-          padding: '16px 20px 18px 20px',
+          padding: variant === 'hero' ? '14px 24px' : '16px 20px 18px 20px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
+          flexDirection: variant === 'hero' ? 'row' : 'column',
+          alignItems: variant === 'hero' ? 'center' : 'stretch',
+          justifyContent: variant === 'hero' ? 'space-between' : 'flex-start',
+          gap: '12px',
+          flexWrap: 'wrap',
           textAlign: 'left'
         }}>
           <p style={{
@@ -254,7 +261,9 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             color: '#334155',
             lineHeight: 1.45,
             fontStyle: 'italic',
-            fontWeight: 500
+            fontWeight: 500,
+            flex: variant === 'hero' ? 1 : undefined,
+            minWidth: '240px'
           }}>
             „Wir freuen uns, allen Familien unserer Musikschule den Zugang zu modernen didaktischen Übewerkzeugen im Rahmen unseres Unterrichtsangebots kostenfrei zu ermöglichen.“
           </p>
@@ -262,7 +271,8 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '8px'
+            gap: '8px',
+            flexShrink: 0
           }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#0f172a' }}>
               — Die Schulleitung, {schoolName}
@@ -327,12 +337,15 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
 
       {/* 1. HEADER (WARM & EINLADEND) */}
       <div style={{
-        padding: '22px 20px 16px 20px',
+        padding: variant === 'hero' ? '20px 24px 16px 24px' : '22px 20px 16px 20px',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: variant === 'hero' ? 'row' : 'column',
+        alignItems: variant === 'hero' ? 'center' : 'stretch',
+        justifyContent: variant === 'hero' ? 'space-between' : 'flex-start',
         gap: '12px',
         borderBottom: '1px solid #f1f5f9',
-        textAlign: 'left'
+        textAlign: 'left',
+        flexWrap: 'wrap'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
@@ -410,19 +423,29 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
         </div>
       </div>
 
-      {/* 2. STIFTER-KORPUS (FLIESSENDE REIHEN MIT FARBIGER IDENTITY - ZERO BOX-IN-BOX) */}
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+      {/* 2. STIFTER-KORPUS (FLIESSENDE REIHEN ODER RESPONSIVES GRID IM HERO-MODUS) */}
+      <div style={{
+        padding: variant === 'hero' ? '18px 24px' : '0 20px',
+        display: variant === 'hero' ? 'grid' : 'flex',
+        gridTemplateColumns: variant === 'hero' ? 'repeat(auto-fit, minmax(260px, 1fr))' : undefined,
+        flexDirection: variant === 'hero' ? undefined : 'column',
+        gap: variant === 'hero' ? '16px' : '0',
+        textAlign: 'left'
+      }}>
         
         {/* TIER 1: SCHIRMHERRSCHAFT (BERNSTEIN-GOLD) */}
         {hauptSponsors.length > 0 && hauptSponsors.map((haupt, idx) => (
           <div
             key={haupt.id}
             style={{
-              padding: '16px 0',
+              padding: variant === 'hero' ? '14px 18px' : '16px 0',
+              borderRadius: variant === 'hero' ? '16px' : '0',
+              background: variant === 'hero' ? '#fffdf7' : 'transparent',
+              border: variant === 'hero' ? '1px solid #fef3c7' : 'none',
+              borderBottom: variant !== 'hero' && (idx < hauptSponsors.length - 1 || partnerSponsors.length > 0 || foerderSponsors.length > 0) ? '1px solid #f1f5f9' : undefined,
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px',
-              borderBottom: (idx < hauptSponsors.length - 1 || partnerSponsors.length > 0 || foerderSponsors.length > 0) ? '1px solid #f1f5f9' : 'none'
+              gap: '4px'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '2px' }}>
@@ -496,11 +519,14 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
           <div
             key={s.id}
             style={{
-              padding: '14px 0',
+              padding: variant === 'hero' ? '14px 18px' : '14px 0',
+              borderRadius: variant === 'hero' ? '16px' : '0',
+              background: variant === 'hero' ? '#f0fdf4' : 'transparent',
+              border: variant === 'hero' ? '1px solid #dcfce7' : 'none',
+              borderBottom: variant !== 'hero' && (idx < partnerSponsors.length - 1 || foerderSponsors.length > 0) ? '1px solid #f1f5f9' : undefined,
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px',
-              borderBottom: (idx < partnerSponsors.length - 1 || foerderSponsors.length > 0) ? '1px solid #f1f5f9' : 'none'
+              gap: '4px'
             }}
           >
             <div style={{
@@ -561,11 +587,14 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
           <div
             key={s.id}
             style={{
-              padding: '12px 0',
+              padding: variant === 'hero' ? '14px 18px' : '12px 0',
+              borderRadius: variant === 'hero' ? '16px' : '0',
+              background: variant === 'hero' ? '#f8faff' : 'transparent',
+              border: variant === 'hero' ? '1px solid #e0e7ff' : 'none',
+              borderBottom: variant !== 'hero' && (idx < foerderSponsors.length - 1) ? '1px solid #f1f5f9' : undefined,
               display: 'flex',
               flexDirection: 'column',
-              gap: '3px',
-              borderBottom: (idx < foerderSponsors.length - 1) ? '1px solid #f1f5f9' : 'none'
+              gap: '3px'
             }}
           >
             <div style={{
@@ -627,10 +656,13 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
       <div style={{
         background: '#fafafc',
         borderTop: '1px solid #f1f5f9',
-        padding: '16px 20px 18px 20px',
+        padding: variant === 'hero' ? '14px 24px' : '16px 20px 18px 20px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
+        flexDirection: variant === 'hero' ? 'row' : 'column',
+        alignItems: variant === 'hero' ? 'center' : 'stretch',
+        justifyContent: variant === 'hero' ? 'space-between' : 'flex-start',
+        gap: '12px',
+        flexWrap: 'wrap',
         textAlign: 'left'
       }}>
         <p style={{
@@ -639,7 +671,9 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
           color: '#334155',
           lineHeight: 1.45,
           fontStyle: 'italic',
-          fontWeight: 500
+          fontWeight: 500,
+          flex: variant === 'hero' ? 1 : undefined,
+          minWidth: '240px'
         }}>
           „Dank des gesellschaftlichen Engagements unserer Bildungspartner steht Campus-Groovelab allen Familien im laufenden Schuljahr vollkommen gebührenfrei zur Verfügung.“
         </p>
@@ -647,7 +681,8 @@ export const ParentSponsorPatronageCard: React.FC<ParentSponsorPatronageCardProp
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '8px'
+          gap: '8px',
+          flexShrink: 0
         }}>
           <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#0f172a' }}>
             — Die Schulleitung, {schoolName}

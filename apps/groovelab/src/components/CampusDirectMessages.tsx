@@ -251,17 +251,19 @@ export const CampusDynamicAvatar: React.FC<CampusDynamicAvatarProps> = ({
         <div 
           style={{
             position: 'absolute',
-            bottom: '0px',
-            right: '0px',
-            width: '12px',
-            height: '12px',
+            bottom: '-1px',
+            right: '-1px',
+            width: size >= 44 ? '14px' : '13px',
+            height: size >= 44 ? '14px' : '13px',
             borderRadius: '50%',
-            background: isQuietHours ? '#f59e0b' : '#34a853',
-            border: 'none',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+            background: isQuietHours ? '#f59e0b' : '#22c55e',
+            border: '2px solid #ffffff',
+            boxSizing: 'border-box',
+            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.22)',
             zIndex: 2
           }} 
           title={isQuietHours ? 'Im Feierabend' : 'Aktiv'}
+          aria-label={isQuietHours ? 'Status: Im Feierabend' : 'Status: Aktiv'}
         />
       ) : null}
 
@@ -629,6 +631,55 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [, setForceUpdateTick] = useState(0);
   const isParentUnlocked = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+
+  // 🛡️ 0.1% Goldstandard: Fail-Closed Parental Chat Permission Check (DSGVO Art. 8 & BGB § 104)
+  const isChatRestrictedByParent = useMemo(() => {
+    if (!isStudent) return false;
+    
+    // Volljährige Schüler sind ausgenommen (BGB § 2)
+    const birthdate = user?.birthdate || user?.date_of_birth;
+    if (birthdate) {
+      const birth = new Date(birthdate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      if (age >= 18) return false;
+    }
+
+    if (user?.parent_permissions?.allow_chat !== undefined) return !Boolean(user.parent_permissions.allow_chat);
+    if (user?.parent_allow_chat === false) return true;
+
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('campus_allow_chat') === 'false') return true;
+      if (user?.id && localStorage.getItem(`groovelab_parent_allow_chat_${user.id}`) === 'false') return true;
+      if (user?.id && localStorage.getItem(`groovelab_parent_allow_chat_${user.id}`) === 'true') return false;
+      if (localStorage.getItem('campus_allow_chat') === 'true') return false;
+    }
+
+    if (user?.parent_allow_chat === true) return false;
+
+    // Didaktischer Junior-Modus: Default-Deny (Art. 8 DSGVO)
+    const uiLevel = user?.campus_ui_level || 
+      (typeof window !== 'undefined' ? (localStorage.getItem(`campus_student_ui_level_${user?.id}`) || localStorage.getItem('campus_student_ui_level')) : null) || 
+      'junior';
+    if (uiLevel === 'junior') {
+      return true;
+    }
+
+    return false;
+  }, [isStudent, user]);
+
+  const isParentSessionActive = Boolean(
+    isParentUnlocked || 
+    (typeof sessionStorage !== 'undefined' && (
+      sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true' ||
+      Boolean(sessionStorage.getItem('gl_parent_session_lease')) ||
+      Boolean(sessionStorage.getItem('campus_parent_session_lease'))
+    ))
+  );
+
+  const isParentLocked = isChatRestrictedByParent && !isParentSessionActive;
   const handleLockParentMode = () => {
     sessionStorage.removeItem('groovelab_parent_unlocked_global');
     if (user?.id) {
@@ -2704,13 +2755,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
   }, [displayedMessages, selectedRecipient, user]);
 
-  const sendDirectQuickMessage = async (content: string) => {
-    if (!content.trim() || !selectedRecipient) return;
+  const sendDirectQuickMessage = async (content: string): Promise<boolean> => {
+    if (!content.trim() || !selectedRecipient) return false;
+
+    // 🛡️ 0.1% Goldstandard: Fail-Closed Parental Lock Enforcement
+    if (isParentLocked) {
+      setParentPinInput('');
+      setParentPinError('');
+      setShowParentPinModal(true);
+      return false;
+    }
 
     const validation = validateChatMessageContent(content);
     if (!validation.isValid) {
       setRespectWarning(validation);
-      return;
+      return false;
     }
     setRespectWarning(null);
 
@@ -2721,12 +2780,15 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
         if (targetOccTab) {
           const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
+          const isParentSender = user?.role === 'parent' || (typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('campus_parent_session_lease')));
+          const senderRole = isParentSender ? 'parent' : ((user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary') ? user.role : 'student');
           const { data } = await supabase.from('campus_direct_messages').insert({
             sender_id: user.id,
             recipient_id: selectedRecipient.id,
             content: content.trim(),
             occurrence_id: targetOccTab.id,
             read_by: [user.id],
+            sender_role: senderRole,
             school_id: effectiveSchoolId
           }).select().single();
           if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
@@ -2741,29 +2803,68 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       playChatMessageSentSound();
       triggerChatHapticFeedback();
       setTimeout(() => scrollToBottom(true), 50);
+      return true;
     } catch (err: any) {
-      const errStr = String(err?.message || err || '');
-      if (errStr.includes('PARENTAL_CHAT_LOCK') || errStr.includes('JUNIOR_DEFAULT_CHAT')) {
+      const errStr = String(err?.message || (err as any)?.details || (err as any)?.hint || err || '');
+      if (errStr.includes('CHAT_CRISIS_INTERVENTION_REQUIRED') || errStr.includes('CRISIS_DETECTED')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'threat',
+          isCrisis: true,
+          reason: 'Wir sind für dich da. Du bist nicht allein. Wenn es dir nicht gut geht oder du dich in einer Krise befindest, gibt es Menschen, die dir jetzt sofort und vertraulich helfen.'
+        });
+      } else if (errStr.includes('CHAT_RESPECT_VIOLATION') || errStr.includes('TOXIC_CONTENT_DETECTED')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'insult',
+          isCrisis: false,
+          reason: 'Bitte achte auf einen respektvollen und wertschätzenden Ton im Schul-Chat.'
+        });
+      } else if (errStr.includes('PARENTAL_CHAT_LOCK') || errStr.includes('JUNIOR_DEFAULT_CHAT')) {
         setRespectWarning({
           isValid: false,
           category: 'harassment',
+          isCrisis: false,
           reason: 'Der Chat ist für dieses Profil durch die elterlichen Einstellungen pausiert 🛡️'
         });
       } else if (errStr.includes('RECIPIENT_PARENTAL_CHAT') || errStr.includes('RECIPIENT_JUNIOR_CHAT')) {
         setRespectWarning({
           isValid: false,
           category: 'harassment',
+          isCrisis: false,
           reason: 'Der Empfänger kann aufgrund elterlicher Schutz-Einstellungen keine Direktnachrichten empfangen 🛡️'
+        });
+      } else if (errStr.includes('RATE_LIMIT_EXCEEDED')) {
+        setRespectWarning({
+          isValid: false,
+          category: 'harassment',
+          isCrisis: false,
+          reason: 'Zu viele Nachrichten in kurzer Zeit. Bitte warte einen kurzen Moment vor dem nächsten Absenden.'
         });
       } else {
         console.warn('[CampusDirectMessages] Send error:', err);
+        setRespectWarning({
+          isValid: false,
+          category: 'harassment',
+          isCrisis: false,
+          reason: 'Nachricht konnte nicht gesendet werden. Bitte prüfe deine Verbindung und versuche es erneut.'
+        });
       }
+      return false;
     }
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!typedMessage.trim() || !selectedRecipient) return;
+
+    // 🛡️ 0.1% Goldstandard: Fail-Closed Parental Lock Enforcement
+    if (isParentLocked) {
+      setParentPinInput('');
+      setParentPinError('');
+      setShowParentPinModal(true);
+      return;
+    }
     
     const messageText = typedMessage.trim();
     const validation = validateChatMessageContent(messageText);
@@ -2773,7 +2874,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
     setRespectWarning(null);
     setTypedMessage('');
-    await sendDirectQuickMessage(messageText);
+    const success = await sendDirectQuickMessage(messageText);
+    if (!success) {
+      setTypedMessage(messageText);
+    }
   };
 
   return (
@@ -4437,7 +4541,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 );
               }
               return null;
-            })() || (isStudent && (user?.parent_allow_chat === false || (typeof window !== 'undefined' && (localStorage.getItem('campus_allow_chat') === 'false' || localStorage.getItem(`groovelab_parent_allow_chat_${user?.id}`) === 'false'))) && (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') !== 'true') ? (
+            })() || (isParentLocked ? (
               <div style={{
                 padding: '14px 20px',
                 borderTop: '1px solid #e2e8f0',
@@ -4510,15 +4614,24 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   ];
 
                   return (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      overflowX: 'auto',
-                      paddingBottom: '6px',
-                      scrollbarWidth: 'none',
-                      msOverflowStyle: 'none'
-                    }}>
+                    <div 
+                      role="toolbar"
+                      aria-label="Schnelltext-Antworten"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        overflowX: 'auto',
+                        paddingTop: '6px',
+                        paddingBottom: '8px',
+                        paddingLeft: '2px',
+                        paddingRight: '2px',
+                        minHeight: isMobile ? '46px' : '40px',
+                        boxSizing: 'border-box',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none'
+                      }}
+                    >
                       {vettedQuickChips.map((chip, idx) => (
                         <button
                           key={`chip-${idx}`}
@@ -4526,13 +4639,15 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           onClick={() => {
                             setTypedMessage(chip.text);
                           }}
+                          aria-label={`Schnellantwort: ${chip.label}`}
+                          title={chip.text}
                           style={{
-                            padding: '5px 12px',
+                            padding: '6px 14px',
                             borderRadius: '100px',
                             background: '#ffffff',
                             border: '1px solid #e2e8f0',
                             color: '#334155',
-                            fontSize: '0.75rem',
+                            fontSize: '0.78rem',
                             fontWeight: 650,
                             whiteSpace: 'nowrap',
                             cursor: 'pointer',
@@ -4540,24 +4655,28 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                             flexShrink: 0,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '5px',
-                            minHeight: isMobile ? '36px' : '30px',
+                            gap: '6px',
+                            minHeight: isMobile ? '38px' : '32px',
                             touchAction: 'manipulation',
                             transition: 'all 0.15s ease'
                           }}
                           className="hover-scale"
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#10b981';
-                            e.currentTarget.style.background = '#ecfdf5';
-                            e.currentTarget.style.color = '#059669';
+                            e.currentTarget.style.borderColor = '#15803d';
+                            e.currentTarget.style.background = '#f0fdf4';
+                            e.currentTarget.style.color = '#166534';
+                            const svg = e.currentTarget.querySelector('svg');
+                            if (svg) svg.style.color = '#166534';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = '#e2e8f0';
                             e.currentTarget.style.background = '#ffffff';
                             e.currentTarget.style.color = '#334155';
+                            const svg = e.currentTarget.querySelector('svg');
+                            if (svg) svg.style.color = '#15803d';
                           }}
                         >
-                          <chip.icon size={12} strokeWidth={2.4} color="#10b981" style={{ flexShrink: 0 }} />
+                          <chip.icon size={13} strokeWidth={2.4} color="#15803d" aria-hidden="true" style={{ flexShrink: 0, transition: 'color 0.15s ease' }} />
                           <span>{chip.label}</span>
                         </button>
                       ))}
@@ -4608,91 +4727,151 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     </div>
                     {respectWarning.isCrisis && (
                       <div style={{
-                        background: '#ffffff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '6px 10px',
-                        fontSize: '0.72rem',
-                        color: '#991b1b',
-                        fontWeight: 700,
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '2px'
+                        flexDirection: 'column',
+                        gap: '6px',
+                        marginTop: '4px'
                       }}>
-                        <span>Kostenlose & anonyme Nummer gegen Kummer:</span>
-                        <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
-                          <span>116 111</span>
-                        </a>
+                        <div style={{
+                          background: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          color: '#991b1b',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '6px'
+                        }}>
+                          <span>Nummer gegen Kummer (Kinder/Jugend):</span>
+                          <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
+                            <span>116 111</span>
+                          </a>
+                        </div>
+                        <div style={{
+                          background: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          fontSize: '0.72rem',
+                          color: '#991b1b',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '6px'
+                        }}>
+                          <span>Telefonseelsorge & Notfall:</span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <a href="tel:08001110111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
+                              <span>0800 111 0 111</span>
+                            </a>
+                            <span style={{ color: '#fca5a5' }}>•</span>
+                            <a href="tel:112" style={{ color: '#991b1b', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px', textDecoration: 'none', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <span>Notruf 112</span>
+                            </a>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Apple HIG In-Field Send Composer */}
-                <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', position: 'relative', alignItems: 'center' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Deine Nachricht..."
-                    value={typedMessage}
-                    onChange={e => {
-                      setTypedMessage(e.target.value);
-                      if (respectWarning) setRespectWarning(null);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 48px 11px 18px',
-                      minHeight: '44px',
-                      borderRadius: '100px',
-                      border: '1.5px solid #e2e8f0',
-                      background: '#ffffff',
-                      fontSize: '0.88rem',
-                      outline: 'none',
-                      fontWeight: 500,
-                      color: '#0f172a',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                      boxSizing: 'border-box'
-                    }}
-                    onFocus={e => {
-                      e.target.style.borderColor = '#15803d';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                    onBlur={e => {
-                      e.target.style.borderColor = '#e2e8f0';
-                      e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!typedMessage.trim()}
-                    aria-label="Nachricht senden"
-                    style={{
-                      position: 'absolute',
-                      right: '5px',
-                      border: 'none',
-                      background: !typedMessage.trim() ? '#f1f5f9' : '#34a853',
-                      color: !typedMessage.trim() ? '#94a3b8' : '#ffffff',
-                      borderRadius: '50%',
-                      width: '36px',
-                      height: '36px',
-                      minWidth: '36px',
-                      minHeight: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.15s ease',
-                      boxShadow: 'none',
-                      flexShrink: 0,
-                      touchAction: 'manipulation'
-                    }}
-                    className={typedMessage.trim() ? 'hover-scale' : ''}
-                  >
-                    <Send size={15} strokeWidth={2.4} />
-                  </button>
-                </form>
+                {(() => {
+                  const isParentSenderMode = user?.role === 'parent' || (typeof sessionStorage !== 'undefined' && Boolean(sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('campus_parent_session_lease')));
+                  return (
+                    <>
+                      {isParentSenderMode && (
+                        <div style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontSize: '0.70rem',
+                          fontWeight: 800,
+                          color: '#1d4ed8',
+                          background: '#eff6ff',
+                          border: 'none',
+                          padding: '2px 10px',
+                          borderRadius: '100px',
+                          marginBottom: '6px',
+                          alignSelf: 'flex-start'
+                        }}>
+                          <ShieldCheck size={11} color="#1d4ed8" strokeWidth={2.5} />
+                          <span>Senden als Erziehungsberechtigte/r</span>
+                        </div>
+                      )}
+                      <form onSubmit={handleSend} style={{ display: 'flex', width: '100%', position: 'relative', alignItems: 'center' }}>
+                        <input 
+                          type="text" 
+                          placeholder={isParentSenderMode ? "Nachricht als Erziehungsberechtigte/r schreiben..." : "Deine Nachricht..."}
+                          value={typedMessage}
+                          onChange={e => {
+                            setTypedMessage(e.target.value);
+                            if (respectWarning) setRespectWarning(null);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '11px 48px 11px 18px',
+                            minHeight: '44px',
+                            borderRadius: '100px',
+                            border: isParentSenderMode ? '1.5px solid #93c5fd' : '1.5px solid #e2e8f0',
+                            background: isParentSenderMode ? '#fbfdff' : '#ffffff',
+                            fontSize: '0.88rem',
+                            outline: 'none',
+                            fontWeight: 500,
+                            color: '#0f172a',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                            transition: 'border-color 0.15s, box-shadow 0.15s',
+                            boxSizing: 'border-box'
+                          }}
+                          onFocus={e => {
+                            e.target.style.borderColor = isParentSenderMode ? '#2563eb' : '#15803d';
+                            e.target.style.boxShadow = 'none';
+                          }}
+                          onBlur={e => {
+                            e.target.style.borderColor = isParentSenderMode ? '#93c5fd' : '#e2e8f0';
+                            e.target.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                          }}
+                        />
+                        <button
+                          type="submit"
+                          disabled={!typedMessage.trim()}
+                          aria-label="Nachricht senden"
+                          style={{
+                            position: 'absolute',
+                            right: '5px',
+                            border: 'none',
+                            background: !typedMessage.trim() ? '#f1f5f9' : (isParentSenderMode ? '#2563eb' : '#34a853'),
+                            color: !typedMessage.trim() ? '#94a3b8' : '#ffffff',
+                            borderRadius: '50%',
+                            width: '36px',
+                            height: '36px',
+                            minWidth: '36px',
+                            minHeight: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: !typedMessage.trim() ? 'not-allowed' : 'pointer',
+                            transition: 'all 0.15s ease',
+                            boxShadow: 'none',
+                            flexShrink: 0,
+                            touchAction: 'manipulation'
+                          }}
+                          className={typedMessage.trim() ? 'hover-scale' : ''}
+                        >
+                          <Send size={15} strokeWidth={2.4} />
+                        </button>
+                      </form>
+                    </>
+                  );
+                })()}
 
                 {/* 🛡️ Unified Trust & Compliance Sub-Footer (Desktop Only: § 8a SGB VIII & Art. 32 DSGVO) */}
                 {!isMobile && (

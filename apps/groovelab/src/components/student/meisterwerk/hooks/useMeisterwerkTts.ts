@@ -279,7 +279,7 @@ export function useMeisterwerkTts() {
     studentQuestion?: any
   ): string[] => {
     // 🛡️ 1% Goldstandard: Wenn ein strukturiertes Options-Objekt übergeben wird
-    if (weekNumOrTeacherOrOptions && typeof weekNumOrTeacherOrOptions === 'object' && !Array.isArray(weekNumOrTeacherOrOptions) && ('books' in weekNumOrTeacherOrOptions || 'songs' in weekNumOrTeacherOrOptions || 'studentFirstName' in weekNumOrTeacherOrOptions)) {
+    if (weekNumOrTeacherOrOptions && typeof weekNumOrTeacherOrOptions === 'object' && !Array.isArray(weekNumOrTeacherOrOptions) && ('books' in weekNumOrTeacherOrOptions || 'songs' in weekNumOrTeacherOrOptions || 'microScores' in weekNumOrTeacherOrOptions || 'worldTourMasteries' in weekNumOrTeacherOrOptions || 'studentFirstName' in weekNumOrTeacherOrOptions)) {
       const narrative = buildContinuousHomeworkNarrative(weekNumOrTeacherOrOptions);
       return [narrative];
     }
@@ -314,6 +314,7 @@ export function useMeisterwerkTts() {
     handleSetTtsMode,
     isTtsSpeaking,
     activeTtsKey,
+    setActiveTtsKey,
     ttsStatusText,
     handleSpeakText,
     handleStopSpeaking,

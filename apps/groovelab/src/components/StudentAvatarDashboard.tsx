@@ -342,7 +342,7 @@ export function StudentAvatarDashboard({
         flex: profile.activeTab === 'homework_book' ? 1 : undefined,
         minHeight: profile.activeTab === 'homework_book' ? 0 : undefined,
         overflowX: 'clip',
-        padding: (profile.isMobile || profile.activeTab === 'homework_book') ? '0' : '0 0 40px 0', 
+        padding: (profile.isMobile || profile.activeTab === 'homework_book' || profile.activeTab === 'briefing') ? '0' : '0 0 40px 0', 
         boxSizing: 'border-box'
       }}
     >
@@ -455,9 +455,7 @@ export function StudentAvatarDashboard({
                   ? true
                   : (profile.studentUiLevel === 'junior'
                       ? false
-                      : (profile.studentUser?.parent_allow_absences !== undefined && profile.studentUser?.parent_allow_absences !== null
-                          ? Boolean(profile.studentUser.parent_allow_absences)
-                          : (profile.studentUiLevel === 'pro')))
+                      : Boolean(profile.studentUser?.parent_allow_absences === true))
               }
               isParentUnlocked={parent.isParentUnlocked || parent.checkIsParentSessionActiveLocal()}
             />
@@ -679,6 +677,13 @@ export function StudentAvatarDashboard({
           studentId={studentId}
           studentUser={profile.studentUser}
           isParentUnlocked={parent.isParentUnlocked}
+          isChatAllowed={
+            profile.isAdultStudent
+              ? true
+              : (profile.studentUser?.parent_allow_chat !== undefined && profile.studentUser?.parent_allow_chat !== null
+                  ? Boolean(profile.studentUser.parent_allow_chat)
+                  : (profile.studentUiLevel !== 'junior'))
+          }
           onRefreshData={schedule.fetchSchedule}
           isRescheduleSheetOpen={schedule.isRescheduleSheetOpen}
           closeRescheduleBottomSheet={() => schedule.setIsRescheduleSheetOpen(false)}

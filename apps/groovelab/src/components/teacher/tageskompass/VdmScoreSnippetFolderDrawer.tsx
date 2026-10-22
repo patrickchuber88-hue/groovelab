@@ -15,7 +15,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Music, Layers, Activity, Zap, Play, Square, Search,
-  ChevronLeft, Plus, X, Clock, Check, Sparkles,
+  ChevronLeft, ChevronRight, Plus, X, Clock, Check, Sparkles,
   Smile, Guitar, Mic, Users
 } from 'lucide-react';
 import { MicroScoreSnippet, MicroScoreInstrument } from '../../student/meisterwerk/microscore/microScore.types';
@@ -236,7 +236,7 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
   return (
     <div
       role="region"
-      aria-label="VdM Notenschnipsel-Bibliothek"
+      aria-label="Notenschnipsel-Bibliothek"
       style={{
         marginTop: '8px',
         padding: '12px 14px',
@@ -252,45 +252,50 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
     >
       {/* 1. Header: Titel + Instrument + Action Buttons */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <div style={{
-            width: '26px',
-            height: '26px',
+            width: '28px',
+            height: '28px',
             borderRadius: '8px',
-            background: '#0f172a',
+            background: '#4f46e5',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)'
           }}>
             <Music size={14} />
           </div>
-          <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a' }}>
-            VdM-Notenschnipsel ({snippets.length})
-          </span>
-          <span style={{
-            fontSize: '0.68rem',
-            background: '#f1f5f9',
-            color: '#64748b',
-            padding: '2px 7px',
-            borderRadius: '6px',
-            fontWeight: 700
-          }}>
-            1–4 Takte • Unterrichtsgebrauch
-          </span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap', minWidth: 0 }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.01em' }}>
+              Notenschnipsel
+            </span>
+            <span style={{
+              fontSize: '0.68rem',
+              background: '#f1f5f9',
+              color: '#475569',
+              padding: '2px 7px',
+              borderRadius: '6px',
+              fontWeight: 700
+            }}>
+              {snippets.length} Übungen · 1–4 Takte
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
           {/* Instrumenten Schnell-Filter */}
           <select
             value={selectedInstrument}
             onChange={(e) => setSelectedInstrument(e.target.value)}
             aria-label="Instrumentenfilter für Notenschnipsel"
             style={{
+              height: '30px',
               background: '#f8fafc',
               border: '1px solid #cbd5e1',
               borderRadius: '8px',
-              padding: '4px 8px',
+              padding: '0 8px',
               fontSize: '0.72rem',
               fontWeight: 700,
               color: '#334155',
@@ -305,25 +310,35 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
             ))}
           </select>
 
-          {/* Neu komponieren Button */}
+          {/* Neu komponieren Button (Freundliches Campus Indigo) */}
           <button
             type="button"
             onClick={onOpenCreateNew}
             title="Eigenen Notenschnipsel (1–4 Takte) komponieren"
             aria-label="Eigenen Notenschnipsel komponieren"
             style={{
-              background: '#0f172a',
+              height: '30px',
+              background: '#4f46e5',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
-              padding: '5px 10px',
+              padding: '0 10px',
               fontSize: '0.72rem',
               fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.22)',
+              transition: 'all 0.15s ease'
             }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = '#4338ca';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = '#4f46e5';
+            }}
+            className="hover-scale-mini"
           >
             <Plus size={13} />
             <span>Neu</span>
@@ -335,17 +350,19 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
             onClick={onClose}
             aria-label="Notenschnipsel-Menü schließen"
             style={{
+              width: '30px',
+              height: '30px',
               background: '#f1f5f9',
-              border: 'none',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
-              width: '26px',
-              height: '26px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#64748b',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
             }}
+            className="hover-scale-mini"
           >
             <X size={14} />
           </button>
@@ -356,18 +373,18 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '8px',
         background: '#f8fafc',
         border: '1px solid #e2e8f0',
         borderRadius: '10px',
-        padding: '5px 10px'
+        padding: '6px 10px'
       }}>
         <Search size={14} color="#94a3b8" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Schnellsuche (z. B. C-Dur, Kadenz, Triolen, Hanon, Spider)..."
+          placeholder="Schnellsuche (z. B. C-Dur, Kadenz, Triolen, Hanon)..."
           aria-label="Notenschnipsel durchsuchen"
           style={{
             border: 'none',
@@ -376,7 +393,8 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
             fontSize: '0.78rem',
             fontWeight: 600,
             color: '#1e293b',
-            width: '100%'
+            width: '100%',
+            minWidth: 0
           }}
         />
         {searchQuery && (
@@ -394,7 +412,7 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
       {!searchQuery && !selectedCategory && (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
           gap: '8px'
         }}>
           {VDM_CATEGORIES.map(cat => {
@@ -418,36 +436,97 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
                   setSelectedSubFolder('all');
                 }}
                 style={{
-                  background: cat.color.bg,
-                  border: `1px solid ${cat.color.border}`,
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderLeft: `4px solid ${cat.color.activeBg}`,
                   borderRadius: '12px',
                   padding: '10px 12px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
+                  gap: '6px',
                   textAlign: 'left',
                   cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.03)',
+                  minWidth: 0,
+                  width: '100%',
+                  outline: 'none',
                   transition: 'all 0.15s ease'
                 }}
-                className="hover-scale-mini"
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.borderLeftColor = cat.color.activeBg;
+                  e.currentTarget.style.boxShadow = `0 4px 14px ${cat.color.activeBg}22`;
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.borderLeftColor = cat.color.activeBg;
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(15, 23, 42, 0.03)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                className="vdm-folder-card"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cat.color.text }}>
-                    <Icon size={16} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800 }}>{cat.name}</span>
+                {/* Header-Row: Squircle Icon (in Markenfarbe) + Title + Counter Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: cat.color.bg,
+                      color: cat.color.text,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      border: `1px solid ${cat.color.border}35`
+                    }}>
+                      <Icon size={16} strokeWidth={2.2} />
+                    </div>
+                    <span style={{
+                      fontSize: '0.80rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      minWidth: 0
+                    }}>
+                      {cat.name}
+                    </span>
                   </div>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    background: cat.color.badgeBg,
-                    color: cat.color.badgeText,
-                    padding: '2px 6px',
-                    borderRadius: '6px'
-                  }}>
-                    {count}
-                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                    <span style={{
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      background: cat.color.bg,
+                      color: cat.color.text,
+                      padding: '2px 7px',
+                      borderRadius: '100px',
+                      letterSpacing: '0.02em'
+                    }}>
+                      {count}
+                    </span>
+                    <ChevronRight size={13} color="#94a3b8" />
+                  </div>
                 </div>
-                <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+
+                {/* Description Text: Zero-Overlap mit strict line-clamp */}
+                <span style={{
+                  fontSize: '0.70rem',
+                  color: '#64748b',
+                  fontWeight: 500,
+                  lineHeight: 1.32,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  minWidth: 0,
+                  width: '100%',
+                  wordBreak: 'break-word'
+                }}>
                   {cat.description}
                 </span>
               </button>
@@ -555,7 +634,8 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
                     gap: '8px',
                     padding: '7px 10px',
                     background: isPlaying ? '#f8fafc' : '#ffffff',
-                    border: isPlaying ? '1.5px solid #0f172a' : '1px solid #e2e8f0',
+                    border: isPlaying ? '1.5px solid #4f46e5' : '1px solid #e2e8f0',
+                    borderLeft: `4px solid ${activeCategoryObj?.color.activeBg || '#4f46e5'}`,
                     borderRadius: '10px',
                     transition: 'all 0.15s ease'
                   }}
@@ -572,16 +652,17 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
                         height: '28px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: isPlaying ? '#0f172a' : '#f1f5f9',
-                        color: isPlaying ? '#ffffff' : '#0f172a',
+                        background: isPlaying ? '#4f46e5' : '#eef2ff',
+                        color: isPlaying ? '#ffffff' : '#4f46e5',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      {isPlaying ? <Square size={11} fill="#ffffff" /> : <Play size={12} fill="#0f172a" style={{ marginLeft: '1px' }} />}
+                      {isPlaying ? <Square size={11} fill="#ffffff" /> : <Play size={12} fill="#4f46e5" style={{ marginLeft: '1px' }} />}
                     </button>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
@@ -602,14 +683,14 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
                         {snip.vdmLevel && (
                           <>
                             <span>•</span>
-                            <span style={{ textTransform: 'capitalize' }}>VdM {snip.vdmLevel}</span>
+                            <span style={{ textTransform: 'capitalize' }}>Stufe {snip.vdmLevel}</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Rechts: 1-Click Zuweisen Button */}
+                  {/* Rechts: 1-Click Zuweisen Button (Freundliches Campus Indigo) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -625,18 +706,26 @@ export const VdmScoreSnippetFolderDrawer: React.FC<VdmScoreSnippetFolderDrawerPr
                     title={`„${snip.title}“ als Wochen-Hausaufgabe anheften`}
                     aria-label={`„${snip.title}“ als Wochen-Hausaufgabe anheften`}
                     style={{
-                      background: '#0f172a',
+                      background: '#4f46e5',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '8px',
-                      padding: '5px 10px',
+                      padding: '5px 11px',
                       fontSize: '0.72rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '4px',
-                      flexShrink: 0
+                      flexShrink: 0,
+                      boxShadow: '0 2px 5px rgba(79, 70, 229, 0.22)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#4338ca';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = '#4f46e5';
                     }}
                     className="hover-scale-mini"
                   >
