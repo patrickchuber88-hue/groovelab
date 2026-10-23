@@ -105,7 +105,7 @@ export const TeacherMakeupRadarWidget: React.FC<TeacherMakeupRadarWidgetProps> =
       {/* Token Items List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {tokens.map((token) => {
-          const studentDisplayName = `${token.student_first_name} ${maskLastName(token.student_last_name, showRealNames)}`.trim();
+          const studentDisplayName = `${token.student_first_name} ${maskLastName(token.student_last_name, showRealNames, token.student_id, token.student_first_name)}`.trim();
           const origDateFormatted = token.original_date 
             ? new Date(token.original_date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
             : '–';

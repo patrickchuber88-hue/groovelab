@@ -1374,7 +1374,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
                                           const cleanLn = rawLn.replace(/&.*/, '').trim();
                                           if (cleanFn || cleanLn) {
-                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
+                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames, stud.id || found?.id, cleanFn)}`.trim();
                                           }
                                           return stud.name || 'Schüler';
                                         });
@@ -1403,7 +1403,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                       const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
                                       const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
                                       if (fn || ln) {
-                                        return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+                                        return `${fn} ${maskLastName(ln, showRealNames, slot.student?.id || found?.id, fn)}`.trim();
                                       }
                                       return slot.student?.name || 'Schüler';
                                     })()}

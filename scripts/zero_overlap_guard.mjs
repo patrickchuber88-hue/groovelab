@@ -361,15 +361,40 @@ if (zBaseMatch && zStickyMatch && zDropdownMatch && zModalMatch && zAlertMatch) 
 const toxicNegativeMarginRegex = /margin(?:-(?:top|bottom|left|right))?:\s*-(?:[2-9]\d|\d{3,})px/g;
 const toxicMargins = indexCss.match(toxicNegativeMarginRegex) || [];
 
-const dekade6Pass = zIndexHierarchyValid && toxicMargins.length === 0;
+// 🛡️ Zero-Trapped-Dropdown & Stacking-Context Elevation Guard (0,1% Goldstandard)
+// Scan components rendering custom interactive dropdowns/popovers to ensure their host containers
+// dynamically elevate zIndex when open, preventing entrapment under subsequent DOM siblings.
+let trappedDropdownViolations = [];
+const keyDropdownComponents = [
+  'SecretaryRoomCardItem.tsx',
+  'AdminBandsView.tsx',
+  'ScheduleCalendarView.tsx',
+  'ScheduleCalendarViewDesktop.tsx'
+];
+
+for (const compName of keyDropdownComponents) {
+  const filePath = tsxFiles.find(f => f.endsWith(compName));
+  if (filePath) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const hasDropdownState = /showFloorDropdown|showAddMember|roomDropdownOpen/i.test(content);
+    if (hasDropdownState) {
+      const hasElevation = /zIndex:\s*(?:showFloorDropdown|showAddMember\s*===?\s*band\.id|showAddMember|roomDropdownOpen)\s*\?\s*\d+/i.test(content);
+      if (!hasElevation) {
+        trappedDropdownViolations.push(compName);
+      }
+    }
+  }
+}
+
+const dekade6Pass = zIndexHierarchyValid && toxicMargins.length === 0 && trappedDropdownViolations.length === 0;
 
 recordCheck(
   'Dekade 6',
-  'Absolute/Fixed Positioning & 5-Tier Z-Index (Monotone Stacking)',
+  'Absolute/Fixed Positioning & 5-Tier Z-Index (Monotone Stacking & Dropdown Elevation)',
   dekade6Pass,
   dekade6Pass
-    ? '5-Tier Z-Index hierarchy verified strictly monotonic (Base < Sticky < Dropdown < Modal < Alert), 0 toxic negative margins.'
-    : `Z-Index valid=${zIndexHierarchyValid}, toxic margins count=${toxicMargins.length}`
+    ? '5-Tier Z-Index hierarchy verified strictly monotonic (Base < Sticky < Dropdown < Modal < Alert), 0 toxic negative margins, 0 trapped dropdowns.'
+    : `Z-Index valid=${zIndexHierarchyValid}, toxic margins count=${toxicMargins.length}, trappedDropdownViolations=${trappedDropdownViolations.join(', ')}`
 );
 
 // =============================================================================

@@ -269,7 +269,7 @@ export function useTeacherAbsence({
         teacher_contact_status: teacherContactStatus,
         teacher_contacted_at: teacherContactedAt,
         student,
-        studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (n.student_name || 'Schüler'),
+        studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames, student.id, student.first_name)}`.trim() : (n.student_name || 'Schüler'),
         instrument: student?.instrument || n.instrument || 'Unterricht'
       });
     });
@@ -313,7 +313,7 @@ export function useTeacherAbsence({
             teacher_contact_status: teacherContactStatus,
             teacher_contacted_at: teacherContactedAt,
             student,
-            studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (s.title || 'Schüler'),
+            studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames, student.id || s.student_id, student.first_name)}`.trim() : (s.title || 'Schüler'),
             instrument: s.instrument || student?.instrument || 'Unterricht'
           });
         }

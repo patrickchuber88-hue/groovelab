@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { isUUID } from '../utils/uuidValidator';
 import { logApplicationAudit } from './auditLogService';
+import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 
 export interface UserNote {
   id: string;
@@ -139,15 +140,13 @@ export const parseSmartTags = (text: string) => {
   return { studentMentions, tags, rooms, isTodo };
 };
 
-// GDPR-compliant student name masking (Vorname + N.)
-export const maskStudentName = (rawName: string | null | undefined): string | null => {
+// GDPR-compliant student name masking (Vorname + N. bzw. Klarnamen nach PIN Step-Up)
+export const maskStudentName = (rawName: string | null | undefined, privacyOverride?: boolean): string | null => {
   if (!rawName) return null;
-  const parts = String(rawName).trim().split(/\s+/);
-  if (parts.length <= 1) return parts[0] || null;
-  const fName = parts[0];
-  const lName = parts.slice(1).join(' ');
-  const maskedL = lName ? `${lName[0]}.` : '';
-  return `${fName} ${maskedL}`.trim();
+  const isPrivacy = privacyOverride !== undefined 
+    ? privacyOverride 
+    : (typeof window !== 'undefined' ? (window.__glPrivacyMode ?? true) : true);
+  return formatSingleStudentAnonymized(rawName, undefined, undefined, isPrivacy);
 };
 
 // Intelligente Mängel-Erkennung (konsistent über alle Module & Boards)

@@ -752,7 +752,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                               alignItems: 'center'
                             }}
                           >
-                            <span>{student.first_name} {maskLastName(student.last_name, isTeacher ? showRealNames : true, student.id)}</span>
+                            <span>{student.first_name} {maskLastName(student.last_name, isTeacher ? showRealNames : true, student.id, student.first_name)}</span>
                             <span style={{ 
                               fontSize: '0.75rem', 
                               fontWeight: 800, 
@@ -843,7 +843,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         {assignableStudents
                           .filter(s => !selectedEnsemble.members.some((m: any) => m.student_id === s.id))
                           .map(s => (
-                            <option key={s.id} value={s.id}>{s.first_name} {maskLastName(s.last_name, isTeacher ? showRealNames : true, s.id)} ({s.instrument || 'Kein Hauptinstrument'})</option>
+                            <option key={s.id} value={s.id}>{s.first_name} {maskLastName(s.last_name, isTeacher ? showRealNames : true, s.id, s.first_name)} ({s.instrument || 'Kein Hauptinstrument'})</option>
                           ))
                         }
                       </select>
@@ -909,7 +909,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                               )}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prof.first_name} {maskLastName(prof.last_name, isTeacher ? showRealNames : true, prof.student_id || prof.id)}</div>
+                              <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prof.first_name} {maskLastName(prof.last_name, isTeacher ? showRealNames : true, prof.student_id || prof.id, prof.first_name)}</div>
                               
                               {/* Edit instrument role inline */}
                               {isEditing ? (
@@ -1015,7 +1015,7 @@ export function EnsembleDashboard({ user, schoolId, supabase }: EnsembleDashboar
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>
-                          <span>{prof.first_name} {maskLastName(prof.last_name, isTeacher ? showRealNames : true, prof.student_id || prof.id)}</span>
+                          <span>{prof.first_name} {maskLastName(prof.last_name, isTeacher ? showRealNames : true, prof.student_id || prof.id, prof.first_name)}</span>
                           <span>•</span>
                           <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>

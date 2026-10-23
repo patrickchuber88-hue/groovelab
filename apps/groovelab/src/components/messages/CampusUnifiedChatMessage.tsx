@@ -67,6 +67,7 @@ export interface CampusUnifiedChatMessageProps {
   replyCount?: number;
   onOpenTopicThread?: (topicId: string) => void;
   recipientIsOffDuty?: boolean;
+  isPrivacyMode?: boolean;
 }
 
 /**
@@ -92,7 +93,8 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
   appointmentContextLabel,
   replyCount,
   onOpenTopicThread,
-  recipientIsOffDuty = false
+  recipientIsOffDuty = false,
+  isPrivacyMode
 }) => {
   const isSelf = msg.sender_id === currentUserId;
   const isSys = isChatMessageSystem(msg);
@@ -175,8 +177,8 @@ export const CampusUnifiedChatMessage: React.FC<CampusUnifiedChatMessageProps> =
 
   // Resolved display name for sender
   const resolvedSenderName = isSenderTeacher
-    ? formatTeacherFullName(senderUser?.first_name || '', senderUser?.last_name || '') || formatStudentDisplayName(senderUser)
-    : formatStudentDisplayName(senderUser);
+    ? formatTeacherFullName(senderUser?.first_name || '', senderUser?.last_name || '') || formatStudentDisplayName(senderUser, isPrivacyMode)
+    : formatStudentDisplayName(senderUser, isPrivacyMode);
 
   // Content sanitization & fail-closed masking
   const rawContent = String(msg.content || '');

@@ -164,7 +164,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       const isStudent = selectedQRUser.role === 'student';
       const formattedStudentName = isStudent
         ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
-        : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`;
+        : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames, selectedQRUser.id, selectedQRUser.first_name)}`;
       const userRole = selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : (selectedQRUser.role === 'teacher' ? 'Lehrkraft' : 'Schüler'));
       const qrToken = selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '';
 

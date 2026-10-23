@@ -60,6 +60,36 @@ Jedes interaktive Element (Karten, Badges mit Klickfunktion, Modale) muss ohne M
 * Besitzt ein Element einen farbigen Hintergrund, ist ein Rand in einer abweichenden Farbe streng verboten (`border: 'none'` ist der Standard; homogene Tone-in-Tone Nuancen oder weiße/transluzente Lichtkanten sind zulässig).
 * Ghost-/Outline-Stil (weißer Hintergrund mit farbigem Rand) ist 100 % konform.
 
+### Säule 6: Dropdown & Popover Stacking Context Elevation & Interaction Hygiene (0,1% Goldstandard)
+* **Stacking-Context Isolation (W3C Compositing Spec)**: Elemente mit GPU-Transform (`.hover-scale` mit `transform: translateZ(0)`) erzeugen einen isolierten Stacking Context. Ein Kind-Dropdown kann diesen niemals verlassen. Daher MUSS die Host-Karte ihren Z-Index dynamisch anheben:
+  ```tsx
+  // Host-Karte / Zeile
+  <div style={{ position: 'relative', zIndex: isOpen ? 50 : 1 }} className="hover-scale">
+  ```
+* **Interaction Hygiene & Dismissibility**: Dropdowns müssen bei Klick außerhalb (`mousedown`) und Betätigen der `Escape`-Taste reaktionslos schließen:
+  ```tsx
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+  ```
+* **WAI-ARIA Blueprint**:
+  - Trigger-Button: `aria-haspopup="listbox"`, `aria-expanded={isOpen}`, rotierender Chevron (`transform: isOpen ? 'rotate(180deg)' : 'none'`).
+  - Menü: `role="listbox"`, `aria-label="..."`, `zIndex: 100` (bzw. `var(--z-dropdown-popover)`).
+  - Optionen: `role="option"`, `aria-selected={current === val}`.
+
 ---
 
 ## 2. Automatisierte Pre-Flight Checkliste (A11y)
@@ -70,3 +100,4 @@ Vor dem Freigeben einer UI-Komponente:
 - [ ] Weisen alle Textfarben auf farbigen KPI-Hintergründen mindestens 4,5:1 Kontrast auf?
 - [ ] Lässt sich das Desktop-Layout ohne horizontale Scrollbalken oder verschobene Grids bedienen?
 - [ ] Bleiben farbige Buttons strikt unifarben (kein Color-Clash zwischen Füllung und Rahmen)?
+- [ ] Heben Karten/Listenzeilen mit Dropdown ihren Stacking Context bei geöffnetem Zustand dynamisch an (`zIndex: isOpen ? 50 : 1`) und schließen bei Klick außerhalb / Escape?

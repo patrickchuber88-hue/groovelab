@@ -189,7 +189,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
 
               const studentName = n.student_name || (() => {
                 const student = allStudents.find(s => s.id === n.student_id);
-                return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : `Schüler: ${resolveUserCampusId({ id: n.student_id, role: 'student' })}`;
+                return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames, student.id, student.first_name)}`.trim() : `Schüler: ${resolveUserCampusId({ id: n.student_id, role: 'student' })}`;
               })();
 
               return (

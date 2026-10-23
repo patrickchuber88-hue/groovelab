@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building, Music, AlertCircle, Wrench, Clock, Trash2, ChevronDown, Check, Edit2, Users, Maximize2 } from 'lucide-react';
 
 export interface SecretaryRoomCardItemProps {
@@ -38,6 +38,28 @@ export function SecretaryRoomCardItem({
 }: SecretaryRoomCardItemProps) {
   const [showFloorDropdown, setShowFloorDropdown] = useState(false);
   const [isHoveringDetails, setIsHoveringDetails] = useState(false);
+  const floorDropdownRef = useRef<HTMLDivElement>(null);
+
+  // 0.1% Goldstandard: Interaction Hygiene & Dismissibility (Click-Outside & Escape-Key)
+  useEffect(() => {
+    if (!showFloorDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (floorDropdownRef.current && !floorDropdownRef.current.contains(e.target as Node)) {
+        setShowFloorDropdown(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowFloorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showFloorDropdown]);
 
   const initials = (room.name || 'RM')
     .split(' ')
@@ -86,7 +108,8 @@ export function SecretaryRoomCardItem({
         width: '100%',
         minHeight: '66px',
         boxSizing: 'border-box',
-        position: 'relative'
+        position: 'relative',
+        zIndex: showFloorDropdown ? 50 : 1
       }}
       className="hover-scale"
     >
@@ -185,9 +208,11 @@ export function SecretaryRoomCardItem({
           {/* Subline: Floor Quick-Select & Building */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
             {/* Interactive Floor Pill */}
-            <div style={{ position: 'relative' }}>
+            <div ref={floorDropdownRef} style={{ position: 'relative' }}>
               <button
                 type="button"
+                aria-haspopup="listbox"
+                aria-expanded={showFloorDropdown}
                 aria-label={`Stockwerk ändern (aktuell ${currentFloor})`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -199,7 +224,7 @@ export function SecretaryRoomCardItem({
                   gap: '4px',
                   padding: '3px 9px',
                   borderRadius: '7px',
-                  background: '#f1f5f9',
+                  background: showFloorDropdown ? '#e2e8f0' : '#f1f5f9',
                   border: 'none',
                   fontSize: '0.74rem',
                   fontWeight: 800,
@@ -210,11 +235,20 @@ export function SecretaryRoomCardItem({
                 className="hover-scale-mini"
               >
                 <span>{currentFloor}</span>
-                <ChevronDown size={11} style={{ color: '#64748b' }} />
+                <ChevronDown
+                  size={11}
+                  style={{
+                    color: '#64748b',
+                    transform: showFloorDropdown ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.15s ease'
+                  }}
+                />
               </button>
 
               {showFloorDropdown && (
                 <div
+                  role="listbox"
+                  aria-label={`Stockwerk für Raum ${room.name} auswählen`}
                   onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'absolute',
@@ -224,18 +258,20 @@ export function SecretaryRoomCardItem({
                     background: '#ffffff',
                     borderRadius: '12px',
                     border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.15)',
+                    boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 4px 10px -2px rgba(15, 23, 42, 0.08)',
                     padding: '4px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '2px',
                     zIndex: 100,
-                    minWidth: '110px'
+                    minWidth: '120px'
                   }}
                 >
                   {allFloorsList.map((fl) => (
                     <button
                       key={fl}
+                      role="option"
+                      aria-selected={currentFloor === fl}
                       type="button"
                       onClick={() => {
                         onChangeRoomFloor(room.id, fl);
@@ -253,7 +289,14 @@ export function SecretaryRoomCardItem({
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        textAlign: 'left'
+                        textAlign: 'left',
+                        transition: 'background 0.1s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentFloor !== fl) e.currentTarget.style.background = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentFloor !== fl) e.currentTarget.style.background = 'transparent';
                       }}
                     >
                       <span>{fl}</span>

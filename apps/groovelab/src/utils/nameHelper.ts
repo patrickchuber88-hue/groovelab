@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase as defaultSupabaseClient } from '../lib/supabase';
 
 // ─── Stable storage on `window` – survives Vite HMR module reloads ─────────
 // privacyMode = true  → last names masked (e.g. "M.")
@@ -10,20 +11,35 @@ declare global {
     __glPrivacySubs: Set<(mode: boolean) => void>;
     __glPrivacyTimer?: any;
     __glRevealedVaultCache?: Map<string, string>;
+    __glRevealedVaultSecondaryMap?: Map<string, string>;
     __glStepUpPin?: string;
     __glStepUpPinExpiresAt?: number;
+    __supabaseClient?: any;
   }
 }
 
 if (typeof window !== 'undefined') {
   if (window.__glPrivacyMode === undefined) {
     // Default: privacy ON (names masked like "Olivia W.").
-    // Persist user preference in localStorage.
-    const stored = localStorage.getItem('groovelab_name_privacy');
-    window.__glPrivacyMode = stored !== null ? stored === 'true' : true;
+    // For maximum fail-closed security, start with privacy mode active:
+    window.__glPrivacyMode = true;
+    localStorage.setItem('groovelab_name_privacy', 'true');
   }
   if (!window.__glPrivacySubs) window.__glPrivacySubs = new Set();
   if (!window.__glRevealedVaultCache) window.__glRevealedVaultCache = new Map();
+  if (!window.__glRevealedVaultSecondaryMap) window.__glRevealedVaultSecondaryMap = new Map();
+  if (!window.__supabaseClient && defaultSupabaseClient) {
+    window.__supabaseClient = defaultSupabaseClient;
+  }
+}
+
+/**
+ * Register the global Supabase client singleton for vault decryption.
+ */
+export function setGlobalVaultSupabaseClient(client: any): void {
+  if (typeof window !== 'undefined' && client) {
+    window.__supabaseClient = client;
+  }
 }
 
 function getMode(): boolean {
@@ -48,12 +64,18 @@ function setMode(value: boolean) {
       if (window.__glRevealedVaultCache) {
         window.__glRevealedVaultCache.clear();
       }
+      if (window.__glRevealedVaultSecondaryMap) {
+        window.__glRevealedVaultSecondaryMap.clear();
+      }
       clearStepUpPin();
     }, 60000);
   } else {
     // Privacy is ON: clear in-memory revealed plain text cache and clear transient Step-Up PIN
     if (window.__glRevealedVaultCache) {
       window.__glRevealedVaultCache.clear();
+    }
+    if (window.__glRevealedVaultSecondaryMap) {
+      window.__glRevealedVaultSecondaryMap.clear();
     }
     clearStepUpPin();
   }
@@ -152,11 +174,52 @@ export function toggleRealNamesWithStepUp(
 export function maskLastName(
   lastName: string | undefined | null,
   privacyMode: boolean = true,
-  fallbackId?: string | null
+  fallbackId?: string | null,
+  firstName?: string | null
 ): string {
   // 0,1% Goldstandard Vault Integration: Check in-memory revealed vault cache if privacyMode is false
-  if (privacyMode === false && fallbackId && typeof window !== 'undefined' && window.__glRevealedVaultCache?.has(fallbackId)) {
-    return window.__glRevealedVaultCache.get(fallbackId)!;
+  if (privacyMode === false && typeof window !== 'undefined') {
+    // 1. Direct UUID lookup (Highest precision)
+    if (fallbackId && window.__glRevealedVaultCache?.has(fallbackId)) {
+      return window.__glRevealedVaultCache.get(fallbackId)!;
+    }
+    // 2. Secondary lookup via "FirstName Initial."
+    if (firstName && lastName && window.__glRevealedVaultSecondaryMap) {
+      const cleanF = firstName.replace(/^Unterricht:\s*/i, '').trim();
+      const fWords = cleanF.split(/\s+/);
+      const cleanL = lastName.trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+      const init = cleanL.length > 0 ? cleanL[0].toUpperCase() : '';
+      
+      const secKey1 = `${cleanF.toLowerCase()} ${init}.`;
+      if (window.__glRevealedVaultSecondaryMap.has(secKey1)) {
+        return window.__glRevealedVaultSecondaryMap.get(secKey1)!;
+      }
+      if (fWords.length > 1) {
+        const secKey2 = `${fWords[0].toLowerCase()} ${init}.`;
+        if (window.__glRevealedVaultSecondaryMap.has(secKey2)) {
+          return window.__glRevealedVaultSecondaryMap.get(secKey2)!;
+        }
+      }
+      if (window.__glRevealedVaultSecondaryMap.has(cleanF.toLowerCase())) {
+        return window.__glRevealedVaultSecondaryMap.get(cleanF.toLowerCase())!;
+      }
+    }
+    // 3. Smart Initial lookup if fallbackId was omitted by legacy board callers
+    if (lastName && window.__glRevealedVaultCache && window.__glRevealedVaultCache.size > 0) {
+      const trimmed = lastName.trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+      if (trimmed.length > 0) {
+        const initLetter = trimmed.charAt(0).toUpperCase();
+        const matches: string[] = [];
+        for (const val of window.__glRevealedVaultCache.values()) {
+          if (val && val.toUpperCase().startsWith(initLetter)) {
+            if (!matches.includes(val)) matches.push(val);
+          }
+        }
+        if (matches.length === 1) {
+          return matches[0];
+        }
+      }
+    }
   }
 
   if (lastName && lastName.trim()) {
@@ -222,8 +285,24 @@ export function formatSingleStudentAnonymized(
   let lName = parts.slice(1).join(' ') || (lastName || '').trim();
 
   // 0,1% Goldstandard Vault Integration: Check in-memory revealed vault cache if privacyMode is false
-  if (privacyMode === false && fallbackId && typeof window !== 'undefined' && window.__glRevealedVaultCache?.has(fallbackId)) {
-    lName = window.__glRevealedVaultCache.get(fallbackId)!;
+  if (privacyMode === false) {
+    if (fallbackId && typeof window !== 'undefined' && window.__glRevealedVaultCache?.has(fallbackId)) {
+      lName = window.__glRevealedVaultCache.get(fallbackId)!;
+    } else if (typeof window !== 'undefined' && window.__glRevealedVaultSecondaryMap) {
+      const cleanF = fName.replace(/^Unterricht:\s*/i, '').trim();
+      const fWords = cleanF.split(/\s+/);
+      const cleanL = (lName || '').trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+      const init = cleanL.length > 0 ? cleanL[0].toUpperCase() : '';
+      
+      const secKey1 = `${cleanF.toLowerCase()} ${init}.`;
+      if (window.__glRevealedVaultSecondaryMap.has(secKey1)) {
+        lName = window.__glRevealedVaultSecondaryMap.get(secKey1)!;
+      } else if (fWords.length > 1 && window.__glRevealedVaultSecondaryMap.has(`${fWords[0].toLowerCase()} ${init}.`)) {
+        lName = window.__glRevealedVaultSecondaryMap.get(`${fWords[0].toLowerCase()} ${init}.`)!;
+      } else if (window.__glRevealedVaultSecondaryMap.has(cleanF.toLowerCase())) {
+        lName = window.__glRevealedVaultSecondaryMap.get(cleanF.toLowerCase())!;
+      }
+    }
   }
 
   let initial = '';
@@ -417,7 +496,7 @@ export async function revealStudentFullNameViaVault(
   const effectivePin = pin || getValidStepUpPin();
 
   try {
-    const client = supabaseClient || (window as any).__supabaseClient;
+    const client = supabaseClient || (typeof window !== 'undefined' && (window as any).__supabaseClient) || defaultSupabaseClient;
     if (!client) {
       return { success: false, error: 'NO_CLIENT' };
     }
@@ -443,8 +522,17 @@ export async function revealStudentFullNameViaVault(
       if (!window.__glRevealedVaultCache) {
         window.__glRevealedVaultCache = new Map();
       }
+      if (!window.__glRevealedVaultSecondaryMap) {
+        window.__glRevealedVaultSecondaryMap = new Map();
+      }
       if (data.last_name) {
         window.__glRevealedVaultCache.set(studentId, data.last_name);
+        if (data.first_name) {
+          const cleanL = data.last_name.trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+          const init = cleanL.length > 0 ? cleanL[0].toUpperCase() : '';
+          const secKey = `${data.first_name.trim().toLowerCase()} ${init}.`;
+          window.__glRevealedVaultSecondaryMap.set(secKey, data.last_name.trim());
+        }
       }
     }
 
@@ -473,7 +561,7 @@ export async function revealClassRosterNamesViaVault(
   const effectivePin = pin || getValidStepUpPin();
 
   try {
-    const client = supabaseClient || (window as any).__supabaseClient;
+    const client = supabaseClient || (typeof window !== 'undefined' && (window as any).__supabaseClient) || defaultSupabaseClient;
     if (!client) {
       return { success: false, error: 'NO_CLIENT' };
     }
@@ -498,10 +586,30 @@ export async function revealClassRosterNamesViaVault(
       if (!window.__glRevealedVaultCache) {
         window.__glRevealedVaultCache = new Map();
       }
+      if (!window.__glRevealedVaultSecondaryMap) {
+        window.__glRevealedVaultSecondaryMap = new Map();
+      }
       if (Array.isArray(data.students)) {
         data.students.forEach((st: any) => {
-          if (st.student_id && st.last_name) {
-            window.__glRevealedVaultCache!.set(st.student_id, st.last_name);
+          const sId = st.student_id || st.id;
+          if (sId && st.last_name) {
+            window.__glRevealedVaultCache!.set(sId, st.last_name);
+            if (st.id) window.__glRevealedVaultCache!.set(st.id, st.last_name);
+            if (st.student_id) window.__glRevealedVaultCache!.set(st.student_id, st.last_name);
+            if (st.first_name) {
+              const cleanF = st.first_name.replace(/^Unterricht:\s*/i, '').trim();
+              const fWords = cleanF.split(/\s+/);
+              const cleanL = st.last_name.trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+              const init = cleanL.length > 0 ? cleanL[0].toUpperCase() : '';
+              
+              window.__glRevealedVaultSecondaryMap!.set(`${cleanF.toLowerCase()} ${init}.`, st.last_name.trim());
+              if (fWords.length > 1) {
+                window.__glRevealedVaultSecondaryMap!.set(`${fWords[0].toLowerCase()} ${init}.`, st.last_name.trim());
+              }
+              if (!window.__glRevealedVaultSecondaryMap!.has(cleanF.toLowerCase())) {
+                window.__glRevealedVaultSecondaryMap!.set(cleanF.toLowerCase(), st.last_name.trim());
+              }
+            }
           }
         });
       }
@@ -520,8 +628,8 @@ export async function revealClassRosterNamesViaVault(
 
 /**
  * React hook – subscribe to privacy-mode changes.
- * Returns { visible: boolean, toggleVisibility: fn }
- * where `visible` = true means privacy is ON (names hidden).
+ * Returns { visible: boolean, isPrivacyMode: boolean, areRealNamesVisible: boolean, toggleVisibility: fn }
+ * where `visible` = true means privacy is ON (names hidden, for backward compatibility).
  */
 export function useRealNamesVisibility() {
   const [privacyMode, setPrivacyMode] = useState<boolean>(() => getMode());
@@ -540,21 +648,40 @@ export function useRealNamesVisibility() {
   const toggleVisibility = (forceValue?: boolean) => {
     const next = forceValue !== undefined ? forceValue : !getMode();
     if (next === false) {
-      // 🛡️ Fail-Closed Step-Up Guard: Einblenden erfordert zwingend aktive Step-Up PIN
-      if (isStepUpActive()) {
-        setMode(false);
-      } else {
-        triggerStepUpPinPrompt(() => {
+      // 🛡️ Fail-Closed Step-Up Guard: Einblenden (OWASP ASVS L3 / NIST SP 800-63B / BSI TR-02102-1)
+      // Das Einblenden der bürgerlichen Klarnamen erfordert platformweit zwingend eine aktive, verifizierte Step-Up PIN im RAM.
+      if (!isStepUpActive()) {
+        triggerStepUpPinPrompt(async () => {
           setMode(false);
+        });
+      } else {
+        revealClassRosterNamesViaVault(undefined, getValidStepUpPin()!).then((res) => {
+          if (res.success) {
+            setMode(false);
+          } else {
+            triggerStepUpPinPrompt(async () => {
+              setMode(false);
+            });
+          }
+        }).catch(() => {
+          triggerStepUpPinPrompt(() => {
+            setMode(false);
+          });
         });
       }
     } else {
       // Maskieren: Sofort sperren und flüchtige PIN bereinigen
       setMode(true);
+      clearStepUpPin();
     }
   };
 
-  return { visible: privacyMode, toggleVisibility };
+  return {
+    visible: privacyMode,
+    isPrivacyMode: privacyMode,
+    areRealNamesVisible: !privacyMode,
+    toggleVisibility
+  };
 }
 
 /**
@@ -697,6 +824,9 @@ export function formatTeacherFullName(
  */
 export function formatStudentDisplayName(u: any, privacyModeOverride?: boolean): string {
   if (!u) return '';
+  if (typeof u === 'string') {
+    return formatSingleStudentAnonymized(u, undefined, undefined, privacyModeOverride !== undefined ? privacyModeOverride : (typeof window !== 'undefined' ? (window.__glPrivacyMode ?? true) : true));
+  }
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
   const isTeacherRole = role === 'teacher' || roles.includes('teacher');
@@ -711,7 +841,7 @@ export function formatStudentDisplayName(u: any, privacyModeOverride?: boolean):
   }
 
   // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
-  if (role === 'student' || role === 'pupil') {
+  if (role === 'student' || role === 'pupil' || !role) {
     const isStudentViewer = typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'student';
     if (isStudentViewer) {
       return formatStudentPureFirstName(u.first_name);
@@ -719,11 +849,26 @@ export function formatStudentDisplayName(u: any, privacyModeOverride?: boolean):
     const privacy = privacyModeOverride !== undefined ? privacyModeOverride : (typeof window !== 'undefined' ? (window.__glPrivacyMode ?? true) : true);
 
     // If privacy is OFF and we have in-memory revealed vault cache for this student:
-    if (privacy === false && u.id && typeof window !== 'undefined' && window.__glRevealedVaultCache?.has(u.id)) {
-      return `${formatStudentPureFirstName(u.first_name)} ${window.__glRevealedVaultCache.get(u.id)}`.trim();
+    if (privacy === false && typeof window !== 'undefined') {
+      const sId = u.id || u.student_id || u.user_id;
+      if (sId && window.__glRevealedVaultCache?.has(sId)) {
+        return `${formatStudentPureFirstName(u.first_name)} ${window.__glRevealedVaultCache.get(sId)}`.trim();
+      }
+      if (window.__glRevealedVaultSecondaryMap && u.first_name) {
+        const cleanF = String(u.first_name).replace(/^Unterricht:\s*/i, '').trim().toLowerCase();
+        const cleanL = String(u.last_name || u.full_last_name || '').trim().replace(/^[^a-zA-ZäöüÄÖÜß]+/, '');
+        const init = cleanL.length > 0 ? cleanL[0].toUpperCase() : '';
+        const secKey = `${cleanF} ${init}.`;
+        if (window.__glRevealedVaultSecondaryMap.has(secKey)) {
+          return `${formatStudentPureFirstName(u.first_name)} ${window.__glRevealedVaultSecondaryMap.get(secKey)}`.trim();
+        }
+        if (window.__glRevealedVaultSecondaryMap.has(cleanF)) {
+          return `${formatStudentPureFirstName(u.first_name)} ${window.__glRevealedVaultSecondaryMap.get(cleanF)}`.trim();
+        }
+      }
     }
 
-    return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id, privacy);
+    return formatSingleStudentAnonymized(u.first_name, u.full_last_name || u.last_name, u.id || u.student_id || u.user_id, privacy);
   }
 
   if (u.first_name && (u.full_last_name || u.last_name)) {

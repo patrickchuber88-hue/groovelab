@@ -7635,8 +7635,8 @@ export function ScheduleCalendarViewDesktop({
                       const p1Ln = p1Tokens.slice(1).join(' ');
                       const p2Fn = p2Tokens[0] || 'Schüler 2';
                       const p2Ln = p2Tokens.slice(1).join(' ');
-                      const p1Formatted = `${p1Fn} ${maskLastName(p1Ln, showRealNames)}`.trim();
-                      const p2Formatted = `${p2Fn} ${maskLastName(p2Ln, showRealNames)}`.trim();
+                      const p1Formatted = `${p1Fn} ${maskLastName(p1Ln, showRealNames, null, p1Fn)}`.trim();
+                      const p2Formatted = `${p2Fn} ${maskLastName(p2Ln, showRealNames, null, p2Fn)}`.trim();
                       if (parts.length > 2) {
                         return `${p1Formatted} & ${parts.length - 1} weitere`;
                       }
@@ -7645,7 +7645,7 @@ export function ScheduleCalendarViewDesktop({
                     const tokens = rawGroupText.split(/\s+/).filter(Boolean);
                     const singleFn = tokens[0] || 'Schüler';
                     const singleLn = tokens.slice(1).join(' ');
-                    return `${singleFn} ${maskLastName(singleLn, showRealNames)}`.trim();
+                    return `${singleFn} ${maskLastName(singleLn, showRealNames, occ.student_id, singleFn)}`.trim();
                   };
 
                   // 🏛️ Tier-1 Enterprise Group Member Aggregation & Reconciliation Engine
@@ -7740,12 +7740,12 @@ export function ScheduleCalendarViewDesktop({
 
                   const displayNames = isGroup 
                     ? (groupMembersList.length > 0
-                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames)}`.trim()).filter(Boolean).join(' & ')
+                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames, m.id, m.first_name)}`.trim()).filter(Boolean).join(' & ')
                         : sanitizeFormattedGroupNames(occ.name || occ.student_name || 'Gruppe'))
                     : (occ.student_id === 'vacant' 
                         ? 'Freier Platz' 
                         : (() => {
-                            const singleFormatted = `${resolvedFn} ${maskLastName(resolvedLn, showRealNames)}`.trim();
+                            const singleFormatted = `${resolvedFn} ${maskLastName(resolvedLn, showRealNames, occ.student_id, resolvedFn)}`.trim();
                             if (singleFormatted) return singleFormatted;
                             if (occ.name) return occ.name;
                             if (occ.student_name) return occ.student_name;
@@ -7754,7 +7754,7 @@ export function ScheduleCalendarViewDesktop({
 
                   const groupTooltipText = isGroup
                     ? (groupMembersList.length > 0
-                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames)}`.trim()).filter(Boolean).join('\n')
+                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames, m.id, m.first_name)}`.trim()).filter(Boolean).join('\n')
                         : displayNames)
                     : (isBreak ? undefined : displayNames);
 
@@ -8010,7 +8010,7 @@ export function ScheduleCalendarViewDesktop({
                             }
                             if (!swapSourceOcc) {
                               setSwapSourceOcc(occ);
-                              const name = `${occ.student?.first_name || 'Schüler'} ${maskLastName(occ.student?.last_name || '', showRealNames)}`.trim();
+                              const name = `${occ.student?.first_name || 'Schüler'} ${maskLastName(occ.student?.last_name || '', showRealNames, occ.student?.id || occ.student_id, occ.student?.first_name)}`.trim();
                               showActionToast(`${name} als 1. Termin gewählt. Klicke nun Termin 2 an (auch in Folgewochen).`);
                               return;
                             }
@@ -9332,7 +9332,7 @@ return (
         const isMoved = occ?.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time);
         const isCancelled = occ?.status && ['cancelled', 'canceled_by_student'].includes(occ.status);
         const canDiscard = isMoved || isCancelled;
-        const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() : 'Schüler';
+        const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames, occ.student?.id || occ.student_id, occ.student?.first_name)}`.trim() : 'Schüler';
         const isPastDate = editOccState?.date ? new Date(editOccState.date) < new Date(new Date().setHours(0,0,0,0)) : false;
         
         const isModalBreak = occ ? isBreakOccurrence(occ) : false;
@@ -9340,7 +9340,7 @@ return (
           ? 'Pause bearbeiten'
           : (occ?.student_id 
               ? (isGruppenunterrichtOcc 
-                  ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames)}`.trim()).join(' & ')
+                  ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames, go.student?.id || go.id, go.student?.first_name)}`.trim()).join(' & ')
                   : isEnsembleOcc 
                     ? 'Ensemble/Band Termin' 
                     : `Termin bearbeiten: ${studentName}`
@@ -9655,7 +9655,7 @@ return (
                           </div>
                           <div>
                             <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
-                              {occ.student.first_name} {maskLastName(occ.student.last_name, showRealNames)}
+                              {occ.student.first_name} {maskLastName(occ.student.last_name, showRealNames, occ.student.id, occ.student.first_name)}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                               <span style={{
@@ -9707,7 +9707,7 @@ return (
                             return (
                               <div key={go.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: '10px', background: itemBg, border: itemBorder }}>
                                 <span style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, textDecoration: 'none' }}>
-                                  {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
+                                  {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames, go.student?.id, go.student?.first_name)}
                                 </span>
                                 {!isGoCancelled && !isGoAbsent && (
                                   <button
@@ -9807,7 +9807,7 @@ return (
                     </div>
 
                     {/* Room Selection Dropdown */}
-                    <div style={{ marginBottom: '16px', position: 'relative' }}>
+                    <div style={{ marginBottom: '16px', position: 'relative', zIndex: roomDropdownOpen ? 30 : 1 }}>
                       <label style={{ display: 'block', fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Freie Räume</label>
                       <button
                         type="button"
@@ -9980,7 +9980,7 @@ return (
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  const sName = occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Schüler';
+                                  const sName = occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames, occ.student.id, occ.student.first_name)}`.trim() : 'Schüler';
                                   if (await showConfirm(`Möchtest du ${sName} für diesen Termin als abwesend markieren?`)) {
                                     updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schüler]' }, `${sName} als abwesend markiert`);
                                     setEditOccState(null);
@@ -10561,8 +10561,8 @@ return (
         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
         const primaryColor = isCampusTheme ? '#34a853' : '#007aff';
         
-        const srcName = `${sourceOcc.student?.first_name || ''} ${maskLastName(sourceOcc.student?.last_name, showRealNames)}`.trim() || 'Schüler';
-        const tgtName = `${targetOcc.student?.first_name || ''} ${maskLastName(targetOcc.student?.last_name, showRealNames)}`.trim() || 'Schüler';
+        const srcName = `${sourceOcc.student?.first_name || ''} ${maskLastName(sourceOcc.student?.last_name, showRealNames, sourceOcc.student?.id, sourceOcc.student?.first_name)}`.trim() || 'Schüler';
+        const tgtName = `${targetOcc.student?.first_name || ''} ${maskLastName(targetOcc.student?.last_name, showRealNames, targetOcc.student?.id, targetOcc.student?.first_name)}`.trim() || 'Schüler';
 
         return (
           <div
@@ -10734,7 +10734,7 @@ return (
       {/* Swap Detail Modal */}
       {swapDetailModalOcc && (() => {
         const occ = swapDetailModalOcc;
-        const s1Name = `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name || '', showRealNames)}`.trim() || 'Schüler';
+        const s1Name = `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name || '', showRealNames, occ.student?.id || occ.student_id, occ.student?.first_name)}`.trim() || 'Schüler';
         const s1Instrument = occ.student?.instrument || (occ as any).instrument || '';
         
         // Find partner information
@@ -10756,7 +10756,7 @@ return (
         }
 
         let partnerName = partnerOcc 
-          ? `${partnerOcc.student?.first_name || ''} ${maskLastName(partnerOcc.student?.last_name || '', showRealNames)}`.trim() 
+          ? `${partnerOcc.student?.first_name || ''} ${maskLastName(partnerOcc.student?.last_name || '', showRealNames, partnerOcc.student?.id || partnerOcc.student_id, partnerOcc.student?.first_name)}`.trim() 
           : '';
         if (!partnerName && occ.notes) {
           const match = occ.notes.match(/Getauscht mit (.+)/i);

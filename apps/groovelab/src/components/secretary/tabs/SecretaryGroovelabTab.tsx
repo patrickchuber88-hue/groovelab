@@ -733,7 +733,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                         ) : (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {activeCoachesForLayout.filter(Boolean).map((c, idx) => {
-                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name, showRealNames)}` : 'Coach';
+                              const coachName = c.users ? `${c.users.first_name} ${maskLastName(c.users.last_name, showRealNames, c.users.id, c.users.first_name)}` : 'Coach';
                               return (
                                 <div
                                   key={c.id || idx}

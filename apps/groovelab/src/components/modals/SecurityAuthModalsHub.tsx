@@ -320,10 +320,14 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
         title="Klarnamen freischalten"
         description="Bitte bestätige deine persönliche 4-stellige PIN, um die bürgerlichen Klarnamen für 60 Sekunden freizugeben."
         onSuccess={async (enteredPin) => {
-          if (!user?.id) return false;
+          const effectiveUserId = user?.id || (typeof localStorage !== 'undefined' ? (localStorage.getItem('groovelab_user_id') || localStorage.getItem('gl_active_session_lease_user_id')) : null);
+          if (!effectiveUserId) return false;
           try {
-            const { data: isValid, error } = await supabase.rpc('verify_personal_pin', {
-              user_uuid: user.id,
+            const client = supabase || (typeof window !== 'undefined' && (window as any).__supabaseClient);
+            if (!client) return false;
+
+            const { data: isValid, error } = await client.rpc('verify_personal_pin', {
+              user_uuid: effectiveUserId,
               input_pin: enteredPin
             });
 
@@ -335,7 +339,10 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
             setStepUpPin(enteredPin);
 
             // 🛡️ 0,1% Goldstandard: Batch-Entschlüsselung für 60s Auto-Curtain
-            await revealClassRosterNamesViaVault(undefined, enteredPin, supabase);
+            const res = await revealClassRosterNamesViaVault(undefined, enteredPin, client);
+            if (!res.success) {
+              return false;
+            }
 
             if (pendingStepUpCallbackRef.current) {
               pendingStepUpCallbackRef.current();
