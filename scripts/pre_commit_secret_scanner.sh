@@ -70,8 +70,8 @@ ADD[[:space:]]+COLUMN.*(password|passwort).*DEFAULT[[:space:]]+['"][^'"]+['"]
 master_admin_password[[:space:]]*=[[:space:]]*['"][^'"]+['"]
 PATTERNS_EOF
 
-# Schneller Batch-Scan mit xargs und grep -E -f (vermeidet tausende Child-Prozesse)
-RAW_MATCHES=$(echo "$FILES" | tr '\n' '\0' | xargs -0 grep -nE -f "$TMP_PATTERNS" 2>/dev/null || true)
+# Schneller Batch-Scan mit xargs und grep -E -f (vermeidet tausende Child-Prozesse, -I ignoriert Binärdateien)
+RAW_MATCHES=$(echo "$FILES" | tr '\n' '\0' | xargs -0 grep -I -nE -f "$TMP_PATTERNS" 2>/dev/null || true)
 
 if [ -n "$RAW_MATCHES" ]; then
     while IFS= read -r line; do

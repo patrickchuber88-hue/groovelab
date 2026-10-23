@@ -152,8 +152,9 @@ async function main() {
     } else {
       failedCount++;
       process.stderr.write(`  ❌ [FAIL] ${res.name.padEnd(54)} (${res.durationMs}ms)\n`);
-      if (res.stderr) {
-        const errorLines = res.stderr.trim().split('\n').slice(-4);
+      const errOutput = (res.stderr && res.stderr.trim().length > 0) ? res.stderr.trim() : (res.stdout ? res.stdout.trim() : '');
+      if (errOutput) {
+        const errorLines = errOutput.split('\n').slice(-10);
         process.stderr.write(`            ↳ ${errorLines.join('\n            ↳ ')}\n`);
       }
     }
