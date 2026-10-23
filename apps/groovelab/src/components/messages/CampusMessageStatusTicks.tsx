@@ -35,15 +35,16 @@ export const CampusMessageStatusTicks: React.FC<CampusMessageStatusTicksProps> =
 }) => {
   if (!isSelf) return null;
 
-  // 1. Pending / Sending State
-  if (status === 'sending') {
+  // 1. Pending / Sending / Offline State
+  if (status === 'sending' || status === 'pending_offline') {
+    const isOffline = status === 'pending_offline';
     return (
       <span 
-        title="Wird gesendet..." 
-        aria-label="Wird gesendet" 
+        title={isOffline ? "Wartet auf Verbindung... (wird automatisch im Hintergrund gesendet)" : "Wird gesendet..."} 
+        aria-label={isOffline ? "Wartet auf Verbindung" : "Wird gesendet"} 
         style={{ display: 'inline-flex', alignItems: 'center' }}
       >
-        <Clock size={size - 2} color="rgba(255, 255, 255, 0.65)" />
+        <Clock size={size - 2} color={isOffline ? "#f59e0b" : "rgba(255, 255, 255, 0.65)"} />
       </span>
     );
   }

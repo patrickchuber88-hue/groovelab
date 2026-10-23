@@ -19,6 +19,7 @@ export interface ChatRespectValidationResult {
   category?: 'extremism' | 'insult' | 'harassment' | 'threat' | 'health_data';
   reason?: string;
   isCrisis?: boolean;
+  suggestedNeutralText?: string;
 }
 
 export interface CrisisSupportInfo {
@@ -152,7 +153,10 @@ function normalizeForGuard(text: string): string {
  * Validiert eine Chat-Nachricht gegen die 4 No-Bullying-Kategorien
  * unter absolutem Schutz der musikpädagogischen Whitelist.
  */
-export function validateChatMessageContent(content: string | null | undefined): ChatRespectValidationResult {
+export function validateChatMessageContent(
+  content: string | null | undefined,
+  options?: { senderRole?: string }
+): ChatRespectValidationResult {
   if (!content) {
     return { isValid: true };
   }
@@ -200,14 +204,15 @@ export function validateChatMessageContent(content: string | null | undefined): 
   }
 
   // 2. 🛡️ DSGVO Art. 9 / BDSG § 26 Schutz vor unbewusster Speicherung von Gesundheits- & Diagnosedaten
-  const healthCheck = detectHealthDataTerms(rawTrimmed);
+  const healthCheck = detectHealthDataTerms(rawTrimmed, options);
   if (healthCheck.hasHealthData) {
     return {
       isValid: false,
       matchedTerm: healthCheck.matchedTerm,
       category: 'health_data',
-      reason: `Datenschutz-Schutzschild (Art. 9 DSGVO): Die Nachricht enthält medizinische Signalwörter ('${healthCheck.matchedTerm}'). Bitte erfassen Sie Absagen neutral und vermeiden Sie Diagnosedaten im Chat.`,
-      isCrisis: false
+      reason: `Datenschutz-Schutzschild (Art. 9 DSGVO): Die Nachricht enthält medizinische Diagnosedaten oder Signalwörter ('${healthCheck.matchedTerm}'). Im Schul-Chat dürfen keine Diagnosen übermittelt werden.`,
+      isCrisis: false,
+      suggestedNeutralText: healthCheck.suggestedNeutralText
     };
   }
 

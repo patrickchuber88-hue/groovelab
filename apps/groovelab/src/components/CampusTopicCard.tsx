@@ -40,6 +40,7 @@ export interface CampusTopicCardProps {
   isMobile: boolean;
   isUnread?: boolean;
   autoFocusReply?: boolean;
+  onTogglePermanent?: (topicId: string, isPermanent: boolean) => Promise<void>;
 }
 
 export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
@@ -56,7 +57,8 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
   findUserById,
   isMobile,
   isUnread = false,
-  autoFocusReply = false
+  autoFocusReply = false,
+  onTogglePermanent
 }) => {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -266,8 +268,8 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
         </div>
       </div>
 
-      {/* TOPIC TITLE / BETREFF (Mandatory for Threads) */}
-      <div style={{ marginBottom: '6px' }}>
+      {/* TOPIC TITLE / BETREFF (Mandatory for Threads) & ⭐ DAUERHAFT TOGGLE */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
         <h3
           id={`topic-title-${topic.id}`}
           style={{
@@ -276,11 +278,43 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
             fontWeight: 900,
             color: '#0f172a',
             lineHeight: 1.3,
-            wordBreak: 'break-word'
+            wordBreak: 'break-word',
+            flex: 1
           }}
         >
           {extractedSubject}
         </h3>
+
+        {/* ⭐ 0.1% Goldstandard: Dauerhaft-Chip für zeitlose Themen */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onTogglePermanent) {
+              onTogglePermanent(topic.id, !topic.is_permanent);
+            }
+          }}
+          title={topic.is_permanent ? 'Dauerhaft aktiv: Bleibt über das Schuljahr hinaus erhalten' : 'Tippen, um dieses Thema über den Schuljahreswechsel dauerhaft zu behalten'}
+          aria-label={topic.is_permanent ? 'Thema ist dauerhaft aktiv' : 'Thema als dauerhaft markieren'}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            padding: '2px 8px',
+            borderRadius: '100px',
+            border: topic.is_permanent ? '1px solid #fde68a' : '1px solid #e2e8f0',
+            background: topic.is_permanent ? '#fef3c7' : '#f8fafc',
+            color: topic.is_permanent ? '#92400e' : '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            flexShrink: 0
+          }}
+        >
+          <span>⭐</span>
+          <span>{topic.is_permanent ? 'Dauerhaft' : 'Dauerhaft?'}</span>
+        </button>
       </div>
 
       {/* TOPIC CONTENT (only rendered if non-empty and not identical to subject) */}

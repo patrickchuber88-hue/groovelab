@@ -27,7 +27,8 @@ const IGNORED_PATHS = [
   'scripts/verify_neutral_ausfall_invariants.mjs',
   'forensic_ux_process_audit.md',
   'implementation_plan.md',
-  'apps/groovelab/src/utils/medicalTermGuard.ts'
+  'apps/groovelab/src/utils/medicalTermGuard.ts',
+  'apps/groovelab/src/tests/test_medical_term_guard_forensic.ts'
 ];
 
 let violationsCount = 0;

@@ -148,6 +148,20 @@ function testStudentMinorProtection() {
     '1.6 Kinderschutz § 8a SGB VIII / DSA Art. 16: Schimpfwörter werden gefiltert, Fagott-Regel schützt Musikbegriffe, Notruf 116 111 greift'
   );
 
+  // 1.6b DSGVO Art. 9 Abs. 1 Health-Data & Diagnosis Shield (0,1% Goldstandard)
+  const oncologyCheck = validateChatMessageContent('ich habe eine Krebserkrankung und kann nicht unterrichten', { senderRole: 'teacher' });
+  const statusCheck = validateChatMessageContent('ich bin krank', { senderRole: 'teacher' });
+  const lampenfieberCheck = validateChatMessageContent('Ich habe großes Lampenfieber vor dem Auftritt', { senderRole: 'student' });
+  assert(
+    !oncologyCheck.isValid &&
+    oncologyCheck.category === 'health_data' &&
+    Boolean(oncologyCheck.suggestedNeutralText) &&
+    statusCheck.isValid &&
+    lampenfieberCheck.isValid,
+    'Rolle 1 (Schüler)',
+    '1.6b DSGVO Art. 9 Abs. 1 Health-Shield: Krebserkrankung blockiert, "krank" erlaubt, Lampenfieber geschützt'
+  );
+
   // 1.7 ISO/IEC 27001 Annex A.8.28 Zero-Client-Secrets in Browser Storage
   const authFiles = [
     path.join(SRC_DIR, 'hooks', 'useAuthSessionActions.ts'),

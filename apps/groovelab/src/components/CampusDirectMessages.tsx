@@ -22,6 +22,8 @@ import { primeDecryptedCache } from '../lib/security/messageCrypto';
 import { extractOccurrenceDateFromMessage, parseLocalDate } from './messages/CompactAppointmentEventCard';
 import { ContextualAppointmentBanner } from './messages/ContextualAppointmentBanner';
 import { CampusUnifiedChatMessage } from './messages/CampusUnifiedChatMessage';
+import { CampusChatRespectWarningBanner } from './messages/CampusChatRespectWarningBanner';
+import { CampusChatSearchToggle, CampusChatSearchInputBar, CampusChatLoadOlderButton } from './messages/CampusChatSearchControls';
 import { playChatMessageSentSound, triggerChatHapticFeedback } from '../utils/chatSoundAndHaptics';
 import { getLocalGroupsCache, setLocalGroupsCache, getLocalChannelsCache, setLocalChannelsCache, getLocalTeachersCache, setLocalTeachersCache, ensureActiveSessionLease } from '../hooks/useCampusMessagingData';
 import { useMessageReadObserver } from '../hooks/useMessageReadObserver';
@@ -428,6 +430,22 @@ export function CampusDirectMessages({
   const [messageReactions, setMessageReactions] = useState<CampusTopicReaction[]>([]);
   const [reportingMessage, setReportingMessage] = useState<any | null>(null);
   const [reportToast, setReportToast] = useState<string | null>(null);
+
+  // ⚡ 0.1% Goldstandard: Reduziertes Laden, In-Chat-Suche & ⭐ Dauerhaft
+  const [visibleMessageLimit, setVisibleMessageLimit] = useState(50);
+  const [inChatSearchQuery, setInChatSearchQuery] = useState('');
+  const [isChatSearchOpen, setIsChatSearchOpen] = useState(false);
+
+  const handleTogglePermanentTopic = async (topicId: string, isPermanent: boolean) => {
+    try {
+      await supabase.from('campus_direct_messages').update({ is_permanent: isPermanent }).eq('id', topicId);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('groovelab_topic_permanent_toggled', { detail: { topicId, isPermanent } }));
+      }
+    } catch (err) {
+      console.error('[CampusDirectMessages] Fehler beim Umschalten des Dauerhaft-Status:', err);
+    }
+  };
 
   const handleInitiateReport = (msg: any) => {
     const lastReportKey = `cgl_last_report_${selectedRecipient?.id || 'general'}`;
@@ -1471,7 +1489,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       ? (activeChannelId || groupChannels.find(c => c.is_default)?.id || groupChannels[0]?.id)
       : undefined;
 
-    const validation = validateChatMessageContent(`${cleanSub} ${cleanBody}`);
+    const validation = validateChatMessageContent(`${cleanSub} ${cleanBody}`, { senderRole: isTeacherOrStaff ? 'teacher' : 'student' });
     if (!validation.isValid) {
       setRespectWarning(validation);
       return;
@@ -1514,7 +1532,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     const isGroup = Boolean(selectedRecipient.is_group);
     if (isGroup && !activeChannelId) return;
 
-    const validation = validateChatMessageContent(content);
+    const validation = validateChatMessageContent(content, { senderRole: isTeacherOrStaff ? 'teacher' : 'student' });
     if (!validation.isValid) {
       setRespectWarning(validation);
       return;
@@ -2572,6 +2590,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       lastRecipientIdRef.current = selectedRecipient.id;
       lastChannelIdRef.current = activeChannelId;
       lastSubTabRef.current = activeSubTab;
+      setVisibleMessageLimit(50);
+      setInChatSearchQuery('');
+      setIsChatSearchOpen(false);
     }
 
     if (isUserScrolledUpRef.current) return;
@@ -2766,7 +2787,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       return false;
     }
 
-    const validation = validateChatMessageContent(content);
+    const validation = validateChatMessageContent(content, { senderRole: isTeacherOrStaff ? 'teacher' : 'student' });
     if (!validation.isValid) {
       setRespectWarning(validation);
       return false;
@@ -2867,7 +2888,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
     
     const messageText = typedMessage.trim();
-    const validation = validateChatMessageContent(messageText);
+    const validation = validateChatMessageContent(messageText, { senderRole: isTeacherOrStaff ? 'teacher' : 'student' });
     if (!validation.isValid) {
       setRespectWarning(validation);
       return;
@@ -3738,8 +3759,24 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   <ShieldCheck size={isMobile ? 16 : 14} color="#ffffff" />
                   {!isMobile && <span>DSGVO-konform</span>}
                 </span>
+
+                {/* 🔍 In-Chat Sofort-Suche Toggle */}
+                <CampusChatSearchToggle
+                  isOpen={isChatSearchOpen}
+                  onToggle={() => setIsChatSearchOpen(prev => !prev)}
+                  isMobile={isMobile}
+                />
               </div>
             </div>
+
+            {/* 🔍 Ausklappbares In-Chat Suchfeld */}
+            {isChatSearchOpen && (
+              <CampusChatSearchInputBar
+                query={inChatSearchQuery}
+                onChange={setInChatSearchQuery}
+                onClear={() => setInChatSearchQuery('')}
+              />
+            )}
 
             {/* 💬 Teams-Style Channel Tab Bar (Only for Group Chats) */}
             {selectedRecipient.is_group && (
@@ -4367,6 +4404,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         isMobile={isMobile}
                         isUnread={isUnread}
                         autoFocusReply={Boolean(focusedTopicId && topic.id === focusedTopicId)}
+                        onTogglePermanent={handleTogglePermanentTopic}
                       />
                     );
                   });
@@ -4390,7 +4428,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   </div>
                 );
 
-                if (displayedMessages.length === 0) {
+                // ⚡ 0.1% Goldstandard: In-Chat Suche & Reduziertes Paging
+                const searchTrimmed = inChatSearchQuery.trim().toLowerCase();
+                const filteredForSearch = searchTrimmed
+                  ? displayedMessages.filter(m => String(m.content || '').toLowerCase().includes(searchTrimmed))
+                  : displayedMessages;
+
+                const visibleList = searchTrimmed
+                  ? filteredForSearch
+                  : filteredForSearch.slice(-visibleMessageLimit);
+
+                if (visibleList.length === 0) {
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '30px 20px', textAlign: 'center' }}>
                       {pedagogicalTrustBanner}
@@ -4398,61 +4446,73 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                         <MessageSquare size={30} strokeWidth={2} />
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                        {selectedRecipient?.is_group ? `Noch keine Nachrichten in „${selectedRecipient.name}“` : `Noch keine Nachrichten mit ${formatStudentDisplayName(selectedRecipient)}`}
+                        {searchTrimmed ? `Keine Treffer für „${inChatSearchQuery}“` : (selectedRecipient?.is_group ? `Noch keine Nachrichten in „${selectedRecipient.name}“` : `Noch keine Nachrichten mit ${formatStudentDisplayName(selectedRecipient)}`)}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
-                        {selectedRecipient?.is_group ? 'Beginne den Austausch mit dieser Gruppe!' : 'Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!'}
+                        {searchTrimmed ? 'Versuche einen anderen Suchbegriff oder leere das Suchfeld.' : (selectedRecipient?.is_group ? 'Beginne den Austausch mit dieser Gruppe!' : 'Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!')}
                       </div>
                     </div>
                   );
                 }
 
-                return displayedMessages.map((msg, idx) => {
-                  const prevMsg = idx > 0 ? displayedMessages[idx - 1] : null;
-                  const effectiveUserId = currentUserId || user?.id;
-                  const senderUser = selectedRecipient?.is_group
-                    ? (allKnownUsersMap.get(msg.sender_id) || { id: msg.sender_id, first_name: 'Mitglied', last_name: '', role: 'student' })
-                    : selectedRecipient;
+                return (
+                  <>
+                    {/* ⚡ Ältere Nachrichten laden (Paginierung) */}
+                    {!searchTrimmed && (
+                      <CampusChatLoadOlderButton
+                        totalMessages={displayedMessages.length}
+                        currentLimit={visibleMessageLimit}
+                        onLoadMore={() => setVisibleMessageLimit(prev => prev + 50)}
+                      />
+                    )}
+                    {visibleList.map((msg, idx) => {
+                      const prevMsg = idx > 0 ? visibleList[idx - 1] : null;
+                      const effectiveUserId = currentUserId || user?.id;
+                      const senderUser = selectedRecipient?.is_group
+                        ? (allKnownUsersMap.get(msg.sender_id) || { id: msg.sender_id, first_name: 'Mitglied', last_name: '', role: 'student' })
+                        : selectedRecipient;
 
-                  const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
-                  const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
-                  const isSuperseded = Boolean(laterSysMsg);
+                      const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
+                      const laterSysMsg = visibleList.slice(idx + 1).find(m => isSystemMessage(m));
+                      const isSuperseded = Boolean(laterSysMsg);
 
-                  // Find matching occurrence even in 'all' view
-                  const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
-                    (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
-                    (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
-                  );
+                      // Find matching occurrence even in 'all' view
+                      const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
+                        (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
+                        (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
+                      );
 
-                  const occContext = (activeSubTab === 'all' || activeSubTab === 'general') ? getMessageOccurrenceContext(msg) : null;
+                      const occContext = (activeSubTab === 'all' || activeSubTab === 'general') ? getMessageOccurrenceContext(msg) : null;
 
-                  return (
-                    <CampusUnifiedChatMessage
-                      key={msg.id || `msg-${idx}`}
-                      msg={msg}
-                      prevMsg={prevMsg}
-                      currentUserId={effectiveUserId}
-                      currentUserRole={user?.role}
-                      senderUser={senderUser}
-                      isGroup={Boolean(selectedRecipient?.is_group)}
-                      isMobile={isMobile}
-                      onSendMessage={onSendMessage}
-                      onNavigateToSchedule={onNavigateToSchedule}
-                      onInitiateReport={handleInitiateReport}
-                      customGradient={studentRosterColorMap.get(senderUser?.id || msg.sender_id)}
-                      pedagogicalBanner={idx === 0 ? pedagogicalTrustBanner : undefined}
-                      currentOcc={matchedOcc}
-                      isSuperseded={isSuperseded}
-                      appointmentContextLabel={occContext?.label}
-                      replyCount={topicRepliesCountMap.get(msg.id) || 0}
-                      recipientIsOffDuty={Boolean(isRecipientInQuietHours && (isStudent || !isTeacherOrStaff))}
-                      onOpenTopicThread={(topicId) => {
-                        setOneOnOneMode('threads');
-                        setFocusedTopicId(topicId);
-                      }}
-                    />
-                  );
-                });
+                      return (
+                        <CampusUnifiedChatMessage
+                          key={msg.id || `msg-${idx}`}
+                          msg={msg}
+                          prevMsg={prevMsg}
+                          currentUserId={effectiveUserId}
+                          currentUserRole={user?.role}
+                          senderUser={senderUser}
+                          isGroup={Boolean(selectedRecipient?.is_group)}
+                          isMobile={isMobile}
+                          onSendMessage={onSendMessage}
+                          onNavigateToSchedule={onNavigateToSchedule}
+                          onInitiateReport={handleInitiateReport}
+                          customGradient={studentRosterColorMap.get(senderUser?.id || msg.sender_id)}
+                          pedagogicalBanner={idx === 0 ? pedagogicalTrustBanner : undefined}
+                          currentOcc={matchedOcc}
+                          isSuperseded={isSuperseded}
+                          appointmentContextLabel={occContext?.label}
+                          replyCount={topicRepliesCountMap.get(msg.id) || 0}
+                          recipientIsOffDuty={Boolean(isRecipientInQuietHours && (isStudent || !isTeacherOrStaff))}
+                          onOpenTopicThread={(topicId) => {
+                            setOneOnOneMode('threads');
+                            setFocusedTopicId(topicId);
+                          }}
+                        />
+                      );
+                    })}
+                  </>
+                );
               })()}
               <div ref={messagesEndRef} />
             </div>
@@ -4706,81 +4766,14 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
                 {/* 🚨 Pre-Flight Respect Guard Warning & Crisis Intervention Card */}
                 {respectWarning && (
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px',
-                    background: respectWarning.isCrisis ? '#fee2e2' : '#fef9c3',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '10px 14px',
-                    marginBottom: '8px',
-                    width: '100%',
-                    boxSizing: 'border-box'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: respectWarning.isCrisis ? '#991b1b' : '#92400e', fontWeight: 800, fontSize: '0.80rem' }}>
-                      <AlertTriangle size={16} color={respectWarning.isCrisis ? '#dc2626' : '#d97706'} style={{ flexShrink: 0 }} />
-                      <span>{respectWarning.isCrisis ? 'Wichtiger Hinweis & Hilfeangebot' : 'Respektvoller Umgang im Schul-Chat'}</span>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: respectWarning.isCrisis ? '#7f1d1d' : '#78350f', lineHeight: 1.4, fontWeight: 550 }}>
-                      {respectWarning.reason}
-                    </div>
-                    {respectWarning.isCrisis && (
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px',
-                        marginTop: '4px'
-                      }}>
-                        <div style={{
-                          background: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '6px 10px',
-                          fontSize: '0.72rem',
-                          color: '#991b1b',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '6px'
-                        }}>
-                          <span>Nummer gegen Kummer (Kinder/Jugend):</span>
-                          <a href="tel:116111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
-                            <span>116 111</span>
-                          </a>
-                        </div>
-                        <div style={{
-                          background: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '6px 10px',
-                          fontSize: '0.72rem',
-                          color: '#991b1b',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '6px'
-                        }}>
-                          <span>Telefonseelsorge & Notfall:</span>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                            <a href="tel:08001110111" style={{ color: '#b91c1c', textDecoration: 'underline', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              <Phone size={12} color="#dc2626" style={{ flexShrink: 0 }} />
-                              <span>0800 111 0 111</span>
-                            </a>
-                            <span style={{ color: '#fca5a5' }}>•</span>
-                            <a href="tel:112" style={{ color: '#991b1b', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px', textDecoration: 'none', fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <span>Notruf 112</span>
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <CampusChatRespectWarningBanner
+                    respectWarning={respectWarning}
+                    onApplyNeutralText={(text) => {
+                      setTypedMessage(text);
+                      setRespectWarning(null);
+                    }}
+                    onDismiss={() => setRespectWarning(null)}
+                  />
                 )}
 
                 {/* Apple HIG In-Field Send Composer */}

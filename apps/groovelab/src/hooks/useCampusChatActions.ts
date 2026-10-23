@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { primeDecryptedCache } from '../lib/security/messageCrypto';
 
 // Local storage helpers for optimistic and zero-bounce read state
@@ -172,6 +172,13 @@ export function useCampusChatActions({
 
     const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
 
+    // 🛡️ 0.1% Kellerraum-Resilienz: Wenn Gerät offline, sofort in lokaler Outbox puffern
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      console.info('[useCampusChatActions] Gerät offline (Kellerraum-Modus), puffere Nachricht in lokaler Outbox:', tempId);
+      setCampusMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'pending_offline' } : m));
+      return;
+    }
+
     try {
       const payload: any = {
         sender_id: uid,
@@ -254,7 +261,14 @@ export function useCampusChatActions({
             insertedMsg = retryRes.data;
           }
         } else {
-          // Rollback optimistic update on error
+          // 🛡️ 0.1% Kellerraum-Resilienz: Bei Netzwerkfehler in lokaler Outbox behalten statt Rollback
+          const isNetworkError = typeof navigator !== 'undefined' && (!navigator.onLine || String(error?.message || '').toLowerCase().includes('failed to fetch'));
+          if (isNetworkError) {
+            console.info('[useCampusChatActions] Netzwerkfehler erkannt, halte Nachricht in Outbox:', tempId);
+            setCampusMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'pending_offline' } : m));
+            return;
+          }
+          // Rollback optimistic update on real non-network error
           setCampusMessages(prev => prev.filter(m => m.id !== tempId));
           throw error;
         }
