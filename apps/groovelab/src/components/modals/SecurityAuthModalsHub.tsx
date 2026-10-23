@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Clock, Check } from 'lucide-react';
 import { StepUpPinModal } from '../ui/StepUpPinModal';
-import { setStepUpPin, revealClassRosterNamesViaVault } from '../../utils/nameHelper';
+import { revealClassRosterNamesViaVault } from '../../utils/nameHelper';
 
 const AdminSecuritySuiteModal = lazy(() => import('../AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
 const QuarterlyAccessReportModal = lazy(() => import('../ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
@@ -326,19 +326,10 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
             const client = supabase || (typeof window !== 'undefined' && (window as any).__supabaseClient);
             if (!client) return false;
 
-            const { data: isValid, error } = await client.rpc('verify_personal_pin', {
-              user_uuid: effectiveUserId,
-              input_pin: enteredPin
-            });
-
-            if (error || !isValid) {
-              return false;
-            }
-
-            // PIN autorisiert: 5-Minuten-Grace-Period im RAM aktivieren
-            setStepUpPin(enteredPin);
-
-            // 🛡️ 0,1% Goldstandard: Batch-Entschlüsselung für 60s Auto-Curtain
+            // 🛡️ 0,1% Goldstandard Atomare Verifikation & Lease Minting (NIST SP 800-63B / BSI TR-02102-1):
+            // revealClassRosterNamesViaVault verifiziert die PIN serverseitig via Bcrypt in PostgreSQL,
+            // mintet ein flüchtiges Step-Up Lease Token (300s TTL), speichert NUR das Token im RAM
+            // und entschlüsselt die Klarnamen für den 60s Auto-Curtain. Keine PIN-Speicherung im Client!
             const res = await revealClassRosterNamesViaVault(undefined, enteredPin, client);
             if (!res.success) {
               return false;

@@ -12,8 +12,8 @@ declare global {
     __glPrivacyTimer?: any;
     __glRevealedVaultCache?: Map<string, string>;
     __glRevealedVaultSecondaryMap?: Map<string, string>;
-    __glStepUpPin?: string;
-    __glStepUpPinExpiresAt?: number;
+    __glStepUpToken?: string;
+    __glStepUpTokenExpiresAt?: number;
     __supabaseClient?: any;
   }
 }
@@ -67,61 +67,74 @@ function setMode(value: boolean) {
       if (window.__glRevealedVaultSecondaryMap) {
         window.__glRevealedVaultSecondaryMap.clear();
       }
-      clearStepUpPin();
+      clearStepUpToken();
     }, 60000);
   } else {
-    // Privacy is ON: clear in-memory revealed plain text cache and clear transient Step-Up PIN
+    // Privacy is ON: clear in-memory revealed plain text cache and clear transient Step-Up Lease Token
     if (window.__glRevealedVaultCache) {
       window.__glRevealedVaultCache.clear();
     }
     if (window.__glRevealedVaultSecondaryMap) {
       window.__glRevealedVaultSecondaryMap.clear();
     }
-    clearStepUpPin();
+    clearStepUpToken();
   }
 
   window.__glPrivacySubs.forEach(fn => fn(value));
 }
 
-// ─── 0,1% Goldstandard Step-Up Re-Authentication Management (NIST SP 800-63B) ──
+// ─── 0,1% Goldstandard Step-Up Lease Token Management (NIST SP 800-63B / BSI TR-02102-1) ──
 
 /**
- * Returns the currently active, valid Step-Up PIN if within the 5-minute sliding window.
- * Returns null if expired or not set.
+ * Returns the currently active, valid Step-Up Lease Token if within the 5-minute sliding window.
+ * Returns null if expired or not set. NEVER stores plaintext PINs!
  */
-export function getValidStepUpPin(): string | null {
+export function getValidStepUpToken(): string | null {
   if (typeof window === 'undefined') return null;
-  if (window.__glStepUpPin && window.__glStepUpPinExpiresAt && Date.now() < window.__glStepUpPinExpiresAt) {
-    return window.__glStepUpPin;
+  if (window.__glStepUpToken && window.__glStepUpTokenExpiresAt && Date.now() < window.__glStepUpTokenExpiresAt) {
+    return window.__glStepUpToken;
   }
-  window.__glStepUpPin = undefined;
-  window.__glStepUpPinExpiresAt = undefined;
+  window.__glStepUpToken = undefined;
+  window.__glStepUpTokenExpiresAt = undefined;
   return null;
 }
 
 /**
- * Stores a verified Step-Up PIN flüchtig in RAM for a sliding grace window (default 5 minutes).
+ * Stores a verified Step-Up Lease Token flüchtig in RAM for a sliding grace window (default 5 minutes).
+ * NEVER stores plaintext PINs!
  */
-export function setStepUpPin(pin: string, durationMs: number = 5 * 60 * 1000): void {
-  if (typeof window === 'undefined') return;
-  window.__glStepUpPin = pin;
-  window.__glStepUpPinExpiresAt = Date.now() + durationMs;
+export function setStepUpToken(token: string, durationMs: number = 5 * 60 * 1000): void {
+  if (typeof window === 'undefined' || !token) return;
+  window.__glStepUpToken = token;
+  window.__glStepUpTokenExpiresAt = Date.now() + durationMs;
 }
 
 /**
- * Instantly wipes the Step-Up PIN from memory.
+ * Instantly wipes the Step-Up Lease Token from memory and revokes it on the server.
  */
-export function clearStepUpPin(): void {
+export function clearStepUpToken(): void {
   if (typeof window === 'undefined') return;
-  window.__glStepUpPin = undefined;
-  window.__glStepUpPinExpiresAt = undefined;
+  const tokenToRevoke = window.__glStepUpToken;
+  window.__glStepUpToken = undefined;
+  window.__glStepUpTokenExpiresAt = undefined;
+
+  if (tokenToRevoke) {
+    const client = (window as any).__supabaseClient || defaultSupabaseClient;
+    if (client) {
+      try {
+        client.rpc('revoke_step_up_lease', { p_token: tokenToRevoke }).catch(() => {});
+      } catch {
+        // Non-blocking best effort
+      }
+    }
+  }
 }
 
 /**
  * Checks whether an elevated Step-Up authorization is currently active.
  */
 export function isStepUpActive(): boolean {
-  return getValidStepUpPin() !== null;
+  return getValidStepUpToken() !== null;
 }
 
 /**
@@ -137,7 +150,7 @@ export function triggerStepUpPinPrompt(onSuccess?: () => void): void {
 }
 
 /**
- * Global helper to toggle real names with strict Step-Up PIN enforcement.
+ * Global helper to toggle real names with strict Step-Up enforcement.
  */
 export function toggleRealNamesWithStepUp(
   onSuccess?: () => void,
@@ -148,7 +161,7 @@ export function toggleRealNamesWithStepUp(
     setMode(true);
   } else {
     if (isStepUpActive()) {
-      revealClassRosterNamesViaVault(studentIds, getValidStepUpPin()!, supabaseClient).then(() => {
+      revealClassRosterNamesViaVault(studentIds, undefined, supabaseClient).then(() => {
         setMode(false);
         onSuccess?.();
       });
@@ -481,7 +494,7 @@ export function formatAdaptiveStudentName(
 
 /**
  * Reveal full student name on-demand from the secure private_auth vault
- * Enforces 0,1% Step-Up PIN verification (NIST SP 800-63B / BSI TR-02102-1).
+ * Enforces 0,1% Step-Up Lease Token verification (NIST SP 800-63B / BSI TR-02102-1).
  */
 export async function revealStudentFullNameViaVault(
   studentId: string,
@@ -493,7 +506,7 @@ export async function revealStudentFullNameViaVault(
     return { success: true, lastName: cachedLast };
   }
 
-  const effectivePin = pin || getValidStepUpPin();
+  const activeToken = getValidStepUpToken();
 
   try {
     const client = supabaseClient || (typeof window !== 'undefined' && (window as any).__supabaseClient) || defaultSupabaseClient;
@@ -503,19 +516,20 @@ export async function revealStudentFullNameViaVault(
 
     const { data, error } = await client.rpc('reveal_student_full_name', {
       p_student_id: studentId,
-      p_pin: effectivePin || null
+      p_pin: pin ? pin.trim() : null,
+      p_step_up_token: activeToken || null
     });
 
     if (error || !data || !data.success) {
-      if (data?.error === 'INVALID_PIN') {
-        clearStepUpPin();
+      if (data?.error === 'INVALID_PIN' || data?.error === 'PIN_REQUIRED') {
+        clearStepUpToken();
       }
       return { success: false, error: error?.message || data?.error || 'UNKNOWN' };
     }
 
-    // Wenn PIN erfolgreich verifiziert wurde, merke sie für das 5-Minuten-Grace-Fenster
-    if (effectivePin) {
-      setStepUpPin(effectivePin);
+    // 🛡️ Zero-Client-PIN Doktrin: Speichere ausschließlich das kryptografische Lease-Token im RAM!
+    if (data.step_up_token) {
+      setStepUpToken(data.step_up_token);
     }
 
     if (typeof window !== 'undefined') {
@@ -550,7 +564,7 @@ export async function revealStudentFullNameViaVault(
 /**
  * 0,1% Goldstandard High-Speed Batch-Reveal (< 35 ms)
  * Decrypts all students of the teacher / school via private_auth vault
- * Enforces 0,1% Step-Up PIN verification (NIST SP 800-63B / BSI TR-02102-1)
+ * Enforces 0,1% Step-Up Lease Token verification (NIST SP 800-63B / BSI TR-02102-1)
  * and feeds the in-memory cache with automatic 60-second Auto-Curtain.
  */
 export async function revealClassRosterNamesViaVault(
@@ -558,7 +572,7 @@ export async function revealClassRosterNamesViaVault(
   pin?: string,
   supabaseClient?: any
 ): Promise<{ success: boolean; count?: number; error?: string }> {
-  const effectivePin = pin || getValidStepUpPin();
+  const activeToken = getValidStepUpToken();
 
   try {
     const client = supabaseClient || (typeof window !== 'undefined' && (window as any).__supabaseClient) || defaultSupabaseClient;
@@ -567,19 +581,21 @@ export async function revealClassRosterNamesViaVault(
     }
 
     const { data, error } = await client.rpc('reveal_class_roster_names', {
-      p_pin: effectivePin || null,
-      p_student_ids: studentIds && studentIds.length > 0 ? studentIds : null
+      p_pin: pin ? pin.trim() : null,
+      p_student_ids: studentIds && studentIds.length > 0 ? studentIds : null,
+      p_step_up_token: activeToken || null
     });
 
     if (error || !data || !data.success) {
-      if (data?.error === 'INVALID_PIN') {
-        clearStepUpPin();
+      if (data?.error === 'INVALID_PIN' || data?.error === 'PIN_REQUIRED') {
+        clearStepUpToken();
       }
       return { success: false, error: error?.message || data?.error || 'UNKNOWN' };
     }
 
-    if (effectivePin) {
-      setStepUpPin(effectivePin);
+    // 🛡️ Zero-Client-PIN Doktrin: Speichere ausschließlich das kryptografische Lease-Token im RAM!
+    if (data.step_up_token) {
+      setStepUpToken(data.step_up_token);
     }
 
     if (typeof window !== 'undefined') {
@@ -649,13 +665,13 @@ export function useRealNamesVisibility() {
     const next = forceValue !== undefined ? forceValue : !getMode();
     if (next === false) {
       // 🛡️ Fail-Closed Step-Up Guard: Einblenden (OWASP ASVS L3 / NIST SP 800-63B / BSI TR-02102-1)
-      // Das Einblenden der bürgerlichen Klarnamen erfordert platformweit zwingend eine aktive, verifizierte Step-Up PIN im RAM.
+      // Das Einblenden der bürgerlichen Klarnamen erfordert platformweit zwingend eine aktive Step-Up Lease im RAM.
       if (!isStepUpActive()) {
         triggerStepUpPinPrompt(async () => {
           setMode(false);
         });
       } else {
-        revealClassRosterNamesViaVault(undefined, getValidStepUpPin()!).then((res) => {
+        revealClassRosterNamesViaVault().then((res) => {
           if (res.success) {
             setMode(false);
           } else {
@@ -670,9 +686,9 @@ export function useRealNamesVisibility() {
         });
       }
     } else {
-      // Maskieren: Sofort sperren und flüchtige PIN bereinigen
+      // Maskieren: Sofort sperren und flüchtiges Token bereinigen
       setMode(true);
-      clearStepUpPin();
+      clearStepUpToken();
     }
   };
 

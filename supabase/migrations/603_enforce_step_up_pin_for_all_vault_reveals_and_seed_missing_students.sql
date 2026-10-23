@@ -50,15 +50,15 @@ INSERT INTO private_auth.blind_student_lastname_vault (
     updated_at = clock_timestamp();
 
 -- ------------------------------------------------------------------------------
--- 2. SSOT-PIN: Peter Pan mit persönlicher PIN 1110 absichern
+-- 2. SSOT-PIN: Peter Pan mit persönlichem Argon2/Bcrypt Hash absichern
 -- ------------------------------------------------------------------------------
 INSERT INTO private_auth.user_secrets (user_id, argon2_personal_pin_hash, updated_at)
 VALUES (
     '11079eae-664a-49a4-8692-771d83a3193c',
-    extensions.crypt('1110', extensions.gen_salt('bf', 10)),
+    '$2a$10$iVNHr4R9ypuaD0Ftku6kd.R7xJ1prQIbLeI5ZGB/mFdEX7QURZAWu',
     NOW()
 ) ON CONFLICT (user_id) DO UPDATE SET
-    argon2_personal_pin_hash = EXCLUDED.argon2_personal_pin_hash,
+    argon2_personal_pin_hash = COALESCE(private_auth.user_secrets.argon2_personal_pin_hash, EXCLUDED.argon2_personal_pin_hash),
     updated_at = NOW();
 
 UPDATE public.users_raw
