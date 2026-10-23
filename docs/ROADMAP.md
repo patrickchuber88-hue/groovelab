@@ -253,7 +253,7 @@ Das physische Musiker-Pass & Koffer-Badge Set ersetzt diesen Prozess durch einen
 1. **Das Musiker-Set (Dual-Carrier):**
    * **1× CR80 Plastikkarte (0,76 mm Bio-rPVC):** Robust wie eine Bankkarte, seidenmatt, abgerundete Ecken, mit Schullogo und Schülernummer.
    * **1× Koffer-Badge (Instrumenten-Schlüsselanhänger):** Wetterfester Mini-Key-Tag mit Metallring für den Reißverschluss des Gitarren-Gigbags oder Geigenkoffers.
-2. **100 % DSGVO-Anonymisierung (Art. 25 Privacy by Design):**
+2. **100 % DSGVO-Pseudonymisierung (Art. 4 Nr. 5 / Art. 25 Privacy by Design):**
    * Auf dem Ausweis steht ausnahmslos **„Vorname + N.“** (z. B. *„Amelia H.“*) und das Instrument (*„Schlagzeug“*).
    * Der aufgedruckte QR-Code enthält ausschließlich eine pseudonyme 128-Bit UUID (`https://campus-groovelab.de/qr/<token>`). Zero Klardaten auf dem Trägermedium.
 3. **Didaktischer Check-in & Alltags-Präsenz:**

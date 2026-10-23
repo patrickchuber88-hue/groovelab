@@ -369,9 +369,9 @@ export function useTeacherStudentPrep({
             ]
           : [];
 
-        // 🛡️ Privacy Invariant (DSGVO Art. 25): !showRealNames triggers privacy masking ("M.")
+        // 🛡️ Privacy Invariant (DSGVO Art. 25): showRealNames (privacyMode) triggers masking ("M.") / vault lookup
         const rawStudentName = activeStudent.first_name 
-          ? `${activeStudent.first_name} ${maskLastName(activeStudent.last_name, !showRealNames)}`.trim()
+          ? `${activeStudent.first_name} ${maskLastName(activeStudent.last_name, showRealNames, activeStudent.id || studentId)}`.trim()
           : (activeStudent.name || 'Schüler');
 
         const prepPayload = {

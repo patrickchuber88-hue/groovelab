@@ -128,7 +128,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const summaryText = 'Leitbild & Schutzprinzip: Campus-Groovelab dient den Lehrkräften zur Erleichterung des Unterrichtsalltags (nicht umgekehrt). Die Schulmanagement- und Übe-Plattform wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der „digitalen Kreidetafel“ konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug („Fast-Track“) zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle didaktische Freiheit vor Scheinselbstständigkeitsrisiken.';
+    const summaryText = cleanPdfText('Leitbild & Schutzprinzip: Campus-Groovelab dient den Lehrkräften zur Erleichterung des Unterrichtsalltags (nicht umgekehrt). Die Schulmanagement- und Übe-Plattform wurde nach der Subsidiaritäts-Doktrin und dem Grundsatz der "digitalen Kreidetafel" konzipiert: Sie dient als rein freiwilliges, unterstützendes Convenience-Werkzeug ("Fast-Track") zur Unterrichtsbegleitung und ersetzt weder städtische ERP-Systeme noch offizielle Dienstwege. Die Plattform enthält keinerlei Überwachungsfunktionen für Lehrkräfte und schützt Honorarkräfte durch volle didaktische Freiheit vor Scheinselbstständigkeitsrisiken.');
     const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 10);
     doc.text(splitSummary, margin + 5, 55);
 
@@ -141,8 +141,8 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     const section1Points = [
       {
-        title: 'A. Keine automatisierte Überwachung oder Verhaltensbewertung',
-        desc: 'Die Plattform enthält keinerlei Algorithmen, künstliche Intelligenz oder automatisierte Auswertungsroutinen, die dazu bestimmt oder objektiv geeignet sind, das Arbeits- oder Unterrichtsverhalten, die didaktische Güte oder die quantitative Leistung von angestellten Lehrkräften oder Honorarkräften zu überwachen, auszuwerten oder einem vergleichenden Ranking zu unterziehen.'
+        title: 'A. Keine automatisierte Überwachung, Zero-Meeting-Bots & EU AI Act Freistellung',
+        desc: 'Die Plattform enthält keinerlei Algorithmen, KI oder automatisierte Auswertungsroutinen zur Überwachung oder zum Ranking von Lehrkräften. StGB § 201 Safe-Harbor: Es existieren keine verdeckten Meeting-Bots oder automatischen Raum-Transkriptionen; Lehrkräfte und Schüler dürfen aktiv und willentlich die gerätenative Diktierfunktion per Push-to-Talk in sichtbare Textfelder mit voller Editierkontrolle vor dem Absenden sowie 1-Klick-Sprachmemos mit deterministischem releaseAudioStream() nutzen. EU AI Act: 100% deterministische DSP/FFT ohne probabilistische KI (0 Pflicht zu KI-Beauftragten oder FRIA gem. Art. 4 & 27 KI-VO).'
       },
       {
         title: 'B. Keine Aktivitäts-, Verweildauer- oder Klick-Reports für die Schulleitung',
@@ -187,8 +187,8 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     const section2Points = [
       {
-        title: 'A. Didaktisches Assistenz-Prinzip, Übermittlungsfreiheit & Weisungsfreiheit',
-        desc: 'Campus-Groovelab dient dem Unterrichtsalltag der Lehrkraft, nicht dem Schulalltag der Schulleitung. Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Termine und Raumwünsche digital über Campus-Groovelab oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln. Es besteht kein Nutzungszwang und keine arbeitsteilige Einbindung in den städtischen Weisungsapparat.'
+        title: 'A. 2-Phasen Herrenberg-Zukunftsschutz, Übermittlungs- & Weisungsfreiheit',
+        desc: 'Campus-Groovelab dient dem Unterrichtsalltag der Lehrkraft, nicht dem Schulalltag der Schulleitung. Stundenplan-, Raum- und Terminbelegungsfunktionen stellen rechtlich unverbindliche didaktische Dispositionsvorschläge dar. Lehrkräften (insbesondere freien Honorarkräften) steht es vollkommen frei, Termine und Raumwünsche digital über Campus-Groovelab oder herkömmlich (per E-Mail, Telefon oder Zettel) an die Verwaltung zu übermitteln. 2-Phasen-Schutzschild: Phase 1 schützt im Rahmen des Moratoriums nach § 127 SGB IV befristet bis zum 31.12.2027; Phase 2 sichert ab 01.01.2028 nach Auslaufen des § 127 SGB IV dauerhafte, unanfechtbare Weisungs- und Indizienfreiheit nach § 7 Abs. 1 SGB IV & BSG B 12 R 3/20 R (0% Payroll, 0% Zeiterfassung).'
       },
       {
         title: 'B. Subsidiaritäts-Doktrin, Nichterreichbarkeit & Zeiteinteilung (§ 5 ArbSchG)',
@@ -238,8 +238,8 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     const section3Points = [
       {
-        title: 'A. Ausschluss von US-Cloudservern & US-Behördenzugriff (Schrems II)',
-        desc: 'Der gesamte Plattformbetrieb (Datenbanken, Programmcode, Audio-Memos, Backups) erfolgt ausschließlich in ISO 27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur) sowie der Hetzner Online GmbH (Falkenstein/Vogtland und Nürnberg). Ein Datentransfer in Drittländer (USA) oder die Unterwerfung unter den US CLOUD Act / FISA 702 ist vollständig ausgeschlossen.'
+        title: 'A. Ausschluss von US-Cloudservern, Stufe-2/3 Garantien (Schrems II & TIA-Freiheit)',
+        desc: 'Der gesamte Plattformbetrieb (Datenbanken, Programmcode, Audio-Memos, Backups) erfolgt ausschließlich in ISO 27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur) sowie der Hetzner Online GmbH (Falkenstein/Vogtland und Nürnberg). Stufe-2 Mutterkonzern-Garantie: Sowohl Auftragsverarbeiter als auch Subprozessoren (United Internet AG / IONOS SE & Hetzner Online GmbH) sind 100% deutsche Gesellschaften ohne US-Mutterkonzern (0% US CLOUD Act / FISA 702). Stufe-3 Zero-Support-Backdoor: Keinerlei Support- oder Fernwartungszugriff aus Drittländern (0% TIA-Pflicht).'
       },
       {
         title: 'B. Schutz der Privatsphäre von Lehrkräften & Zero-Mail IAM',
@@ -253,24 +253,26 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
 
     curY += 7;
     section3Points.forEach((p) => {
+      const splitP = doc.splitTextToSize(cleanPdfText(p.desc), contentWidth - 8);
+      const boxHeight = Math.max(24, splitP.length * 3.4 + 11);
+
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
-      doc.roundedRect(margin, curY, contentWidth, 24, 2, 2, 'F');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'F');
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.setLineWidth(0.3);
-      doc.roundedRect(margin, curY, contentWidth, 24, 2, 2, 'S');
+      doc.roundedRect(margin, curY, contentWidth, boxHeight, 2, 2, 'S');
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.8);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(p.title, margin + 4, curY + 6);
+      doc.text(cleanPdfText(p.title), margin + 4, curY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.6);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitP = doc.splitTextToSize(p.desc, contentWidth - 8);
       doc.text(splitP, margin + 4, curY + 11.5);
 
-      curY += 28;
+      curY += boxHeight + 3.5;
     });
 
     // Official Seal & Sign-Off Box
@@ -289,7 +291,7 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.8);
     doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-    const sealText = 'Der Betreiber dokumentiert hiermit verbindlich die technischen Eigenschaften von Campus-Groovelab zur Vorlage bei der Personalvertretung (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie zur Einhaltung von DSGVO (Art. 5, 28, 32) und § 26 BDSG. Nach dem Leitbild des didaktischen Assistenz-Prinzips enthält die Plattform keinerlei Funktionen zur Leistungs- oder Verhaltenskontrolle von Lehrkräften und wahrt die technische Dispositionsfreiheit freier Honorarkräfte (BSG B 12 R 3/20 R). Hinweis gem. § 3 RDG: Diese technische Architektur-Dokumentation stellt keine individuelle Rechtsberatung im Sinne des Rechtsdienstleistungsgesetzes dar.';
+    const sealText = cleanPdfText('Der Betreiber dokumentiert hiermit verbindlich die technischen Eigenschaften von Campus-Groovelab zur Vorlage bei der Personalvertretung (§ 87 Abs. 1 Nr. 6 BetrVG, LPVG der Länder, BPersVG) sowie zur Einhaltung von DSGVO (Art. 5, 28, 32) und § 26 BDSG. Nach dem Leitbild des didaktischen Assistenz-Prinzips enthält die Plattform keinerlei Funktionen zur Leistungs- oder Verhaltenskontrolle von Lehrkräften und wahrt die technische Dispositionsfreiheit freier Honorarkräfte (BSG B 12 R 3/20 R). Hinweis gem. § 3 RDG: Diese technische Architektur-Dokumentation stellt keine individuelle Rechtsberatung im Sinne des Rechtsdienstleistungsgesetzes dar.');
     const splitSeal = doc.splitTextToSize(sealText, contentWidth - 12);
     doc.text(splitSeal, margin + 6, curY + 15);
 
@@ -342,11 +344,11 @@ export async function generateStaffCouncilDeclarationPDF(options: StaffCouncilDe
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.4);
       doc.setTextColor(accentRed[0], accentRed[1], accentRed[2]);
-      doc.text(`• ${ab.title}:`, margin + 6, boxY);
+      doc.text(cleanPdfText(`• ${ab.title}:`), margin + 6, boxY);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
       doc.setTextColor(textGray[0], textGray[1], textGray[2]);
-      const splitDesc = doc.splitTextToSize(ab.desc, contentWidth - 12);
+      const splitDesc = doc.splitTextToSize(cleanPdfText(ab.desc), contentWidth - 12);
       doc.text(splitDesc, margin + 6, boxY + 3.8);
       boxY += splitDesc.length * 3.2 + 5;
     });

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
+import QRCode from 'react-qr-code';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
-  Eye, FileCheck, FileText, Fingerprint, HeartHandshake, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
+  Eye, EyeOff, FileCheck, FileText, Fingerprint, HeartHandshake, KeyRound, Lightbulb, Palmtree, Printer, QrCode, School, ShieldAlert,
   ShieldCheck, Sparkles, Tablet, Trash2, Upload, X, Zap
 } from 'lucide-react';
-import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
-import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 import { AvvCertificateModal } from '../modals/AvvCertificateModal';
 import { SUPPORTED_STATES } from '../../utils/schoolHolidayEngine';
 import { SecretarySponsorsModal } from './sponsors/SecretarySponsorsModal';
+import { SecretaryPrivacyGovernanceModal } from './modals/SecretaryPrivacyGovernanceModal';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -40,6 +40,7 @@ export interface SecretarySetupViewProps {
   logRetention: string;
   setLogRetention: (val: string) => void;
   currentUserProfile: any;
+  currentSchoolProfile?: any;
   biometricsStatus: any;
   biometricsMessage: string;
   kioskToken: string;
@@ -102,11 +103,19 @@ export interface SecretarySetupViewProps {
   setShowSchoolHolidays?: (val: boolean) => void;
   holidayJurisdiction?: string;
   setHolidayJurisdiction?: (val: string) => void;
+  lessonBufferBefore?: number;
+  setLessonBufferBefore?: (val: number) => void;
+  lessonBufferAfter?: number;
+  setLessonBufferAfter?: (val: number) => void;
 }
 
 export function SecretarySetupView(props: SecretarySetupViewProps) {
   const {
     schoolId,
+    lessonBufferBefore = 15,
+    setLessonBufferBefore = () => {},
+    lessonBufferAfter = 15,
+    setLessonBufferAfter = () => {},
     showSchoolHolidays = true,
     setShowSchoolHolidays,
     holidayJurisdiction = 'DE_BW',
@@ -138,6 +147,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
     logRetention,
     setLogRetention,
     currentUserProfile,
+    currentSchoolProfile = props.currentSchoolProfile,
     biometricsStatus,
     biometricsMessage,
     kioskToken,
@@ -198,8 +208,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
     contractEndsAt
   } = props;
 
-  const [copiedClause, setCopiedClause] = React.useState(false);
   const [showCertModal, setShowCertModal] = useState<boolean>(false);
+  const [showBypassPin, setShowBypassPin] = useState<boolean>(false);
+  const [showKioskQr, setShowKioskQr] = useState<boolean>(false);
 
   return (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -213,100 +224,29 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 </p>
               </div>
 
-              {/* iOS-Style 3-Way Segmented Control */}
+              {/* Status-Badge statt verwirrendem Phantom-Umschalter */}
               <div 
-                role="tablist" 
-                aria-label="Modulbereich filtern" 
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  background: '#f1f5f9',
-                  padding: '4px',
-                  borderRadius: '14px',
+                  background: '#f8fafc',
+                  padding: '6px 14px',
+                  borderRadius: '12px',
                   border: '1px solid #e2e8f0',
-                  gap: '4px'
+                  gap: '8px'
                 }}
               >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={true}
-                  onClick={() => {
-                    if (props.setSettingsTab) props.setSettingsTab('administration');
-                    props.setActiveSecretarySettingsModal('administration');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: '#ffffff',
-                    color: '#dc2626',
-                    fontSize: '0.78rem',
-                    fontWeight: 850,
-                    cursor: 'pointer',
-                    boxShadow: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>🏛️ Verwaltung</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={false}
-                  onClick={() => {
-                    if (props.setSettingsTab) props.setSettingsTab('general');
-                    props.setActiveSecretarySettingsModal('general');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#16a34a',
-                    fontSize: '0.78rem',
-                    fontWeight: 750,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>🎓 Campus</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={false}
-                  onClick={() => {
-                    if (props.setSettingsTab) props.setSettingsTab('general');
-                    props.setActiveSecretarySettingsModal('general');
-                  }}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '10px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#b45309',
-                    fontSize: '0.78rem',
-                    fontWeight: 750,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <span>⚡ GrooveLab</span>
-                </button>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569' }}>
+                  9 Systemmodule aktiv
+                </span>
               </div>
             </div>
 
-            {/* MODULAR COVER CARDS GRID */}
+            {/* MODULAR COVER CARDS GRID: 3x3 SYMMETRISCH (9 MODULE) */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : windowWidth < 1024 ? 'repeat(3, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))',
+              gridTemplateColumns: windowWidth < 640 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
               gap: '18px',
               width: '100%'
             }}>
@@ -331,9 +271,9 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 },
                 {
                   id: 'sync',
-                  title: 'Kalender & Sync',
-                  subtitle: `${calendarUrls.length} Kalender abonniert`,
-                  badge: syncInterval === 'realtime' ? 'Echtzeit' : syncInterval === 'hourly' ? 'Stündlich' : 'Täglich',
+                  title: 'Kalender, Ferien & Sync',
+                  subtitle: `${calendarUrls.length} iCal-Feeds • ${SUPPORTED_STATES.find(s => s.code === holidayJurisdiction)?.name || 'Baden-Württemberg'}`,
+                  badge: showSchoolHolidays ? 'Ferien & Sync aktiv' : (syncInterval === 'realtime' ? 'Echtzeit' : syncInterval === 'hourly' ? 'Stündlich' : 'Täglich'),
                   gradient: '#06b6d4',
                   shadowColor: 'transparent',
                   icon: Zap
@@ -351,7 +291,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   id: 'backup',
                   title: 'Lokale Datensicherung',
                   subtitle: lastBackupDate ? 'Sicherung vorhanden' : 'JSON-Backup Tresor',
-                  badge: 'Backup Tresor',
+                  badge: lastBackupDate ? 'Gesichert' : 'Backup Tresor',
                   gradient: '#6366f1',
                   shadowColor: 'transparent',
                   icon: Database
@@ -365,15 +305,6 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   shadowColor: 'transparent',
                   icon: Clock
                 },
-                {
-                  id: 'danger_zone',
-                  title: 'Werkseinstellungen',
-                  subtitle: 'Musikschule zurücksetzen',
-                  badge: 'Gefahr',
-                  gradient: '#ef4444',
-                  shadowColor: 'transparent',
-                  icon: ShieldAlert
-                },
                 { id: 'sponsors', title: 'Sponsoren & Partner', subtitle: 'Bildungsförderung & Toasts', badge: 'Patenschaften', gradient: '#facc15', shadowColor: 'transparent', icon: HeartHandshake },
                 {
                   id: 'feedback',
@@ -383,6 +314,15 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                   gradient: '#a855f7',
                   shadowColor: 'transparent',
                   icon: Lightbulb
+                },
+                {
+                  id: 'danger_zone',
+                  title: 'Werkseinstellungen',
+                  subtitle: 'Musikschule zurücksetzen',
+                  badge: 'Gefahr',
+                  gradient: '#ef4444',
+                  shadowColor: 'transparent',
+                  icon: ShieldAlert
                 }
               ].map((module) => {
                 const IconComp = module.icon;
@@ -439,19 +379,36 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         {module.subtitle}
                       </div>
                     </div>
-                    {module.badge && (
-                      <span style={{
-                        marginTop: '10px',
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        color: module.id === 'danger_zone' ? '#dc2626' : (module.id === 'security_privacy' && !isAvvSigned ? '#d97706' : '#ea4335'),
-                        background: module.id === 'danger_zone' ? '#fee2e2' : (module.id === 'security_privacy' && !isAvvSigned ? '#fef3c7' : '#fce8e6'),
-                        padding: '2px 8px',
-                        borderRadius: '100px'
-                      }}>
-                        {module.badge}
-                      </span>
-                    )}
+                    {module.badge && (() => {
+                      let badgeColor = '#475569';
+                      let badgeBg = '#f1f5f9';
+
+                      if (module.id === 'danger_zone') {
+                        badgeColor = '#dc2626';
+                        badgeBg = '#fee2e2';
+                      } else if (module.id === 'security_privacy' && !isAvvSigned) {
+                        badgeColor = '#b45309';
+                        badgeBg = '#fef3c7';
+                      } else if (['Kiosk Aktiv', 'AVV Gezeichnet', 'Auto-Clean An', 'Gesichert', 'Ferien Aktiv'].includes(module.badge)) {
+                        badgeColor = '#047857';
+                        badgeBg = '#d1fae5';
+                      }
+
+                      return (
+                        <span style={{
+                          marginTop: '10px',
+                          fontSize: '0.62rem',
+                          fontWeight: 800,
+                          color: badgeColor,
+                          background: badgeBg,
+                          padding: '2.5px 9px',
+                          borderRadius: '100px',
+                          letterSpacing: '0.02em'
+                        }}>
+                          {module.badge}
+                        </span>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -498,7 +455,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
             )}
 
             {/* FOCUS MODAL FOR SELECTED SETTINGS CATEGORY */}
-            {activeSecretarySettingsModal && activeSecretarySettingsModal !== 'sponsors' && (
+            {activeSecretarySettingsModal && activeSecretarySettingsModal !== 'sponsors' && activeSecretarySettingsModal !== 'security_privacy' && (
               <div 
                 role="dialog"
                 aria-modal="true"
@@ -524,6 +481,13 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 }}
               >
                 <div 
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="secretary-settings-modal-title"
+                  tabIndex={-1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setActiveSecretarySettingsModal(null);
+                  }}
                   style={{
                     width: '100%',
                     maxWidth: activeSecretarySettingsModal === 'general' ? '740px' : '680px',
@@ -535,7 +499,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     display: 'flex',
                     flexDirection: 'column',
                     overflow: 'hidden',
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    outline: 'none'
                   }}
                   className="animate-scale-in"
                 >
@@ -580,10 +545,10 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         {activeSecretarySettingsModal === 'danger_zone' && <ShieldAlert size={22} color="#ffffff" />}
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+                        <h3 id="secretary-settings-modal-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                           {activeSecretarySettingsModal === 'general' && 'Schul-Stammdaten & Branding'}
                           {activeSecretarySettingsModal === 'links' && 'Kiosk-Flotte & Raum-Terminals'}
-                          {activeSecretarySettingsModal === 'sync' && 'Kalender & Synchronisation'}
+                          {activeSecretarySettingsModal === 'sync' && 'Kalender, Schulferien & Synchronisation'}
                           {activeSecretarySettingsModal === 'security_privacy' && 'Datenschutz, AVV & DSB-Audit'}
                           {activeSecretarySettingsModal === 'backup' && 'Lokale Datensicherung'}
                           {activeSecretarySettingsModal === 'school_year' && 'Schuljahr & Auto-Bereinigung'}
@@ -592,7 +557,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                           {activeSecretarySettingsModal === 'general' && 'Stammdaten, Anschrift und Schullogo deines Campus.'}
                           {activeSecretarySettingsModal === 'links' && 'QR-Kiosk-Kopplung für Raum-Tablets, Kiosk-PIN-Richtlinien & Schul-Links.'}
-                          {activeSecretarySettingsModal === 'sync' && 'Datenabgleich, Live-Sync und externe iCal-Abonnements.'}
+                          {activeSecretarySettingsModal === 'sync' && 'Datenabgleich, gesetzliche KMK-Ferien und externe iCal-Abonnements.'}
                           {activeSecretarySettingsModal === 'security_privacy' && 'Auftragsverarbeitungsvertrag (Art. 28 DSGVO), DSB-Prüfportal & TOMs.'}
                           {activeSecretarySettingsModal === 'backup' && 'JSON-Export und Wiederherstellung der Schuldatenbank.'}
                           {activeSecretarySettingsModal === 'school_year' && 'Schuljahresbeginn und automatische DSGVO-Bereinigung.'}
@@ -601,11 +566,13 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={() => setActiveSecretarySettingsModal(null)}
+                      aria-label="Modal schließen"
                       style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
                         border: '1px solid #e2e8f0',
                         background: '#ffffff',
                         color: '#64748b',
@@ -613,11 +580,11 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        transition: 'all 0.15s'
+                        transition: 'all 0.15s ease'
                       }}
                       className="hover-scale"
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                   </div>
 
@@ -642,10 +609,14 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Wunsch-Subdomain *</label>
                               <input
                                 type="text"
+                                placeholder="z. B. stadtmusikschule"
                                 value={schoolSubdomain}
                                 onChange={(e) => setSchoolSubdomain(e.target.value)}
                                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
                               />
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
+                                URL: <strong>https://{(schoolSubdomain || 'schule').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-')}.campus-groovelab.de</strong>
+                              </span>
                             </div>
                           </div>
 
@@ -740,56 +711,51 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             />
                           </div>
 
-                          {/* Unterrichts-Pufferzeiten (Standard: 15 Min Vor-/Nachbereitung) */}
+                          {/* Unterrichts-Pufferzeiten (Standard: 15 Min Vor-/Nachbereitung vor 1. und nach letztem Termin) */}
                           <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '16px' }}>
-                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>
-                              ⏱️ Unterrichts-Pufferzeiten & Rhythmus
-                            </strong>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <strong style={{ fontSize: '0.84rem', color: '#1e293b' }}>
+                                ⏱️ Unterrichts-Pufferzeiten &amp; Rhythmus
+                              </strong>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '2px 8px', borderRadius: '6px' }}>
+                                0,1% Goldstandard Block-Puffer
+                              </span>
+                            </div>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: 1.35 }}>
-                              Festlegung der standardmäßigen Pufferzeiten vor und nach dem Unterricht (z.&nbsp;B. für Raumwechsel, Instrumentenaufbau und Vorbereitung).
+                              Festlegung der standardmäßigen Rüstzeiten: <strong>Puffer vor dem 1. Termin</strong> (z.&nbsp;B. für Raumaufbau/Vorbereitung) und <strong>nach dem letzten Termin</strong> (Abbau, Lüften, Protokoll). Zwischen Schülern derselben Lehrkraft bleibt der Unterricht nahtlos (100% Raumkapazität).
                             </span>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
                               <div>
                                 <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                                  Puffer vor Unterricht (Minuten)
+                                  Rüstpuffer vor 1. Termin (Minuten)
                                 </label>
                                 <input
                                   type="number"
                                   min={0}
                                   max={60}
                                   step={5}
-                                  defaultValue={(() => {
-                                    try {
-                                      return localStorage.getItem(`groovelab_buffer_before_${schoolId}`) || '15';
-                                    } catch { return '15'; }
-                                  })()}
+                                  value={lessonBufferBefore}
                                   onChange={(e) => {
-                                    try {
-                                      localStorage.setItem(`groovelab_buffer_before_${schoolId}`, e.target.value);
-                                    } catch {}
+                                    const val = Math.max(0, Math.min(60, Number(e.target.value) || 0));
+                                    setLessonBufferBefore(val);
                                   }}
                                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
                                 />
                               </div>
                               <div>
                                 <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                                  Puffer nach Unterricht (Minuten)
+                                  Nachbereitung nach letztem Termin (Minuten)
                                 </label>
                                 <input
                                   type="number"
                                   min={0}
                                   max={60}
                                   step={5}
-                                  defaultValue={(() => {
-                                    try {
-                                      return localStorage.getItem(`groovelab_buffer_after_${schoolId}`) || '15';
-                                    } catch { return '15'; }
-                                  })()}
+                                  value={lessonBufferAfter}
                                   onChange={(e) => {
-                                    try {
-                                      localStorage.setItem(`groovelab_buffer_after_${schoolId}`, e.target.value);
-                                    } catch {}
+                                    const val = Math.max(0, Math.min(60, Number(e.target.value) || 0));
+                                    setLessonBufferAfter(val);
                                   }}
                                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
                                 />
@@ -818,8 +784,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
                         {/* HINWEIS: PERSÖNLICHE ZUGANGSDATEN & PASSKEYS IM USER-DOCK */}
                         <div style={{
-                          background: '#f8fafc',
-                          border: '1.5px dashed #cbd5e1',
+                          background: '#f0f9ff',
+                          border: 'none',
                           borderRadius: '16px',
                           padding: '14px 18px',
                           display: 'flex',
@@ -840,10 +806,10 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             <KeyRound size={20} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <strong style={{ fontSize: '0.84rem', color: '#0f172a', display: 'block' }}>
+                            <strong style={{ fontSize: '0.84rem', color: '#0369a1', display: 'block' }}>
                               Persönliche Zugangsdaten, Passkeys &amp; Login-PINs
                             </strong>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.4 }}>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#0284c7', lineHeight: 1.4 }}>
                               Eigene Geräte-Passkeys (Touch ID / Face ID), Master-Passwörter und persönliche 4-stellige Schnell-PINs gehören zur individuellen Sicherheit deines Benutzer-Accounts und werden im <strong>Profil-Dock unten links</strong> verwaltet.
                             </p>
                           </div>
@@ -886,12 +852,36 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '4px', marginBottom: '12px', lineHeight: '1.3' }}>
                               Notfall-PIN zum Entsperren von Kiosk-Stationen im Offline-Betrieb.
                             </span>
-                            <input
-                              type="password"
-                              value={bypassPin}
-                              onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '120px', textAlign: 'center', background: '#ffffff' }}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                type={showBypassPin ? 'text' : 'password'}
+                                value={bypassPin}
+                                onChange={(e) => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                aria-label="Master Bypass-PIN"
+                                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', letterSpacing: '0.3em', width: '110px', textAlign: 'center', background: '#ffffff', outline: 'none' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowBypassPin(!showBypassPin)}
+                                aria-label={showBypassPin ? 'PIN verbergen' : 'PIN anzeigen'}
+                                title={showBypassPin ? 'PIN verbergen' : 'PIN anzeigen'}
+                                style={{
+                                  background: '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '8px',
+                                  padding: '7px 10px',
+                                  cursor: 'pointer',
+                                  color: '#475569',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                className="hover-scale"
+                              >
+                                {showBypassPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -906,6 +896,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               <input 
                                 readOnly 
                                 value={schoolSubdomain ? (window.location.hostname.includes('localhost') ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}` : `https://${schoolSubdomain}.campus-groovelab.de`) : `${window.location.origin}/?school_id=${schoolId}`} 
+                                aria-label="Schul-Anmeldelink"
                                 style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.8rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
                               />
                               <button 
@@ -932,51 +923,100 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             </div>
                           </div>
 
-                          {kioskToken && (
-                            <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
-                              <strong style={{ fontSize: '0.82rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>Tablet-Kopplung (QR-Kiosk-Modus)</strong>
-                              <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '10px', lineHeight: '1.4' }}>
-                                Link zum permanenten Koppeln von Tablets/iPads im Schulsaal als Scan-Station.
-                              </span>
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <input 
-                                  readOnly 
-                                  value={schoolSubdomain 
-                                    ? (window.location.hostname.includes('localhost') 
-                                      ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                      : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                                    : `${window.location.origin}/device-onboarding/${kioskToken}`
-                                  } 
-                                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.8rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
-                                />
-                                <button 
-                                  onClick={() => { 
-                                    const link = schoolSubdomain 
-                                      ? (window.location.hostname.includes('localhost') 
-                                        ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
-                                        : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
-                                      : `${window.location.origin}/device-onboarding/${kioskToken}`;
-                                    navigator.clipboard.writeText(link); 
-                                    setCopiedKioskLink(true);
-                                    setTimeout(() => setCopiedKioskLink(false), 2000);
-                                  }} 
-                                  style={{ 
-                                    padding: '8px 16px', 
-                                    fontSize: '0.78rem', 
-                                    fontWeight: 800,
-                                    borderRadius: '8px',
-                                    border: copiedKioskLink ? '1.5px solid #0284c7' : 'none',
-                                    background: copiedKioskLink ? '#e0f2fe' : '#0284c7',
-                                    color: copiedKioskLink ? '#0284c7' : '#ffffff',
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {copiedKioskLink ? '✓ Kopiert!' : 'Kopieren'}
-                                </button>
+                          {kioskToken && (() => {
+                            const kioskFullUrl = schoolSubdomain 
+                              ? (typeof window !== 'undefined' && window.location.hostname.includes('localhost') 
+                                ? `http://${schoolSubdomain}.localhost:${window.location.port || '5173'}/device-onboarding/${kioskToken}` 
+                                : `https://${schoolSubdomain}.campus-groovelab.de/device-onboarding/${kioskToken}`) 
+                              : (typeof window !== 'undefined' ? `${window.location.origin}/device-onboarding/${kioskToken}` : `/device-onboarding/${kioskToken}`);
+
+                            return (
+                              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                                  <div>
+                                    <strong style={{ fontSize: '0.82rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>Tablet-Kopplung (QR-Kiosk-Modus)</strong>
+                                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '10px', lineHeight: '1.4' }}>
+                                      Link &amp; QR-Code zum permanenten Koppeln von Tablets/iPads im Schulsaal als Scan-Station.
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, background: '#e0f2fe', color: '#0284c7', padding: '3px 8px', borderRadius: '100px', whiteSpace: 'nowrap' }}>
+                                    Kiosk Station
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  <input 
+                                    readOnly 
+                                    value={kioskFullUrl} 
+                                    aria-label="Tablet-Kopplungs-URL"
+                                    style={{ flex: 1, minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.8rem', fontFamily: 'monospace', background: '#f8fafc', color: '#1e293b' }} 
+                                  />
+                                  <button 
+                                    type="button"
+                                    onClick={() => { 
+                                      navigator.clipboard.writeText(kioskFullUrl); 
+                                      setCopiedKioskLink(true);
+                                      setTimeout(() => setCopiedKioskLink(false), 2000);
+                                    }} 
+                                    style={{ 
+                                      padding: '8px 16px', 
+                                      fontSize: '0.78rem', 
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      border: copiedKioskLink ? '1.5px solid #0284c7' : 'none',
+                                      background: copiedKioskLink ? '#e0f2fe' : '#0284c7',
+                                      color: copiedKioskLink ? '#0284c7' : '#ffffff',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {copiedKioskLink ? '✓ Kopiert!' : 'Kopieren'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowKioskQr(!showKioskQr)}
+                                    style={{
+                                      padding: '8px 14px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      border: '1.5px solid #0284c7',
+                                      background: showKioskQr ? '#0284c7' : '#e0f2fe',
+                                      color: showKioskQr ? '#ffffff' : '#0284c7',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    <QrCode size={14} /> {showKioskQr ? 'QR verbergen' : '📱 QR zeigen'}
+                                  </button>
+                                </div>
+
+                                {showKioskQr && (
+                                  <div style={{
+                                    marginTop: '14px',
+                                    padding: '16px',
+                                    background: '#f8fafc',
+                                    borderRadius: '14px',
+                                    border: '1px solid #e2e8f0',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    textAlign: 'center'
+                                  }}>
+                                    <div style={{ background: '#ffffff', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                                      <QRCode value={kioskFullUrl} size={150} level="M" />
+                                    </div>
+                                    <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600, maxWidth: '380px', lineHeight: 1.4 }}>
+                                      📱 <strong>Kiosk-Kamera Scan:</strong> Öffne die Kamera auf dem Saal-iPad und scanne diesen Code, um das Tablet permanent als Kiosk-Station zu verbinden.
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
 
                       </div>
@@ -1143,368 +1183,6 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             <span style={{ fontSize: '0.9rem', flexShrink: 0 }}>🛡️</span>
                             <span><strong>Datenschutz-Hinweis (Art. 28 DSGVO):</strong> Externe Feeds (z.&nbsp;B. Google Calendar, Apple iCloud oder Schulserver) werden von Campus-Groovelab ausschließlich passiv und ohne Weitergabe von Schülerdaten an Dritte im deutschen Hetzner-Rechenzentrum verarbeitet. Bitte stellen Sie als verantwortliche Stelle sicher, dass in externen iCal-Feeds keine vertraulichen personenbezogenen Klarnamen oder Gesundheitsdaten enthalten sind, sofern hierfür keine gesonderte Rechtsgrundlage vorliegt.</span>
                           </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {activeSecretarySettingsModal === 'security_privacy' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                        {/* Städtischer DSB-Prüfausweis & Audit-Portal (Art. 38 DSGVO) */}
-                        <div style={{
-                          background: '#dcfce7',
-                          border: 'none',
-                          borderRadius: '20px',
-                          padding: '20px',
-                          color: '#0f172a',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                          gap: '16px',
-                          boxShadow: 'none'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                            <div style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '12px',
-                              background: '#34a853',
-                              border: 'none',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#ffffff',
-                              boxShadow: 'none'
-                            }}>
-                              <ShieldCheck size={24} />
-                            </div>
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
-                                  🪪 DSB-Prüfausweis (Art. 38 DSGVO)
-                                </h4>
-                                <span style={{ background: '#d1fae5', color: '#047857', border: 'none', padding: '2px 8px', borderRadius: '100px', fontSize: '0.65rem', fontWeight: 800 }}>
-                                  E-Mail-Frei
-                                </span>
-                              </div>
-                              <p style={{ margin: '4px 0 0 0', fontSize: '0.74rem', color: '#475569', fontWeight: 500 }}>
-                                Offizieller QR-Prüfausweis für den städtischen Datenschutzbeauftragten.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              onClick={() => window.dispatchEvent(new CustomEvent('open_admin_security_suite'))}
-                              style={{
-                                background: '#ef4444',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: 'none'
-                              }}
-                              className="hover-scale"
-                            >
-                              <ShieldCheck size={14} /> Sicherheits- & Geräte-Zentrale
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowDpoPortalModal(true)}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #cbd5e1',
-                                color: '#334155',
-                                padding: '8px 14px',
-                                borderRadius: '10px',
-                                fontWeight: 750,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Eye size={14} /> Audit-Portal
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowDpoIdCardModal(true)}
-                              style={{
-                                background: '#34a853',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-
-                                boxShadow: 'none'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Printer size={14} /> DSB-Ausweis drucken
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => generateMessengerSafetyCertificatePDF({
-                                schoolName: schoolName || 'Musikschule',
-                                schoolAddress: `${schoolStreet || ''} ${schoolHouseNumber || ''}, ${schoolZipCode || ''} ${schoolCity || ''}`.trim(),
-                                schoolId
-                              })}
-                              style={{
-                                background: '#34a853',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: 'none'
-                              }}
-                              className="hover-scale"
-                            >
-                              <FileCheck size={14} /> Messenger-Attest (PDF)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const ok = await copyMessengerClauseToClipboard(schoolName);
-                                if (ok) {
-                                  setCopiedClause(true);
-                                  setTimeout(() => setCopiedClause(false), 3000);
-                                }
-                              }}
-                              style={{
-                                background: copiedClause ? '#34a853' : '#0f172a',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '8px 16px',
-                                borderRadius: '10px',
-                                fontWeight: 800,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.20)',
-                                transition: 'all 0.2s ease'
-                              }}
-                              className="hover-scale"
-                            >
-                              {copiedClause ? <Check size={14} /> : <Copy size={14} />}
-                              {copiedClause ? 'Klausel kopiert!' : 'Schulordnungs-Klausel'}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* AV-Vertrag Statusbereich */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <div style={{ 
-                            background: isAvvSigned ? '#e6f4ea' : '#fee2e2', 
-                            border: 'none', 
-                            borderRadius: '16px', 
-                            padding: '16px', 
-                            display: 'flex', 
-                            alignItems: 'flex-start', 
-                            gap: '12px',
-                            fontSize: '0.76rem',
-                            color: isAvvSigned ? '#137333' : '#b91c1c',
-                            lineHeight: '1.45'
-                          }}>
-                            <FileText size={20} style={{ color: isAvvSigned ? '#34a853' : '#ef4444', flexShrink: 0, marginTop: '2px' }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: isAvvSigned ? '#137333' : '#991b1b' }}>AV-Vertrag mit Campus-Groovelab (Schul-Vereinbarung)</strong>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <span style={{ 
-                                    fontSize: '0.62rem', 
-                                    fontWeight: 900, 
-                                    background: isAvvSigned ? '#d1fae5' : '#fee2e2', 
-                                    border: 'none', 
-                                    color: isAvvSigned ? '#047857' : '#b91c1c', 
-                                    padding: '3px 8px', 
-                                    borderRadius: '100px', 
-                                    textTransform: 'uppercase' 
-                                  }}>
-                                    {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
-                                  </span>
-                                  {isAvvSigned ? (
-                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                      <button
-                                        onClick={() => setShowAvvModal(true)}
-                                        style={{
-                                          fontSize: '0.62rem', 
-                                          fontWeight: 800, 
-                                          background: '#ffffff', 
-                                          border: 'none', 
-                                          color: '#065f46', 
-                                          padding: '3.5px 10px', 
-                                          borderRadius: '100px', 
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                                        }}
-                                      >
-                                        <FileText size={11} /> AVV Text
-                                      </button>
-                                      <button
-                                        onClick={() => setShowCertModal(true)}
-                                        style={{
-                                          fontSize: '0.62rem', 
-                                          fontWeight: 850, 
-                                          background: '#16a34a', 
-                                          border: 'none', 
-                                          color: '#ffffff', 
-                                          padding: '3.5px 10px', 
-                                          borderRadius: '100px', 
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          boxShadow: 'none'
-                                        }}
-                                      >
-                                        <ShieldCheck size={11} /> AVV-Siegeldokument (PDF)
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => setShowAvvModal(true)}
-                                      style={{
-                                        fontSize: '0.62rem', 
-                                        fontWeight: 900, 
-                                        background: '#dc2626', 
-                                        border: 'none', 
-                                        color: '#ffffff', 
-                                        padding: '3.5px 10px', 
-                                        borderRadius: '100px', 
-                                        textTransform: 'uppercase',
-                                        cursor: 'pointer',
-                                        boxShadow: 'none'
-                                      }}
-                                    >
-                                      Jetzt unterzeichnen
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <span style={{ display: 'block', marginTop: '4px', color: isAvvSigned ? '#34a853' : '#7f1d1d' }}>
-                                {isAvvSigned 
-                                  ? 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab wurde rechtsgültig gezeichnet.' 
-                                  : 'Der AVV nach Art. 28 DSGVO zwischen deiner Musikschule und Campus-Groovelab steht zur digitalen Signatur bereit.'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Eltern-Infoblatt Vorlage */}
-                          <div style={{ 
-                            background: '#fefce8', 
-                            border: 'none', 
-                            borderRadius: '16px', 
-                            padding: '16px', 
-                            display: 'flex', 
-                            alignItems: 'flex-start', 
-                            gap: '12px',
-                            fontSize: '0.76rem',
-                            color: '#854d0e',
-                            lineHeight: '1.45'
-                          }}>
-                            <FileText size={20} style={{ color: '#ca8a04', flexShrink: 0, marginTop: '2px' }} />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <strong style={{ fontSize: '0.8rem', display: 'block', marginBottom: '2px', color: '#854d0e' }}>Eltern-Information &amp; Einwilligung (Vorlage)</strong>
-                                <button 
-                                  onClick={() => {
-                                    const isGrooveOnly = !hasCampusSub && hasGroovelabSub;
-                                    const isCampusOnly = hasCampusSub && !hasGroovelabSub;
-                                    
-                                    let appName = 'Campus-Groovelab';
-                                    let subjectPhrase = 'Instrumental- und Groovelab-Unterrichts';
-                                    if (isGrooveOnly) {
-                                      appName = 'GrooveLab';
-                                      subjectPhrase = 'Groovelab-Unterrichts';
-                                    } else if (isCampusOnly) {
-                                      appName = 'Campus';
-                                      subjectPhrase = 'Instrumentalunterrichts';
-                                    }
-
-                                    const filename = isGrooveOnly 
-                                      ? 'Eltern_Information_Einwilligung_Groovelab.txt' 
-                                      : isCampusOnly
-                                        ? 'Eltern_Information_Einwilligung_Campus.txt'
-                                        : 'Eltern_Information_Einwilligung_Campus_Groovelab.txt';
-
-                                    const costPhrase = isGrooveOnly || studentBillingOption === 'school_covered' || !studentBillingOption
-                                      ? '- Die Nutzung der App ist für Sie und Ihr Kind vollständig kostenlos (die Gebühren trägt die Musikschule).'
-                                      : '- Die Nutzung der App erfolgt als transparenter Jahresbeitrag von maximal 5,39 € für das Schuljahr (1. Monat kostenlos, danach max. 11 × 0,49 € / Monat; Einmalzahlung, keine automatische Verlängerung).';
-                                    const text = `ELTERN-INFORMATION & EINWILLIGUNG ZUR NUTZUNG DER APP ${appName.toUpperCase()}\n\nSehr geehrte Eltern, liebe Erziehungsberechtigte,\n\nim Rahmen des ${subjectPhrase} nutzen wir ab sofort die webbasierte, datenschutzkonforme App „${appName}“ zur pädagogischen Begleitung und Gamification (XP-Punkte, Band-Matching, Song-Bibliotheken).\n\nDATENSCHUTZ UND SICHERHEIT STEHEN AN ERSTER STELLE:\n${costPhrase}\n- Es werden keinerlei sensible Vertragsdaten, Bankdaten oder E-Mail-Adressen von Kindern oder Eltern erfasst.\n- Zur Identifizierung und zum Schutz vor Schulterblicken im Unterricht wird der Nachname auf allen Schüler- und Lehrer-Dashboards standardmäßig maskiert (z. B. „Jonas M.“).\n- Das Hosting findet zu 100 % in ISO/IEC 27001 zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Nürnberg/Falkenstein • 0 % US-Cloud) statt.\n- Audio-Aufnahmen dienen nur Übe-Protokollen und werden bei Löschung physisch vernichtet.\n\nMit der Nutzung der App willigen Sie ein, dass wir ein geschütztes Übe-Profil für Ihr Kind anlegen. Sie können die Löschung oder Sperrung des Profils jederzeit über uns verlangen.\n\nVielen Dank für Ihre Unterstützung!`;
-                                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = filename;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                  }}
-                                  style={{ 
-                                    fontSize: '0.62rem', 
-                                    fontWeight: 900, 
-                                    background: '#fef08a', 
-                                    border: 'none', 
-                                    color: '#854d0e', 
-                                    padding: '3px 8px', 
-                                    borderRadius: '100px', 
-                                    textTransform: 'uppercase',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  Herunterladen
-                                </button>
-                              </div>
-                              <span style={{ display: 'block', marginTop: '4px' }}>
-                                Lade dir hier die rechtssichere Eltern-Informationsvorlage und Einverständniserklärung zur Verteilung an deine Schüler herunter.
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Audit Log Retention */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 20px' }}>
-                          <div>
-                            <strong style={{ fontSize: '0.84rem', color: '#1e293b', display: 'block' }}>Vorhaltezeit des Änderungsprotokolls</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Verlaufsprotokolle (Audit Logs) nach X Tagen automatisch löschen.</span>
-                          </div>
-                          <select 
-                            value={logRetention} 
-                            onChange={(e) => setLogRetention(e.target.value)} 
-                            style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: '0.8rem', fontWeight: 700 }}
-                          >
-                            <option value="30">Nach 30 Tagen</option>
-                            <option value="90">Nach 90 Tagen</option>
-                            <option value="365">Nach 1 Jahr</option>
-                            <option value="never">Nie löschen (manuell)</option>
-                          </select>
                         </div>
                       </div>
                     )}
@@ -1907,10 +1585,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                     gap: '10px'
                   }}>
                     <button
+                      type="button"
                       onClick={() => setActiveSecretarySettingsModal(null)}
                       style={{
-                        padding: '8px 18px',
-                        borderRadius: '10px',
+                        padding: '10px 20px',
+                        minHeight: '44px',
+                        borderRadius: '12px',
                         border: '1px solid #cbd5e1',
                         background: '#ffffff',
                         color: '#475569',
@@ -1925,16 +1605,18 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
                     {activeSecretarySettingsModal !== 'danger_zone' && (
                       <button
+                        type="button"
                         onClick={async () => {
                           await handleSaveAllSettings();
                           setActiveSecretarySettingsModal(null);
                         }}
                         disabled={!isSettingsDirty || isSavingSettings}
                         style={{
-                          padding: '8px 20px',
-                          borderRadius: '10px',
+                          padding: '10px 22px',
+                          minHeight: '44px',
+                          borderRadius: '12px',
                           border: 'none',
-                          background: isSettingsDirty ? '#ea4335' : '#cbd5e1',
+                          background: isSettingsDirty ? '#0f172a' : '#e2e8f0',
                           color: isSettingsDirty ? '#ffffff' : '#94a3b8',
                           fontSize: '0.82rem',
                           fontWeight: 800,
@@ -1955,11 +1637,38 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
               isOpen={showCertModal}
               onClose={() => setShowCertModal(false)}
               schoolId={schoolId}
-              schoolName={props.schoolName || 'Musikschule'}
-              adminName={props.currentUserProfile?.full_name || 'Schulleitung'}
+              schoolName={props.schoolName || currentSchoolProfile?.name || 'Musikschule'}
+              adminName={currentSchoolProfile?.avv_signee_name || props.currentUserProfile?.full_name || (typeof window !== 'undefined' ? localStorage.getItem(`groovelab_avv_signee_${schoolId}`) : '') || 'Schulleitung (Vertretungsberechtigte Person)'}
+              confirmationDate={currentSchoolProfile?.avv_signed_at || (typeof window !== 'undefined' ? localStorage.getItem(`groovelab_avv_signed_${schoolId}`) : undefined)}
+              auditChecksum={currentSchoolProfile?.avv_checksum || (typeof window !== 'undefined' ? localStorage.getItem(`groovelab_avv_checksum_${schoolId}`) : undefined)}
             />
 
             <SecretarySponsorsModal isOpen={activeSecretarySettingsModal === 'sponsors'} onClose={() => setActiveSecretarySettingsModal(null)} schoolId={schoolId} schoolName={props.schoolName || 'Musikschule'} schoolStreet={props.schoolStreet} schoolZipCode={props.schoolZipCode} schoolCity={props.schoolCity} schoolEmail={props.schoolEmail} schoolPhoneNumber={props.schoolPhoneNumber} studentsCount={students?.length || 350} />
+
+            <SecretaryPrivacyGovernanceModal
+              isOpen={activeSecretarySettingsModal === 'security_privacy'}
+              onClose={() => setActiveSecretarySettingsModal(null)}
+              schoolId={schoolId}
+              schoolName={props.schoolName}
+              schoolStreet={props.schoolStreet}
+              schoolHouseNumber={props.schoolHouseNumber}
+              schoolZipCode={props.schoolZipCode}
+              schoolCity={props.schoolCity}
+              isAvvSigned={isAvvSigned}
+              hasCampusSub={hasCampusSub}
+              hasGroovelabSub={hasGroovelabSub}
+              studentBillingOption={studentBillingOption}
+              logRetention={logRetention}
+              setLogRetention={setLogRetention}
+              onOpenSecuritySuite={() => window.dispatchEvent(new CustomEvent('open_admin_security_suite'))}
+              onOpenDpoPortal={() => setShowDpoPortalModal(true)}
+              onOpenDpoIdCard={() => setShowDpoIdCardModal(true)}
+              onOpenAvvModal={() => setShowAvvModal(true)}
+              onOpenCertModal={() => setShowCertModal(true)}
+              onSaveSettings={handleSaveAllSettings}
+              isSettingsDirty={isSettingsDirty}
+              isSavingSettings={isSavingSettings}
+            />
 
           </div>
   );

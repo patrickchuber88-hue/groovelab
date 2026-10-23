@@ -217,6 +217,16 @@ export const useSecretaryLicenses = ({
   });
 
   const [showChangeTariffModal, setShowChangeTariffModal] = useState<boolean>(false);
+  const [selectedModalOption, setSelectedModalOption] = useState<any>(null);
+  const [activeStudentsModalList, setActiveStudentsModalList] = useState<{
+    list: any[];
+    month: string;
+    amount?: number;
+    campusCount?: number;
+    groovelabCount?: number;
+    passiveCount?: number;
+  } | null>(null);
+  const [modalStudentSearchQuery, setModalStudentSearchQuery] = useState<string>('');
   const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
   const [checkoutStep, setCheckoutStep] = useState<number>(1);
   const [billingPayer, setBillingPayer] = useState<'school' | 'student'>('school');
@@ -313,6 +323,7 @@ export const useSecretaryLicenses = ({
   // Trial Logs (Student activation trials)
   const [trialLogs, setTrialLogs] = useState<any[]>([]);
   const [trialLogsLoading, setTrialLogsLoading] = useState<boolean>(false);
+  const [showTrialLogModal, setShowTrialLogModal] = useState<boolean>(false);
 
   // ─── TARIFF BOOKINGS FETCH & BASELINE SYNTHESIZER ───
   const fetchTariffBookings = useCallback(async (overrideSchoolData?: any) => {
@@ -1022,6 +1033,12 @@ export const useSecretaryLicenses = ({
     setNextBillingOptionEffectiveAt,
     showChangeTariffModal,
     setShowChangeTariffModal,
+    selectedModalOption,
+    setSelectedModalOption,
+    activeStudentsModalList,
+    setActiveStudentsModalList,
+    modalStudentSearchQuery,
+    setModalStudentSearchQuery,
     showCheckoutModal,
     setShowCheckoutModal,
     checkoutStep,
@@ -1142,6 +1159,8 @@ export const useSecretaryLicenses = ({
     setTrialLogs,
     trialLogsLoading,
     setTrialLogsLoading,
+    showTrialLogModal,
+    setShowTrialLogModal,
     fetchTrialLogs,
     generateMailtoLink,
     handleConfirmStudentTrial,

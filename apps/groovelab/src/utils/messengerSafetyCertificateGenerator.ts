@@ -125,21 +125,21 @@ export async function generateMessengerSafetyCertificatePDF(
     const pillars = [
       {
         num: '1',
-        title: 'Datenbankseitiger Ausschluss von 1:1-Schüler-Direktnachrichten',
-        legal: 'Schutzzweck: § 832 BGB (Aufsichtspflicht), § 8a SGB VIII (Kinderschutz)',
-        desc: 'Private 1:1-Direktnachrichten zwischen Schülerinnen und Schülern sind sowohl in der Benutzeroberfläche als auch auf Datenbankebene durch einen zwingenden PostgreSQL-Trigger (enforce_campus_chat_governance) gesperrt. Schüler kommunizieren 1:1 ausschließlich mit ihrer zugeteilten Lehrkraft; Gruppenkanäle (Ensembles/Bands) stehen unter Lehrkraft-Moderation und Wortfilterung.'
+        title: 'Datenbankseitiger Ausschluss von 1:1-Schüler-Direktchats & Zero-Photo Doktrin',
+        legal: 'Schutzzweck: § 832 BGB (Aufsichtspflicht), § 8a SGB VIII (Kinderschutz), § 22 KUG',
+        desc: 'Private 1:1-Direktchats zwischen Schülern sind datenbankseitig via PostgreSQL-Trigger (enforce_campus_chat_governance) gesperrt. Schüler kommunizieren 1:1 ausschließlich mit ihrer Lehrkraft. KUG § 22 Zero-Photo Doktrin: Foto- und Videouploads sind im Chat vollständig deaktiviert.'
       },
       {
         num: '2',
-        title: 'Proaktives No-Bullying Respect-Gate (Strafrechts- & Jugendschutz-Pre-Flight)',
-        legal: 'Rechtsnorm: §§ 185 ff., 86a, 130, 241 StGB, JuSchG, § 8a SGB VIII',
-        desc: 'Jede Nachricht wird vor der Übertragung einer clientseitigen und serverseitigen Integritätsprüfung unterzogen. Verfassungsfeindliche Parolen, rassistische Hassrede, schwere personale Ehrverletzungen, sexuelle Belästigung und Gewaltdrohungen werden vor dem Senden blockiert. Eine geschützte Musik-Whitelist schützt Fachbegriffe vor False Positives.'
+        title: 'Proaktives No-Bullying Respect-Gate & Flag-to-Hide (DSA Art. 16)',
+        legal: 'Rechtsnorm: §§ 185 ff., 86a, 130, 241 StGB, JuSchG, Art. 6 & 16 DSA',
+        desc: 'Jede Nachricht wird vor dem Senden serverseitig auf Hate-Speech, Beleidigungen und Bedrohungen gefiltert (Musik-Whitelist geschützt). Unangemessene Beiträge in Band-Pinnwänden können mit 1 Klick sofort für alle unsichtbar geschaltet werden (Notice-and-Action).'
       },
       {
         num: '3',
-        title: 'Elterliche Kontrollhoheit & PIN-Sperre (Art. 8 DSGVO & KUG)',
-        legal: 'Rechtsnorm: Art. 8 DSGVO (Einwilligung Minderjähriger), BGB (Elterliche Sorge)',
-        desc: 'Erziehungsberechtigte besitzen über das Eltern-Portal volle Transparenz über alle Chatverläufe ihrer Kinder. Bei Bedarf kann der Chat im Schülerprofil mit einer 4-stelligen Eltern-PIN mit einem Klick schreibgesperrt werden (Lesen erlaubt, Antworten gesperrt).'
+        title: 'Elterliche Kontrollhoheit, PIN-Sperre & 14-Tage Auto-Löschung',
+        legal: 'Rechtsnorm: Art. 8 & Art. 5 DSGVO (Einwilligung Minderjähriger & Speicherbegrenzung)',
+        desc: 'Erziehungsberechtigte besitzen volle Einsicht in alle Chats ihrer Kinder und können den Chat per Eltern-PIN jederzeit schreibsperren. Pinnwand-Beiträge unterliegen einer automatischen 14-Tage-Löschbegrenzung (zwei Probenzyklen) gem. DIN 66398.'
       },
       {
         num: '4',
@@ -154,13 +154,13 @@ export async function generateMessengerSafetyCertificatePDF(
       doc.setDrawColor(borderGray[0], borderGray[1], borderGray[2]);
       doc.roundedRect(margin, yPos, contentWidth, 31, 2, 2, 'FD');
 
-      // Green Check Badge
+      // Green Check Badge with centered number
       doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
       doc.circle(margin + 6, yPos + 7, 3.5, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
-      doc.text(p.num, margin + 4.8, yPos + 8.5);
+      doc.text(p.num, margin + 6, yPos + 8.2, { align: 'center' });
 
       // Title & Legal
       doc.setFont('helvetica', 'bold');

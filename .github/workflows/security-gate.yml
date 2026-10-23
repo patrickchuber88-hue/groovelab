@@ -39,11 +39,14 @@ jobs:
       - name: "5. Software Supply Chain & Vulnerability Audit"
         run: npm run security:deps
 
-      - name: "6. Campus-Groovelab Core Quality Gate (Drift, Legal, Buttons, Headers, Typecheck)"
-        run: npm run gate
+      - name: "6. Campus-Groovelab Core Quality Gate (16 Architecture Guards)"
+        run: node scripts/morning_gate_orchestrator.mjs
 
-      - name: "7. PostgreSQL Multi-Tenancy & RLS Isolation Tests"
+      - name: "7. Monorepo TypeScript Typecheck"
+        run: npm run typecheck
+
+      - name: "8. PostgreSQL Multi-Tenancy & RLS Isolation Tests"
         run: npm run test:rls
 
-      - name: "8. Users-View Airgap & Leakage Penetration Suite"
+      - name: "9. Users-View Airgap & Leakage Penetration Suite"
         run: npm run test:leakage

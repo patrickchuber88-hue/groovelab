@@ -311,7 +311,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       img.onload = () => {
         ctx.drawImage(img, 60, 40, 280, 280);
 
-        // 100% Anonymous Footer (Zero PII for privacy & child safety)
+        // 100% Pseudonymous Footer (Zero PII for privacy & child safety)
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 16px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center';
@@ -319,10 +319,10 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
 
         ctx.fillStyle = '#64748b';
         ctx.font = '500 12px Inter, system-ui, sans-serif';
-        ctx.fillText('Anonymer QR-Sticker für Notenheft & Koffer', 200, 392);
+        ctx.fillText('Pseudonymer QR-Sticker (ohne Klarnamen) für Notenheft & Koffer', 200, 392);
 
         const link = document.createElement('a');
-        link.download = `QR_Sticker_Notenheft_Anonym.png`;
+        link.download = `QR_Sticker_Notenheft_Pseudonym.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
       };
@@ -739,7 +739,7 @@ ${link}
 Deine Vorteile auf einen Blick:
 📅 1. Stundenplan-Wunschzeiten in 2 Min. übermitteln
 💳 2. Digitalen Schülerausweis (Apple Wallet & Fotogalerie) speichern
-🏷️ 3. Anonymen QR-Sticker für dein Notenheft herunterladen & am Kiosk einchecken
+🏷️ 3. Pseudonymen QR-Sticker (ohne Klarnamen) für dein Notenheft herunterladen & am Kiosk einchecken
 📚 4. Hausaufgabenheft & Übe-Timer direkt nutzen`
       : `Hallo ${student.first_name}! 🎶
 
@@ -748,7 +748,7 @@ ${link}
 
 Deine Vorteile auf einen Blick:
 💳 1. Digitalen Pass (Apple Wallet & Fotogalerie) speichern
-🏷️ 2. Anonymen QR-Sticker für dein Instrument/Notenheft herunterladen & am Kiosk einchecken
+🏷️ 2. Pseudonymen QR-Sticker (ohne Klarnamen) für dein Instrument/Notenheft herunterladen & am Kiosk einchecken
 🎸 3. Band-Repertoire, Songs & Skills in GrooveLab freischalten`;
 
     navigator.clipboard.writeText(formattedText);

@@ -1,5 +1,7 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
 import { Clock, Check } from 'lucide-react';
+import { StepUpPinModal } from '../ui/StepUpPinModal';
+import { setStepUpPin, revealClassRosterNamesViaVault } from '../../utils/nameHelper';
 
 const AdminSecuritySuiteModal = lazy(() => import('../AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
 const QuarterlyAccessReportModal = lazy(() => import('../ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
@@ -75,6 +77,23 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
   const effectiveSchool = school || (Array.isArray(user?.schools) ? user?.schools[0] : user?.schools);
 
   const isGroovelabPlatform = activePlatform === 'groovelab';
+
+  // 🛡️ 0,1% Globaler Step-Up PIN Listener (NIST SP 800-63B / BSI TR-02102-1)
+  const [stepUpPromptOpen, setStepUpPromptOpen] = useState<boolean>(false);
+  const pendingStepUpCallbackRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const handleStepUpRequest = (e: any) => {
+      const onSuccess = e?.detail?.onSuccess;
+      pendingStepUpCallbackRef.current = typeof onSuccess === 'function' ? onSuccess : null;
+      setStepUpPromptOpen(true);
+    };
+
+    window.addEventListener('groovelab:step-up-pin-request', handleStepUpRequest);
+    return () => {
+      window.removeEventListener('groovelab:step-up-pin-request', handleStepUpRequest);
+    };
+  }, []);
 
   return (
     <>
@@ -290,6 +309,44 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
           </div>
         </div>
       )}
+
+      {/* 🔒 0,1% Globaler Step-Up PIN Guard (NIST SP 800-63B / BSI TR-02102-1) */}
+      <StepUpPinModal
+        isOpen={stepUpPromptOpen}
+        onClose={() => {
+          setStepUpPromptOpen(false);
+          pendingStepUpCallbackRef.current = null;
+        }}
+        title="Klarnamen freischalten"
+        description="Bitte bestätige deine persönliche 4-stellige PIN, um die bürgerlichen Klarnamen für 60 Sekunden freizugeben."
+        onSuccess={async (enteredPin) => {
+          if (!user?.id) return false;
+          try {
+            const { data: isValid, error } = await supabase.rpc('verify_personal_pin', {
+              user_uuid: user.id,
+              input_pin: enteredPin
+            });
+
+            if (error || !isValid) {
+              return false;
+            }
+
+            // PIN autorisiert: 5-Minuten-Grace-Period im RAM aktivieren
+            setStepUpPin(enteredPin);
+
+            // 🛡️ 0,1% Goldstandard: Batch-Entschlüsselung für 60s Auto-Curtain
+            await revealClassRosterNamesViaVault(undefined, enteredPin, supabase);
+
+            if (pendingStepUpCallbackRef.current) {
+              pendingStepUpCallbackRef.current();
+              pendingStepUpCallbackRef.current = null;
+            }
+            return true;
+          } catch {
+            return false;
+          }
+        }}
+      />
     </>
   );
 };

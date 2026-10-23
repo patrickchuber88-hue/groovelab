@@ -145,9 +145,9 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     padding: '14px 20px',
                     fontSize: '0.85rem',
                     fontWeight: 800,
-                    background: showRealNames ? '#fee2e2' : '#ffffff',
-                    border: showRealNames ? 'none' : '1px solid #cbd5e1',
-                    color: showRealNames ? '#b91c1c' : '#64748b',
+                    background: showRealNames ? '#ffffff' : '#fee2e2',
+                    border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fca5a5',
+                    color: showRealNames ? '#475569' : '#dc2626',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
@@ -156,10 +156,11 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                     flex: windowWidth < 768 ? 1 : 'none'
                   }}
                   className="hover-scale"
-                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+                  title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                  aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                 >
-                  {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
-                  <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
+                  {showRealNames ? <Eye size={16} color="#34a853" /> : <EyeOff size={16} color="#dc2626" />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
                 </button>
                 {teachersManageStudents && (
                   <button
@@ -293,7 +294,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                         key={student.id} 
                         role="button"
                         tabIndex={0}
-                        aria-label={`Schülerprofil öffnen: ${student.first_name} ${maskLastName(student.last_name, showRealNames)}, ${formatDisplaySubjectOrInstrument(student, teacher)}`}
+                        aria-label={`Schülerprofil öffnen: ${student.first_name} ${maskLastName(student.last_name, showRealNames, student.id)}, ${formatDisplaySubjectOrInstrument(student, teacher)}`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -335,7 +336,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>{student.first_name} {maskLastName(student.last_name, showRealNames)}</span>
+                              <span>{student.first_name} {maskLastName(student.last_name, showRealNames, student.id)}</span>
                               {isStudentActive ? (
                                 <span title="Interaktives Campus-Studio aktiv (Übe-Timer, Loopstation & Aufnahmen)" style={{ display: 'inline-flex', alignItems: 'center' }}>
                                   <Headphones size={13} style={{ color: '#16a34a', flexShrink: 0 }} />

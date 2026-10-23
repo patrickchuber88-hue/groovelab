@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Music, Disc, Volume2, Mic, Package, GripVertical, 
   DoorOpen, Sparkles, ExternalLink, Edit2, ChevronDown, 
-  ChevronUp, X, Check, ArrowRight
+  ChevronUp, X, Check, ArrowRight, Wrench, AlertTriangle
 } from 'lucide-react';
 
 export interface EquipmentInstance {
@@ -131,11 +131,31 @@ export const SecretaryEquipmentCard: React.FC<SecretaryEquipmentCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
+  const [showQuickAssign, setShowQuickAssign] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'ready' | 'service' | 'defect'>(() => {
+    try {
+      return (localStorage.getItem(`groovelab_eq_health_${group.baseName}`) as any) || 'ready';
+    } catch {
+      return 'ready';
+    }
+  });
+
+  const toggleHealthStatus = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextStatus = healthStatus === 'ready' ? 'service' : healthStatus === 'service' ? 'defect' : 'ready';
+    setHealthStatus(nextStatus);
+    try {
+      localStorage.setItem(`groovelab_eq_health_${group.baseName}`, nextStatus);
+    } catch {}
+  };
 
   const firstFreeInstance = group.instances.find(inst => !inst.roomId);
   const hasFree = !!firstFreeInstance;
   const freeCount = group.instances.filter(i => !i.roomId).length;
   const visualMeta = getInstrumentVisualMeta(group.baseName);
+  const freeInstanceTag = firstFreeInstance 
+    ? (firstFreeInstance.fullName.match(/#\d+$/)?.[0] || `#${group.instances.indexOf(firstFreeInstance) + 1}`) 
+    : '';
 
   // Aggregation of assigned rooms with strict deduplication
   const roomAssignmentsMap: Record<string, { roomId: string; roomName: string; count: number; instances: EquipmentInstance[] }> = {};
@@ -237,6 +257,35 @@ export const SecretaryEquipmentCard: React.FC<SecretaryEquipmentCardProps> = ({
                 {group.baseName}
               </span>
 
+              {/* Apple SF Health Status Pill (Klickbar für Zustands-Ampel) */}
+              <button
+                type="button"
+                onClick={toggleHealthStatus}
+                title={`Betriebsstatus: ${healthStatus === 'ready' ? 'Einsatzbereit' : healthStatus === 'service' ? 'Wartung / Stimmung fällig' : 'Defekt gemeldet'} (Klicken zum Umschalten)`}
+                style={{
+                  border: 'none',
+                  background: healthStatus === 'ready' ? '#ecfdf5' : healthStatus === 'service' ? '#fffbeb' : '#fef2f2',
+                  color: healthStatus === 'ready' ? '#15803d' : healthStatus === 'service' ? '#b45309' : '#b91c1c',
+                  fontSize: '0.64rem',
+                  fontWeight: 800,
+                  padding: '2px 7px',
+                  borderRadius: '6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <span style={{ 
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  background: healthStatus === 'ready' ? '#22c55e' : healthStatus === 'service' ? '#f59e0b' : '#ef4444' 
+                }} />
+                {healthStatus === 'ready' ? 'Bereit' : healthStatus === 'service' ? 'Wartung' : 'Defekt'}
+              </button>
+
               {group.model && group.model !== 'Standard' && (
                 <span style={{ 
                   fontSize: '0.68rem', 
@@ -274,34 +323,121 @@ export const SecretaryEquipmentCard: React.FC<SecretaryEquipmentCardProps> = ({
             {/* Aggregated Badges Row */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
               
-              {/* Free Pool Pill */}
+              {/* Free Pool Pill with Concrete Instance Tag (#3) & 1-Click Apple Quick-Assign */}
               {freeCount > 0 && (
-                <span 
-                  draggable={!selectedRoom}
-                  onDragStart={(e) => {
-                    e.stopPropagation();
-                    if (!firstFreeInstance) return;
-                    e.dataTransfer.setData("text/plain", firstFreeInstance.fullName);
-                    e.dataTransfer.effectAllowed = "copyMove";
-                  }}
-                  title="Ziehe diese Einheit auf einen Raum in der rechten Spalte"
-                  style={{ 
-                    fontSize: '0.68rem', 
-                    fontWeight: 800, 
-                    padding: '3px 10px', 
-                    borderRadius: '8px',
-                    background: '#f0fdf4',
-                    color: '#15803d',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: selectedRoom ? 'default' : 'grab'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Sparkles size={12} color="#16a34a" />
-                  {freeCount > 1 ? `${freeCount}× Frei im Pool` : '1× Frei (Ziehbar)'}
-                </span>
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  <span 
+                    draggable={!selectedRoom}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      if (!firstFreeInstance) return;
+                      e.dataTransfer.setData("text/plain", firstFreeInstance.fullName);
+                      e.dataTransfer.effectAllowed = "copyMove";
+                    }}
+                    title="Ziehe diese Einheit auf einen Raum in der rechten Spalte oder klicke für Schnell-Zuweisung"
+                    style={{ 
+                      fontSize: '0.68rem', 
+                      fontWeight: 800, 
+                      padding: '3px 10px', 
+                      borderRadius: '8px',
+                      background: '#f0fdf4',
+                      color: '#15803d',
+                      border: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      cursor: selectedRoom ? 'default' : 'pointer'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowQuickAssign(prev => !prev);
+                    }}
+                  >
+                    <Sparkles size={12} color="#16a34a" />
+                    {freeCount > 1 ? `${freeCount}× Frei (z. B. ${freeInstanceTag})` : `Frei: ${freeInstanceTag} (Ziehbar)`}
+                    <ChevronDown size={11} style={{ opacity: 0.7 }} />
+                  </span>
+
+                  {/* Apple Action Popover for Tablet & 1-Click Desktop */}
+                  {showQuickAssign && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        left: 0,
+                        zIndex: 100,
+                        background: 'rgba(255, 255, 255, 0.98)',
+                        backdropFilter: 'blur(20px)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(15, 23, 42, 0.10)',
+                        borderRadius: '14px',
+                        padding: '6px',
+                        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(0, 0, 0, 0.04)',
+                        minWidth: '220px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #f1f5f9', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Zuweisen an Raum:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowQuickAssign(false)}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: 0 }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+
+                      <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {rooms.map(rm => (
+                          <button
+                            key={rm.id}
+                            type="button"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setShowQuickAssign(false);
+                              if (firstFreeInstance) {
+                                await onAssignToRoom(firstFreeInstance.fullName, rm.id);
+                              }
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              textAlign: 'left',
+                              padding: '6px 8px',
+                              borderRadius: '8px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              transition: 'background 0.12s'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <DoorOpen size={13} color="#64748b" />
+                              {rm.name}
+                            </span>
+                            {rm.floor && (
+                              <span style={{ fontSize: '0.60rem', color: '#64748b', background: '#f8fafc', padding: '1px 5px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                {rm.floor}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Clean Deduplicated Room Location Badges */}

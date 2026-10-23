@@ -400,52 +400,107 @@ export interface PlatformAnnouncement {
 
 export const FEEDBACK_CATEGORIES: FeedbackCategory[] = [
   {
-    id: 'schedule',
-    name: 'Stundenplan & Termine',
-    shortName: 'Stundenplan & Termine',
-    iconName: 'Calendar',
-    allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
-    tags: ['Stundenplan-Designer', 'Terminänderungen', 'Raumplaner', 'Veranstaltungen', 'Kalender-Sync']
-  },
-  {
     id: 'homework',
-    name: 'Hausaufgaben & Schüler',
-    shortName: 'Hausaufgaben & Schüler',
+    name: 'Aufgaben-Board & Pädagogik',
+    shortName: 'Aufgaben-Board & Pädagogik',
     iconName: 'BookOpen',
     allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
-    tags: ['Hausaufgabenheft', 'Meisterwerk-Protokoll', 'Übe-Timer & Streaks', 'Fahrpläne & Notizen', 'Schülerverwaltung']
+    tags: [
+      'Üben & Hausaufgabenheft',
+      'Noten, Songs & Repertoire',
+      'Aufnahmen & Mitschnitte',
+      'Groove-Trainer & Metronom',
+      'Stimmgerät (Tuner)',
+      'Gehörtraining (EarLab)',
+      'Campus-Loopstation',
+      'Fähigkeiten (Skill-Radar)',
+      'Musik-Weltreise',
+      'Aufgaben-Archiv'
+    ]
   },
   {
-    id: 'audio',
-    name: 'Audio-Tresor & Studio',
-    shortName: 'Audio-Tresor & Studio',
-    iconName: 'Music',
+    id: 'schedule',
+    name: 'Stundenplan, Termine & Events',
+    shortName: 'Stundenplan & Events',
+    iconName: 'Calendar',
     allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
-    tags: ['Loopstation', 'Play-Along Studio', 'Unterrichts-Aufnahmen', 'Schüler-Aufnahmen', 'Audio-Tresor & Speicher']
+    tags: [
+      'Stundenplan-Designer',
+      'Raumbelegung & Konflikte',
+      'Terminausfälle & Vertretung',
+      'Konzerte & Vorspiele',
+      'Kalender-Sync (iCal)'
+    ]
+  },
+  {
+    id: 'messaging',
+    name: 'Messenger & Elternkontakt',
+    shortName: 'Messenger & Eltern',
+    iconName: 'Mail',
+    allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
+    tags: [
+      'DSGVO-Messenger',
+      'Eltern-Kommunikation',
+      'Unterrichts-Absagen',
+      'Schul-Durchsagen',
+      'Ruhezeiten (Quiet Hours)'
+    ]
   },
   {
     id: 'bands',
-    name: 'Bands & Repertoire',
-    shortName: 'Bands & Repertoire',
-    iconName: 'Users',
+    name: 'GrooveLab & Band-Studio',
+    shortName: 'GrooveLab & Bands',
+    iconName: 'Music',
     allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
-    tags: ['Band-Verwaltung', 'Live Lab', 'Songs meistern', 'Repertoire-Planer', 'Skill-Radar & XP', 'Musiker-Avatare']
+    tags: [
+      'Live Lab Stationen',
+      'Songs & Repertoire',
+      'Band-Besetzung',
+      'Band-Matching',
+      '3D-Avatare & XP'
+    ]
+  },
+  {
+    id: 'audio',
+    name: 'Mediathek & Notenmaterial',
+    shortName: 'Mediathek',
+    iconName: 'Library',
+    allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
+    tags: [
+      'VDM MicroScores (Notenausschnitte)',
+      'Didaktische Textbausteine',
+      'Audio-Tresor & Play-Alongs',
+      'Song-Architektur & Lead-Sheets'
+    ]
   },
   {
     id: 'admin_billing',
-    name: 'Verwaltung & Finanzen',
+    name: 'Schulverwaltung & Finanzen',
     shortName: 'Verwaltung & Finanzen',
     iconName: 'CreditCard',
     allowedRoles: ['admin', 'secretary'],
-    tags: ['Zahlungsabgleich', 'Schüler-Aktivierungen', 'Direktabrechnung (Eltern)', 'Lehrkräfte & Klassen', 'Kiosk-Terminal']
+    tags: [
+      'Schüler-Aktivierungen & Verträge',
+      'Lehrkräfte & Kollegium',
+      'Rechnungen & Gebühren',
+      'Bankabgleich (CAMT) & DATEV',
+      'Mahnwesen & Finanzen',
+      'Kiosk-Terminal & Lizenzen'
+    ]
   },
   {
     id: 'general',
-    name: 'App, Login & Sonstiges',
-    shortName: 'App, Login & Sonstiges',
+    name: 'App, Login & Account',
+    shortName: 'App, Login & Account',
     iconName: 'Settings',
     allowedRoles: ['admin', 'secretary', 'teacher', 'student'],
-    tags: ['Login & PIN', 'Modul-Wechsel (Kombi)', 'App-Geschwindigkeit', 'Design & Darstellung', 'Allgemeine Idee']
+    tags: [
+      'Login, QR & PIN-Sicherheit',
+      'Elternbereich (Junior/Teen/Pro)',
+      'App-Geschwindigkeit & Offline-Sync',
+      'Design & Barrierefreiheit',
+      'Allgemeine Idee'
+    ]
   }
 ];
 

@@ -251,7 +251,7 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
                   }}
                   title={
                     isLastNameRevealedLocally
-                      ? 'Nachnamen verbergen (Anonymisiert)'
+                      ? 'Nachnamen verbergen (Pseudonymisiert)'
                       : 'Nachnamen enthüllen (Klarname zur Anwesenheitskontrolle)'
                   }
                   className="hover-scale-mini"

@@ -859,7 +859,7 @@ export const AdminStatsView: React.FC<AdminStatsViewProps> = ({
                       />
                     </div>
                     <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.9rem' }}>
-                      {user.first_name} {maskLastName(user.last_name, showRealNames)}
+                      {user.first_name} {maskLastName(user.last_name, showRealNames, user.id)}
                     </div>
                   </div>
                   <div style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 950, display: 'flex', alignItems: 'center', gap: '4px', boxShadow: 'none' }}>

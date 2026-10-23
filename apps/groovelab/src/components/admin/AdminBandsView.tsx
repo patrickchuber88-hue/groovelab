@@ -228,7 +228,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                             style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid #f1f5f9' }}
                           >
                             <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
-                            {s.first_name} {maskLastName(s.last_name, showRealNames)}
+                            {s.first_name} {maskLastName(s.last_name, showRealNames, s.id)}
                           </div>
                         ))}
                       </div>
@@ -643,7 +643,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                               <button 
                                 key={s.id}
                                 type="button"
-                                aria-label={`${s.first_name} ${maskLastName(s.last_name, showRealNames)} als Sänger zuweisen`}
+                                aria-label={`${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)} als Sänger zuweisen`}
                                 onClick={async () => {
                                   try {
                                     await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });
@@ -680,7 +680,7 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                                   <img src={(s.photo_url && !s.photo_url.includes('avatar_ghost')) ? s.photo_url : (s.is_external_vocalist ? '/avatars/gesang_avatar.png' : '/avatars/gitarre_avatar_new.png')} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 </div>
                                 <div>
-                                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames, s.id)}</div>
                                   {s.is_external_vocalist && <div style={{ fontSize: '0.6rem', color: activePlatform === 'groovelab' ? '#854d0e' : brandColor, fontWeight: 700 }}>Externer Gesang</div>}
                                 </div>
                               </button>

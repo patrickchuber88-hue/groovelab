@@ -532,8 +532,8 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         </span>
                       </div>
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: 'none' }}>
-                      DSGVO-Anonymisiert
+                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 800, background: '#ecfdf5', padding: '3px 8px', borderRadius: '100px', border: 'none' }} title="Datenminimierung aktiv: Nachname wird im System als Initiale geführt (Pseudonymisierung nach Art. 25 DSGVO)">
+                      DSGVO-Pseudonymisiert
                     </span>
                   </div>
 
@@ -822,7 +822,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                 {/* 👁️ Global Eye toggle */}
                 <button
                   type="button"
-                  aria-label={showRealNames ? "Klarnamen anzeigen" : "Nachnamen maskieren (Datenschutz)"}
+                  aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                   onClick={() => toggleRealNames()}
                   style={{
                     display: 'inline-flex',
@@ -833,18 +833,18 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                     padding: '0 10px',
                     fontSize: '0.76rem',
                     fontWeight: 700,
-                    background: showRealNames ? '#ffffff' : '#fef9c3',
-                    border: showRealNames ? '1px solid #cbd5e1' : 'none',
-                    color: showRealNames ? '#475569' : '#854d0e',
+                    background: showRealNames ? '#ffffff' : '#fee2e2',
+                    border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fca5a5',
+                    color: showRealNames ? '#475569' : '#dc2626',
                     cursor: 'pointer',
                     fontFamily: 'Urbanist, -apple-system, sans-serif',
                     height: '30px',
                     whiteSpace: 'nowrap'
                   }}
-                  title={showRealNames ? "Klarnamen (vollständige Nachnamen) anzeigen" : "Nachnamen wieder maskieren (Datenschutz)"}
+                  title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                 >
-                  {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
-                  <span>{showRealNames ? "Klarnamen" : "DSGVO-Modus"}</span>
+                  {showRealNames ? <Eye size={13} color="#34a853" /> : <EyeOff size={13} color="#dc2626" />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
                 </button>
 
                 {/* Koffer-Tag Notfall-Scanner */}
@@ -1109,6 +1109,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
               ) : (
                 paginatedStudents.map((student: any) => {
                   const isSelected = selectedStudentIds.includes(student.id);
+                  const studentDisplayName = `${student.first_name || ''} ${maskLastName(student.last_name, showRealNames, student.id)}`.trim();
                   return (
                     <div 
                       key={student.id} 
@@ -1144,7 +1145,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       >
                         <input 
                           type="checkbox"
-                          aria-label={`Schüler ${student.first_name} ${student.last_name} auswählen`}
+                          aria-label={`Schüler ${studentDisplayName} auswählen`}
                           checked={isSelected}
                           onChange={(e) => {
                             e.stopPropagation();
@@ -1162,7 +1163,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       <div 
                         role="button"
                         tabIndex={0}
-                        aria-label={`Schülerdetails für ${student.first_name} ${maskLastName(student.last_name, showRealNames)} öffnen`}
+                        aria-label={`Schülerdetails für ${student.first_name} ${maskLastName(student.last_name, showRealNames, student.id)} öffnen`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -1210,7 +1211,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                             }}
                             className="student-title-text"
                           >
-                            <span>{student.first_name} {maskLastName(student.last_name, showRealNames)}</span>
+                            <span>{student.first_name} {maskLastName(student.last_name, showRealNames, student.id)}</span>
                             {/* Subtle matter yellow dot for inactive students > 21 days (strictly informative, no tooltip per F65) */}
                             {(() => {
                               const lastActive = student.last_sign_in_at || student.updated_at || student.created_at;
@@ -1294,7 +1295,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       {/* Teacher Select */}
                       <div style={{ flex: '1.2', minWidth: 0 }}>
                         <select
-                          aria-label={`Lehrkraft für ${student.first_name} ${student.last_name}`}
+                          aria-label={`Lehrkraft für ${studentDisplayName}`}
                           value={student.teacher_id || ''}
                           onChange={(e) => {
                             handleUpdateStudentTeacher(student.id, e.target.value || null);
@@ -1335,7 +1336,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       {/* Duration Select */}
                       <div style={{ flex: '0.7', minWidth: 0 }}>
                         <select
-                          aria-label={`Unterrichtsdauer für ${student.first_name} ${student.last_name}`}
+                          aria-label={`Unterrichtsdauer für ${studentDisplayName}`}
                           value={student.lesson_duration || 30}
                           onChange={async (e) => {
                             const newDur = parseInt(e.target.value);
@@ -1394,7 +1395,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* Campus Chip with Direct 1-Click Toggle */}
                         <button
                           type="button"
-                          aria-label={`Campus-Modul für ${student.first_name} ${student.last_name} ${student.is_campus_active ? 'deaktivieren' : 'aktivieren'}`}
+                          aria-label={`Campus-Modul für ${studentDisplayName} ${student.is_campus_active ? 'deaktivieren' : 'aktivieren'}`}
                           onClick={() => {
                             if (handleToggleStudentModule) {
                               handleToggleStudentModule(student, 'campus');
@@ -1452,7 +1453,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* GrooveLab Chip with Direct 1-Click Toggle */}
                         <button
                           type="button"
-                          aria-label={`GrooveLab-Modul für ${student.first_name} ${student.last_name} ${student.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
+                          aria-label={`GrooveLab-Modul für ${studentDisplayName} ${student.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
                           onClick={() => {
                             if (handleToggleStudentModule) {
                               handleToggleStudentModule(student, 'groovelab');
@@ -1507,12 +1508,12 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* Direct Red Delete Button */}
                         <button
                           type="button"
-                          aria-label={`Schüler ${student.first_name} ${student.last_name} löschen`}
+                          aria-label={`Schüler ${studentDisplayName} löschen`}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteStudentCampus(
                               student.id, 
-                              `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+                              studentDisplayName,
                               student.instrument,
                               student.teacher_id,
                               student.is_campus_active,
@@ -1542,7 +1543,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         {/* ⋮ 3-Dots Options Menu Button */}
                         <button
                           type="button"
-                          aria-label={`Weitere Optionen für ${student.first_name} ${student.last_name}`}
+                          aria-label={`Weitere Optionen für ${studentDisplayName}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (activeContextMenu?.student?.id === student.id) {

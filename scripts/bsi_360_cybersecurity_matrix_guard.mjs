@@ -43,6 +43,13 @@ const migrationFiles = fs.existsSync(migrationsDir)
   ? fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'))
   : [];
 
+// Sort migration files numerically to prevent OS/filesystem readdir non-determinism (ext4 directory hash order)
+migrationFiles.sort((a, b) => {
+  const numA = parseInt(a.match(/^(\d+)_/)?.[1] || '0', 10);
+  const numB = parseInt(b.match(/^(\d+)_/)?.[1] || '0', 10);
+  return numA - numB;
+});
+
 const trackedFunctions = [
   'build_safe_school_context',
   'get_current_authenticated_user_id',
@@ -166,7 +173,7 @@ const bffIndex = readTextSafe('packages/bff-server/src/index.ts');
 const bffIdempotency = readTextSafe('packages/bff-server/src/services/idempotencyLedger.ts');
 
 const deploySh = readTextSafe('deploy.sh');
-const backupSh = readTextSafe('backup.sh');
+const backupSh = readTextSafe('scripts/backup.sh') || readTextSafe('backup.sh');
 const backupEnterpriseSh = readTextSafe('scripts/backup_supabase_enterprise.sh');
 const backupCampusDbSh = readTextSafe('deploy/backup/backup_campus_db.sh');
 
@@ -514,7 +521,7 @@ const domains = [
           backupCampusDbSh.includes('umask 077') &&
           backupCampusDbSh.includes('age -r') &&
           !backupCampusDbSh.includes('--symmetric'),
-        evidence: 'deploy.sh, backup.sh, backup_supabase_enterprise.sh & backup_campus_db.sh'
+        evidence: 'deploy.sh, scripts/backup.sh, backup_supabase_enterprise.sh & backup_campus_db.sh'
       }
     ]
   }

@@ -1152,7 +1152,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           const isMe = sess?.user_id === userId;
                           const hasHelp = (viewMode !== 'student' || isMe) && helpRequests.some(r => r.station_id === station.id);
                           const effectiveSessUser = isMe && teacher ? { ...sess?.users, ...teacher, photo_url: teacher.photo_url || sess?.users?.photo_url, avatar_url: teacher.avatar_url || sess?.users?.avatar_url } : sess?.users;
-                          const studentName = effectiveSessUser ? `${effectiveSessUser.first_name} ${maskLastName(effectiveSessUser.last_name, showRealNames)}` : '';
+                          const studentName = effectiveSessUser ? `${effectiveSessUser.first_name} ${maskLastName(effectiveSessUser.last_name, showRealNames, effectiveSessUser.id)}` : '';
 
                           return (
                             <div
@@ -1287,7 +1287,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const isMe = sess?.user_id === userId;
                           const hasHelp = (viewMode !== 'student' || isMe) && helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id);
-                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
+                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames, sess.users.id)}` : '';
 
                           return (
                             <div

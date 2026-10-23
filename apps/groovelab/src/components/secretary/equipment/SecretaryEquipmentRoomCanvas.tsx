@@ -55,6 +55,16 @@ export const SecretaryEquipmentRoomCanvas: React.FC<SecretaryEquipmentRoomCanvas
     return ['Alle', ...Array.from(set).sort()];
   }, [rooms]);
 
+  // Track duplicate room names to guarantee 100% disambiguation (z.B. 2x "Musikzimmer")
+  const duplicateRoomNames = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rooms.forEach(r => {
+      const n = (r.name || '').trim().toLowerCase();
+      counts[n] = (counts[n] || 0) + 1;
+    });
+    return new Set(Object.keys(counts).filter(k => counts[k] > 1));
+  }, [rooms]);
+
   // Filtered rooms
   const filteredRooms = useMemo(() => {
     if (floorFilter === 'Alle') return sortedRooms;
@@ -212,30 +222,49 @@ export const SecretaryEquipmentRoomCanvas: React.FC<SecretaryEquipmentRoomCanvas
         </span>
       </div>
 
-      {/* FLOOR TABS (Schnellnavigation bei vielen Räumen) */}
+      {/* FLOOR TABS: Originalgetreuer Apple macOS / iPadOS Segmented Control */}
       {availableFloors.length > 2 && (
-        <div style={{ display: 'flex', gap: '4px', overflowX: 'auto', paddingBottom: '2px' }}>
-          {availableFloors.map(floor => (
-            <button
-              key={floor}
-              type="button"
-              onClick={() => setFloorFilter(floor)}
-              style={{
-                border: 'none',
-                background: floorFilter === floor ? '#0f172a' : '#f1f5f9',
-                color: floorFilter === floor ? '#ffffff' : '#64748b',
-                fontSize: '0.66rem',
-                fontWeight: 700,
-                padding: '4px 10px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s'
-              }}
-            >
-              {floor}
-            </button>
-          ))}
+        <div 
+          role="tablist"
+          aria-label="Etagen-Filter"
+          style={{ 
+            display: 'inline-flex', 
+            background: 'rgba(15, 23, 42, 0.06)', 
+            padding: '3px', 
+            borderRadius: '11px', 
+            gap: '2px',
+            overflowX: 'auto',
+            maxWidth: '100%',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
+          }}
+        >
+          {availableFloors.map(floor => {
+            const isActive = floorFilter === floor;
+            return (
+              <button
+                key={floor}
+                role="tab"
+                aria-selected={isActive}
+                type="button"
+                onClick={() => setFloorFilter(floor)}
+                style={{
+                  border: 'none',
+                  background: isActive ? '#ffffff' : 'transparent',
+                  color: isActive ? '#0f172a' : '#64748b',
+                  fontSize: '0.68rem',
+                  fontWeight: isActive ? 800 : 650,
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+              >
+                {floor}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -293,14 +322,34 @@ export const SecretaryEquipmentRoomCanvas: React.FC<SecretaryEquipmentRoomCanvas
                     : '0 1px 3px rgba(15, 23, 42, 0.02)'
               }}
             >
-              {/* Room Header Row */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
-                  <DoorOpen size={15} color={isSelected ? '#0f172a' : '#64748b'} /> 
-                  {rm.name}
+              {/* Room Header Row with Apple Tabular Disambiguation */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', minWidth: 0 }}>
+                  <DoorOpen size={15} color={isSelected ? '#0f172a' : '#64748b'} style={{ flexShrink: 0 }} /> 
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {rm.name}
+                  </span>
+                  {duplicateRoomNames.has((rm.name || '').trim().toLowerCase()) && (
+                    <span 
+                      title={`Eindeutige Raum-Unterscheidung (${rm.floor || 'Bereich'})`}
+                      style={{ 
+                        fontSize: '0.60rem', 
+                        fontWeight: 800, 
+                        fontFamily: 'monospace', 
+                        color: '#6366f1', 
+                        background: '#eef2ff', 
+                        border: '1px solid #c7d2fe', 
+                        padding: '1px 5px', 
+                        borderRadius: '4px',
+                        flexShrink: 0
+                      }}
+                    >
+                      {rm.floor ? `[${rm.floor}]` : `[ID:${rm.id.slice(0, 4)}]`}
+                    </span>
+                  )}
                 </span>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                   {rm.floor && (
                     <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '5px' }}>
                       {rm.floor}

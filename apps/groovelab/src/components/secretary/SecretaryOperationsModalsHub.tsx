@@ -900,7 +900,7 @@ export const SecretaryOperationsModalsHub: React.FC<SecretaryOperationsModalsHub
                     <ul style={{ margin: '8px 0 0 0', paddingLeft: '18px', fontSize: '0.84rem', color: '#1e293b', lineHeight: 1.6 }}>
                       {students.filter((s: any) => selectedStudentIds.includes(s.id)).map((s: any) => (
                         <li key={s.id}>
-                          <strong>{s.first_name} {maskLastName(s.last_name, showRealNames)}</strong> {s.instrument ? `(${s.instrument})` : ''}
+                          <strong>{s.first_name} {maskLastName(s.last_name, showRealNames, s.id)}</strong> {s.instrument ? `(${s.instrument})` : ''}
                         </li>
                       ))}
                     </ul>

@@ -544,10 +544,10 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
 
                         ctx.fillStyle = '#64748b';
                         ctx.font = '500 12px Inter, system-ui, sans-serif';
-                        ctx.fillText('Anonymer QR-Sticker für Notenheft & Koffer', 200, 392);
+                        ctx.fillText('Pseudonymer QR-Sticker (ohne Klarnamen) für Notenheft & Koffer', 200, 392);
 
                         const link = document.createElement('a');
-                        link.download = `QR_Sticker_Notenheft_Anonym.png`;
+                        link.download = `QR_Sticker_Notenheft_Pseudonym.png`;
                         link.href = canvas.toDataURL('image/png');
                         link.click();
                       };

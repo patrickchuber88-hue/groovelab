@@ -283,9 +283,9 @@ export function generateMusicalRandomPattern(): { pattern: boolean[]; syllablesJ
 
 const SOUND_KITS: { id: SoundKitType; label: string }[] = [
   { id: 'acoustic', label: 'Drums' },
-  { id: 'body_percussion', label: 'Body Percussion' },
-  { id: 'urban_808', label: 'Urban 808' },
-  { id: 'latin', label: 'Latin Congas' }
+  { id: 'body_percussion', label: 'Body Perc' },
+  { id: 'classic_wood', label: 'Klassik & Holz' },
+  { id: 'cajon_latin', label: 'Cajón & Perk' }
 ];
 
 export interface LevelTheme {
@@ -435,7 +435,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const [bpm, setBpm] = useState<number>(initialBpm);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isBassEnabled, setIsBassEnabled] = useState<boolean>(true);
   const [isProMode, setIsProMode] = useState<boolean>(false);
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState<boolean>(false);
 
@@ -700,46 +699,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       console.warn('[GrooveTrainer] StudioSoundEngine play error:', e);
     }
   }, [getAudioContext, inputMode, isMuted, soundKit]);
-
-  // Groovy Synthesized Bassline (Play-Along Companion)
-  const playBassNote = useCallback((pitchHz: number, time: number, duration: number = 0.2) => {
-    if (isMuted || !isBassEnabled) return;
-    const ctx = getAudioContext();
-    if (!ctx) return;
-
-    const safeTime = Math.max(ctx.currentTime + 0.005, time);
-
-    // 🛡️ Anti-Bleed Click-Masking für Bassnote
-    try {
-      AcousticOnsetEngine.getInstance().registerScheduledClick(safeTime, duration);
-    } catch (_) {}
-
-    const bassScale = inputMode === 'acoustic' ? 0.35 : 1.0;
-
-    try {
-      const osc = ctx.createOscillator();
-      const filter = ctx.createBiquadFilter();
-      const gain = ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(pitchHz, safeTime);
-
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(800, safeTime);
-      filter.frequency.exponentialRampToValueAtTime(220, safeTime + duration);
-      filter.Q.value = 4.0;
-
-      gain.gain.setValueAtTime(0.32 * bassScale, safeTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, safeTime + duration);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(safeTime);
-      osc.stop(safeTime + duration + 0.05);
-    } catch (_) {}
-  }, [getAudioContext, inputMode, isBassEnabled, isMuted]);
 
   // Round completion: Accumulate into Session Vault & engage 1.2s restart protection cooldown
   const handleFinishSession = useCallback(() => {
@@ -1098,11 +1057,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }
         // 🛡️ Die 16tel-Zwischenräume (Offbeats ohne Zielnote) bleiben STUMM!
         // Kein maschinelles 16tel-Nähmaschinen-Dauertickern mehr!
-
-        if (isBassEnabled && stepIdx === 0) {
-          const rootFreq = (barIdx % 2 === 0) ? 65.41 : 77.78;
-          playBassNote(rootFreq, scheduledTime, 0.28);
-        }
       }
 
       // Visual Anticipation Pulse: 120ms before actual beat
@@ -1137,7 +1091,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }
       }
     }
-  }, [activeLevelConfig, activeTargetPattern, bpm, getAudioContext, handleFinishSession, isBassEnabled, playBassNote, playDrumSound, rollNewRandomGroove, selectedLevel, trainingMode]);
+  }, [activeLevelConfig, activeTargetPattern, bpm, getAudioContext, handleFinishSession, playDrumSound, rollNewRandomGroove, selectedLevel, trainingMode]);
 
   // 🎯 Stabile Ref für scheduleAudioEvents, damit der Scheduler ohne Drift und ohne Re-Creation der Intervalle läuft
   const scheduleAudioEventsRef = useRef(scheduleAudioEvents);
@@ -2043,30 +1997,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 })}
               </div>
             </div>
-
-            {/* Bass Play-Along Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsBassEnabled(!isBassEnabled)}
-              style={{
-                background: isBassEnabled ? '#fffbeb' : '#ffffff',
-                border: isBassEnabled ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
-                color: isBassEnabled ? '#92400e' : '#64748b',
-                borderRadius: '10px',
-                padding: '5px 10px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '0.72rem',
-                fontWeight: 900,
-                transition: 'all 0.15s ease'
-              }}
-              title="Groovige Bassline zu- oder abschalten"
-            >
-              <Music size={12} color={isBassEnabled ? '#d97706' : '#64748b'} />
-              <span>Bass {isBassEnabled ? 'AN' : 'AUS'}</span>
-            </button>
           </div>
 
           {/* Spielmodi / Challenge-Auswahl in der Klangkiste */}
@@ -2454,8 +2384,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             onBpmChange={(newBpm) => setBpm(newBpm)}
             soundKit={soundKit}
             onSoundKitChange={(kit) => setSoundKit(kit)}
-            isBassEnabled={isBassEnabled}
-            onToggleBass={() => setIsBassEnabled(!isBassEnabled)}
             onOpenAudioSettings={() => setShowAudioSettingsSheet(true)}
             pocketStreak={pocketStreak}
             comboMultiplier={comboMultiplier}

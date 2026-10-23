@@ -17,6 +17,7 @@ import { RoomHeaderDropdownSelector } from "./rooms/RoomHeaderDropdownSelector";
 import { RoomBookingActionDock } from "./rooms/RoomBookingActionDock";
 import { RoomBookingSidebarHeader } from "./rooms/RoomBookingSidebarHeader";
 import { CampusRoomsDailyRadarGrid, RoomCalendarModeSwitch, RoomCalendarViewMode } from "./rooms/CampusRoomsDailyRadarGrid";
+import { checkRoomBlockCollision, RoomSlot } from "../../utils/roomBlockBufferEngine";
 
 const capitalizeName = (str: string | null | undefined): string => {
   if (!str) return "";
@@ -390,8 +391,42 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         return sStart < qEnd && sEnd > qStart;
       });
 
-      if (hasConflict || hasScheduleConflict || hasBlockedConflict) {
-        alert('Kollisions-Sperre: Dieser Raum ist zum gewählten Zeitraum bereits belegt.');
+      // 0,1% Goldstandard Block-Pufferprüfung (15 Min vor 1. und nach letztem Termin)
+      const bufferConfig = {
+        bufferBeforeMinutes: Number(schoolObj?.opening_hours?.campus_settings?.lesson_buffer_before_min ?? 15),
+        bufferAfterMinutes: Number(schoolObj?.opening_hours?.campus_settings?.lesson_buffer_after_min ?? 15),
+        scope: 'block_boundaries' as const
+      };
+
+      const relevantRoomSlots: RoomSlot[] = (mergedSchedules || [])
+        .filter((s: any) => {
+          if (s.room_id !== targetRoomId) return false;
+          const matchesDay = s.day_of_week === targetDay || s.day_of_week === targetDayInt || String(s.day_of_week) === String(targetDayInt);
+          return matchesDay && (s.time_slot || s.start_time);
+        })
+        .map((s: any) => ({
+          id: s.id,
+          startTime: s.time_slot || s.start_time,
+          duration: s.duration || s.duration_minutes || 45,
+          teacherId: s.teacher_id,
+          roomId: s.room_id,
+          studentName: s.student_name || (s.students ? `${s.students.first_name || ''} ${s.students.last_name || ''}`.trim() : undefined)
+        }));
+
+      const blockCollision = checkRoomBlockCollision(
+        {
+          startTime: quickBookingModalData.startTime,
+          endTime: quickBookingModalData.endTime,
+          roomId: targetRoomId
+        },
+        relevantRoomSlots,
+        bufferConfig
+      );
+
+      if (hasConflict || hasScheduleConflict || hasBlockedConflict || blockCollision.hasConflict) {
+        alert(blockCollision.hasConflict && blockCollision.conflictMessage
+          ? `Kollisions-Sperre: ${blockCollision.conflictMessage}`
+          : 'Kollisions-Sperre: Dieser Raum ist zum gewählten Zeitraum bereits belegt.');
         return;
       }
 
@@ -1348,7 +1383,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                 finalPurpose = bookingPurpose.trim();
               } else if (bookingType === 'lesson') {
                 const studentObj = students.find(s => s.id === bookingStudentId);
-                finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+                finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames, studentObj.id)}` : (isStaff ? creatorName : 'Unterricht');
               } else {
                 finalPurpose = isStaff ? creatorName : 'Eigennutzung';
               }
@@ -1546,7 +1581,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       if (bookingPurpose && bookingPurpose.trim()) {
         finalPurpose = bookingPurpose.trim();
       } else if (bookingType === 'lesson') {
-        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames, studentObj.id)}` : (isStaff ? creatorName : 'Unterricht');
       } else {
         finalPurpose = isStaff ? creatorName : 'Eigennutzung';
       }
@@ -1764,7 +1799,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
       if (bookingPurpose && bookingPurpose.trim()) {
         finalPurpose = bookingPurpose.trim();
       } else if (bookingType === 'lesson') {
-        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames)}` : (isStaff ? creatorName : 'Unterricht');
+        finalPurpose = studentObj ? `Unterricht: ${studentObj.first_name} ${maskLastName(studentObj.last_name, showRealNames, studentObj.id)}` : (isStaff ? creatorName : 'Unterricht');
       } else {
         finalPurpose = isStaff ? creatorName : 'Eigennutzung';
       }
@@ -2327,7 +2362,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
            date: occ.date,
            startTime: startTimeStr,
            endTime: endTimeStr,
-           purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}` : 'Unterricht',
+           purpose: occ.student ? `Unterricht: ${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames, occ.student.id)}` : 'Unterricht',
            teacherId: userId,
            status: occ.status,
            isSchedule: true
@@ -3415,6 +3450,25 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                       </button>
                     )}
 
+                    {/* 0,1% Apple Goldstandard Divider: Trennung von Quick-Filtern und Container-Lifecycle */}
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        width: '1px',
+                        height: '18px',
+                        background: '#e5e5ea',
+                        margin: '0 2px'
+                      }}
+                    />
+
+                    {/* Autoritativer Einklappen-Button: 100% oben rechts im Widget-Header */}
+                    <RoomTopCatalogToggleBtn
+                      isCollapsed={isTopCatalogCollapsed}
+                      onToggle={toggleTopCatalog}
+                      variant="catalog-toolbar"
+                      brandColor={brandColor}
+                    />
+
                     {showRoomFinderBar && (
                       <div style={{
                         position: 'absolute',
@@ -3629,7 +3683,6 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                         );
                       })}
                     </div>
-                    <RoomTopCatalogToggleBtn isCollapsed={isTopCatalogCollapsed} onToggle={toggleTopCatalog} variant="catalog-toolbar" brandColor={brandColor} />
                   </div>
                 </div>
 
@@ -3784,8 +3837,8 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                   </div>
 
                   {/* View Switcher & Week Controls */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: 'auto', justifyContent: 'space-between' }}>
-                    <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                    <div className="calendar-controls-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <RoomCalendarModeSwitch mode={roomCalendarViewMode} onChange={setRoomCalendarViewMode} brandColor={brandColor} />
                       <button
                         onClick={() => {
@@ -3829,14 +3882,15 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                           <ChevronRight size={16} />
                         </button>
                       </div>
-
-                      {!isMobile && (
-                        <>
-                          <RoomTopCatalogToggleBtn isCollapsed={isTopCatalogCollapsed} onToggle={toggleTopCatalog} brandColor={brandColor} roomCount={rooms.length} variant="calendar-header" />
-                          <RoomSidebarToggleBtn isOpen={isRightSidebarOpen} onToggle={toggleSidebar} brandColor={brandColor} showDivider={false} />
-                        </>
-                      )}
                     </div>
+
+                    {/* Autoritatives Top-Right Layout Action Dock: Strikt oben rechts im Eck verankert */}
+                    {!isMobile && (
+                      <div className="calendar-layout-dock" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+                        <RoomTopCatalogToggleBtn isCollapsed={isTopCatalogCollapsed} onToggle={toggleTopCatalog} brandColor={brandColor} roomCount={rooms.length} variant="calendar-header" />
+                        <RoomSidebarToggleBtn isOpen={isRightSidebarOpen} onToggle={toggleSidebar} brandColor={brandColor} showDivider={false} />
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -1,23 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   X, Bug, Lightbulb, Mic, MicOff, Check, AlertCircle, Sparkles, 
-  Send, ShieldCheck, Tag, Info, Layers, Loader2, Calendar, BookOpen, 
-  Music, Users, CreditCard, Settings, Building2, Award, ShieldOff,
-  ChevronDown, ChevronUp, MessageCircle, Clock, Search, Archive, CheckCircle2,
-  Inbox, RefreshCw, Zap
+  Send, ShieldCheck, ChevronDown, ChevronUp, MessageCircle, Clock, 
+  Search, Archive, CheckCircle2, RefreshCw, Zap, ArrowLeft,
+  Loader2, Calendar, BookOpen,
+  Music, Users, CreditCard, Settings, Layers, Lock, Mail, Library
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { 
-  FeedbackType, HeroOptInType, FEEDBACK_CATEGORIES, 
+  FeedbackType, HeroOptInType, 
   getAvailableCategoriesForRole, formatLegalHeroCredit,
   FEEDBACK_STATUSES, PlatformFeedbackItem, computeSlaTarget,
   formatSlaCountdown
 } from '../../config/feedbackConfig';
-import { CampusGroovelabText } from '../CampusGroovelabBrand';
-import { requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
 import { useDictationInput } from '../../hooks/useVoiceToText';
 
-const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor') => {
+const renderCategoryIcon = (iconName: string, size = 13, color = 'currentColor') => {
   switch (iconName) {
     case 'Calendar': return <Calendar size={size} color={color} />;
     case 'BookOpen': return <BookOpen size={size} color={color} />;
@@ -25,11 +23,13 @@ const renderCategoryIcon = (iconName: string, size = 14, color = 'currentColor')
     case 'Users': return <Users size={size} color={color} />;
     case 'CreditCard': return <CreditCard size={size} color={color} />;
     case 'Settings': return <Settings size={size} color={color} />;
+    case 'Mail': return <Mail size={size} color={color} />;
+    case 'Library': return <Library size={size} color={color} />;
     default: return <Layers size={size} color={color} />;
   }
 };
 
-const renderStatusIcon = (statusId: string, size = 13, color = 'currentColor') => {
+const renderStatusIcon = (statusId: string, size = 12, color = 'currentColor') => {
   switch (statusId) {
     case 'in_review': return <Search size={size} color={color} />;
     case 'planned': return <Sparkles size={size} color={color} />;
@@ -61,19 +61,26 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
   schoolName = '',
   activePlatform = 'campus'
 }) => {
-  // Tab Navigation: 'submit' vs 'my_feedback'
+  // Navigation: 'submit' vs 'my_feedback'
   const [activeModalTab, setActiveModalTab] = useState<'submit' | 'my_feedback'>('submit');
   const [myFeedbackItems, setMyFeedbackItems] = useState<PlatformFeedbackItem[]>([]);
   const [loadingMyFeedback, setLoadingMyFeedback] = useState<boolean>(false);
 
+  // Form State
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('feature_idea');
   const [grantGhostAccess, setGrantGhostAccess] = useState<boolean>(false);
-  const [selectedBoardId, setSelectedBoardId] = useState<string>('schedule');
+  const [selectedBoardId, setSelectedBoardId] = useState<string>('homework');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [content, setContent] = useState<string>('');
-  const [heroOptIn, setHeroOptIn] = useState<HeroOptInType>('school_only');
+  const [heroOptIn, setHeroOptIn] = useState<HeroOptInType>('anonymous');
   const [showLegalDetails, setShowLegalDetails] = useState<boolean>(false);
-  
+
+  // Dropdown Popover Toggles
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState<boolean>(false);
+  const [isBoardDropdownOpen, setIsBoardDropdownOpen] = useState<boolean>(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const boardDropdownRef = useRef<HTMLDivElement>(null);
+
   // Canonical Voice dictation engine
   const [speechError, setSpeechError] = useState<string | null>(null);
   const {
@@ -87,8 +94,8 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     onChange: setContent
   });
 
-  // Student pseudonymization helper (GDPR Article 8 compliant)
-  const studentPseudonym = React.useMemo(() => {
+  // Student pseudonymization helper (GDPR Article 8 & KUG § 22 compliant)
+  const studentPseudonym = useMemo(() => {
     if (userRole !== 'student') return userName;
     if (!userName) return 'Schüler/in';
     const parts = userName.trim().split(/\s+/);
@@ -104,6 +111,18 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
   const [countdownSeconds, setCountdownSeconds] = useState<number>(3600);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const availableCategories = useMemo(() => getAvailableCategoriesForRole(userRole), [userRole]);
+  const currentCategory = useMemo(() => {
+    return availableCategories.find(c => c.id === selectedBoardId) || availableCategories[0];
+  }, [availableCategories, selectedBoardId]);
+
+  // Theme color based on module (Campus green, Groovelab yellow, Admin red)
+  const accentColor = activePlatform === 'groovelab' 
+    ? '#facc15' 
+    : (userRole === 'admin' || userRole === 'secretary' || activePlatform === 'admin_desk')
+      ? '#ea4335'
+      : '#34a853';
+
   // Live SLA Countdown Interval for Active Submission
   useEffect(() => {
     if (!isSubmitted || !submittedTicket) return;
@@ -116,16 +135,19 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     return () => clearInterval(interval);
   }, [isSubmitted, submittedTicket]);
 
-  const availableCategories = getAvailableCategoriesForRole(userRole);
-  const currentCategory = availableCategories.find(c => c.id === selectedBoardId) || availableCategories[0];
-
-  // Theme color based on module
-  const accentColor = activePlatform === 'groovelab' 
-    ? '#facc15' 
-    : (userRole === 'admin' || userRole === 'secretary' || activePlatform === 'admin_desk')
-      ? '#ea4335'
-      : '#34a853';
-
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setIsTypeDropdownOpen(false);
+      }
+      if (boardDropdownRef.current && !boardDropdownRef.current.contains(e.target as Node)) {
+        setIsBoardDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchMyFeedback = async () => {
     if (!userId) return;
@@ -168,7 +190,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
         });
       } catch (e) {}
 
-      // 4. Query Supabase (if table exists)
+      // 4. Query Supabase
       try {
         const { data, error } = await supabase
           .from('platform_feedback')
@@ -185,7 +207,6 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
             localStorage.setItem(`cg_my_platform_feedback_${userId}`, JSON.stringify(merged));
           } catch (e) {}
 
-          // If user opened my_feedback tab, mark unread responses as read
           if (activeModalTab === 'my_feedback') {
             const unreadIds = data.filter((it: any) => it.admin_response && it.is_user_read === false).map((it: any) => it.id);
             if (unreadIds.length > 0) {
@@ -198,7 +219,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
           return;
         }
       } catch (dbErr) {
-        // Table might not exist yet or offline - use local items smoothly
+        // Table fallback
       }
 
       setMyFeedbackItems(localItems);
@@ -219,20 +240,21 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       setContent('');
       setSelectedTags([]);
       setActiveModalTab('submit');
+      setIsTypeDropdownOpen(false);
+      setIsBoardDropdownOpen(false);
+      setShowLegalDetails(false);
       
-      // Smart category selection based on active platform
       if (activePlatform === 'groovelab' && availableCategories.some(c => c.id === 'bands')) {
         setSelectedBoardId('bands');
       } else if (availableCategories.length > 0 && !availableCategories.some(c => c.id === selectedBoardId)) {
         setSelectedBoardId(availableCategories[0].id);
       }
     } else {
-      // Stop speech dictation if modal is closed
       stopDictation();
     }
   }, [isOpen, userId, activePlatform]);
 
-  const unreadResponseCount = React.useMemo(() => {
+  const unreadResponseCount = useMemo(() => {
     return myFeedbackItems.filter(it => it.admin_response && it.is_user_read === false).length;
   }, [myFeedbackItems]);
 
@@ -252,24 +274,21 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    // Stop recording if active
     if (isRecording) {
       stopDictation();
     }
 
-    // Telemetry metadata snapshot
     const metadata = {
       os: typeof navigator !== 'undefined' ? navigator.platform : 'unknown',
       browser: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
       viewport: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : 'unknown',
       app_version: 'v2.6.0',
-      current_route: typeof window !== 'undefined' ? window.location.pathname : 'settings'
+      current_route: typeof window !== 'undefined' ? window.location.pathname : 'dashboard'
     };
 
     const sanitizedName = userRole === 'student' ? studentPseudonym : (userName || null);
     const localId = 'fb_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const nowIso = new Date().toISOString();
-
     const ticketNumber = 'CG-SUP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const newFeedbackItem: PlatformFeedbackItem = {
@@ -299,7 +318,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       is_user_read: true
     };
 
-    // 1. Optimistic Local Persistence (guarantees zero data loss even without SQL table)
+    // 1. Optimistic Local Persistence (Zero Data Loss)
     try {
       const userStorageKey = `cg_my_platform_feedback_${userId}`;
       const existingUser = JSON.parse(localStorage.getItem(userStorageKey) || '[]');
@@ -342,7 +361,6 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       console.warn('Supabase platform_feedback table note:', cloudErr);
     }
 
-    // Retain ticket in state for Mission Control Stage
     setSubmittedTicket(newFeedbackItem);
     setIsSubmitted(true);
     setIsSubmitting(false);
@@ -355,33 +373,35 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       position: 'fixed',
       inset: 0,
       zIndex: 99999,
-      backgroundColor: 'rgba(15, 23, 42, 0.60)',
+      backgroundColor: 'rgba(15, 23, 42, 0.55)',
       backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '16px'
+      padding: '16px',
+      boxSizing: 'border-box'
     }}>
       <div 
         role="dialog"
         aria-modal="true"
-        aria-label="Feedback & Feature Hub"
+        aria-label="Ideenschmiede & Support"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#ffffff',
           borderRadius: '24px',
-          width: '100%',
-          maxWidth: '640px',
-          maxHeight: '92vh',
+          width: '94%',
+          maxWidth: '840px',
+          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0,0,0,0.1)',
-          border: '1px solid rgba(226, 232, 240, 0.9)',
+          boxShadow: '0 24px 60px -15px rgba(15, 23, 42, 0.22), 0 0 1px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(226, 232, 240, 0.95)',
           overflow: 'hidden',
-          animation: 'fadeInScale 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+          fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
         }}
       >
-        {/* Header */}
+        {/* ─── Ultra-Sleek Zen Header ─── */}
         <div style={{
           padding: '18px 24px',
           borderBottom: '1px solid #f1f5f9',
@@ -391,142 +411,132 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
           background: '#ffffff',
           flexShrink: 0
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '12px',
-              backgroundColor: `${accentColor}12`,
+              width: '34px',
+              height: '34px',
+              borderRadius: '10px',
+              backgroundColor: `${accentColor}14`,
               color: accentColor,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <Lightbulb size={20} strokeWidth={2.2} />
+              <Lightbulb size={18} strokeWidth={2.4} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                Feedback & Ideenschmiede
+              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                Ideenschmiede
               </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <CampusGroovelabText /> wächst gemeinsam mit deinen Ideen
+              <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
+                Gemeinsam Campus-Groovelab weiterentwickeln
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: '50%',
-              width: '34px',
-              height: '34px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#64748b',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
-          >
-            <X size={16} />
-          </button>
-        </div>
 
-        {/* Main Tab Switch: Submit vs My Feedback */}
-        <div style={{
-          padding: '8px 24px',
-          background: '#f8fafc',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          gap: '8px',
-          flexShrink: 0,
-          position: 'relative',
-          zIndex: 10
-        }}>
-          <button
-            type="button"
-            onClick={() => setActiveModalTab('submit')}
-            style={{
-              flex: 1,
-              padding: '8px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeModalTab === 'submit' ? '#ffffff' : 'transparent',
-              color: activeModalTab === 'submit' ? '#0f172a' : '#64748b',
-              fontWeight: activeModalTab === 'submit' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              boxShadow: activeModalTab === 'submit' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Lightbulb size={15} color={activeModalTab === 'submit' ? accentColor : '#94a3b8'} />
-            <span>Neues Anliegen einreichen</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveModalTab('my_feedback')}
-            style={{
-              flex: 1,
-              padding: '8px 14px',
-              borderRadius: '12px',
-              border: 'none',
-              background: activeModalTab === 'my_feedback' ? '#ffffff' : 'transparent',
-              color: activeModalTab === 'my_feedback' ? '#0f172a' : '#64748b',
-              fontWeight: activeModalTab === 'my_feedback' ? 800 : 600,
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              position: 'relative',
-              boxShadow: activeModalTab === 'my_feedback' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Inbox size={15} color={activeModalTab === 'my_feedback' ? accentColor : '#94a3b8'} />
-            <span>Meine Einreichungen ({myFeedbackItems.length})</span>
-            {unreadResponseCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '6px',
-                right: '12px',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: '#ef4444',
-                boxShadow: 'none'
-              }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {activeModalTab === 'submit' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveModalTab('my_feedback');
+                  fetchMyFeedback();
+                }}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '100px',
+                  padding: '5px 11px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                }}
+              >
+                <span>Meine Ideen ({myFeedbackItems.length})</span>
+                {unreadResponseCount > 0 && (
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                )}
+                <span style={{ opacity: 0.6 }}>→</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('submit')}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '100px',
+                  padding: '5px 11px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <ArrowLeft size={12} />
+                <span>Neues Anliegen</span>
+              </button>
             )}
-          </button>
+
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              aria-label="Schließen"
+              style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#64748b',
+                transition: 'all 0.15s ease',
+                flexShrink: 0
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
-        {/* Content Body */}
+        {/* ─── Body Area ─── */}
         <div style={{
-          padding: '22px 24px',
+          padding: '20px 24px',
           overflowY: 'auto',
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          gap: '18px',
           background: '#ffffff'
         }}>
           {activeModalTab === 'my_feedback' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            /* ─── SUB-VIEW: Meine Einreichungen ─── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Deine bisherigen Beiträge ({myFeedbackItems.length})
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Bisherige Einreichungen ({myFeedbackItems.length})
                 </span>
                 <button
                   type="button"
@@ -536,29 +546,29 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    padding: '4px 8px',
+                    padding: '3px 8px',
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e2e8f0',
                     background: '#ffffff',
                     color: '#64748b',
-                    fontSize: '0.72rem',
+                    fontSize: '0.70rem',
                     fontWeight: 700,
                     cursor: 'pointer'
                   }}
                 >
-                  <RefreshCw size={11} className={loadingMyFeedback ? 'animate-spin' : ''} />
+                  <RefreshCw size={10} className={loadingMyFeedback ? 'animate-spin' : ''} />
                   <span>Aktualisieren</span>
                 </button>
               </div>
 
               {loadingMyFeedback ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                  <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                  <p style={{ margin: 0, fontSize: '0.85rem' }}>Lade deine Einreichungen...</p>
+                <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
+                  <Loader2 size={22} className="animate-spin" style={{ margin: '0 auto 6px' }} />
+                  <p style={{ margin: 0, fontSize: '0.80rem' }}>Lade deine Beiträge...</p>
                 </div>
               ) : myFeedbackItems.length === 0 ? (
                 <div style={{
-                  padding: '48px 24px',
+                  padding: '36px 20px',
                   textAlign: 'center',
                   background: '#f8fafc',
                   borderRadius: '16px',
@@ -566,11 +576,11 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '12px'
+                  gap: '10px'
                 }}>
                   <div style={{
-                    width: '48px',
-                    height: '48px',
+                    width: '40px',
+                    height: '40px',
                     borderRadius: '50%',
                     backgroundColor: '#e2e8f0',
                     color: '#64748b',
@@ -578,13 +588,13 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <Inbox size={24} />
+                    <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                      Noch keine Einreichungen vorhanden
+                    <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                      Noch keine Einreichungen
                     </h4>
-                    <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b', maxWidth: '320px' }}>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                       Du hast bisher noch keine Ideen oder Fehlerberichte eingereicht.
                     </p>
                   </div>
@@ -593,144 +603,135 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     onClick={() => setActiveModalTab('submit')}
                     style={{
                       marginTop: '4px',
-                      padding: '8px 16px',
-                      borderRadius: '10px',
+                      padding: '7px 14px',
+                      borderRadius: '8px',
                       border: 'none',
                       background: accentColor,
                       color: '#ffffff',
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       fontWeight: 800,
                       cursor: 'pointer'
                     }}
                   >
-                    Jetzt erstes Anliegen einreichen
+                    Jetzt erste Idee einreichen
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
                   {myFeedbackItems.map(item => {
                     const statusMeta = FEEDBACK_STATUSES.find(s => s.id === item.status) || FEEDBACK_STATUSES[0];
+                    const slaTarget = computeSlaTarget(item.created_at, item.admin_responded_at);
+
                     return (
                       <div
                         key={item.id}
                         style={{
                           background: '#ffffff',
-                          border: '1.5px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '16px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '14px',
+                          padding: '12px 14px',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '10px',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                          gap: '8px',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                         }}
                       >
-                        {/* Header Row */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '8px',
+                              padding: '2px 7px',
+                              borderRadius: '6px',
                               background: item.type === 'bug' ? '#fee2e2' : (item.type === 'support_request' ? '#ecfeff' : '#fef3c7'),
                               color: item.type === 'bug' ? '#b91c1c' : (item.type === 'support_request' ? '#0891b2' : '#b45309'),
-                              fontSize: '0.72rem',
+                              fontSize: '0.70rem',
                               fontWeight: 800
                             }}>
-                              {item.type === 'bug' ? <Bug size={12} /> : (item.type === 'support_request' ? <ShieldCheck size={12} /> : <Lightbulb size={12} />)}
-                              {item.type === 'bug' ? 'Fehlerbericht' : (item.type === 'support_request' ? 'Express-Support' : 'Feature-Idee')}
+                              {item.type === 'bug' ? <Bug size={11} /> : (item.type === 'support_request' ? <Zap size={11} /> : <Lightbulb size={11} />)}
+                              {item.type === 'bug' ? 'Fehler' : (item.type === 'support_request' ? 'Support' : 'Idee')}
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                              • {item.ticket_number ? `#${item.ticket_number}` : ''} • {item.board_name} • {new Date(item.created_at).toLocaleDateString('de-DE')}
+                            <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                              • {item.ticket_number || ''} • {item.board_name} • {new Date(item.created_at).toLocaleDateString('de-DE')}
                             </span>
                           </div>
 
-                          {/* Status Pill & Dynamic SLA Badge */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {(() => {
-                              const slaTarget = computeSlaTarget(item.created_at, item.admin_responded_at);
-                              return (
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '3px 8px',
-                                  borderRadius: '100px',
-                                  background: slaTarget.badgeBg,
-                                  color: slaTarget.badgeColor,
-                                  fontSize: '0.68rem',
-                                  fontWeight: 800,
-                                  border: `1px solid ${slaTarget.badgeColor}25`
-                                }}>
-                                  <Zap size={10} />
-                                  <span>{slaTarget.label}</span>
-                                </span>
-                              );
-                            })()}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '2px 7px',
+                              borderRadius: '100px',
+                              background: slaTarget.badgeBg,
+                              color: slaTarget.badgeColor,
+                              fontSize: '0.66rem',
+                              fontWeight: 800
+                            }}>
+                              <Zap size={9} />
+                              <span>{slaTarget.label}</span>
+                            </span>
 
                             <div style={{
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '5px',
-                              padding: '4px 10px',
+                              gap: '4px',
+                              padding: '2px 8px',
                               borderRadius: '100px',
                               background: statusMeta.badgeBg,
                               color: statusMeta.badgeColor,
-                              fontSize: '0.72rem',
+                              fontSize: '0.70rem',
                               fontWeight: 800
                             }}>
-                              {renderStatusIcon(item.status, 12, statusMeta.badgeColor)}
+                              {renderStatusIcon(item.status, 11, statusMeta.badgeColor)}
                               <span>{statusMeta.label}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Submission Content */}
                         <div style={{
                           background: '#f8fafc',
-                          padding: '10px 12px',
-                          borderRadius: '10px',
-                          fontSize: '0.82rem',
+                          padding: '9px 11px',
+                          borderRadius: '8px',
+                          fontSize: '0.80rem',
                           color: '#334155',
-                          lineHeight: 1.45,
+                          lineHeight: 1.4,
                           whiteSpace: 'pre-wrap',
                           border: '1px solid #f1f5f9'
                         }}>
                           {item.content}
                         </div>
 
-                        {/* Official Developer Response */}
                         {item.admin_response ? (
                           <div style={{
-                            marginTop: '2px',
-                            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            padding: '12px',
+                            background: '#f0f9ff',
+                            borderRadius: '10px',
+                            padding: '10px 12px',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '6px'
+                            gap: '4px',
+                            border: 'none'
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <MessageCircle size={14} color="#0284c7" />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0369a1' }}>
-                                  Offizielle Rückmeldung der Entwickler
+                                <MessageCircle size={13} color="#0284c7" />
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0369a1' }}>
+                                  Rückmeldung der Plattform-Entwickler
                                 </span>
                               </div>
                               {item.admin_responded_at && (
-                                <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600 }}>
+                                <span style={{ fontSize: '0.66rem', color: '#0284c7', fontWeight: 600 }}>
                                   {new Date(item.admin_responded_at).toLocaleDateString('de-DE')}
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '0.82rem', color: '#0f172a', lineHeight: 1.45, fontWeight: 600 }}>
+                            <div style={{ fontSize: '0.80rem', color: '#0f172a', lineHeight: 1.4, fontWeight: 600 }}>
                               {item.admin_response}
                             </div>
                           </div>
                         ) : (
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.70rem', color: '#94a3b8', fontStyle: 'italic' }}>
                             {statusMeta.description}
                           </div>
                         )}
@@ -741,46 +742,44 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
               )}
             </div>
           ) : isSubmitted ? (
+            /* ─── SUB-VIEW: Ticket Eingereicht & SLA Countdown ─── */
             <div style={{
-              padding: '32px 20px',
+              padding: '24px 16px',
               textAlign: 'center',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '18px',
+              gap: '14px',
               background: '#ffffff'
             }}>
-              {/* Ticket Pill */}
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: 'none',
-                padding: '6px 14px',
+                background: '#10b981',
+                padding: '5px 12px',
                 borderRadius: '100px',
                 color: '#ffffff',
-                fontSize: '0.76rem',
-                fontWeight: 900,
+                fontSize: '0.72rem',
+                fontWeight: 800,
                 letterSpacing: '0.04em'
               }}>
-                <Zap size={13} />
-                <span>EXPRESS-TICKET #{submittedTicket?.ticket_number || 'CG-SUP-ACTIVE'}</span>
+                <Check size={13} strokeWidth={3} />
+                <span>TICKET #{submittedTicket?.ticket_number || 'CG-SUP-ACTIVE'} ERFOLGREICH ERFASST</span>
               </div>
 
-              {/* Radial / Big Digital Countdown Clock */}
+              {/* Digital Countdown Box */}
               <div style={{
                 background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                borderRadius: '24px',
-                padding: '24px 28px',
+                borderRadius: '18px',
+                padding: '18px 24px',
                 color: '#ffffff',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                boxShadow: '0 12px 30px -4px rgba(15, 23, 42, 0.25)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 width: '100%',
-                maxWidth: '420px',
+                maxWidth: '380px',
                 boxSizing: 'border-box'
               }}>
                 {(() => {
@@ -791,38 +790,35 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   return (
                     <>
                       <span style={{
-                        fontSize: '0.72rem',
+                        fontSize: '0.70rem',
                         fontWeight: 800,
                         color: isNight ? '#94a3b8' : '#34d399',
                         textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px'
+                        letterSpacing: '0.05em'
                       }}>
-                        {isNight ? '🌙 Nacht- & Ruhezeit-Modus' : '⚡ Live-Kernzeit • 60 Min. SLA'}
+                        {isNight ? '🌙 Nacht- & Ruhezeit-Modus' : '⚡ 60-Minuten Express-SLA'}
                       </span>
 
                       <div style={{
-                        fontSize: '2.5rem',
-                        fontWeight: 950,
+                        fontSize: '2.2rem',
+                        fontWeight: 900,
                         fontFamily: 'monospace',
                         color: isNight ? '#38bdf8' : '#4ade80',
                         letterSpacing: '-0.02em',
-                        marginTop: '6px',
+                        marginTop: '4px',
                         display: 'flex',
                         alignItems: 'baseline',
                         gap: '6px'
                       }}>
                         <span>{formatted.timeString}</span>
-                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#94a3b8' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#94a3b8' }}>
                           {formatted.unit}
                         </span>
                       </div>
 
-                      <span style={{ fontSize: '0.74rem', color: '#cbd5e1', marginTop: '6px', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.72rem', color: '#cbd5e1', marginTop: '4px', fontWeight: 500 }}>
                         {isNight 
-                          ? `Garantierte Antwort: ${target?.displayTarget || 'Nächster Werktag 10:00 Uhr'} (Kernzeit Mo–Fr 09:00–17:00)`
+                          ? `Garantierte Antwort: ${target?.displayTarget || 'Nächster Werktag 10:00 Uhr'}`
                           : 'Garantierte qualifizierte Rückmeldung innerhalb von 60 Minuten'}
                       </span>
                     </>
@@ -830,33 +826,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                 })()}
               </div>
 
-              {/* Status Flow Bar */}
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '14px 18px',
-                width: '100%',
-                maxWidth: '420px',
-                boxSizing: 'border-box',
-                textAlign: 'left',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', boxShadow: '0 0 8px #16a34a' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-                    Ticket erfasst &amp; Plattformbetrieb zugewiesen
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
-                  <strong>Schnelle Rückmeldung:</strong> Deine Anfrage wird direkt im Support priorisiert. Du erhältst die Rückmeldung hier im App-Dashboard sowie per In-App Mitteilung.
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '420px' }}>
+              <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '380px', marginTop: '4px' }}>
                 <button
                   type="button"
                   onClick={() => {
@@ -867,23 +837,17 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   }}
                   style={{
                     flex: 1,
-                    padding: '12px',
-                    borderRadius: '12px',
+                    padding: '10px',
+                    borderRadius: '10px',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: accentColor,
                     color: '#ffffff',
-                    fontSize: '0.82rem',
+                    fontSize: '0.80rem',
                     fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px'
+                    cursor: 'pointer'
                   }}
                 >
-                  <Inbox size={15} />
-                  <span>Zu meinen Einreichungen</span>
+                  Zu meinen Beiträgen
                 </button>
                 <button
                   type="button"
@@ -894,534 +858,404 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     onClose();
                   }}
                   style={{
-                    padding: '12px 18px',
-                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    borderRadius: '10px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.82rem',
+                    fontSize: '0.80rem',
                     fontWeight: 700,
                     cursor: 'pointer'
                   }}
                 >
-                  Schließen
+                  Fertig
                 </button>
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            /* ─── PRIMARY ZEN VIEW: Das vereinfachte Eingabe-Formular ─── */
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               
-              {/* Step 1: Linear-Style Segmented Control (Feature Idea vs Bug vs Express Support) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  Anliegen-Typ
-                </label>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: '6px',
-                  background: '#f8fafc',
-                  padding: '4px',
-                  borderRadius: '14px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFeedbackType('feature_idea');
-                      setGrantGhostAccess(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: feedbackType === 'feature_idea' ? '#ffffff' : 'transparent',
-                      color: feedbackType === 'feature_idea' ? '#0f172a' : '#64748b',
-                      boxShadow: feedbackType === 'feature_idea' ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
-                      cursor: 'pointer',
-                      fontWeight: feedbackType === 'feature_idea' ? 800 : 600,
-                      fontSize: '0.80rem',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Lightbulb size={14} color={feedbackType === 'feature_idea' ? accentColor : '#94a3b8'} strokeWidth={2.2} />
-                    <span>Idee &amp; Wunsch</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFeedbackType('bug');
-                      setGrantGhostAccess(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: feedbackType === 'bug' ? '#ffffff' : 'transparent',
-                      color: feedbackType === 'bug' ? '#0f172a' : '#64748b',
-                      boxShadow: feedbackType === 'bug' ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
-                      cursor: 'pointer',
-                      fontWeight: feedbackType === 'bug' ? 800 : 600,
-                      fontSize: '0.80rem',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Bug size={14} color={feedbackType === 'bug' ? '#ea4335' : '#94a3b8'} strokeWidth={2.2} />
-                    <span>Fehler melden</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFeedbackType('support_request');
-                      setGrantGhostAccess(true);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: feedbackType === 'support_request' ? '#ffffff' : 'transparent',
-                      color: feedbackType === 'support_request' ? '#0f172a' : '#64748b',
-                      boxShadow: feedbackType === 'support_request' ? '0 2px 8px rgba(0, 0, 0, 0.06)' : 'none',
-                      cursor: 'pointer',
-                      fontWeight: feedbackType === 'support_request' ? 800 : 600,
-                      fontSize: '0.80rem',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Zap size={14} color={feedbackType === 'support_request' ? '#0891b2' : '#94a3b8'} strokeWidth={2.2} />
-                    <span>Express-Support (60m)</span>
-                  </button>
-                </div>
-
-                {/* 60-Minute SLA Pledge Banner */}
-                {(feedbackType === 'support_request' || feedbackType === 'bug') && (
+              {/* Row 1: Dual Inline Selectors (Type + Board) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  {/* 1. Anliegen-Typ Segmented Switch */}
                   <div style={{
-                    background: '#ecfdf5',
-                    border: 'none',
+                    display: 'flex',
+                    background: '#f1f5f9',
+                    padding: '3px',
                     borderRadius: '12px',
-                    padding: '10px 14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    marginTop: '8px'
+                    gap: '3px'
                   }}>
-                    <span style={{ fontSize: '1.1rem' }}>⚡</span>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#065f46' }}>
-                        60-Minuten Express-Rückmeldung
-                      </div>
-                      <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '1px' }}>
-                        Garantierte qualifizierte Erst-Rückmeldung an Werktagen (Mo–Fr 09:00–17:00 Uhr) innerhalb von 60 Min.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Enterprise Ghost Mode Consent Box */}
-                {(feedbackType === 'support_request' || feedbackType === 'bug') && (
-                  <div style={{
-                    marginTop: '10px',
-                    background: grantGhostAccess ? '#ecfeff' : '#f8fafc',
-                    border: grantGhostAccess ? '1.5px solid #67e8f9' : '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '12px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    transition: 'all 0.2s ease'
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={grantGhostAccess}
-                        onChange={(e) => setGrantGhostAccess(e.target.checked)}
-                        style={{ marginTop: '2px', width: '16px', height: '16px', accentColor: '#0891b2', cursor: 'pointer' }}
-                      />
-                      <div>
-                        <div style={{ fontSize: '0.80rem', fontWeight: 800, color: grantGhostAccess ? '#0e7490' : '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <ShieldCheck size={14} color={grantGhostAccess ? '#0891b2' : '#64748b'} />
-                          Persönlichen Support & Ghost-Zugriff für 7 Tage gestatten
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: grantGhostAccess ? '#155e75' : '#64748b', marginTop: '2px', lineHeight: 1.4 }}>
-                          Ich erlaube dem Campus-Groovelab Plattform-Support temporär Einsicht in mein Profil, um diesen gemeldeten Fehler in meinem Stundenplan/Briefing direkt zu analysieren und zu beheben.
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Step 2: Board Selector & Smart Tags (Monochrome Icons) */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                  Bereich / Board
-                </label>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                  gap: '8px'
-                }}>
-                  {availableCategories.map((cat) => {
-                    const isSelected = selectedBoardId === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedBoardId(cat.id);
-                          setSelectedTags([]);
-                        }}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: '12px',
-                          border: isSelected ? `1.5px solid ${accentColor}` : '1px solid #e2e8f0',
-                          background: isSelected ? `${accentColor}0f` : '#ffffff',
-                          color: isSelected ? '#0f172a' : '#475569',
-                          fontSize: '0.82rem',
-                          fontWeight: isSelected ? 800 : 600,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isSelected ? `0 2px 8px ${accentColor}18` : '0 1px 2px rgba(0,0,0,0.02)'
-                        }}
-                      >
-                        <div style={{
-                          width: '26px',
-                          height: '26px',
-                          borderRadius: '8px',
-                          background: isSelected ? `${accentColor}20` : '#f1f5f9',
-                          color: isSelected ? accentColor : '#64748b',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {renderCategoryIcon(cat.iconName, 13, isSelected ? accentColor : '#64748b')}
-                        </div>
-                        <span style={{ lineHeight: '1.25' }}>
-                          {cat.shortName}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Smart Tags Chips */}
-                {currentCategory && currentCategory.tags.length > 0 && (
-                  <div style={{
-                    marginTop: '10px',
-                    padding: '10px 12px',
-                    background: '#f8fafc',
-                    borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '6px',
-                    alignItems: 'center'
-                  }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
-                      Smarte Tags:
-                    </span>
-                    {currentCategory.tags.map((tag) => {
-                      const isTagSelected = selectedTags.includes(tag);
+                    {[
+                      { id: 'feature_idea', label: 'Idee & Wunsch', icon: Lightbulb, color: accentColor },
+                      { id: 'bug', label: 'Fehler melden', icon: Bug, color: '#ea4335' },
+                      { id: 'support_request', label: 'Express-Support (60m)', icon: Zap, color: '#0891b2' },
+                    ].map(opt => {
+                      const Icon = opt.icon;
+                      const isSel = feedbackType === opt.id;
                       return (
                         <button
-                          key={tag}
+                          key={opt.id}
                           type="button"
-                          onClick={() => toggleTag(tag)}
+                          onClick={() => {
+                            setFeedbackType(opt.id as FeedbackType);
+                            if (opt.id === 'support_request') setGrantGhostAccess(true);
+                          }}
                           style={{
-                            padding: '4px 10px',
-                            borderRadius: '8px',
-                            border: isTagSelected ? `1px solid ${accentColor}` : '1px solid #cbd5e1',
-                            background: isTagSelected ? accentColor : '#ffffff',
-                            color: isTagSelected ? '#ffffff' : '#475569',
-                            fontSize: '0.73rem',
-                            fontWeight: isTagSelected ? 800 : 600,
-                            cursor: 'pointer',
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s ease',
-                            boxShadow: isTagSelected ? `0 2px 6px ${accentColor}30` : 'none'
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: '9px',
+                            border: 'none',
+                            background: isSel ? '#ffffff' : 'transparent',
+                            color: isSel ? '#0f172a' : '#64748b',
+                            fontSize: '0.78rem',
+                            fontWeight: isSel ? 800 : 600,
+                            cursor: 'pointer',
+                            boxShadow: isSel ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          {isTagSelected && <Check size={11} strokeWidth={3} />}
-                          <span>{tag}</span>
+                          <Icon size={13} color={isSel ? opt.color : '#64748b'} strokeWidth={isSel ? 2.5 : 2} />
+                          <span>{opt.label}</span>
                         </button>
                       );
                     })}
                   </div>
-                )}
-              </div>
 
-              {/* Step 3: Textarea + Floating Voice Dictation Glass Pill */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {feedbackType === 'feature_idea' ? 'Deine Idee oder dein Wunsch' : 'Problem-Beschreibung'}
-                  </label>
-                  {content.length > 0 && (
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
-                      {content.length} Zeichen
-                    </span>
-                  )}
-                </div>
+                  <span style={{ fontSize: '0.76rem', color: '#94a3b8', fontWeight: 600, margin: '0 2px' }}>in</span>
 
-                <div style={{ position: 'relative' }}>
-                  <textarea
-                    rows={4}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder={
-                      feedbackType === 'feature_idea'
-                        ? 'Beschreibe kurz, wie dein Vorschlag den Unterricht oder die Organisation noch einfacher machen würde...'
-                        : 'Was genau ist passiert? Beschreibe den Fehler kurz...'
-                    }
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px 44px 14px',
-                      borderRadius: '14px',
-                      border: '1.5px solid #cbd5e1',
-                      fontSize: '0.88rem',
-                      fontFamily: 'inherit',
-                      color: '#0f172a',
-                      boxSizing: 'border-box',
-                      resize: 'vertical',
-                      outline: 'none',
-                      minHeight: '110px',
-                      lineHeight: 1.5,
-                      transition: 'border-color 0.15s, box-shadow 0.15s'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = accentColor;
-                      e.currentTarget.style.boxShadow = `0 0 0 3px ${accentColor}18`;
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  />
-
-                  {/* Floating Dictation Action Pill */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '10px',
-                    right: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
+                  {/* 2. Bereich / Board Inline Pill */}
+                  <div ref={boardDropdownRef} style={{ position: 'relative' }}>
                     <button
                       type="button"
-                      onClick={toggleDictation}
+                      onClick={() => {
+                        setIsBoardDropdownOpen(prev => !prev);
+                        setIsTypeDropdownOpen(false);
+                      }}
                       style={{
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px',
-                        padding: '5px 11px',
-                        borderRadius: '20px',
-                        border: isRecording ? '1px solid #ef4444' : '1px solid rgba(203, 213, 225, 0.8)',
-                        background: isRecording ? '#fee2e2' : 'rgba(255, 255, 255, 0.94)',
-                        backdropFilter: 'blur(8px)',
-                        color: isRecording ? '#dc2626' : '#475569',
-                        fontSize: '0.73rem',
+                        padding: '6px 12px',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#0f172a',
+                        fontSize: '0.78rem',
                         fontWeight: 750,
                         cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                         transition: 'all 0.15s ease'
                       }}
-                      title={isRecording ? 'Diktat beenden' : 'Per Spracheingabe diktieren'}
+                      onMouseOver={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = '#e2e8f0'}
                     >
-                      {isRecording ? (
-                        <>
-                          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#dc2626' }} />
-                          <MicOff size={13} />
-                          <span>Höre zu...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Mic size={13} color="#64748b" />
-                          <span>Diktieren</span>
-                        </>
-                      )}
+                      {renderCategoryIcon(currentCategory?.iconName || 'Layers', 13, '#64748b')}
+                      <span>{currentCategory?.shortName || 'Bereich'}</span>
+                      <ChevronDown size={12} color="#64748b" />
                     </button>
+
+                    {isBoardDropdownOpen && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: '4px',
+                        width: '260px',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                        background: '#ffffff',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 0 1px rgba(0,0,0,0.1)',
+                        padding: '4px',
+                        zIndex: 100,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px'
+                      }}>
+                        {availableCategories.map(cat => {
+                          const isSel = selectedBoardId === cat.id;
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedBoardId(cat.id);
+                                setSelectedTags([]);
+                                setIsBoardDropdownOpen(false);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '7px 10px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: isSel ? '#f1f5f9' : 'transparent',
+                                color: isSel ? '#0f172a' : '#475569',
+                                fontSize: '0.78rem',
+                                fontWeight: isSel ? 800 : 600,
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                width: '100%'
+                              }}
+                              onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = isSel ? '#f1f5f9' : 'transparent'}
+                            >
+                              <span style={{ color: isSel ? accentColor : '#64748b' }}>
+                                {renderCategoryIcon(cat.iconName, 13, 'currentColor')}
+                              </span>
+                              <span style={{ flex: 1 }}>{cat.shortName}</span>
+                              {isSel && <Check size={12} color="#0f172a" strokeWidth={3} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
-                {(speechError || dictationError) && (
-                  <p style={{ margin: '4px 0 0', fontSize: '0.74rem', color: '#ef4444', fontWeight: 600 }}>
-                    {speechError || dictationError}
-                  </p>
+
+                {/* 60m SLA Pill Indicator (Subtle & Quiet) */}
+                {(feedbackType === 'support_request' || feedbackType === 'bug') && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    borderRadius: '100px',
+                    background: '#ecfdf5',
+                    color: '#065f46',
+                    fontSize: '0.72rem',
+                    fontWeight: 800
+                  }}>
+                    <Zap size={11} color="#059669" />
+                    <span>60m SLA Garantie</span>
+                  </span>
                 )}
               </div>
 
-              {/* Step 4: Helden-Moment Interactive Mini-Cards (Monochrome Icons) */}
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '16px',
-                padding: '14px 16px',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '6px',
-                    background: '#fef3c7',
-                    color: '#d97706',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    <Sparkles size={14} />
+              {/* Optional Ghost Access Toggle (Only for bug/support) */}
+              {(feedbackType === 'support_request' || feedbackType === 'bug') && (
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  padding: '6px 10px',
+                  borderRadius: '10px',
+                  background: grantGhostAccess ? '#f0fdf4' : '#f8fafc',
+                  border: grantGhostAccess ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                  transition: 'all 0.15s ease'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={grantGhostAccess}
+                    onChange={(e) => setGrantGhostAccess(e.target.checked)}
+                    style={{ width: '14px', height: '14px', accentColor: '#16a34a', cursor: 'pointer' }}
+                  />
+                  <div style={{ fontSize: '0.74rem', color: grantGhostAccess ? '#166534' : '#64748b', fontWeight: 600 }}>
+                    Support-Diagnose & temporären Ghost-Zugriff für 7 Tage gestatten
                   </div>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
-                      Helden-Moment
-                    </span>
-                    <span style={{ fontSize: '0.74rem', color: '#64748b', marginLeft: '6px' }}>
-                      Ehrenvolle Erwähnung im Update-Briefing bei erfolgreicher Umsetzung
-                    </span>
-                  </div>
-                </div>
+                </label>
+              )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
-                  {[
-                    {
-                      id: 'school_only',
-                      title: 'Nur Musikschule',
-                      subtitle: schoolName ? schoolName : 'Schulname',
-                      icon: Building2
-                    },
-                    {
-                      id: 'full',
-                      title: userRole === 'student' ? 'Vorname & Schule' : 'Name & Schule',
-                      subtitle: userRole === 'student'
-                        ? (schoolName ? `${studentPseudonym} (${schoolName})` : studentPseudonym)
-                        : (schoolName ? `${userName || 'Vorname & Name'} (${schoolName})` : (userName || 'Vorname & Name')),
-                      icon: Award
-                    },
-                    {
-                      id: 'anonymous',
-                      title: 'Anonym bleiben',
-                      subtitle: 'Keine Namensnennung',
-                      icon: ShieldOff
-                    }
-                  ].map((opt) => {
-                    const isSelected = heroOptIn === opt.id;
-                    const Icon = opt.icon;
+              {/* Row 2: Main Textarea (The Visual Hero) */}
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  rows={5}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={
+                    feedbackType === 'feature_idea'
+                      ? 'Was würde deinen Schul- oder Unterrichtsalltag noch einfacher machen? Beschreibe deine Idee...'
+                      : feedbackType === 'bug'
+                        ? 'Was genau ist passiert? Beschreibe kurz das Fehlerbild...'
+                        : 'Wie können wir dir direkt helfen? Beschreibe dein Anliegen...'
+                  }
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px 42px 16px',
+                    borderRadius: '16px',
+                    border: '1.5px solid #e2e8f0',
+                    fontSize: '0.90rem',
+                    fontFamily: 'inherit',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    resize: 'none',
+                    outline: 'none',
+                    minHeight: '150px',
+                    lineHeight: 1.55,
+                    transition: 'border-color 0.15s, box-shadow 0.15s'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = accentColor;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${accentColor}18`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+
+                {/* Floating Micro-Pill: Dictate Button & Character Counter */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '8px',
+                  left: '12px',
+                  right: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  pointerEvents: 'none'
+                }}>
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
+                    {content.length > 0 ? `${content.length} Zeichen` : ''}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={toggleDictation}
+                    style={{
+                      pointerEvents: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '4px 10px',
+                      borderRadius: '100px',
+                      border: isRecording ? '1px solid #ef4444' : '1px solid #cbd5e1',
+                      background: isRecording ? '#fee2e2' : 'rgba(255, 255, 255, 0.94)',
+                      color: isRecording ? '#dc2626' : '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={isRecording ? 'Diktat beenden' : 'Per Spracheingabe diktieren'}
+                  >
+                    {isRecording ? (
+                      <>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#dc2626' }} />
+                        <MicOff size={11} />
+                        <span>Höre zu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={11} color="#64748b" />
+                        <span>Diktieren</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {(speechError || dictationError) && (
+                <p style={{ margin: '-6px 0 0', fontSize: '0.72rem', color: '#ef4444', fontWeight: 600 }}>
+                  {speechError || dictationError}
+                </p>
+              )}
+
+              {/* Row 3: Smart Tags (Compact Chips, Only If Category Has Tags) */}
+              {currentCategory && currentCategory.tags.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '3px' }}>
+                    Themen:
+                  </span>
+                  {currentCategory.tags.map((tag) => {
+                    const isTagSelected = selectedTags.includes(tag);
                     return (
-                      <div
-                        key={opt.id}
-                        onClick={() => setHeroOptIn(opt.id as any)}
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
                         style={{
-                          background: isSelected ? '#ffffff' : '#f1f5f9',
-                          border: isSelected ? `1.5px solid ${accentColor}` : '1px solid #e2e8f0',
-                          borderRadius: '12px',
-                          padding: '10px 12px',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          border: isTagSelected ? `1px solid ${accentColor}` : '1px solid #e2e8f0',
+                          background: isTagSelected ? `${accentColor}18` : '#f8fafc',
+                          color: isTagSelected ? (accentColor === '#facc15' ? '#854d0e' : accentColor) : '#64748b',
+                          fontSize: '0.70rem',
+                          fontWeight: isTagSelected ? 800 : 600,
                           cursor: 'pointer',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '10px',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isSelected ? `0 2px 8px ${accentColor}18` : 'none'
+                          gap: '3px',
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <div style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '8px',
-                          background: isSelected ? `${accentColor}15` : '#ffffff',
-                          color: isSelected ? accentColor : '#64748b',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <Icon size={14} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: isSelected ? '#0f172a' : '#475569', lineHeight: 1.2 }}>
-                            {opt.title}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-                            {opt.subtitle}
-                          </div>
-                        </div>
-                      </div>
+                        {isTagSelected && <Check size={10} strokeWidth={3} />}
+                        <span>{tag}</span>
+                      </button>
                     );
                   })}
                 </div>
-              </div>
+              )}
 
-              {/* Master Legal Security & Compliance Section (100% Wasserdicht) */}
+              {/* Error Message */}
+              {errorMessage && (
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: '#fee2e2',
+                  color: '#b91c1c',
+                  fontSize: '0.78rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <AlertCircle size={14} />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* ─── Row 4: Multi-Tier Legal Governance (100% Wasserdicht & Flüsterleise) ─── */}
               <div style={{
-                background: '#f8fafc',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                padding: '10px 12px',
+                paddingTop: '8px',
+                borderTop: '1px solid #f1f5f9',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px'
+                gap: '6px'
               }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                  <ShieldCheck size={16} color={accentColor} style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontSize: '0.72rem', color: '#334155', lineHeight: 1.4 }}>
-                      <strong>Rechtssichere Einreichung:</strong> Vorschläge erfolgen freiwillig und unentgeltlich zur Plattform-Weiterentwicklung (§§ 31 ff. UrhG). Die Helden-Nennung basiert auf deiner Einwilligung (Art. 6 DSGVO) und ist jederzeit widerruflich.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowLegalDetails(prev => !prev)}
-                      style={{
-                        marginTop: '4px',
-                        padding: 0,
-                        background: 'transparent',
-                        border: 'none',
-                        color: accentColor,
-                        fontSize: '0.70rem',
-                        fontWeight: 750,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      <span>{showLegalDetails ? 'Rechtliche Details & DSGVO-Hinweise einklappen' : 'Vollständige rechtliche Bedingungen & DSGVO anzeigen'}</span>
-                      {showLegalDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                    </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1 }}>
+                    <ShieldCheck size={14} color={accentColor} style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.3 }}>
+                      Freiwillige & unentgeltliche Einreichung (§§ 31 ff. UrhG). Vertrauliche interne Bearbeitung (DSGVO). Keine Drittgeheimnisse.
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowLegalDetails(prev => !prev)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: accentColor === '#facc15' ? '#854d0e' : accentColor,
+                      fontSize: '0.70rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                      flexShrink: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    <span>{showLegalDetails ? 'Schließen' : 'Details'}</span>
+                    {showLegalDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  </button>
                 </div>
 
-                {/* Expandable Legal Terms */}
+                {/* Expandable 4-Pillar Legal Compliance Sheet */}
                 {showLegalDetails && (
                   <div style={{
-                    marginTop: '4px',
                     padding: '10px 12px',
-                    background: '#ffffff',
+                    background: '#f8fafc',
                     borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e2e8f0',
                     fontSize: '0.68rem',
                     color: '#475569',
                     lineHeight: 1.45,
@@ -1430,55 +1264,40 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     gap: '6px'
                   }}>
                     <div>
-                      <strong>1. Unentgeltliche Rechteeinräumung (§§ 31 ff. UrhG):</strong> Mit dem Einreichen räumst du Campus-Groovelab das unentgeltliche, zeitlich, räumlich und inhaltlich unbeschränkte sowie übertragbare Recht ein, deinen Vorschlag für die Weiterentwicklung, Anpassung und Verwertung der Plattform zu nutzen. Ein Anspruch auf Umsetzung oder Vergütung (§ 32 UrhG) ist ausgeschlossen.
+                      <strong>1. Unentgeltliche Rechteeinräumung (§§ 31 ff., 39 UrhG):</strong> Mit der Einreichung räumst du dem Plattformbetreiber ein unentgeltliches, zeitlich, räumlich und inhaltlich unbeschränktes Recht ein, deinen Vorschlag für die Weiterentwicklung und Verwertung von Campus-Groovelab zu nutzen. Ein Anspruch auf Umsetzung oder Vergütung (§ 32 UrhG) ist ausgeschlossen.
                     </div>
                     <div>
-                      <strong>2. Datenschutz & Minderjährigenschutz (Art. 6, 7 & 8 DSGVO):</strong> Die Nennung im Helden-Moment erfolgt auf Basis deiner freiwilligen Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) und kann jederzeit formlos mit Wirkung für die Zukunft widerrufen werden. Bei Schülern erfolgt eine Nennung stets pseudonymisiert (Vorname + 1. Buchstabe Nachname).
+                      <strong>2. Vertraulichkeit & interner Ideenschutz (Art. 5 & 6 DSGVO):</strong> Dein Feedback wird ausschließlich intern zur Optimierung von Campus-Groovelab verarbeitet. Es erfolgt keine Weitergabe von Namen, Schuldaten oder Kontaktdaten an Dritte oder die Öffentlichkeit. Status-Updates zu deinem Anliegen erhältst du direkt in deinem geschützten Account unter „Meine Ideen“.
                     </div>
                     <div>
-                      <strong>3. Verbot von Drittdaten (§ 1 GeschGehG, Art. 5 DSGVO):</strong> Es ist untersagt, vertrauliche Geschäftsgeheimnisse oder personenbezogene Daten dritter Personen (z. B. fremde Namen, Noten, Adressen oder Kontodaten) im Freitextfeld einzutragen.
+                      <strong>3. Verbot von Drittdaten (§§ 1 ff. GeschGehG):</strong> Es ist untersagt, vertrauliche Geschäftsgeheimnisse oder personenbezogene Daten dritter Personen (fremde Noten, Krankheitsdaten gem. Art. 9 DSGVO, Kontoverbindungen) einzutragen.
                     </div>
                     <div>
-                      <strong>4. Sprachdiktat & Hardware-Sicherheit (§ 25 TDDDG):</strong> Die Spracheingabe nutzt die lokale Browser-Schnittstelle (Web Speech API). Auf unseren Servern werden zu keinem Zeitpunkt Sprachaufnahmen gespeichert.
+                      <strong>4. Lokale Spracherkennung (§ 25 TDDDG):</strong> Die Spracheingabe verarbeitet Audiodaten lokal im Browser. Es werden keine Sprachaufnahmen auf Servern gespeichert.
                     </div>
                   </div>
                 )}
               </div>
 
-              {errorMessage && (
-                <div style={{
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  backgroundColor: '#fee2e2',
-                  border: 'none',
-                  color: '#b91c1c',
-                  fontSize: '0.82rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <AlertCircle size={16} />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px' }}>
+              {/* ─── Row 6: Bottom Action Buttons ─── */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
                   style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
+                    padding: '8px 14px',
+                    borderRadius: '9px',
                     border: '1px solid #cbd5e1',
                     background: '#ffffff',
                     color: '#475569',
-                    fontSize: '0.85rem',
+                    fontSize: '0.80rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
                 >
                   Abbrechen
                 </button>
@@ -1488,21 +1307,20 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 22px',
-                    borderRadius: '10px',
+                    gap: '6px',
+                    padding: '8px 18px',
+                    borderRadius: '9px',
                     border: 'none',
                     background: (!content.trim() || isSubmitting) ? '#94a3b8' : accentColor,
-                    color: '#ffffff',
-                    fontSize: '0.85rem',
+                    color: accentColor === '#facc15' ? '#0f172a' : '#ffffff',
+                    fontSize: '0.80rem',
                     fontWeight: 800,
                     cursor: (!content.trim() || isSubmitting) ? 'not-allowed' : 'pointer',
-                    boxShadow: 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                  <span>{isSubmitting ? 'Wird gesendet...' : 'Jetzt einreichen'}</span>
+                  {isSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                  <span>{isSubmitting ? 'Wird gesendet...' : 'Einreichen'}</span>
                 </button>
               </div>
             </form>

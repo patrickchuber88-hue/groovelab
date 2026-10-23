@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SecretaryModalsMasterHubProps } from './SecretaryModalsMasterHub';
+import { computeB2BPricingMetrics } from './hooks/useSecretaryLicenses';
 
 export interface BuildSecretaryModalsMasterHubPropsParams {
   // Identity & Core Infrastructure
@@ -133,6 +134,35 @@ export function buildSecretaryModalsMasterHubProps(
     getEffectiveStorageUsedBytes,
     generateStarterPin
   } = params;
+
+  // 🏛️ Revisionssichere B2B-Metriken für lückenlose Rechnungs- und Modals-Integrität
+  const pricingMetrics = computeB2BPricingMetrics({
+    isBillingBooked: !!licenses?.isBillingBooked,
+    hasCampusSub: !!licenses?.hasCampusSub,
+    campusActivatedThisMonth: !!licenses?.campusActivatedThisMonth,
+    hasGroovelabSub: !!licenses?.hasGroovelabSub,
+    groovelabActivatedThisMonth: !!licenses?.groovelabActivatedThisMonth,
+    effectiveSchoolRates: licenses?.effectiveSchoolRates || masterPricing || {
+      priceCampus: 19.9,
+      priceGroovelab: 12.9,
+      priceKombi: 24.9,
+      priceTeacher: 0.49,
+      priceStudent: 0.49
+    },
+    students: studentsHook?.students || [],
+    campusTeachers: staff?.campusTeachers || [],
+    bypassTeachers: staff?.bypassTeachers || [],
+    coaches: staff?.coaches || [],
+    allTeachers: staff?.allTeachers || [],
+    billingPayer: licenses?.billingPayer || 'school',
+    studentBillingOption: licenses?.studentBillingOption || 'option2',
+    selectedStorageAddonGb: licenses?.selectedStorageAddonGb || 0,
+    selectedStorageAddonFee: licenses?.selectedStorageAddonFee || 0,
+    currentSchoolProfile: currentSchoolProfile || {},
+    subscriptionBypass: !!licenses?.subscriptionBypass,
+    extraBillingOption: licenses?.extraBillingOption || 'option1',
+    bookedExtraUsers: licenses?.bookedExtraUsers || 0
+  });
 
   return {
     operationsProps: {
@@ -281,11 +311,11 @@ export function buildSecretaryModalsMasterHubProps(
       setSelectedInvoice: licenses?.setSelectedInvoice ?? (() => {}),
       campusActivatedThisMonth: licenses.campusActivatedThisMonth,
       groovelabActivatedThisMonth: licenses.groovelabActivatedThisMonth,
-      billableTeachersCount: licenses.billableTeachersCount,
-      activeStudentsCount_global: licenses.activeStudentsCount_global,
-      activeGroovelabStudentsCount_global: licenses.activeGroovelabStudentsCount_global,
-      passiveStudentsCount_global: licenses.passiveStudentsCount_global,
-      isSammelzahler: licenses.isSammelzahler,
+      billableTeachersCount: licenses.billableTeachersCount ?? pricingMetrics.billableTeachersCount,
+      activeStudentsCount_global: licenses.activeStudentsCount_global ?? pricingMetrics.activeStudentsCount_global,
+      activeGroovelabStudentsCount_global: licenses.activeGroovelabStudentsCount_global ?? pricingMetrics.activeGroovelabStudentsCount_global,
+      passiveStudentsCount_global: licenses.passiveStudentsCount_global ?? pricingMetrics.passiveStudentsCount_global,
+      isSammelzahler: licenses.isSammelzahler ?? pricingMetrics.isSammelzahler,
       operatorCompany,
       operatorContact,
       operatorStreet,

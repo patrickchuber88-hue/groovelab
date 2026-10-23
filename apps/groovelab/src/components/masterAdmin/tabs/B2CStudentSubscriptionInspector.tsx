@@ -54,7 +54,7 @@ export function getCanonicalSchoolYearEndLabel(contractEndsAt?: string | null): 
   }
   const now = new Date();
   const endYear = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
-  return `31.08.${endYear}`;
+  return `Schuljahresende ${endYear}`;
 }
 
 export const B2CStudentSubscriptionInspector: React.FC<B2CStudentSubscriptionInspectorProps> = ({

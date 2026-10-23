@@ -1716,7 +1716,7 @@ export function ScheduleCalendarViewDesktop({
     const rawFirstName = currentOcc.student?.first_name || '';
     const rawLastName = currentOcc.student?.last_name || '';
     const displayStudent = currentOcc.student 
-      ? `${rawFirstName} ${showRealNames ? rawLastName : maskLastName(rawLastName)}`.trim() 
+      ? `${rawFirstName} ${maskLastName(rawLastName, showRealNames)}`.trim() 
       : 'Termin';
     const timeDisplay = updates.start_time ? ` (auf ${updates.start_time.substring(0, 5)} Uhr)` : '';
     const message = customActionMessage || `Termin für ${displayStudent}${timeDisplay} angepasst`;
@@ -6249,15 +6249,15 @@ export function ScheduleCalendarViewDesktop({
 
               <button
                 type="button"
-                aria-label={showRealNames ? "Klarnamen schützen und Nachnamen abkürzen" : "Vollständige Schülernamen anzeigen"}
-                aria-pressed={showRealNames}
+                aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                aria-pressed={!showRealNames}
                 onClick={() => toggleRealNames()}
-                className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                style={{ color: showRealNames ? brandColor : undefined }}
-                title={showRealNames ? "Namen sind geschützt (Nachnamen gekürzt) – klicken zum Anzeigen" : "Vollständige Namen werden angezeigt – klicken zum Schützen"}
+                className={`apple-btn ${!showRealNames ? 'active' : ''}`}
+                style={!showRealNames ? { background: '#fee2e2', color: '#dc2626', borderColor: '#fca5a5' } : {}}
+                title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
               >
-                {showRealNames ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showRealNames ? "Namen schützen" : "Namen anzeigen"}</span>
+                {showRealNames ? <Eye size={13} color="#34a853" /> : <EyeOff size={13} color="#dc2626" />}
+                <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
               </button>
 
               <button

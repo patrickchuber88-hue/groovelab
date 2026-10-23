@@ -1,10 +1,10 @@
 {
   "organization": "Campus-Groovelab Enterprise Systems",
   "jurisdiction": "EU / DSGVO / DIN EN ISO/IEC 27001 / BSI IT-Grundschutz",
-  "timestamp": "2026-10-23T11:26:27.766Z",
+  "timestamp": "2026-10-23T20:49:00.858Z",
   "year": 2026,
   "week": 43,
-  "totalDurationMs": 32825,
+  "totalDurationMs": 28377,
   "overallVerdict": "PASSED_100_PERCENT",
   "bsiCybersecurityScorecard": {
     "weightedScore": 100,
@@ -87,22 +87,22 @@
       "id": "RUNNER_1",
       "name": "Master-Runner 1 (Dashboards & Bounding-Box Forensics)",
       "passed": true,
-      "durationMs": 7586
+      "durationMs": 7517
     },
     {
       "id": "RUNNER_2",
       "name": "Master-Runner 2 (Resilience & Fault Isolation Forensics)",
       "passed": true,
-      "durationMs": 4695
+      "durationMs": 4491
     },
     {
       "id": "RUNNER_3",
       "name": "Master-Runner 3 (Sovereignty, WORM & Legal Forensics)",
       "passed": true,
-      "durationMs": 20544
+      "durationMs": 16369
     }
   ],
-  "sha256Seal": "89df4c16fcdaed71dac3d2cd1e75744e4024d9bc08526f96ab0c400fa1401bc3",
+  "sha256Seal": "f3191544dd9eb739af2d6003f1ccfdccdef84fed11eed04add1fc9719b47dd16",
   "complianceFrameworks": [
     "DSGVO Art. 32 (Sicherheit der Verarbeitung)",
     "DSGVO Art. 28 (Auftragsverarbeitung & TOMs)",

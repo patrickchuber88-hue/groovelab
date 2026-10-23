@@ -183,7 +183,7 @@ export const AdminMissionsView: React.FC<AdminMissionsViewProps> = ({
                                 style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
                                 alt="" 
                               />
-                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{student.first_name} {maskLastName(student.last_name, showRealNames)}</span>
+                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{student.first_name} {maskLastName(student.last_name, showRealNames, student.id)}</span>
                             </td>
                             <td style={{ padding: '14px 16px' }}>
                               <select

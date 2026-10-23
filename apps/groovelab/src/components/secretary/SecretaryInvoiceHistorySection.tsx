@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { Calendar, CreditCard, Users, FileText, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, CreditCard, Users, FileText, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { getDynamicAnnualPrice } from './licenses/licenseUtils';
 
 export interface SecretaryInvoiceHistorySectionProps {
@@ -308,95 +308,178 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
         aktAmount = subscriptionBypass ? 0 : parseFloat((effectiveActivationsCount * studentFee * restmonate).toFixed(2));
       }
 
-      let infRecord: any = {
-        id: infId,
-        type: "INF",
-        year: String(y),
-        monthName: monthName,
-        date: invoiceDateStr,
-        dueDateStr: dueDateStr,
-        dueDateObj: dueDateObj,
-        due_date: dueDateObj.toISOString(),
-        countdownStr: infCountdownStr,
-        isCurrentMonth: isCurrent,
-        b2b: infPureAmount,
-        amount: infPureAmount,
-        schoolStudentCost: 0,
-        schoolStudentLevy: 0,
-        schoolExtraCost: 0,
-        extraLevyMonthly: 0,
-        extraEinmalzahlung: 0,
-        b2c: 0,
-        einmalzahlung: 0,
-        status: infStatus,
-        paid: isInfPaid,
-        creationTime: creationTime,
-        totalTeachersCount: billableTeachersCount,
-        passiveStudentsCount: monthPassiveCount,
-        passiveStudentsHostingFee: monthPassiveFee,
-        activeGroovelabCount: monthGroovelabActiveCount,
-        groovelabStudentsHostingFee: monthGroovelabStudentFee,
-        storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
-        storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
-        auditHash: `CG-INF-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
-        gobd_version: 5,
-        activatedStudentsList: []
-      };
+      const isSammelzahlerSchool = billingPayer === "school" || 
+        !['both', 'debit', 'cash', 'option1'].includes(studentBillingOption || '') ||
+        studentBillingOption === "option2" ||
+        studentBillingOption === "option3_2" ||
+        studentBillingOption === "option3_3";
 
-      let aktRecord: any = {
-        id: aktId,
-        type: "AKT",
-        year: String(y),
-        monthName: monthName,
-        date: invoiceDateStr,
-        dueDateStr: dueDateStr,
-        dueDateObj: dueDateObj,
-        due_date: dueDateObj.toISOString(),
-        countdownStr: aktCountdownStr,
-        isCurrentMonth: isCurrent,
-        b2b: 0,
-        amount: aktAmount,
-        schoolStudentCost: 0,
-        schoolStudentLevy: 0,
-        schoolExtraCost: 0,
-        extraLevyMonthly: 0,
-        extraEinmalzahlung: 0,
-        b2c: aktAmount,
-        einmalzahlung: (studentBillingOption === "option3_2" || studentBillingOption === "option3_3") ? aktAmount : 0,
-        status: aktStatus,
-        paid: isAktPaid,
-        creationTime: creationTime,
-        activeCampusCount: monthCampusActiveCount,
-        activeGroovelabCount: 0,
-        passiveStudentsCount: 0,
-        activationsCount: effectiveActivationsCount,
-        restmonate: restmonate,
-        studentFee: studentFee,
-        auditHash: `CG-AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
-        gobd_version: 5,
-        activatedStudentsList: invoiceStudentsList.map((s: any) => {
-          const isNewlyActivated = (() => {
-            if (!s.activated_at) return false;
-            const d = new Date(s.activated_at);
-            return d.getMonth() === targetMonthZeroIndexed && d.getFullYear() === targetYear;
-          })();
-          return {
-            id: s.id,
-            first_name: s.first_name || s.vorname || '',
-            last_name: s.last_name || s.nachname || '',
-            instrument: s.instrument || s.instrument_name || s.fach || s.subject || 'Schülerprofil',
-            isCampusActive: !!(s.isCampusActive || s.is_campus_active),
-            isGroovelabActive: !!(s.isGroovelabActive || s.is_groovelab_active),
-            activated_at: s.activated_at || s.created_at || null,
-            isNewlyActivated: isNewlyActivated
-          };
-        })
-      };
+      if (isSammelzahlerSchool) {
+        // 🏛️ 0,1% Goldstandard: Konsolidierte Monatsrechnung für Sammelzahler (Abschnitt A + Abschnitt B)
+        // 100% Kanonische Parität mit MasterAdmin useBillingData.ts
+        const consolidatedAmount = parseFloat((infPureAmount + aktAmount).toFixed(2));
+        const consolidatedId = isCreated 
+          ? `RE-${formattedSchoolNumericId}-${yearShort}${monthStr}-01` 
+          : `VS-${formattedSchoolNumericId}-${yearShort}${monthStr}`;
 
-      list.push(infRecord);
+        const isConsolidatedPaidExplicit = paidInvoicesList.includes(consolidatedId) ||
+          paidInvoicesList.includes(`INF-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`) ||
+          paidInvoicesList.includes(`RE-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`) ||
+          paidInvoicesList.includes(`AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}-01`);
 
-      if (aktRecord.amount > 0 && (billingPayer === "school" || studentBillingOption === "option2" || studentBillingOption === "option3_2" || studentBillingOption === "option3_3")) {
-        list.push(aktRecord);
+        const isConsolidatedPaid = isConsolidatedPaidExplicit || (isSepaActive && isPastDueDate && isCreated);
+        const consolidatedStatus = resolveInvoiceStatus(isConsolidatedPaid);
+        const consolidatedCountdownStr = resolveCountdownSubtitle(consolidatedStatus);
+
+        const consolidatedRecord: any = {
+          id: consolidatedId,
+          type: "ALL",
+          year: String(y),
+          monthName: monthName,
+          date: invoiceDateStr,
+          dueDateStr: dueDateStr,
+          dueDateObj: dueDateObj,
+          due_date: dueDateObj.toISOString(),
+          countdownStr: consolidatedCountdownStr,
+          isCurrentMonth: isCurrent,
+          b2b: infPureAmount,
+          b2c: aktAmount,
+          amount: consolidatedAmount,
+          schoolStudentCost: 0,
+          schoolStudentLevy: 0,
+          schoolExtraCost: 0,
+          extraLevyMonthly: 0,
+          extraEinmalzahlung: 0,
+          einmalzahlung: (studentBillingOption === "option3_2" || studentBillingOption === "option3_3") ? aktAmount : 0,
+          status: consolidatedStatus,
+          paid: isConsolidatedPaid,
+          creationTime: creationTime,
+          totalTeachersCount: billableTeachersCount,
+          passiveStudentsCount: monthPassiveCount,
+          passiveStudentsHostingFee: monthPassiveFee,
+          activeGroovelabCount: monthGroovelabActiveCount,
+          groovelabStudentsHostingFee: monthGroovelabStudentFee,
+          activeCampusCount: monthCampusActiveCount,
+          activationsCount: effectiveActivationsCount,
+          restmonate: restmonate,
+          studentFee: studentFee,
+          storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
+          storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
+          auditHash: `CG-RE-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
+          gobd_version: 5,
+          isSammelzahler: true,
+          activatedStudentsList: invoiceStudentsList.map((s: any) => {
+            const isNewlyActivated = (() => {
+              if (!s.activated_at) return false;
+              const d = new Date(s.activated_at);
+              return d.getMonth() === targetMonthZeroIndexed && d.getFullYear() === targetYear;
+            })();
+            return {
+              id: s.id,
+              first_name: s.first_name || s.vorname || '',
+              last_name: s.last_name || s.nachname || '',
+              instrument: s.instrument || s.instrument_name || s.fach || s.subject || 'Schülerprofil',
+              isCampusActive: !!(s.isCampusActive || s.is_campus_active),
+              isGroovelabActive: !!(s.isGroovelabActive || s.is_groovelab_active),
+              activated_at: s.activated_at || s.created_at || null,
+              isNewlyActivated: isNewlyActivated
+            };
+          })
+        };
+
+        list.push(consolidatedRecord);
+      } else {
+        // Direktabrechnung Schüler/Eltern: Getrennte Belege
+        let infRecord: any = {
+          id: infId,
+          type: "INF",
+          year: String(y),
+          monthName: monthName,
+          date: invoiceDateStr,
+          dueDateStr: dueDateStr,
+          dueDateObj: dueDateObj,
+          due_date: dueDateObj.toISOString(),
+          countdownStr: infCountdownStr,
+          isCurrentMonth: isCurrent,
+          b2b: infPureAmount,
+          amount: infPureAmount,
+          schoolStudentCost: 0,
+          schoolStudentLevy: 0,
+          schoolExtraCost: 0,
+          extraLevyMonthly: 0,
+          extraEinmalzahlung: 0,
+          b2c: 0,
+          einmalzahlung: 0,
+          status: infStatus,
+          paid: isInfPaid,
+          creationTime: creationTime,
+          totalTeachersCount: billableTeachersCount,
+          passiveStudentsCount: monthPassiveCount,
+          passiveStudentsHostingFee: monthPassiveFee,
+          activeGroovelabCount: monthGroovelabActiveCount,
+          groovelabStudentsHostingFee: monthGroovelabStudentFee,
+          storageAddonGb: Number(currentSchoolProfile?.storage_addon_gb || selectedStorageAddonGb || 0),
+          storageAddonMonthlyFee: selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0),
+          auditHash: `CG-INF-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
+          gobd_version: 5,
+          activatedStudentsList: []
+        };
+
+        let aktRecord: any = {
+          id: aktId,
+          type: "AKT",
+          year: String(y),
+          monthName: monthName,
+          date: invoiceDateStr,
+          dueDateStr: dueDateStr,
+          dueDateObj: dueDateObj,
+          due_date: dueDateObj.toISOString(),
+          countdownStr: aktCountdownStr,
+          isCurrentMonth: isCurrent,
+          b2b: 0,
+          amount: aktAmount,
+          schoolStudentCost: 0,
+          schoolStudentLevy: 0,
+          schoolExtraCost: 0,
+          extraLevyMonthly: 0,
+          extraEinmalzahlung: 0,
+          b2c: aktAmount,
+          einmalzahlung: 0,
+          status: aktStatus,
+          paid: isAktPaid,
+          creationTime: creationTime,
+          activeCampusCount: monthCampusActiveCount,
+          activeGroovelabCount: 0,
+          passiveStudentsCount: 0,
+          activationsCount: effectiveActivationsCount,
+          restmonate: restmonate,
+          studentFee: studentFee,
+          auditHash: `CG-AKT-${formattedSchoolNumericId}-${yearShort}${monthStr}`,
+          gobd_version: 5,
+          activatedStudentsList: invoiceStudentsList.map((s: any) => {
+            const isNewlyActivated = (() => {
+              if (!s.activated_at) return false;
+              const d = new Date(s.activated_at);
+              return d.getMonth() === targetMonthZeroIndexed && d.getFullYear() === targetYear;
+            })();
+            return {
+              id: s.id,
+              first_name: s.first_name || s.vorname || '',
+              last_name: s.last_name || s.nachname || '',
+              instrument: s.instrument || s.instrument_name || s.fach || s.subject || 'Schülerprofil',
+              isCampusActive: !!(s.isCampusActive || s.is_campus_active),
+              isGroovelabActive: !!(s.isGroovelabActive || s.is_groovelab_active),
+              activated_at: s.activated_at || s.created_at || null,
+              isNewlyActivated: isNewlyActivated
+            };
+          })
+        };
+
+        list.push(infRecord);
+
+        if (aktRecord.amount > 0) {
+          list.push(aktRecord);
+        }
       }
 
       m++;
@@ -626,7 +709,12 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
                           : inv.id.replace('INV-', 'RE-')}
                       </strong>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 600, marginTop: '2px' }}>
-                        {inv.type === 'INF' ? (
+                        {inv.type === 'ALL' ? (
+                          <>
+                            <Sparkles size={12} color="#7c3aed" style={{ verticalAlign: 'middle' }} />
+                            Konsolidierte Monatsrechnung (Campus &amp; GrooveLab)
+                          </>
+                        ) : inv.type === 'INF' ? (
                           <>
                             <CreditCard size={12} color="#64748b" style={{ verticalAlign: 'middle' }} />
                             Service- &amp; Infrastruktur
@@ -658,7 +746,19 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
 
                     {/* Spalte 3: Klassifizierung (Kein Leerloch!) */}
                     <div>
-                      {inv.type === 'AKT' ? (
+                      {inv.type === 'ALL' ? (
+                        <span style={{ 
+                          fontSize: '0.68rem', 
+                          color: '#6b21a8', 
+                          background: '#f3e8ff', 
+                          padding: '3px 8px', 
+                          borderRadius: '6px', 
+                          fontWeight: 700,
+                          display: 'inline-block'
+                        }}>
+                          Sammel (Schule)
+                        </span>
+                      ) : inv.type === 'AKT' ? (
                         <span style={{ 
                           fontSize: '0.68rem', 
                           color: billingPayer === 'student' ? '#15803d' : '#9a3412', 
@@ -716,7 +816,7 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
 
                     {/* Spalte 6: Aktionen (Rechtsbündig, kompakt) */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                      {inv.type === 'AKT' && (
+                      {(inv.type === 'AKT' || inv.type === 'ALL') && (
                         <button 
                           type="button"
                           onClick={() => setActiveStudentsModalList({ 
@@ -744,7 +844,7 @@ export const SecretaryInvoiceHistorySection: React.FC<SecretaryInvoiceHistorySec
                           title="Aktivierte Schüler anzeigen"
                         >
                           <Users size={12} color="#64748b" />
-                          Schüler ({inv.activatedStudentsList?.length || inv.activationsCount || 0})
+                          Schüler ({inv.activatedStudentsList?.length || inv.activationsCount || inv.activeCampusCount || 0})
                         </button>
                       )}
 

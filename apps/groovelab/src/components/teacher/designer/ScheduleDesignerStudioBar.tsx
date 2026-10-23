@@ -586,13 +586,14 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
         <button
           type="button"
           onClick={onToggleRealNames}
+          aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
           style={{
-            background: showRealNames ? 'rgba(52, 168, 83, 0.12)' : 'rgba(0, 0, 0, 0.04)',
-            border: showRealNames ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.05)',
+            background: showRealNames ? '#ffffff' : '#fee2e2',
+            border: showRealNames ? '1px solid #cbd5e1' : '1px solid #fca5a5',
             borderRadius: '8px',
             padding: '3px 9px',
             height: '28px',
-            color: showRealNames ? '#15803d' : '#475569',
+            color: showRealNames ? '#475569' : '#dc2626',
             fontSize: '0.72rem',
             fontWeight: 700,
             cursor: 'pointer',
@@ -603,10 +604,10 @@ export const ScheduleDesignerStudioBar: React.FC<ScheduleDesignerStudioBarProps>
             boxSizing: 'border-box',
             transition: 'all 0.15s ease'
           }}
-          title={showRealNames ? "Schüler-Nachnamen sind gekürzt (Datenschutz aktiv)" : "Vollständige Schülernamen anzeigen"}
+          title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
         >
-          {showRealNames ? <EyeOff size={12} /> : <Eye size={12} />}
-          <span>{showRealNames ? "Namen geschützt" : "Namen anzeigen"}</span>
+          {showRealNames ? <Eye size={12} color="#34a853" /> : <EyeOff size={12} color="#dc2626" />}
+          <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
         </button>
       </div>
 

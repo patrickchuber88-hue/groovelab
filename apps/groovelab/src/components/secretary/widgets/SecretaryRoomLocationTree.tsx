@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { School, Building2, Plus, Edit2, Trash2, HelpCircle, Layers, ChevronDown, ChevronRight } from 'lucide-react';
+import { School, Building2, Plus, Edit2, Trash2, HelpCircle, Layers, ChevronDown, ChevronRight, PanelLeftClose } from 'lucide-react';
 
 export interface SecretaryRoomLocationTreeProps {
   buildings: any[];
@@ -21,6 +21,8 @@ export interface SecretaryRoomLocationTreeProps {
   allFloorsList: string[];
   addedFloors: string[];
   getFloorColor: (name: string) => { avatarBg: string; avatarColor: string };
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export function SecretaryRoomLocationTree({
@@ -42,7 +44,9 @@ export function SecretaryRoomLocationTree({
   onDropRoomToFloor,
   allFloorsList = [],
   addedFloors = [],
-  getFloorColor
+  getFloorColor,
+  isCollapsed = false,
+  onToggleCollapse
 }: SecretaryRoomLocationTreeProps) {
   const [collapsedBuildings, setCollapsedBuildings] = useState<Record<string, boolean>>({});
 
@@ -69,38 +73,64 @@ export function SecretaryRoomLocationTree({
       boxShadow: '0 1px 3px rgba(15, 23, 42, 0.02)',
       boxSizing: 'border-box'
     }}>
-      {/* HEADER: Title & Quick Add */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <School size={20} style={{ color: '#0f172a' }} />
-          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
+      {/* HEADER: Title, Quick Add & Collapse */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <School size={20} style={{ color: '#0f172a', flexShrink: 0 }} />
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             Standort & Ebenen
           </h3>
         </div>
-        <button
-          type="button"
-          aria-label="Neues Gebäude anlegen"
-          onClick={() => onOpenBuildingEditor()}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '4px',
-            borderRadius: '9px',
-            padding: '5px 10px',
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            background: 'rgba(234, 67, 53, 0.08)',
-            color: '#ea4335',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'Urbanist',
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale-mini"
-        >
-          <Plus size={13} />
-          <span>Gebäude</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <button
+            type="button"
+            aria-label="Neues Gebäude anlegen"
+            onClick={() => onOpenBuildingEditor()}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              borderRadius: '9px',
+              padding: '5px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              background: 'rgba(234, 67, 53, 0.08)',
+              color: '#ea4335',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'Urbanist',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <Plus size={13} />
+            <span>Gebäude</span>
+          </button>
+          {onToggleCollapse && (
+            <button
+              type="button"
+              aria-label="Standort & Ebenen einklappen"
+              title="Standort & Ebenen einklappen"
+              onClick={onToggleCollapse}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                background: '#f8fafc',
+                color: '#64748b',
+                border: '1px solid #e2e8f0',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale-mini"
+            >
+              <PanelLeftClose size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* TREE CONTENT LIST */}

@@ -3,7 +3,7 @@
  * Standards: OWASP ASVS Level 3 / DSGVO Art. 25 (Privacy by Design)
  * 
  * Rules:
- * 1. Students: Anonymized to "First Name + Last Initial." (e.g. "Max M.").
+ * 1. Students: Pseudonymized (Art. 4 Nr. 5 DSGVO) to "First Name + Last Initial." (e.g. "Max M.").
  * 2. Teachers: Displayed with FULL NAME ("First Name + Last Name", e.g. "Severin Landenberger").
  * 3. Admins / Secretaries: Displayed with FULL NAME.
  * 4. Fallbacks: "Schüler/in", "Lehrkraft", "Nutzer".
@@ -17,8 +17,8 @@ export interface UserNameLike {
 }
 
 /**
- * Anonymizes a last name to an uppercase single initial with period, e.g. "Mustermann" -> "M."
- * Handles pre-anonymized names like "M.", "M", or empty strings safely.
+ * Pseudonymizes a last name to an uppercase single initial with period, e.g. "Mustermann" -> "M." (Art. 4 Nr. 5 DSGVO)
+ * Handles pre-pseudonymized names like "M.", "M", or empty strings safely.
  */
 export function anonymizeLastName(lastName?: string | null): string {
   if (!lastName) return '';

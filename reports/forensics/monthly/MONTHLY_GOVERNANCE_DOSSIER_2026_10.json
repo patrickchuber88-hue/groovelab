@@ -1,18 +1,24 @@
 {
   "organization": "Campus-Groovelab Enterprise Systems",
   "jurisdiction": "EU / DACH (DSGVO, BFSG 2025, BGB, SGB VIII, KUG, UrhG, revDSG)",
-  "timestamp": "2026-10-23T11:27:18.954Z",
+  "timestamp": "2026-10-23T20:49:41.035Z",
   "year": 2026,
   "month": 10,
-  "totalDurationMs": 46132,
+  "totalDurationMs": 34726,
   "overallVerdict": "PASSED_100_PERCENT",
   "horizonMetrics": {
-    "gitCommitsLast30d": 62,
-    "maxMigrationNum": 599,
+    "gitCommitsLast30d": 63,
+    "maxMigrationNum": 601,
     "workspacesCount": 4,
     "discoveredRoutinesCount": 58,
     "recentRoutinesCount": 32,
-    "isoStandardsAuditCount": 10
+    "isoStandardsAuditCount": 10,
+    "kmkVacationHorizon": {
+      "maxDate": "2030-09-09",
+      "coverageDays": 1416,
+      "statesAudited": 11,
+      "passed": true
+    }
   },
   "isoStandardsMatrix": [
     {
@@ -236,7 +242,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/bsi_360_cybersecurity_matrix_guard.mjs",
       "lastModified": "2026-10-21",
-      "ageDays": 2,
+      "ageDays": 0,
       "isRecent": true
     },
     {
@@ -276,7 +282,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_monthly_governance_dossier.ts",
       "lastModified": "2026-10-21",
-      "ageDays": 2,
+      "ageDays": 0,
       "isRecent": true
     },
     {
@@ -300,7 +306,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_weekly_resilience_dossier.ts",
       "lastModified": "2026-10-21",
-      "ageDays": 2,
+      "ageDays": 3,
       "isRecent": true
     },
     {
@@ -332,7 +338,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/monolith_growth_guard.mjs",
       "lastModified": "2026-10-03",
-      "ageDays": 20,
+      "ageDays": 21,
       "isRecent": true
     },
     {
@@ -348,7 +354,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/product_bible_guard.mjs",
       "lastModified": "2026-10-08",
-      "ageDays": 16,
+      "ageDays": 17,
       "isRecent": true
     },
     {
@@ -364,7 +370,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/run_dashboard_forensics.ts",
       "lastModified": "2026-09-29",
-      "ageDays": 23,
+      "ageDays": 24,
       "isRecent": true
     },
     {
@@ -396,7 +402,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/shadow_compliance_guard.mjs",
       "lastModified": "2026-10-09",
-      "ageDays": 14,
+      "ageDays": 15,
       "isRecent": true
     },
     {
@@ -404,7 +410,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/test_facade_guard.mjs",
       "lastModified": "2026-10-08",
-      "ageDays": 16,
+      "ageDays": 17,
       "isRecent": true
     },
     {
@@ -428,7 +434,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_live_parity.mjs",
       "lastModified": "2026-10-11",
-      "ageDays": 11,
+      "ageDays": 12,
       "isRecent": true
     },
     {
@@ -460,7 +466,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_static_security_headers.mjs",
       "lastModified": "2026-10-09",
-      "ageDays": 13,
+      "ageDays": 14,
       "isRecent": true
     },
     {
@@ -468,7 +474,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_storage_box_integrity.mjs",
       "lastModified": "2026-10-16",
-      "ageDays": 10,
+      "ageDays": 11,
       "isRecent": true
     },
     {
@@ -476,7 +482,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_sw_integrity.mjs",
       "lastModified": "2026-10-09",
-      "ageDays": 13,
+      "ageDays": 14,
       "isRecent": true
     },
     {
@@ -484,7 +490,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_workspace_invariants.ts",
       "lastModified": "2026-10-09",
-      "ageDays": 14,
+      "ageDays": 15,
       "isRecent": true
     },
     {
@@ -509,79 +515,79 @@
       "id": "MUT_SECRET",
       "name": "Secret Scanner Fail-Closed Mutation (High-Entropy Secret)",
       "passed": true,
-      "durationMs": 9766
+      "durationMs": 8971
     },
     {
       "id": "MUT_AUSFALL",
       "name": "Neutral Ausfall Guard Mutation (DSGVO Art. 9 Technical Sick Token)",
       "passed": true,
-      "durationMs": 532
+      "durationMs": 359
     },
     {
       "id": "MUT_BUTTON",
       "name": "Universal Button Guard Mutation (BFSG 2025 Dead Button)",
       "passed": true,
-      "durationMs": 483
+      "durationMs": 364
     },
     {
       "id": "MUT_MONOLITH",
       "name": "Monolith Ceiling Guard Mutation (1.500-Zeilen Obergrenze)",
       "passed": true,
-      "durationMs": 163
+      "durationMs": 91
     },
     {
       "id": "MUT_DRIFT",
       "name": "Security Drift Guard Mutation (Direct users_raw Access)",
       "passed": true,
-      "durationMs": 2006
+      "durationMs": 1349
     },
     {
       "id": "MUT_LEGAL",
       "name": "Legal Compliance Guard Mutation (DSGVO Art. 5/25 Secret in SELECT)",
       "passed": true,
-      "durationMs": 3675
+      "durationMs": 2911
     },
     {
       "id": "MUT_OVERLAP",
       "name": "Zero-Overlap Guard Mutation (Anti-Collision Fixed Height Violation)",
       "passed": true,
-      "durationMs": 246
+      "durationMs": 165
     },
     {
       "id": "MUT_MID_WORD_SPLIT",
       "name": "Zero-Overlap Guard Mutation (Anti-Mid-Word-Split Heading Violation)",
       "passed": true,
-      "durationMs": 202
+      "durationMs": 165
     },
     {
       "id": "MUT_RIGID_GRID_MOBILE",
       "name": "Zero-Overlap Guard Mutation (Unguarded 4-Column Mobile KPI Grid Violation)",
       "passed": true,
-      "durationMs": 437
+      "durationMs": 189
     },
     {
       "id": "MUT_RLS",
       "name": "RLS Catalog Invariant Mutation (Post-470 Unmanaged Table without RLS)",
       "passed": true,
-      "durationMs": 822
+      "durationMs": 373
     },
     {
       "id": "MUT_BSI_MATRIX",
       "name": "BSI 360° Matrix Guard Mutation (SECURITY DEFINER current_user Privilege Bypass)",
       "passed": true,
-      "durationMs": 279
+      "durationMs": 144
     },
     {
       "id": "MUT_RLS_REBAC_DOWNGRADE",
       "name": "BSI 360° Matrix Guard Mutation (§ 201 StGB Audio Policy Leadership Downgrade)",
       "passed": true,
-      "durationMs": 153
+      "durationMs": 174
     },
     {
       "id": "MUT_BFF_UNVERIFIED_COOKIE",
       "name": "Security Drift Guard BFF-01 Mutation (Unverified Cookie Existence Bypass)",
       "passed": true,
-      "durationMs": 2161
+      "durationMs": 1081
     }
   ],
   "guards": [
@@ -590,171 +596,171 @@
       "name": "Security Drift Guard",
       "standard": "Architecture Invariants & No-Bypass",
       "passed": true,
-      "durationMs": 1475
+      "durationMs": 1073
     },
     {
       "id": "GUARD_02",
       "name": "Legal Compliance Guard",
       "standard": "12 Säulen / 18 Checks (DSGVO, BFSG, KUG, UrhG)",
       "passed": true,
-      "durationMs": 3162
+      "durationMs": 2815
     },
     {
       "id": "GUARD_03",
       "name": "Universal Button Guard",
       "standard": "3.700+ Buttons, BFSG 2025, Anti-Freeze",
       "passed": true,
-      "durationMs": 424
+      "durationMs": 328
     },
     {
       "id": "GUARD_04",
       "name": "PWA Mobile Architecture Guard",
       "standard": "Apple HIG, 100dvh, Safe Areas, Touch Targets",
       "passed": true,
-      "durationMs": 42
+      "durationMs": 34
     },
     {
       "id": "GUARD_05",
       "name": "License Compliance Guard",
       "standard": "ISO/IEC 5230 OpenChain (4 Workspaces)",
       "passed": true,
-      "durationMs": 165
+      "durationMs": 39
     },
     {
       "id": "GUARD_06",
       "name": "Zero-Overlap & Fluid-Layout Guard",
       "standard": "Zero Content Occlusion & Desktop Immunity",
       "passed": true,
-      "durationMs": 210
+      "durationMs": 162
     },
     {
       "id": "GUARD_07",
       "name": "Static Security Headers Guard",
       "standard": "Mozilla Observatory A+ & PQC Ingress",
       "passed": true,
-      "durationMs": 51
+      "durationMs": 29
     },
     {
       "id": "GUARD_08",
       "name": "Secret Leak & Entropy Scanner",
       "standard": "OWASP ASVS L3 High-Entropy Token Linter",
       "passed": true,
-      "durationMs": 10264
+      "durationMs": 8376
     },
     {
       "id": "GUARD_09",
       "name": "ISO 27001 / ISO 27701 Guard",
       "standard": "ISO/IEC 27001:2022 Annex A.8.20 / A.8.24",
       "passed": true,
-      "durationMs": 322
+      "durationMs": 29
     },
     {
       "id": "GUARD_10",
       "name": "Monolith Ceiling Guard",
       "standard": "Zero-Inline-Feature Axiom & Ratchet-Down",
       "passed": true,
-      "durationMs": 285
+      "durationMs": 88
     },
     {
       "id": "GUARD_11",
       "name": "Neutral Ausfall Guard",
       "standard": "DSGVO Art. 9 Neutralitäts-Doktrin",
       "passed": true,
-      "durationMs": 475
+      "durationMs": 215
     },
     {
       "id": "GUARD_12",
       "name": "RLS & Schema Catalog Invariants",
       "standard": "22 Forensic Invariants (Migrations 471-519+)",
       "passed": true,
-      "durationMs": 668
+      "durationMs": 357
     },
     {
       "id": "GUARD_13",
       "name": "World Tour Invariants Verifier",
       "standard": "Urtext & UrhG § 64 Gemeinfreiheit",
       "passed": true,
-      "durationMs": 407
+      "durationMs": 322
     },
     {
       "id": "GUARD_14",
       "name": "Users View Security Leakage Audit",
       "standard": "OWASP ASVS L3 Zero-Secret Airgap",
       "passed": true,
-      "durationMs": 378
+      "durationMs": 359
     },
     {
       "id": "GUARD_15",
       "name": "Perimeter Headers & Precache Smoke",
       "standard": "Tri-Observatory (Observatory/Qualys/SecHeaders)",
       "passed": true,
-      "durationMs": 1873
+      "durationMs": 1120
     },
     {
       "id": "GUARD_16",
       "name": "BSI 360° Cybersecurity Matrix Guard",
       "standard": "6 Domänen / 24 Checks (BSI / OWASP ASVS L3)",
       "passed": true,
-      "durationMs": 264
+      "durationMs": 160
     },
     {
       "id": "GUARD_DYN_17",
       "name": "[DYNAMIC AUTO-DISCOVERED] parent_portal_governance_guard.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 34
+      "durationMs": 31
     },
     {
       "id": "GUARD_DYN_18",
       "name": "[DYNAMIC AUTO-DISCOVERED] product_bible_guard.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 75
+      "durationMs": 68
     },
     {
       "id": "GUARD_DYN_19",
       "name": "[DYNAMIC AUTO-DISCOVERED] shadow_compliance_guard.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 478
+      "durationMs": 182
     },
     {
       "id": "GUARD_DYN_20",
       "name": "[DYNAMIC AUTO-DISCOVERED] test_facade_guard.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 712
+      "durationMs": 268
     },
     {
       "id": "GUARD_DYN_21",
       "name": "[DYNAMIC AUTO-DISCOVERED] verify_live_parity.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 166
+      "durationMs": 137
     },
     {
       "id": "GUARD_DYN_22",
       "name": "[DYNAMIC AUTO-DISCOVERED] verify_storage_box_integrity.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 1244
+      "durationMs": 974
     },
     {
       "id": "GUARD_DYN_23",
       "name": "[DYNAMIC AUTO-DISCOVERED] verify_sw_integrity.mjs",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 85
+      "durationMs": 106
     },
     {
       "id": "GUARD_DYN_24",
       "name": "[DYNAMIC AUTO-DISCOVERED] verify_workspace_invariants.ts",
       "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
       "passed": true,
-      "durationMs": 1119
+      "durationMs": 520
     }
   ],
-  "sha256Seal": "8e3f2d489e0ab3a40b5df13ca417de11d5cf6c8527c32da1e9119e8fe522b882",
+  "sha256Seal": "f1ed2c4cd539ba2176eb30e2d8919ec594972c28cfacbb1a7dfb8d86c69a4962",
   "regulatoryFrameworks": [
     "§ 43 GmbHG (Sorgfaltspflicht der Geschäftsführung)",
     "DSGVO Art. 5 Abs. 2 (Rechenschaftspflicht / Accountability)",

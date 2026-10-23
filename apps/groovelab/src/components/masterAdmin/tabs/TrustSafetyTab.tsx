@@ -616,7 +616,7 @@ export function TrustSafetyTab() {
                     </h4>
                     {resolvedResult.isAnonymized && (
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '100px', background: '#f1f5f9', color: '#475569', border: 'none' }}>
-                        Anonymisiert im Web
+                        Pseudonymisiert im Web
                       </span>
                     )}
                   </div>

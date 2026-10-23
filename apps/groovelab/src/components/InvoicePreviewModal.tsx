@@ -172,6 +172,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     : (isGutschrift ? invoice.id.replace('INV-', 'GS-') : invoice.id.replace('INV-', 'RE-'));
 
   const isSammelzahler = billingPayer === 'school' || invoice.isSammelzahler === true || invoice.type === 'ALL';
+  const shouldRenderSectionBCharge = invoice.type === 'ALL' || invoice.type === 'AKT' || (isSammelzahler && invoice.type !== 'INF');
 
   const dateInfo = parseAnyInvoiceDate(invoice.date);
   const finalDueDateStr = invoice.dueDateStr || dateInfo.canonicalDue.dueDateDisplay;
@@ -306,7 +307,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   }
 
   // Abschnitt B: Schüler-Aktivierungen (Campus App)
-  if (isSammelzahler || invoice.type === 'AKT') {
+  if (shouldRenderSectionBCharge) {
     if (studentCount > 0) {
       const uPrice = isFree ? 0 : masterPricing.priceStudent;
       const totalS = parseFloat((studentCount * uPrice).toFixed(2));
@@ -576,8 +577,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 {isGutschrift
                   ? (invoice.status === 'Vorschau' ? 'VORSCHAU: GUTSCHRIFT' : 'GUTSCHRIFT')
                   : (invoice.status === 'Vorschau'
-                    ? (isSammelzahler ? 'VORSCHAU: KONSOLIDIERTE MONATSRECHNUNG' : (isInf ? (isTrial ? 'VORSCHAU: PROBEMONAT' : 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN') : 'VORSCHAU: SCHÜLERAKTIVIERUNGEN'))
-                    : (isSammelzahler ? 'KONSOLIDIERTE MONATSRECHNUNG' : (isInf ? (isTrial ? 'PROBEMONAT' : 'INFRASTRUKTUR- & SERVICEGEBÜHREN') : 'SCHÜLERAKTIVIERUNGEN')))}
+                    ? (invoice.type === 'ALL' || (isSammelzahler && invoice.type !== 'INF' && invoice.type !== 'AKT') 
+                        ? 'VORSCHAU: KONSOLIDIERTE MONATSRECHNUNG' 
+                        : (isInf ? (isTrial ? 'VORSCHAU: PROBEMONAT' : 'VORSCHAU: INFRASTRUKTUR- & SERVICEGEBÜHREN') : 'VORSCHAU: SCHÜLERAKTIVIERUNGEN'))
+                    : (invoice.type === 'ALL' || (isSammelzahler && invoice.type !== 'INF' && invoice.type !== 'AKT') 
+                        ? 'KONSOLIDIERTE MONATSRECHNUNG' 
+                        : (isInf ? (isTrial ? 'PROBEMONAT' : 'INFRASTRUKTUR- & SERVICEGEBÜHREN') : 'SCHÜLERAKTIVIERUNGEN')))}
               </strong>
               <span style={{ color: '#64748b', fontWeight: 700 }}>
                 {isGutschrift ? 'Gutschrift-Nr.' : 'Nr.'} {displayInvoiceId}

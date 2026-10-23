@@ -2,9 +2,10 @@ import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMe
 import { supabase } from '../lib/supabase';
 import { logApplicationAudit } from '../services/auditLogService';
 import { CampusGroovelabText } from './CampusGroovelabBrand';
-import { Send, Search, MessageSquare, User, ArrowLeft, Check, Clock, Inbox, Plus, X, Calendar, ShieldCheck, Lock, Unlock, Sparkles, CheckCheck, Loader2, ChevronDown, RotateCcw, AlertTriangle, ArrowRight, Music, HeartHandshake, Moon, Phone, Fingerprint, Users, Guitar, Mic, Headphones, Radio, Trophy, Flame, Layers, Compass, Info, GraduationCap, Hash, Bell, Trash2, Sliders, MessageCircle, Flag, Disc, Volume2, Speaker, Zap, Repeat, BookOpen, Medal, FolderGit2, Archive, Activity, Award } from 'lucide-react';
+import { Send, Search, MessageSquare, User, ArrowLeft, Check, Clock, Inbox, Plus, X, Calendar, ShieldCheck, Lock, Unlock, Sparkles, CheckCheck, Loader2, ChevronDown, RotateCcw, AlertTriangle, ArrowRight, Music, HeartHandshake, Moon, Phone, Fingerprint, Users, Guitar, Mic, Headphones, Radio, Trophy, Flame, Layers, Compass, Info, GraduationCap, Hash, Bell, Trash2, Sliders, MessageCircle, Flag, Disc, Volume2, Speaker, Zap, Repeat, BookOpen, Medal, FolderGit2, Archive, Activity, Award, Eye, EyeOff } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
-import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName, formatStudentDisplayName } from '../utils/nameHelper';
+import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName, formatStudentDisplayName, isStepUpActive, revealStudentFullNameViaVault, setStepUpPin } from '../utils/nameHelper';
+import { StepUpPinModal } from './ui/StepUpPinModal';
 import { isUUID } from '../utils/uuidValidator';
 import { 
   validateChatMessageContent, 
@@ -395,6 +396,42 @@ export function CampusDirectMessages({
   const lastSubTabRef = useRef<string | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
+  
+  // 🛡️ 0,1% Goldstandard Klarnamen-Auge in der Schülerliste (NIST SP 800-63B / BSI TR-02102-1)
+  const [isRosterLastNameRevealed, setIsRosterLastNameRevealed] = useState<boolean>(false);
+  const [showRosterStepUpModal, setShowRosterStepUpModal] = useState<boolean>(false);
+  const rosterAutoCurtainTimerRef = useRef<any>(null);
+
+  const handleToggleRosterLastNames = () => {
+    if (isRosterLastNameRevealed) {
+      if (rosterAutoCurtainTimerRef.current) {
+        clearTimeout(rosterAutoCurtainTimerRef.current);
+        rosterAutoCurtainTimerRef.current = null;
+      }
+      setIsRosterLastNameRevealed(false);
+      return;
+    }
+
+    if (isStepUpActive()) {
+      setIsRosterLastNameRevealed(true);
+      if (rosterAutoCurtainTimerRef.current) clearTimeout(rosterAutoCurtainTimerRef.current);
+      rosterAutoCurtainTimerRef.current = setTimeout(() => {
+        setIsRosterLastNameRevealed(false);
+        rosterAutoCurtainTimerRef.current = null;
+      }, 60000);
+      return;
+    }
+
+    setShowRosterStepUpModal(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (rosterAutoCurtainTimerRef.current) {
+        clearTimeout(rosterAutoCurtainTimerRef.current);
+      }
+    };
+  }, []);
   const [assignedStudents, setAssignedStudents] = useState<any[]>(() => {
     const studentId = effectiveUid || user?.id || '';
     const cachedTeachers = getLocalTeachersCache(studentId);
@@ -1786,11 +1823,19 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     });
   }, [allAvailableUsers, user?.id, selectedRecipient, isStudent]);
 
-  // Filter partners based on search
+  // Filter partners based on search (including privacy-preserving vault cache matching)
   const filteredPartners = useMemo(() => {
-    return chatPartners.filter(p => 
-      `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return chatPartners;
+    return chatPartners.filter(p => {
+      const combined = `${p.first_name || ''} ${p.last_name || ''}`.toLowerCase();
+      if (combined.includes(q)) return true;
+      if (p.id && typeof window !== 'undefined' && window.__glRevealedVaultCache?.has(p.id)) {
+        const cached = window.__glRevealedVaultCache.get(p.id)!.toLowerCase();
+        if (cached.includes(q)) return true;
+      }
+      return false;
+    });
   }, [chatPartners, searchQuery]);
 
   // Group messages and unread counts
@@ -3030,15 +3075,44 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             </div>
           )}
           
-          <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input 
-              type="text" 
-              placeholder={isStudent ? "Suchen..." : activeMainTab === 'groups' ? "Gruppe suchen..." : "Schüler suchen..."}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600, outline: 'none', boxSizing: 'border-box' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input 
+                type="text" 
+                placeholder={isStudent ? "Suchen..." : activeMainTab === 'groups' ? "Gruppe suchen..." : "Schüler suchen..."}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', padding: '10px 12px 10px 38px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.85rem', fontWeight: 600, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* 👁️ Klarnamen-Auge (Nur für Dozenten im Schüler-Tab mit Step-Up PIN) */}
+            {!isStudent && activeMainTab === 'students' && (
+              <button
+                type="button"
+                onClick={handleToggleRosterLastNames}
+                title={isRosterLastNameRevealed ? "Klarnamen verbergen" : "Klarnamen einblenden (60 Sek.)"}
+                aria-label={isRosterLastNameRevealed ? "Klarnamen verbergen" : "Klarnamen einblenden"}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  flexShrink: 0,
+                  borderRadius: '12px',
+                  border: isRosterLastNameRevealed ? '1px solid #86efac' : '1px solid #e2e8f0',
+                  background: isRosterLastNameRevealed ? '#dcfce7' : '#ffffff',
+                  color: isRosterLastNameRevealed ? '#15803d' : '#64748b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isRosterLastNameRevealed ? '0 2px 6px rgba(34, 197, 94, 0.15)' : 'none'
+                }}
+              >
+                {isRosterLastNameRevealed ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            )}
           </div>
 
           {/* Quick Filters */}
@@ -3375,7 +3449,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a' }}>
-                            {formatStudentDisplayName(item)}
+                            {formatStudentDisplayName(item, !isRosterLastNameRevealed)}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
                             {item.lastMessage && (
@@ -3463,7 +3537,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                           <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#15803d' : '#0f172a' }}>
-                            {formatStudentDisplayName(partner)}
+                            {formatStudentDisplayName(partner, !isRosterLastNameRevealed)}
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
                             {partner.lastMessage && (
@@ -4998,7 +5072,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                       />
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {formatStudentDisplayName(partner)}
+                          {formatStudentDisplayName(partner, !isRosterLastNameRevealed)}
                         </div>
                         <div style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, marginTop: '2px' }}>
                           {partner.unreadCount > 0 ? `${partner.unreadCount} neu` : 'Chat öffnen →'}
@@ -5619,6 +5693,30 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           <span>{reportToast}</span>
         </div>
       )}
+
+      {/* 🔒 0,1% Step-Up PIN Modal für Schülerliste (NIST SP 800-63B / BSI TR-02102-1) */}
+      <StepUpPinModal
+        isOpen={showRosterStepUpModal}
+        onClose={() => setShowRosterStepUpModal(false)}
+        title="Schülerliste entsperren"
+        description="Bitte bestätige deine persönliche 4-stellige Lehrer-PIN, um die Klarnamen der Schülerliste für 60 Sekunden freizugeben."
+        onSuccess={async (enteredPin) => {
+          const testTarget = assignedStudents[0]?.id || user?.id;
+          if (!testTarget) return false;
+          const res = await revealStudentFullNameViaVault(testTarget, enteredPin, supabase);
+          if (res.success || res.error !== 'INVALID_PIN') {
+            setStepUpPin(enteredPin);
+            setIsRosterLastNameRevealed(true);
+            if (rosterAutoCurtainTimerRef.current) clearTimeout(rosterAutoCurtainTimerRef.current);
+            rosterAutoCurtainTimerRef.current = setTimeout(() => {
+              setIsRosterLastNameRevealed(false);
+              rosterAutoCurtainTimerRef.current = null;
+            }, 60000);
+            return true;
+          }
+          return false;
+        }}
+      />
 
     </div>
   );

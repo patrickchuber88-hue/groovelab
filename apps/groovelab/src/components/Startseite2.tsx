@@ -2469,7 +2469,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                           { title: '2. Backend-for-Frontend (BFF) Token-Isolation', desc: 'Alle Client-Anfragen laufen über ein geschütztes BFF-Gateway mit AES-256-GCM JWE-Cookies. Es befinden sich 0% Tokens im Browser-Speicher.' },
                           { title: '3. Strikte Datenminimierung (Privacy by Design)', desc: 'Es werden keine sensiblen Profildaten wie Schüler-E-Mails, Bank-/SEPA-Daten oder Passwörter Minderjähriger im System verarbeitet.' },
                           { title: '4. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
-                          { title: '5. Zero-Knowledge Authentifizierung & PBKDF2', desc: 'Authentifizierungs-Geheimnisse und PINs werden serverseitig mittels PBKDF2/SHA-512 (100.000 Runden) gehasht. FIDO2 Passkeys mit Klon-Schutz.' }
+                          { title: '5. Duale Kryptografie & Zero-Knowledge Auth', desc: 'Authentifizierungs-Geheimnisse und PINs werden serverseitig mittels Salted Bcrypt (Cost 10) in isolierten Schemata und clientseitig mittels PBKDF2-HMAC-SHA-512 (100.000 Runden) sowie AES-256-GCM geschützt. FIDO2 Passkeys mit Klon-Schutz.' }
                         ]
                       },
                       {

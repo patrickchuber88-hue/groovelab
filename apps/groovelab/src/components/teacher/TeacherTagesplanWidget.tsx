@@ -50,8 +50,8 @@ export const TeacherTourDemoSchedule: React.FC<TeacherTourDemoScheduleProps> = (
           <button
             type="button"
             onClick={() => toggleRealNames?.()}
-            aria-label={showRealNames ? "Datenschutz-Modus umschalten: Klarnamen verbergen" : "Datenschutz-Modus umschalten: Klarnamen anzeigen"}
-            title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+            aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+            title={showRealNames ? "Datenschutz aktiv (Vorname N.) – Klick zum Einblenden (PIN)" : "Klarnamen aktiv (60s) – Klick zum Maskieren"}
             style={{
               border: 'none', background: showRealNames ? '#e6f4ea' : '#f1f5f9', color: showRealNames ? '#34a853' : '#64748b',
               width: isCompactMobile ? '44px' : '28px', height: isCompactMobile ? '44px' : '28px',
@@ -810,8 +810,8 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
-                  aria-label={showRealNames ? "Datenschutz-Modus umschalten: Klarnamen verbergen" : "Datenschutz-Modus umschalten: Klarnamen anzeigen"}
-                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+                  aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                  title={showRealNames ? "Datenschutz aktiv (Vorname N.) – Klick zum Einblenden (PIN)" : "Klarnamen aktiv (60s) – Klick zum Maskieren"}
                   style={{
                     border: 'none', background: showRealNames ? '#e6f4ea' : '#f1f5f9', color: showRealNames ? '#34a853' : '#64748b',
                     width: (isMobileDevice || windowWidth < 768) ? '44px' : '28px', height: (isMobileDevice || windowWidth < 768) ? '44px' : '28px',

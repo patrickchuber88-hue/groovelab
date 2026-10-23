@@ -3642,7 +3642,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                     const actDate = s.activated_at ? new Date(s.activated_at) : (s.created_at ? new Date(s.created_at) : null);
                                     const actDateStr = actDate ? actDate.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Automatisch aktiv';
                                     const firstMonth = actDate ? `${deMonthsLocal[actDate.getMonth() + 1]} ${actDate.getFullYear()}` : null;
-                                    const firstInvoicePrefix = (!isCampus && isGroovelab) ? 'INF' : 'AKT';
+                                    const isSammel = billingPayer === 'school' || studentBillingOption === 'option2' || studentBillingOption === 'option1' || studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3';
+                                    const firstInvoicePrefix = isSammel ? 'RE' : ((!isCampus && isGroovelab) ? 'INF' : 'AKT');
                                     const firstInvoiceId = actDate ? `${firstInvoicePrefix}-${formattedSchoolNumericId}-${String(actDate.getFullYear()).slice(-2)}${String(actDate.getMonth() + 1).padStart(2, '0')}-01` : null;
 
                                     return (

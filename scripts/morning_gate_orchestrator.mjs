@@ -8,6 +8,7 @@
 // =============================================================================
 
 import { spawn } from 'child_process';
+import fs from 'fs';
 import https from 'https';
 import http from 'http';
 import path from 'path';
@@ -156,7 +157,41 @@ async function main() {
       if (errOutput) {
         const errorLines = errOutput.split('\n').slice(-10);
         process.stderr.write(`            ↳ ${errorLines.join('\n            ↳ ')}\n`);
+        if (process.env.GITHUB_ACTIONS) {
+          const singleLineErr = errorLines.join(' ').replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').slice(0, 400);
+          process.stdout.write(`::error title=${res.name}::${singleLineErr}\n`);
+        }
+      } else if (process.env.GITHUB_ACTIONS) {
+        process.stdout.write(`::error title=${res.name}::Guard exited with non-zero exit code\n`);
       }
+    }
+  }
+
+  // Write GitHub Actions Step Summary if in CI environment
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      const summaryLines = [
+        `# 🌅 Campus-Groovelab Architecture Quality Gate Summary`,
+        ``,
+        `**Status**: ${failedCount === 0 ? '🏆 PASSED (100% Invariants Satisfied)' : `❌ FAILED (${failedCount} violation(s))`}`,
+        `**Dauer**: ${Date.now() - startTime}ms | **Live Cluster Health**: ${liveHealth.statusText}`,
+        ``,
+        `| Status | Wächter / Invariante | Latenz | Details |`,
+        `|:------:|:---------------------|-------:|:--------|`
+      ];
+
+      for (const res of guardResults) {
+        const icon = res.passed ? '✅' : '❌';
+        const errDetails = !res.passed
+          ? (res.stderr || res.stdout || 'Failed').trim().split('\n').slice(-3).join(' ').slice(0, 200)
+          : 'Invariante erfüllt';
+        summaryLines.push(`| ${icon} | **${res.name}** | ${res.durationMs}ms | ${errDetails} |`);
+      }
+
+      summaryLines.push(``);
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summaryLines.join('\n') + '\n');
+    } catch {
+      // Non-fatal if summary write fails
     }
   }
 

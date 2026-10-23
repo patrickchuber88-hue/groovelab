@@ -1736,7 +1736,7 @@ export function ScheduleCalendarView({
     const rawFirstName = currentOcc.student?.first_name || '';
     const rawLastName = currentOcc.student?.last_name || '';
     const displayStudent = currentOcc.student 
-      ? `${rawFirstName} ${showRealNames ? rawLastName : maskLastName(rawLastName)}`.trim() 
+      ? `${rawFirstName} ${maskLastName(rawLastName, showRealNames)}`.trim() 
       : 'Termin';
     const timeDisplay = updates.start_time ? ` (auf ${updates.start_time.substring(0, 5)} Uhr)` : '';
     const message = customActionMessage || `✨ Termin für ${displayStudent}${timeDisplay} angepasst`;
@@ -6227,12 +6227,13 @@ export function ScheduleCalendarView({
               <button
                 type="button"
                 onClick={() => toggleRealNames()}
-                className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                style={{ color: showRealNames ? brandColor : undefined }}
-                title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+                className={`apple-btn ${!showRealNames ? 'active' : ''}`}
+                style={!showRealNames ? { background: '#fee2e2', color: '#dc2626', borderColor: '#fca5a5' } : {}}
+                title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
               >
-                {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
-                <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
+                {showRealNames ? <Eye size={13} color="#34a853" /> : <EyeOff size={13} color="#dc2626" />}
+                <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
               </button>
 
               <button
@@ -11187,11 +11188,14 @@ return (
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>👁️ Ansicht & Raster</span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button
+                type="button"
                 onClick={() => { toggleRealNames(); setShowMobileToolsSheet(false); }}
-                style={{ padding: '12px', borderRadius: '14px', border: 'none', background: showRealNames ? (isCampus ? '#dcfce7' : (isGroovelab ? '#fef9c3' : '#fee2e2')) : '#f8fafc', color: showRealNames ? brandColor : '#334155', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                style={{ padding: '12px', borderRadius: '14px', border: showRealNames ? '1px solid #e2e8f0' : '1px solid #fca5a5', background: showRealNames ? '#ffffff' : '#fee2e2', color: showRealNames ? '#475569' : '#dc2626', fontWeight: 800, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
               >
-                {showRealNames ? <Eye size={16} /> : <EyeOff size={16} />}
-                <span>{showRealNames ? 'Vorname N.' : 'Klarnamen'}</span>
+                {showRealNames ? <Eye size={16} color="#34a853" /> : <EyeOff size={16} color="#dc2626" />}
+                <span>{showRealNames ? 'Vorname N.' : 'Klarnamen (60s)'}</span>
               </button>
 
               <button

@@ -12,12 +12,10 @@ interface DpoIdCardModalProps {
 export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule Bad Säckingen', schoolId = '104' }: DpoIdCardModalProps) {
   if (!isOpen) return null;
 
-  const dpoPin = '8492';
-  
   // Format short, clean Ausweis ID for display
   const shortSchoolId = schoolId.length > 8 ? schoolId.substring(0, 8).toUpperCase() : schoolId;
   const ausweisId = `DSB-${shortSchoolId}-2026`;
-  const qrData = `CG-DSB-AUDIT-${schoolId}-PIN-${dpoPin}`;
+  const qrData = `CG-DSB-AUDIT-${schoolId}`;
 
   const handlePrint = () => {
     window.print();
@@ -299,9 +297,9 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
                       </div>
                     </div>
                     <div>
-                      <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>PRÜF-PIN</span>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#4ade80', fontFamily: 'SFMono-Regular, Menlo, monospace', letterSpacing: '0.1em' }}>
-                        {dpoPin}
+                      <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>PRÜF-STATUS</span>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 900, color: '#4ade80', fontFamily: 'SFMono-Regular, Menlo, monospace', letterSpacing: '0.05em' }}>
+                        VERIFIZIERT
                       </div>
                     </div>
                   </div>
@@ -309,7 +307,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
                   <div>
                     <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>BERECHTIGUNG</span>
                     <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Lock size={13} color="#4ade80" /> Strikter Read-Only Audit-Zugriff
+                      <Lock size={13} color="#4ade80" /> Strikter Read-Only Audit-Zugriff (Art. 38 DSGVO)
                     </div>
                   </div>
                 </div>
@@ -329,12 +327,12 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
             {/* PRINT-ONLY INSTRUCTIONS (Shown ONLY when printing) */}
             <div className="dsb-print-instructions">
               <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 900, color: '#0f172a' }}>
-                📋 Anleitung für den städtischen Datenschutzbeauftragten (DSB):
+                📋 Hinweise für den städtischen bzw. behördlichen Datenschutzbeauftragten (DSB):
               </h3>
               <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#334155', lineHeight: 1.5, fontWeight: 600 }}>
-                <li>Öffne das Anmeldefenster von <strong>Campus-Groovelab</strong> auf deinem Dienst-iPad oder PC.</li>
-                <li>Scanne den obenstehenden QR-Code mit der Kamera oder gib die PIN <strong>{dpoPin}</strong> im PIN-Feld ein.</li>
-                <li>Das System öffnet sofort das <strong>schreibgeschützte DSB Audit-Portal</strong> (WORM Logs, AVV & TOMs).</li>
+                <li>Dieser Prüfnachweis bestätigt die datenschutzrechtliche Mandantentrennung für <strong>{schoolName}</strong> (ID: {schoolId}).</li>
+                <li>Der schreibgeschützte Prüfzugriff auf das <strong>DSB- &amp; Audit-Portal</strong> (WORM Logs, AVV, TOMs &amp; Betroffenenrechte) erfolgt direkt im Schulleitungs-Cockpit.</li>
+                <li>Zusätzlich stehen die 4 amtlichen Prüfdossiers (VVT, DSFA, Sicherheits-Whitepaper &amp; Personalrats-Attest) mit SHA-256 Siegel als PDF bereit.</li>
               </ol>
             </div>
 
@@ -354,7 +352,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
             >
               <CheckCircle2 size={22} color="#34a853" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 650, lineHeight: 1.45 }}>
-                Der DSB kann diesen Ausweis mit der iPad-Kamera am Anmeldebildschirm scanne oder die PIN <strong>{dpoPin}</strong> eingeben, um sich direkt im Audit-Portal anzumelden.
+                Prüfnachweis für die Schulakte: Zur Durchführung behördlicher Audits gem. Art. 38 DSGVO. Der Live-Zugriff auf das Audit-Portal erfolgt direkt über die Schulleitung.
               </span>
             </div>
           </div>

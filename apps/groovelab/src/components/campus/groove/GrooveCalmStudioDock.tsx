@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Activity, Plus, Minus, Music, SlidersHorizontal, Flame, Drum, Hand, Zap, Sun, Radio } from 'lucide-react';
-import { SoundKitType } from '../../../utils/StudioSoundEngine';
+import { Activity, Plus, Minus, SlidersHorizontal, Flame, Drum, Hand, Sparkles, Layers, Radio } from 'lucide-react';
+import { SoundKitType, StudioSoundEngine } from '../../../utils/StudioSoundEngine';
 import { getTempoItalianLabel } from './GrooveBpmControlDeck';
 
 export interface GrooveCalmStudioDockProps {
@@ -8,8 +8,8 @@ export interface GrooveCalmStudioDockProps {
   onBpmChange: (newBpm: number) => void;
   soundKit: SoundKitType;
   onSoundKitChange: (kit: SoundKitType) => void;
-  isBassEnabled: boolean;
-  onToggleBass: () => void;
+  isBassEnabled?: boolean;
+  onToggleBass?: () => void;
   onOpenAudioSettings: () => void;
   pocketStreak: number;
   comboMultiplier: string;
@@ -24,8 +24,8 @@ export interface GrooveCalmStudioDockProps {
 const SOUND_KITS: { id: SoundKitType; label: string; icon: React.ReactNode }[] = [
   { id: 'acoustic', label: 'Drums', icon: <Drum size={15} strokeWidth={2.2} /> },
   { id: 'body_percussion', label: 'Body Perc', icon: <Hand size={15} strokeWidth={2.2} /> },
-  { id: 'urban_808', label: '808 Beat', icon: <Zap size={15} strokeWidth={2.2} /> },
-  { id: 'latin', label: 'Congas', icon: <Sun size={15} strokeWidth={2.2} /> }
+  { id: 'classic_wood', label: 'Klassik', icon: <Sparkles size={15} strokeWidth={2.2} /> },
+  { id: 'cajon_latin', label: 'Cajón', icon: <Layers size={15} strokeWidth={2.2} /> }
 ];
 
 /**
@@ -37,8 +37,6 @@ export const GrooveCalmStudioDock: React.FC<GrooveCalmStudioDockProps> = ({
   onBpmChange,
   soundKit,
   onSoundKitChange,
-  isBassEnabled,
-  onToggleBass,
   onOpenAudioSettings,
   pocketStreak,
   comboMultiplier,
@@ -306,7 +304,7 @@ export const GrooveCalmStudioDock: React.FC<GrooveCalmStudioDockProps> = ({
         {/* Kompaktes horizontales 4er Segment mit monochromen Icons */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
           {SOUND_KITS.map(kit => {
-            const isSelected = soundKit === kit.id;
+            const isSelected = StudioSoundEngine.normalizeKit(soundKit) === kit.id || soundKit === kit.id;
             return (
               <button
                 key={kit.id}
@@ -339,34 +337,6 @@ export const GrooveCalmStudioDock: React.FC<GrooveCalmStudioDockProps> = ({
               </button>
             );
           })}
-        </div>
-
-        {/* Bassline Play-Along Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-          <button
-            type="button"
-            onClick={onToggleBass}
-            style={{
-              background: isBassEnabled ? '#ecfdf5' : '#f8fafc',
-              border: isBassEnabled ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
-              color: isBassEnabled ? '#065f46' : '#64748b',
-              borderRadius: '8px',
-              padding: '4px 10px',
-              fontSize: '0.68rem',
-              fontWeight: 900,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-            title="Groovige Bassline zu- oder abschalten"
-          >
-            <Music size={11} color={isBassEnabled ? '#059669' : '#64748b'} />
-            <span>Bassline {isBassEnabled ? 'AN' : 'AUS'}</span>
-          </button>
-          <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700 }}>
-            Harmonische Orientierung
-          </span>
         </div>
       </div>
 

@@ -160,7 +160,7 @@ export async function generateDrvComplianceDossierPDF(options: DrvDossierOptions
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.2);
     doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-    const rdgText = 'Dieses technische Dispositions- und Metadaten-Protokoll dokumentiert ausschließlich tatsächliche Systemvorgänge und Raumbelegungen. Es stellt keine Rechtsberatung gem. § 3 RDG dar und ersetzt keine Einzelfallprüfung der vertraglichen Vereinbarungen und gelebten Praxis. Eine verbindliche Statusfeststellung erfolgt ausschließlich im Verfahren nach § 7a SGB IV durch die Clearingstelle der Deutschen Rentenversicherung Bund. Bis zum 31.12.2026 ist für vor dem 01.07.2024 begründete Verträge die gesetzliche Übergangsregelung gem. § 127 SGB IV zu beachten.';
+    const rdgText = 'Dieses technische Dispositions- und Metadaten-Protokoll dokumentiert ausschließlich tatsächliche Systemvorgänge und Raumbelegungen. Es stellt keine Rechtsberatung gem. § 3 RDG dar und ersetzt keine Einzelfallprüfung der vertraglichen Vereinbarungen und gelebten Praxis. Eine verbindliche Statusfeststellung erfolgt ausschließlich im Verfahren nach § 7a SGB IV durch die Clearingstelle der Deutschen Rentenversicherung Bund. Für Bestandsverträge greift das 2-Phasen-Schutzschild: Phase 1 schützt im Rahmen der gesetzlichen Übergangsregelung gem. § 127 SGB IV befristet bis zum 31.12.2027; Phase 2 garantiert ab dem 01.01.2028 nach Auslaufen des § 127 SGB IV dauerhafte, unanfechtbare Status-Immunität gem. § 7 Abs. 1 SGB IV & BSG B 12 R 3/20 R.';
     const splitRdg = doc.splitTextToSize(rdgText, contentWidth - 12);
     doc.text(splitRdg, margin + 6, curY + 11);
 

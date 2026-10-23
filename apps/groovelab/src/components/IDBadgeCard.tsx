@@ -163,8 +163,8 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   let displayLastName = 'Member';
 
   if (isStudentRole) {
-    // 🛡️ 1% Goldstandard Student Privacy Invariant (OWASP ASVS Level 3 / DSGVO Art. 25):
-    // Student badges are ALWAYS strictly anonymized to "Vorname" (line 1) and "N." (line 2).
+    // 🛡️ 1% Goldstandard Student Privacy Invariant (OWASP ASVS Level 3 / DSGVO Art. 25 & Art. 4 Nr. 5):
+    // Student badges are ALWAYS strictly pseudonymized to "Vorname" (line 1) and "N." (line 2).
     // Even if first_name contains full names (e.g. "Amelia Huber"), we cleanly extract the pure first name and mask the last name.
     const rawFirst = (user?.first_name || '').trim();
     const rawLast = (user?.last_name || '').trim();

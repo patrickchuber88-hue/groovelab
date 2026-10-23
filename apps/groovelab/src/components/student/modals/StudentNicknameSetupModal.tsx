@@ -214,7 +214,7 @@ export const StudentNicknameSetupModal: React.FC<StudentNicknameSetupModalProps>
         >
           <ShieldCheck size={18} color="#0284c7" style={{ flexShrink: 0, marginTop: '2px' }} />
           <p style={{ margin: 0, fontSize: '0.74rem', color: '#475569', lineHeight: 1.45, fontWeight: 650 }}>
-            <strong>100% anonym & sicher:</strong> Dein Nickname wird in allen Ranglisten der Musikschule angezeigt.
+            <strong>100% pseudonym & sicher:</strong> Dein Nickname wird in allen Ranglisten der Musikschule statt deines Klarnamens angezeigt.
             Dein echter Vor- und Nachname wird niemals an Mitschüler weitergegeben.
           </p>
         </div>

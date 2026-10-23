@@ -2,6 +2,11 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { areArraysEqualFast } from '../../../utils/fastCompare';
 import { fetchHolidaysCached, HolidayRange } from '../../../utils/holidayHelper';
+import { 
+  getStatutoryHolidaysAndFeiertage, 
+  resolveStateFromZipCode, 
+  mergeStatutoryWithImportedEvents 
+} from '../../../utils/schoolHolidayEngine';
 import { isTeacherCurrentlyAbsent } from '../../../utils/teacherAbsenceHelper';
 import { maskLastName, formatSingleStudentAnonymized } from '../../../utils/nameHelper';
 import { getTeacherActiveBoards } from './useTeacherTagesplan';
@@ -54,13 +59,55 @@ export function useTeacherBookings({
   const [briefingRefreshTicker, setBriefingRefreshTicker] = useState(0);
 
   useEffect(() => {
-    const calendarUrl = teacher?.schools?.calendar_url;
+    const school = teacher?.schools;
+    const campusSettings = school?.opening_hours?.campus_settings || {};
+    const stateCode = campusSettings.holiday_jurisdiction || resolveStateFromZipCode(school?.zip_code, school?.country);
+    const statutoryList = getStatutoryHolidaysAndFeiertage(stateCode);
+
+    const statutoryRanges: HolidayRange[] = statutoryList.map(item => ({
+      start: item.event_date,
+      end: item.event_end_date || item.event_date,
+      name: item.title
+    }));
+
+    const calendarUrl = school?.calendar_url;
     if (calendarUrl) {
-      fetchHolidaysCached(calendarUrl).then(h => {
-        if (h && h.length > 0) setHolidays(h);
+      // First populate instantly with statutory holidays (0ms latency)
+      setHolidays(statutoryRanges);
+
+      fetchHolidaysCached(calendarUrl).then(importedHolidays => {
+        if (importedHolidays && importedHolidays.length > 0) {
+          const deduplicated = mergeStatutoryWithImportedEvents(
+            statutoryList,
+            importedHolidays.map(h => ({
+              title: h.name,
+              event_date: h.start,
+              event_end_date: h.end
+            }))
+          );
+          const mergedRanges: HolidayRange[] = [
+            ...importedHolidays,
+            ...deduplicated.map(item => ({
+              start: item.event_date,
+              end: item.event_end_date || item.event_date,
+              name: item.title
+            }))
+          ];
+          setHolidays(mergedRanges);
+        }
+      }).catch(() => {
+        // Fallback remains statutoryRanges
       });
+    } else {
+      setHolidays(statutoryRanges);
     }
-  }, [teacher?.schools?.calendar_url]);
+  }, [
+    teacher?.schools?.id,
+    teacher?.schools?.calendar_url,
+    teacher?.schools?.zip_code,
+    teacher?.schools?.country,
+    teacher?.schools?.opening_hours
+  ]);
 
   const isTodayHoliday = useMemo(() => {
     const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');

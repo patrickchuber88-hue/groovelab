@@ -1,12 +1,12 @@
 import React from 'react';
-import { Layers, Music, SlidersHorizontal, Mic, Keyboard, Drum, Hand, Zap, Sun } from 'lucide-react';
-import { SoundKitType } from '../../../utils/StudioSoundEngine';
+import { Layers, SlidersHorizontal, Mic, Keyboard, Drum, Hand, Sparkles } from 'lucide-react';
+import { SoundKitType, StudioSoundEngine } from '../../../utils/StudioSoundEngine';
 
 export interface GrooveSoundRackProps {
   soundKit: SoundKitType;
   onSoundKitChange: (kit: SoundKitType) => void;
-  isBassEnabled: boolean;
-  onToggleBass: () => void;
+  isBassEnabled?: boolean;
+  onToggleBass?: () => void;
   inputMode: 'acoustic' | 'touch' | 'midi';
   onInputModeChange: (mode: 'acoustic' | 'touch' | 'midi') => void;
   onOpenAudioSettings: () => void;
@@ -17,15 +17,13 @@ export interface GrooveSoundRackProps {
 const SOUND_KITS: { id: SoundKitType; label: string; icon: React.ReactNode }[] = [
   { id: 'acoustic', label: 'Studio Drums', icon: <Drum size={15} strokeWidth={2.2} /> },
   { id: 'body_percussion', label: 'Body Percussion', icon: <Hand size={15} strokeWidth={2.2} /> },
-  { id: 'urban_808', label: 'Urban 808', icon: <Zap size={15} strokeWidth={2.2} /> },
-  { id: 'latin', label: 'Latin Congas', icon: <Sun size={15} strokeWidth={2.2} /> }
+  { id: 'classic_wood', label: 'Klassik & Holz', icon: <Sparkles size={15} strokeWidth={2.2} /> },
+  { id: 'cajon_latin', label: 'Cajón & Perk', icon: <Layers size={15} strokeWidth={2.2} /> }
 ];
 
 export const GrooveSoundRack: React.FC<GrooveSoundRackProps> = ({
   soundKit,
   onSoundKitChange,
-  isBassEnabled,
-  onToggleBass,
   inputMode,
   onInputModeChange,
   onOpenAudioSettings,
@@ -81,7 +79,7 @@ export const GrooveSoundRack: React.FC<GrooveSoundRackProps> = ({
       {/* 2. Sound-Kit Schnellwahl (Pills) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
         {SOUND_KITS.map(kit => {
-          const isSelected = soundKit === kit.id;
+          const isSelected = StudioSoundEngine.normalizeKit(soundKit) === kit.id || soundKit === kit.id;
           return (
             <button
               key={kit.id}
@@ -115,30 +113,11 @@ export const GrooveSoundRack: React.FC<GrooveSoundRackProps> = ({
         })}
       </div>
 
-      {/* 3. Bassline-Playalong Switch & Eingabemodus */}
+      {/* 3. Eingabemodus */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
-        {/* Bass Toggle */}
-        <button
-          type="button"
-          onClick={onToggleBass}
-          style={{
-            background: isBassEnabled ? '#ecfdf5' : '#f8fafc',
-            border: isBassEnabled ? '1.5px solid #10b981' : '1px solid #cbd5e1',
-            color: isBassEnabled ? '#065f46' : '#64748b',
-            borderRadius: '9px',
-            padding: '4px 9px',
-            fontSize: '0.70rem',
-            fontWeight: 900,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}
-          title="Groovige Bassline zu- oder abschalten"
-        >
-          <Music size={12} color={isBassEnabled ? '#059669' : '#64748b'} />
-          <span>Bassline {isBassEnabled ? 'AN' : 'AUS'}</span>
-        </button>
+        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>
+          Eingabemodus:
+        </span>
 
         {/* Input Mode Switcher */}
         <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '9px', padding: '2px', gap: '2px', border: '1px solid #e2e8f0' }}>

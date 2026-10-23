@@ -103,7 +103,7 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
 
 ### Bewertung & Empfehlung
 
-#### 6.1 Anonymisierte E-Mail-Pipeline (Brevo/Resend) & Zero-Mail
+#### 6.1 Pseudonymisierte E-Mail-Pipeline (Brevo/Resend) & Zero-Mail
 > [!NOTE]
 > **Aktuell nicht notwendig, da kein Drittanbieter-Mailversand stattfindet.**
 * Da wir Schüler- und Lehrerdaten vollständig auf unserem selbstgehosteten Supabase-Server auf Hetzner isolieren und keine Mail-Dienstleister angebunden haben, besteht hier derzeit kein Risiko.
@@ -125,7 +125,7 @@ Dieses Dokument vergleicht die Vorschläge deines Freundes mit der aktuellen Gro
   3. Die Datei auf einen externen Speicher (z. B. Hetzner Storage Box oder AWS S3) spiegelt.
   4. Lokal eine Rotation von z. B. 7 Tagen pflegt.
 
-#### 6.4 Audit Trails & Log-Anonymisierung
+#### 6.4 Audit Trails & Log-Pseudonymisierung (IP-Maskierung)
 > [!TIP]
 > **Gute Ergänzung für städtische Musikschulen.**
 * Log-Rotations-Fristen für Nginx- und Docker-Logs auf dem Server auf 7 Tage zu begrenzen, ist datenschutzrechtlich sauber.

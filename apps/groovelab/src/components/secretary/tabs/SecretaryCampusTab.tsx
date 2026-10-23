@@ -4946,14 +4946,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           title: 'Schulterblick-Schutz', 
                           value: 'Maskierung aktiv', 
                           desc: 'Pseudonymisierte Namensmaskierung (TOM Art. 32).',
-                          legalNote: 'Standardmäßige Namens-Anonymisierung im Schulsekretariat zum Schutz vor unbefugter Einsichtnahme durch Dritte.'
+                          legalNote: 'Standardmäßige Namens-Pseudonymisierung im Schulsekretariat (Vorname + 1. Buchstabe Nachname) gem. Art. 25 und Art. 32 DSGVO.'
                         },
                         { 
                           icon: <HardDrive size={15} style={{ color: '#0f172a' }} />,
-                          title: 'Serverstandort Falkenstein', 
+                          title: 'Hosting Deutschland', 
                           value: 'ISO 27001 (DE)', 
                           desc: 'Deutsches RZ ohne Drittlandtransfer (Art. 44).',
-                          legalNote: 'Betrieb im DIN EN ISO/IEC 27001 zertifizierten deutschen Rechenzentrum (Hetzner Falkenstein). 100% EU-Datensouveränität.'
+                          legalNote: 'Betrieb in DIN EN ISO/IEC 27001 zertifizierten deutschen Rechenzentren (IONOS SE Montabaur & Hetzner Falkenstein/Nürnberg). 100% EU-Datensouveränität.'
                         },
                         { 
                           icon: <Cpu size={15} style={{ color: '#0f172a' }} />,

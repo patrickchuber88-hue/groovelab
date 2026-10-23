@@ -462,7 +462,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       '☕ Freistunden-Erkennung: Pausen und Freiblöcke werden automatisch visualisiert, damit du Vorbereitungszeit optimal nutzen kannst.'
     ],
     invariants: [
-      'Datenschutz-Transparenz: Lehrkräfte werden mit vollem Vor- und Nachnamen geführt, Schüler im Dashboard kindgerecht anonymisiert.',
+      'Datenschutz-Transparenz: Lehrkräfte werden mit vollem Vor- und Nachnamen geführt, Schüler im Dashboard kindgerecht pseudonymisiert (Vorname + Initiale).',
       'Echtzeit-Synchronität: Statusänderungen der Anwesenheit sind sofort für das Sekretariat einsehbar.'
     ],
     tags: ['lehrer', 'briefing', 'timeline', 'tagesplan', 'anwesenheit', 'raumwechsel', 'unterricht'],

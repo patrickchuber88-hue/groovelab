@@ -5,7 +5,7 @@
  * Compliance PDF for music school boards, municipal IT departments, and DPOs.
  */
 
-import { cleanPdfText } from './pdfTypographyEngine';
+import { cleanPdfText, computeCanonicalPayloadHash } from './pdfTypographyEngine';
 
 export async function generateEnterpriseSecurityWhitepaperPDF(options?: { schoolName?: string; returnBlob?: boolean }): Promise<Blob | void> {
   try {
@@ -22,6 +22,16 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     const textGray = [71, 85, 105];
     const lightBg = [248, 250, 252];
     const borderGray = [226, 232, 240];
+
+    const currentDateStr = new Date().toLocaleDateString('de-DE');
+    const canonicalPayload = {
+      docType: 'ENTERPRISE_SECURITY_WHITEPAPER_ISO27001_BSI',
+      schoolName: options?.schoolName || 'ALL_SCHOOLS',
+      date: currentDateStr,
+      standards: 'ISO_27001_2022_BSI_IT_GRUNDSCHUTZ_ASVS_L3',
+      operator: 'Patrick Huber, Rheinfelden'
+    };
+    const sha256Digest = await computeCanonicalPayloadHash(canonicalPayload);
 
     // ==========================================
     // PAGE 1: MANAGEMENT SUMMARY & ARCHITECTURE
@@ -84,20 +94,20 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
         desc: 'Vollständige Entkopplung von Browser und Datenbank-Tokens. Sessions werden rein serverseitig mit AES-256-GCM verschlüsselt in __Host-session Cookies geführt (Zero-Token-Leakage in LocalStorage / SessionStorage) inklusive proaktivem Silent Refresh.'
       },
       {
-        title: 'B. Zero-Mail IAM & Biometrische Passkeys',
-        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens und Bcrypt-Hashes (10 Runden Blowfish gem. BSI TR-02102). Konten sind 100% phishing-immun.'
+        title: 'B. Zero-Mail IAM, Zero-Knowledge Vault & Duale Kryptografie',
+        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens, 360° Zero-Knowledge Identity Vault (HMAC-SHA256 Blind-Links & AES-256 PGP; Safe-Harbor gem. Art. 34 Abs. 3 lit. a DSGVO / EuGH C-413/23 P) mit 60s Auto-Curtain Engine und duale Kryptografie (Bcrypt Cost >= 10 in private_auth + PBKDF2 100.000 Runden SHA-512 & AES-256-GCM).'
       },
       {
         title: 'C. 100% PostgreSQL FORCE Row-Level Security (RLS)',
-        desc: 'Alle 97 Datenbanktabellen erzwingen zwingende Mandantenisolation auf Kernel-Ebene mit isoliertem Transaktions-Kontext (is_local = true). Unautorisierte Cross-Tenant Zugriffe werden serverseitig abgewiesen.'
+        desc: 'Sämtliche produktiven Datenbanktabellen (100% Schema-Abdeckung) erzwingen zwingende Mandantenisolation auf Kernel-Ebene mit isoliertem Transaktions-Kontext (is_local = true). Unautorisierte Cross-Tenant Zugriffe werden serverseitig abgewiesen.'
       },
       {
         title: 'D. Fail-Closed Anti-CSRF & Origin-Guard',
         desc: 'Schutz aller schreibenden Operationen durch browser-native Fetch Metadata (Sec-Fetch-Site), Origin- und Host-Header-Validierung sowie dynamisches IP-Rate-Limiting (3-Strike-Sperre).'
       },
       {
-        title: 'E. Subresource Integrity (SRI) & Deutsche ISO 27001 Cloud',
-        desc: 'Alle Bundles sind mit SHA-384 Hashes versiegelt. 100% Hosting in Deutschland (IONOS SE & Hetzner Falkenstein/Nürnberg) mit stündlich automatisierten, verschlüsselten Backups.'
+        title: 'E. Stufe-2/3 Cloud-Souveränität & ISO 27001 Hosting',
+        desc: '100% deutsches Hosting (IONOS SE Montabaur & Hetzner Falkenstein/Nürnberg) mit stündlich verschlüsselten Backups. Stufe-2 Garantie: 100% deutsche Gesellschaften ohne US-Mutterkonzern (0% US CLOUD Act). Stufe-3 Garantie: Zero-Support-Backdoor (0% TIA-Pflicht).'
       }
     ];
 
@@ -123,10 +133,10 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       curY += 28;
     });
 
-    // Footer Page 1
-    doc.setFontSize(7.5);
+    // Footer Page 1 with cryptographic verification seal
+    doc.setFontSize(6.8);
     doc.setTextColor(148, 163, 184);
-    doc.text('Campus-Groovelab • Enterprise Security Whitepaper | Seite 1 von 2', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text(`Campus-Groovelab • Enterprise Security Whitepaper | SHA256:${sha256Digest.slice(0, 28)}... | Seite 1 von 2`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
     // ==========================================
     // PAGE 2: TOMs, HOSTING & ZERTIFIZIERUNG
@@ -148,9 +158,10 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       {
         cat: '1. Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO & BSI IT-Grundschutz)',
         items: [
-          '• Physische Zutrittskontrolle: ISO 27001 zertifizierte Rechenzentren (IONOS SE & Hetzner Online GmbH, Deutschland).',
-          '• BFF Token-Isolation: Sessions verschlüsselt in __Host-session JWE HttpOnly-Cookies (AES-256-GCM); 0% Tokens im Browser-Speicher.',
-          '• Mandantentrennung: PostgreSQL FORCE Row-Level Security auf allen 97 Tabellen (school_id Isolation auf Kernel-Ebene).'
+          '• Physische Zutrittskontrolle: ISO 27001 zertifizierte Rechenzentren (IONOS SE & Hetzner Online GmbH, Deutschland; 0% US-Mutterkonzern).',
+          '• 360° Zero-Knowledge Identity Vault & Safe-Harbor: Nachnamen in blind_student_lastname_vault mit HMAC-SHA256 Blind-Links und AES-256 PGP (Art. 34 Abs. 3 lit. a DSGVO / EuGH C-413/23 P); 60s Auto-Curtain nach Step-Up PIN (NIST SP 800-63B).',
+          '• ReBAC-Kinderschutz (§ 201 StGB): Tonaufnahmen Minderjähriger sind ausschließlich für Fachlehrer und Schüler zugänglich (0 % Schulleitungszugriff).',
+          '• Mandantentrennung & EU-DNS: PostgreSQL FORCE Row-Level Security auf allen Tabellen; 0 % US-DNS-Resolver (nur Hetzner DE 185.12.64.1 & DNS0.eu) mit Anti-IP-Spoofing.'
         ]
       },
       {
@@ -158,7 +169,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
         items: [
           '• Anti-CSRF Origin-Guard: Fail-Closed Prüfung mit browser-nativem Sec-Fetch-Site Filtering & Host-Poisoning-Schutz.',
           '• Revisionssicherheit: Manipulationssicheres WORM Audit-Ledger & SHA-384 Subresource Integrity (SRI).',
-          '• Hash-Standards: Bcrypt Zero-Knowledge Hashing (10 Runden Blowfish gem. BSI TR-02102) im isolierten Schema private_auth für PINs.'
+          '• Duale Kryptografie: Serverseitig Salted Bcrypt (Cost >= 10 in private_auth) + clientseitig WebCrypto PBKDF2 (100.000 Runden SHA-512) & AES-256-GCM.'
         ]
       },
       {
@@ -175,7 +186,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(t.cat, margin, curY);
+      doc.text(cleanPdfText(t.cat), margin, curY);
       curY += 6;
 
       doc.setFont('helvetica', 'normal');
@@ -228,10 +239,10 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
     doc.text('BSI A+ / ISO 27001 Konformitätsprüfung', margin, curY + 9);
     doc.text('Karl-Fürstenberg-Str. 59 • 79618 Rheinfelden (Baden)', pageWidth - margin - 70, curY + 9);
 
-    // Footer Page 2
-    doc.setFontSize(7.5);
+    // Footer Page 2 with cryptographic verification seal
+    doc.setFontSize(6.8);
     doc.setTextColor(148, 163, 184);
-    doc.text('Campus-Groovelab • Enterprise Security Whitepaper | Seite 2 von 2', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text(`Campus-Groovelab • Enterprise Security Whitepaper | SHA256:${sha256Digest.slice(0, 28)}... | Seite 2 von 2`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
     // Save and Trigger Download or Return Blob
     if (options?.returnBlob) {

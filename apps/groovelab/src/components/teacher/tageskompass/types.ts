@@ -162,7 +162,7 @@ export function formatTagesKompassStudentName(
 }
 
 /**
- * Formatiert Schüler-Gruppen deterministisch und anonymisiert (z. B. "Nora C., Moritz F.")
+ * Formatiert Schüler-Gruppen deterministisch und pseudonymisiert (Art. 4 Nr. 5 DSGVO, z. B. "Nora C., Moritz F.")
  */
 export function formatTagesKompassGroupNames(
   students: TagesKompassStudent[]

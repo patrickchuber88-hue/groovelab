@@ -1407,7 +1407,7 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
   doc.text(`• Terminabsagen durch Schüler: ${data.parentPermissions.allowAbsences ? 'Freigegeben (Eigenständiges Absagen erlaubt)' : 'GESPERRT (Nur durch Eltern via Master-PIN)'}`, 25, y + 16);
   doc.text(`• Direktnachrichten an Lehrkraft: ${data.parentPermissions.allowChat ? 'Freigegeben (Fachlicher 1:1 Austausch aktiv)' : 'GESPERRT (Schreibschutz aktiv)'}`, 25, y + 23);
-  doc.text(`• Klassen-Highlights & Team-Power: ${data.parentPermissions.allowLeaderboard ? 'Freigegeben (Sichtbarkeit mit Vorname + Initiale)' : 'ANONYMISIERT (Keine Namensanzeige)'}`, 25, y + 30);
+  doc.text(`• Klassen-Highlights & Team-Power: ${data.parentPermissions.allowLeaderboard ? 'Freigegeben (Sichtbarkeit mit Vorname + Initiale)' : 'PSEUDONYMISIERT / PRIVAT (Keine Namensanzeige)'}`, 25, y + 30);
   doc.text(`• Audio-Tresor & Eigene Aufnahmen: ${data.parentPermissions.allowMediathek ? 'Freigegeben (Eigenes Übe-Studio aktiv)' : 'GESPERRT (Nur Lehrer-Audios)'}`, 25, y + 37);
   doc.text(`• Nachtruhe-Schutz / Ruhezeiten: ${data.parentPermissions.bedtimeModeEnabled ? `AKTIV (${data.parentPermissions.bedtimeStart || '20:00'} bis ${data.parentPermissions.bedtimeEnd || '07:00'} Uhr)` : 'Deaktiviert (24h Übezugriff)'}`, 25, y + 44);
 

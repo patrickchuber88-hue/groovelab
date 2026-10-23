@@ -153,23 +153,23 @@ export function TeacherDashboardHeader({
 
           <button
             onClick={toggleRealNames}
-            title={showRealNames ? 'Datenschutz-Modus aktivieren (Vorname N.)' : 'Vollständige Schülernamen anzeigen'}
+            title={showRealNames ? 'Klarnamen für 60 Sekunden einblenden (PIN erforderlich)' : 'Datenschutz-Modus sofort aktivieren (Vorname N.)'}
             style={{
-              background: '#ffffff',
-              border: '1.5px solid #e2e8f0',
+              background: showRealNames ? '#ffffff' : '#fef2f2',
+              border: showRealNames ? '1.5px solid #e2e8f0' : '1.5px solid #fca5a5',
               borderRadius: '12px',
               padding: '8px 12px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              color: '#475569',
+              color: showRealNames ? '#475569' : '#dc2626',
               fontSize: '0.8rem',
               fontWeight: 800
             }}
           >
-            {showRealNames ? <Eye size={16} color="#34a853" /> : <EyeOff size={16} color="#64748b" />}
-            <span>{showRealNames ? 'Klartext' : 'Anonym'}</span>
+            {showRealNames ? <Eye size={16} color="#34a853" /> : <EyeOff size={16} color="#dc2626" />}
+            <span>{showRealNames ? 'Vorname N.' : 'Klarnamen (60s)'}</span>
           </button>
 
           <button

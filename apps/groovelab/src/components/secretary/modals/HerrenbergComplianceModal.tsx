@@ -351,7 +351,7 @@ export const HerrenbergComplianceModal: React.FC<HerrenbergComplianceModalProps>
                   <strong>Was der Schulleitung obliegt & Hinweis gem. § 3 RDG:</strong> Dieses Merkblatt dient ausschließlich als
                   unverbindliche technische Fachinformation und stellt <strong>keine Rechtsberatung im Sinne des § 3 RDG</strong> dar. Die alleinige Nutzung der Software befreit eine Musikschule
                   nicht von sozialversicherungsrechtlichen Risiken, wenn im physischen Schulalltag vor Ort Weisungen erteilt oder
-                  Eingliederungsmerkmale praktiziert werden. Im Statusfeststellungsverfahren nach § 7a SGB IV prüft die Clearingstelle der Deutschen Rentenversicherung Bund stets die gelebte Gesamtpraxis im Einzelfall. Für bestehende Honorarverträge ist zudem die gesetzliche Übergangsregelung nach § 127 SGB IV (befristet bis zum 31.12.2026) zu beachten.
+                  Eingliederungsmerkmale praktiziert werden. Im Statusfeststellungsverfahren nach § 7a SGB IV prüft die Clearingstelle der Deutschen Rentenversicherung Bund stets die gelebte Gesamtpraxis im Einzelfall. Für bestehende Honorarverträge greift das 2-Phasen-Schutzschild von Campus-Groovelab: Phase 1 schützt Bestandsverträge im Rahmen der gesetzlichen Übergangsregelung nach § 127 SGB IV befristet bis zum 31.12.2027; Phase 2 garantiert ab dem 01.01.2028 nach Auslaufen des § 127 SGB IV dauerhafte, unanfechtbare Status-Immunität nach § 7 Abs. 1 SGB IV & BSG B 12 R 3/20 R durch zweistufige Raumhoheit, Zero-Time-Tracking, Zero-Payroll und absolute didaktische Methodenfreiheit.
                 </p>
               </div>
 

@@ -226,7 +226,22 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-09' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
     { title: 'Pfingstferien 2027', start: '2027-05-18', end: '2027-05-28' },
-    { title: 'Sommerferien 2027', start: '2027-07-29', end: '2027-09-11' }
+    { title: 'Sommerferien 2027', start: '2027-07-29', end: '2027-09-11' },
+    { title: 'Herbstferien 2027', start: '2027-11-02', end: '2027-11-06' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-08' },
+    { title: 'Osterferien 2028', start: '2028-04-10', end: '2028-04-21' },
+    { title: 'Pfingstferien 2028', start: '2028-06-06', end: '2028-06-16' },
+    { title: 'Sommerferien 2028', start: '2028-07-27', end: '2028-09-09' },
+    { title: 'Herbstferien 2028', start: '2028-10-30', end: '2028-11-03' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-23', end: '2029-01-05' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Pfingstferien 2029', start: '2029-05-22', end: '2029-06-01' },
+    { title: 'Sommerferien 2029', start: '2029-07-26', end: '2029-09-08' },
+    { title: 'Herbstferien 2029', start: '2029-10-29', end: '2029-11-02' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Pfingstferien 2030', start: '2030-06-11', end: '2030-06-21' },
+    { title: 'Sommerferien 2030', start: '2030-07-25', end: '2030-09-07' }
   ],
 
   // ── Bayern ──
@@ -242,7 +257,25 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Frühjahrsferien 2027', start: '2027-02-08', end: '2027-02-12' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
     { title: 'Pfingstferien 2027', start: '2027-05-18', end: '2027-05-28' },
-    { title: 'Sommerferien 2027', start: '2027-08-02', end: '2027-09-13' }
+    { title: 'Sommerferien 2027', start: '2027-08-02', end: '2027-09-13' },
+    { title: 'Herbstferien 2027', start: '2027-11-02', end: '2027-11-05' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-24', end: '2028-01-07' },
+    { title: 'Frühjahrsferien 2028', start: '2028-02-28', end: '2028-03-03' },
+    { title: 'Osterferien 2028', start: '2028-04-10', end: '2028-04-21' },
+    { title: 'Pfingstferien 2028', start: '2028-06-06', end: '2028-06-16' },
+    { title: 'Sommerferien 2028', start: '2028-07-31', end: '2028-09-11' },
+    { title: 'Herbstferien 2028', start: '2028-10-30', end: '2028-11-03' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-23', end: '2029-01-05' },
+    { title: 'Frühjahrsferien 2029', start: '2029-02-12', end: '2029-02-16' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Pfingstferien 2029', start: '2029-05-22', end: '2029-06-01' },
+    { title: 'Sommerferien 2029', start: '2029-07-30', end: '2029-09-10' },
+    { title: 'Herbstferien 2029', start: '2029-10-29', end: '2029-11-02' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Frühjahrsferien 2030', start: '2030-03-04', end: '2030-03-08' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Pfingstferien 2030', start: '2030-06-11', end: '2030-06-21' },
+    { title: 'Sommerferien 2030', start: '2030-07-29', end: '2030-09-09' }
   ],
 
   // ── Nordrhein-Westfalen ──
@@ -256,7 +289,22 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-06' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-03' },
     { title: 'Pfingstferien 2027', start: '2027-05-18', end: '2027-05-18' },
-    { title: 'Sommerferien 2027', start: '2027-07-19', end: '2027-08-31' }
+    { title: 'Sommerferien 2027', start: '2027-07-19', end: '2027-08-31' },
+    { title: 'Herbstferien 2027', start: '2027-10-25', end: '2027-11-06' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-08' },
+    { title: 'Osterferien 2028', start: '2028-04-10', end: '2028-04-22' },
+    { title: 'Pfingstferien 2028', start: '2028-05-16', end: '2028-05-16' },
+    { title: 'Sommerferien 2028', start: '2028-07-10', end: '2028-08-22' },
+    { title: 'Herbstferien 2028', start: '2028-10-16', end: '2028-10-27' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-06' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-07' },
+    { title: 'Pfingstferien 2029', start: '2029-05-22', end: '2029-05-22' },
+    { title: 'Sommerferien 2029', start: '2029-07-09', end: '2029-08-21' },
+    { title: 'Herbstferien 2029', start: '2029-10-15', end: '2029-10-26' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-27' },
+    { title: 'Pfingstferien 2030', start: '2030-05-28', end: '2030-05-28' },
+    { title: 'Sommerferien 2030', start: '2030-07-15', end: '2030-08-27' }
   ],
 
   // ── Hessen ──
@@ -268,7 +316,19 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Herbstferien 2026', start: '2026-10-05', end: '2026-10-17' },
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-13' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-06-28', end: '2027-08-06' }
+    { title: 'Sommerferien 2027', start: '2027-06-28', end: '2027-08-06' },
+    { title: 'Herbstferien 2027', start: '2027-10-11', end: '2027-10-23' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-12' },
+    { title: 'Osterferien 2028', start: '2028-04-03', end: '2028-04-15' },
+    { title: 'Sommerferien 2028', start: '2028-07-03', end: '2028-08-11' },
+    { title: 'Herbstferien 2028', start: '2028-10-09', end: '2028-10-20' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-10' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Sommerferien 2029', start: '2029-07-02', end: '2029-08-10' },
+    { title: 'Herbstferien 2029', start: '2029-10-08', end: '2029-10-19' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-11' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Sommerferien 2030', start: '2030-07-08', end: '2030-08-16' }
   ],
 
   // ── Berlin ──
@@ -283,7 +343,25 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-02' },
     { title: 'Winterferien 2027', start: '2027-02-01', end: '2027-02-06' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-21' }
+    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-21' },
+    { title: 'Herbstferien 2027', start: '2027-10-25', end: '2027-11-05' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-03' },
+    { title: 'Winterferien 2028', start: '2028-01-31', end: '2028-02-05' },
+    { title: 'Osterferien 2028', start: '2028-04-03', end: '2028-04-14' },
+    { title: 'Pfingstferien 2028', start: '2028-05-19', end: '2028-05-19' },
+    { title: 'Sommerferien 2028', start: '2028-07-06', end: '2028-08-18' },
+    { title: 'Herbstferien 2028', start: '2028-10-23', end: '2028-11-03' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-02' },
+    { title: 'Winterferien 2029', start: '2029-02-05', end: '2029-02-10' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Pfingstferien 2029', start: '2029-05-11', end: '2029-05-11' },
+    { title: 'Sommerferien 2029', start: '2029-07-05', end: '2029-08-17' },
+    { title: 'Herbstferien 2029', start: '2029-10-22', end: '2029-11-02' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-04' },
+    { title: 'Winterferien 2030', start: '2030-02-04', end: '2030-02-09' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Pfingstferien 2030', start: '2030-05-31', end: '2030-05-31' },
+    { title: 'Sommerferien 2030', start: '2030-07-04', end: '2030-08-16' }
   ],
 
   // ── Brandenburg ──
@@ -298,7 +376,25 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-02' },
     { title: 'Winterferien 2027', start: '2027-02-01', end: '2027-02-06' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-21' }
+    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-21' },
+    { title: 'Herbstferien 2027', start: '2027-10-25', end: '2027-11-05' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-03' },
+    { title: 'Winterferien 2028', start: '2028-01-31', end: '2028-02-05' },
+    { title: 'Osterferien 2028', start: '2028-04-03', end: '2028-04-14' },
+    { title: 'Pfingstferien 2028', start: '2028-05-19', end: '2028-05-19' },
+    { title: 'Sommerferien 2028', start: '2028-07-06', end: '2028-08-18' },
+    { title: 'Herbstferien 2028', start: '2028-10-23', end: '2028-11-03' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-02' },
+    { title: 'Winterferien 2029', start: '2029-02-05', end: '2029-02-10' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Pfingstferien 2029', start: '2029-05-11', end: '2029-05-11' },
+    { title: 'Sommerferien 2029', start: '2029-07-05', end: '2029-08-17' },
+    { title: 'Herbstferien 2029', start: '2029-10-22', end: '2029-11-02' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-04' },
+    { title: 'Winterferien 2030', start: '2030-02-04', end: '2030-02-09' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Pfingstferien 2030', start: '2030-05-31', end: '2030-05-31' },
+    { title: 'Sommerferien 2030', start: '2030-07-04', end: '2030-08-16' }
   ],
 
   // ── Niedersachsen ──
@@ -312,7 +408,20 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Herbstferien 2026', start: '2026-10-12', end: '2026-10-24' },
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-08' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-18' }
+    { title: 'Sommerferien 2027', start: '2027-07-08', end: '2027-08-18' },
+    { title: 'Herbstferien 2027', start: '2027-10-18', end: '2027-10-30' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-07' },
+    { title: 'Osterferien 2028', start: '2028-03-27', end: '2028-04-08' },
+    { title: 'Pfingstferien 2028', start: '2028-05-19', end: '2028-05-30' },
+    { title: 'Sommerferien 2028', start: '2028-07-20', end: '2028-08-30' },
+    { title: 'Herbstferien 2028', start: '2028-10-16', end: '2028-10-27' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-05' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Sommerferien 2029', start: '2029-07-19', end: '2029-08-29' },
+    { title: 'Herbstferien 2029', start: '2029-10-15', end: '2029-10-26' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Sommerferien 2030', start: '2030-07-18', end: '2030-08-28' }
   ],
 
   // ── Hamburg ──
@@ -325,7 +434,20 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Herbstferien 2026', start: '2026-10-19', end: '2026-10-30' },
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-21', end: '2027-01-01' },
     { title: 'Frühjahrsferien 2027', start: '2027-03-01', end: '2027-03-12' },
-    { title: 'Sommerferien 2027', start: '2027-07-01', end: '2027-08-11' }
+    { title: 'Sommerferien 2027', start: '2027-07-01', end: '2027-08-11' },
+    { title: 'Herbstferien 2027', start: '2027-10-18', end: '2027-10-29' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-22', end: '2028-01-03' },
+    { title: 'Frühjahrsferien 2028', start: '2028-03-06', end: '2028-03-17' },
+    { title: 'Pfingstferien 2028', start: '2028-05-15', end: '2028-05-19' },
+    { title: 'Sommerferien 2028', start: '2028-07-06', end: '2028-08-16' },
+    { title: 'Herbstferien 2028', start: '2028-10-16', end: '2028-10-27' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-20', end: '2029-01-02' },
+    { title: 'Frühjahrsferien 2029', start: '2029-03-05', end: '2029-03-16' },
+    { title: 'Sommerferien 2029', start: '2029-07-05', end: '2029-08-15' },
+    { title: 'Herbstferien 2029', start: '2029-10-15', end: '2029-10-26' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-19', end: '2030-01-02' },
+    { title: 'Frühjahrsferien 2030', start: '2030-03-04', end: '2030-03-15' },
+    { title: 'Sommerferien 2030', start: '2030-07-04', end: '2030-08-14' }
   ],
 
   // ── Rheinland-Pfalz ──
@@ -338,7 +460,20 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Herbstferien 2026', start: '2026-10-05', end: '2026-10-16' },
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-08' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-06-28', end: '2027-08-06' }
+    { title: 'Sommerferien 2027', start: '2027-06-28', end: '2027-08-06' },
+    { title: 'Herbstferien 2027', start: '2027-10-11', end: '2027-10-22' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-07' },
+    { title: 'Osterferien 2028', start: '2028-03-27', end: '2028-04-07' },
+    { title: 'Pfingstferien 2028', start: '2028-05-23', end: '2028-05-26' },
+    { title: 'Sommerferien 2028', start: '2028-07-03', end: '2028-08-11' },
+    { title: 'Herbstferien 2028', start: '2028-10-09', end: '2028-10-20' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-05' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Sommerferien 2029', start: '2029-07-02', end: '2029-08-10' },
+    { title: 'Herbstferien 2029', start: '2029-10-08', end: '2029-10-19' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-04' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Sommerferien 2030', start: '2030-07-08', end: '2030-08-16' }
   ],
 
   // ── Sachsen ──
@@ -353,7 +488,23 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-02' },
     { title: 'Winterferien 2027', start: '2027-02-08', end: '2027-02-19' },
     { title: 'Osterferien 2027', start: '2027-03-26', end: '2027-04-02' },
-    { title: 'Sommerferien 2027', start: '2027-07-12', end: '2027-08-20' }
+    { title: 'Sommerferien 2027', start: '2027-07-12', end: '2027-08-20' },
+    { title: 'Herbstferien 2027', start: '2027-10-11', end: '2027-10-23' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-01' },
+    { title: 'Winterferien 2028', start: '2028-02-07', end: '2028-02-18' },
+    { title: 'Osterferien 2028', start: '2028-04-10', end: '2028-04-15' },
+    { title: 'Pfingstferien 2028', start: '2028-05-19', end: '2028-05-19' },
+    { title: 'Sommerferien 2028', start: '2028-07-17', end: '2028-08-25' },
+    { title: 'Herbstferien 2028', start: '2028-10-09', end: '2028-10-20' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-02' },
+    { title: 'Winterferien 2029', start: '2029-02-05', end: '2029-02-16' },
+    { title: 'Osterferien 2029', start: '2029-03-29', end: '2029-04-06' },
+    { title: 'Sommerferien 2029', start: '2029-07-16', end: '2029-08-24' },
+    { title: 'Herbstferien 2029', start: '2029-10-08', end: '2029-10-19' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-02' },
+    { title: 'Winterferien 2030', start: '2030-02-04', end: '2030-02-15' },
+    { title: 'Osterferien 2030', start: '2030-04-18', end: '2030-04-26' },
+    { title: 'Sommerferien 2030', start: '2030-07-15', end: '2030-08-23' }
   ],
 
   // ── Schleswig-Holstein ──
@@ -366,7 +517,19 @@ const KMK_VACATION_DATABASE: Record<string, RawHolidayPeriod[]> = {
     { title: 'Herbstferien 2026', start: '2026-10-12', end: '2026-10-24' },
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-08' },
     { title: 'Osterferien 2027', start: '2027-03-30', end: '2027-04-14' },
-    { title: 'Sommerferien 2027', start: '2027-07-03', end: '2027-08-14' }
+    { title: 'Sommerferien 2027', start: '2027-07-03', end: '2027-08-14' },
+    { title: 'Herbstferien 2027', start: '2027-10-18', end: '2027-10-30' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-07' },
+    { title: 'Osterferien 2028', start: '2028-03-27', end: '2028-04-12' },
+    { title: 'Sommerferien 2028', start: '2028-07-10', end: '2028-08-19' },
+    { title: 'Herbstferien 2028', start: '2028-10-16', end: '2028-10-27' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-06' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-10' },
+    { title: 'Sommerferien 2029', start: '2029-07-09', end: '2029-08-18' },
+    { title: 'Herbstferien 2029', start: '2029-10-15', end: '2029-10-26' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-30' },
+    { title: 'Sommerferien 2030', start: '2030-07-08', end: '2030-08-17' }
   ]
 };
 
@@ -382,7 +545,22 @@ function getFallbackVacations(stateCode: string): RawHolidayPeriod[] {
     { title: 'Weihnachtsferien 2026/27', start: '2026-12-23', end: '2027-01-08' },
     { title: 'Osterferien 2027', start: '2027-03-22', end: '2027-04-02' },
     { title: 'Pfingstferien 2027', start: '2027-05-18', end: '2027-05-28' },
-    { title: 'Sommerferien 2027', start: '2027-07-15', end: '2027-08-27' }
+    { title: 'Sommerferien 2027', start: '2027-07-15', end: '2027-08-27' },
+    { title: 'Herbstferien 2027', start: '2027-10-18', end: '2027-10-29' },
+    { title: 'Weihnachtsferien 2027/28', start: '2027-12-23', end: '2028-01-07' },
+    { title: 'Osterferien 2028', start: '2028-04-03', end: '2028-04-14' },
+    { title: 'Pfingstferien 2028', start: '2028-05-23', end: '2028-06-02' },
+    { title: 'Sommerferien 2028', start: '2028-07-13', end: '2028-08-25' },
+    { title: 'Herbstferien 2028', start: '2028-10-16', end: '2028-10-27' },
+    { title: 'Weihnachtsferien 2028/29', start: '2028-12-22', end: '2029-01-05' },
+    { title: 'Osterferien 2029', start: '2029-03-26', end: '2029-04-06' },
+    { title: 'Pfingstferien 2029', start: '2029-05-22', end: '2029-06-01' },
+    { title: 'Sommerferien 2029', start: '2029-07-12', end: '2029-08-24' },
+    { title: 'Herbstferien 2029', start: '2029-10-15', end: '2029-10-26' },
+    { title: 'Weihnachtsferien 2029/30', start: '2029-12-24', end: '2030-01-05' },
+    { title: 'Osterferien 2030', start: '2030-04-15', end: '2030-04-26' },
+    { title: 'Pfingstferien 2030', start: '2030-06-11', end: '2030-06-21' },
+    { title: 'Sommerferien 2030', start: '2030-07-11', end: '2030-08-23' }
   ];
 }
 
@@ -497,12 +675,14 @@ export function getStatutoryHolidaysAndFeiertage(stateCode: string): StatutoryEv
   const normState = stateCode.startsWith('DE_BY') ? 'DE_BY' : stateCode;
   const currentYear = new Date().getFullYear();
 
-  // Feiertage für Vorjahr, aktuelles Jahr und Folgejahre
+  // Feiertage für Vorjahr, aktuelles Jahr und Folgejahre bis 2030+
   const rawFeiertage = [
     ...getFeiertageForYear(currentYear - 1, normState),
     ...getFeiertageForYear(currentYear, normState),
     ...getFeiertageForYear(currentYear + 1, normState),
-    ...getFeiertageForYear(currentYear + 2, normState)
+    ...getFeiertageForYear(currentYear + 2, normState),
+    ...getFeiertageForYear(currentYear + 3, normState),
+    ...getFeiertageForYear(currentYear + 4, normState)
   ];
 
   const vacations = getSchoolVacationsForState(normState);

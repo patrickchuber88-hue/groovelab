@@ -237,14 +237,16 @@ export interface DocumentHashFooterOptions {
   legalStandardText?: string;
   qrDataUrl?: string | null;
   verifyUrl?: string;
+  pageWidth?: number;
+  pageHeight?: number;
 }
 
 /**
  * Renders a tamper-evident, court-proof document hash footer (§ 371a ZPO).
  */
 export function drawDocumentHashFooter(doc: jsPDF, options: DocumentHashFooterOptions): void {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageWidth = options.pageWidth ?? doc.internal.pageSize.getWidth();
+  const pageHeight = options.pageHeight ?? doc.internal.pageSize.getHeight();
   const margin = options.margin ?? 18;
   const contentWidth = pageWidth - margin * 2;
   const borderGray: [number, number, number] = [203, 213, 225];
@@ -288,6 +290,12 @@ export function drawDocumentHashFooter(doc: jsPDF, options: DocumentHashFooterOp
     doc.addImage(options.qrDataUrl, 'PNG', pageWidth - margin - 13, footY - 14, 13, 13);
   }
 }
+
+/**
+ * Canonical alias for court-proof document hash footer (§ 371a ZPO).
+ */
+export const drawCourtProofFooter = drawDocumentHashFooter;
+export type CourtProofFooterOptions = DocumentHashFooterOptions;
 
 /**
  * Serializes data into a deterministic canonical JSON string according to RFC 8785 (JCS).

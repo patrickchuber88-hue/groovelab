@@ -552,7 +552,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
                         </option>
                       ))}
                     </optgroup>
-                    <optgroup label="Schüler (anonymisiert)" style={{ background: '#0f172a', color: '#94a3b8' }}>
+                    <optgroup label="Schüler (pseudonymisiert)" style={{ background: '#0f172a', color: '#94a3b8' }}>
                       {schoolUsers.filter(u => u.role === 'student').slice(0, 30).map(s => (
                         <option key={s.id} value={s.id} style={{ background: '#0f172a', color: '#ffffff' }}>
                           🎓 {s.name} {s.instrument ? `(${s.instrument})` : ''}

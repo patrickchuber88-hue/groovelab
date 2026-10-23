@@ -182,7 +182,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
-                  aria-label={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+                  aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -192,19 +192,19 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     padding: '8px 14px',
                     fontSize: '0.82rem',
                     fontWeight: 800,
-                    background: showRealNames ? '#fee2e2' : '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    color: showRealNames ? '#ef4444' : '#64748b',
+                    background: showRealNames ? '#ffffff' : '#fee2e2',
+                    border: showRealNames ? '1px solid #e2e8f0' : '1px solid #fca5a5',
+                    color: showRealNames ? '#475569' : '#dc2626',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     height: '38px',
                     width: windowWidth < 768 ? '100%' : 'auto',
                     boxSizing: 'border-box'
                   }}
-                  title={showRealNames ? "Nachnamen anonymisieren / maskieren" : "Nachnamen für 10 Sekunden einblenden"}
+                  title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                 >
-                  {showRealNames ? <EyeOff size={14} /> : <Eye size={14} />}
-                  <span>{showRealNames ? "Namen maskieren" : "Namen anzeigen"}</span>
+                  {showRealNames ? <Eye size={14} color="#34a853" /> : <EyeOff size={14} color="#dc2626" />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
                 </button>
                 <button
                   type="button"
@@ -316,7 +316,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     const mergedStudent = {
                       ...members[0],
                       id: members[0].id,
-                      first_name: members.map(m => `${m.first_name || ''} ${maskLastName(m.last_name, showRealNames)}`.trim()).join(' & '),
+                      first_name: members.map(m => `${m.first_name || ''} ${maskLastName(m.last_name, showRealNames, m.id)}`.trim()).join(' & '),
                       last_name: '',
                       isGroup: true,
                       group_id: s.group_id,
@@ -387,7 +387,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       role="button"
                       className="btn-allow-wrap"
                       tabIndex={0}
-                      aria-label={`Details für Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
+                      aria-label={`Details für Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`} öffnen`}
                       onClick={() => fetchStudentProfile(s)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -421,7 +421,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                         <div 
-                          title={s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
+                          title={s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`}
                           style={{ 
                             fontWeight: 900, 
                             color: '#0f172a', 
@@ -436,7 +436,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                             wordBreak: 'break-word'
                           }}
                         >
-                          {s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`}
+                          {s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           {s.isGroup && (
@@ -484,7 +484,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           setSelectedStudentForTageskompass(s);
                           setShowTageskompassModal(true); 
                         }} 
-                        aria-label={`Hausaufgabenheft und Schüler-Protokoll für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} öffnen`}
+                        aria-label={`Hausaufgabenheft und Schüler-Protokoll für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`} öffnen`}
                         style={{ 
                           background: '#e6f4ea', 
                           border: 'none', 
@@ -519,7 +519,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                           e.stopPropagation(); 
                           setSelectedTimetableStudent(s); 
                         }} 
-                        aria-label={hasTimetableOnboarding(s) ? `Stundenplan-Slot für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} ansehen` : `Stundenplan für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} einrichten`}
+                        aria-label={hasTimetableOnboarding(s) ? `Stundenplan-Slot für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`} ansehen` : `Stundenplan für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`} einrichten`}
                         style={{ 
                           background: hasTimetableOnboarding(s) ? '#e6f4ea' : '#fefce8', 
                           border: 'none', 
@@ -558,7 +558,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                     <button 
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setSelectedQRUser(s); }} 
-                      aria-label={`QR-Zugangskarte und Login-Token für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} anzeigen`}
+                      aria-label={`QR-Zugangskarte und Login-Token für ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames, s.id)}`} anzeigen`}
                       style={{ 
                         background: "#ffffff", 
                         border: "1px solid #cbd5e1", 

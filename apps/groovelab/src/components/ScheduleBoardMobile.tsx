@@ -5524,12 +5524,13 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 <button
                   type="button"
                   onClick={() => toggleRealNames()}
-                  className={`apple-btn ${showRealNames ? 'active' : ''}`}
-                  style={{ color: showRealNames ? brandColor : undefined }}
-                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+                  className={`apple-btn ${!showRealNames ? 'active' : ''}`}
+                  style={!showRealNames ? { background: '#fee2e2', color: '#dc2626', borderColor: '#fca5a5' } : {}}
+                  title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                  aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
                 >
-                  {showRealNames ? <Eye size={13} /> : <EyeOff size={13} />}
-                  <span>{showRealNames ? "Vorname N." : "Klarnamen"}</span>
+                  {showRealNames ? <Eye size={13} color="#34a853" /> : <EyeOff size={13} color="#dc2626" />}
+                  <span>{showRealNames ? "Vorname N." : "Klarnamen (60s)"}</span>
                 </button>
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
@@ -9757,7 +9758,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         </div>
                         <div>
                           <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                            {showRealNames ? formatSingleStudentAnonymized(student.first_name, student.last_name, student.id, showRealNames) : `${student.first_name} ${student.last_name}`}
+                            {formatSingleStudentAnonymized(student.first_name, student.last_name, student.id, showRealNames)}
                           </div>
                           <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
                             {student.instrument || 'Musikschüler'} · {student.duration} Min.
@@ -9905,10 +9906,16 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                     <Plus size={16} color="#34a853" />
                     <span>+ Neuen Unterrichtstag anlegen</span>
                   </button>
-                  <button type="button" onClick={() => { toggleRealNames(); setShowDesignerToolsSheet(false); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => { toggleRealNames(); setShowDesignerToolsSheet(false); }} 
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '12px', background: showRealNames ? '#ffffff' : '#fee2e2', border: showRealNames ? '1px solid #e2e8f0' : '1px solid #fca5a5', cursor: 'pointer' }}
+                    title={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                    aria-label={showRealNames ? "Klarnamen für 60 Sekunden einblenden (PIN erforderlich)" : "Datenschutz-Modus sofort aktivieren (Vorname N.)"}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {showRealNames ? <Lock size={15} color="#0f172a" /> : <Eye size={15} color="#0f172a" />}
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>{showRealNames ? 'Namen schützen (Vorname N.)' : 'Vollständige Namen anzeigen'}</span>
+                      {showRealNames ? <Eye size={15} color="#34a853" /> : <EyeOff size={15} color="#dc2626" />}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: showRealNames ? '#0f172a' : '#dc2626' }}>{showRealNames ? 'Vorname N. (Datenschutz)' : 'Klarnamen (60s)'}</span>
                     </div>
                   </button>
                 </div>

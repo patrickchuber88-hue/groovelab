@@ -84,7 +84,7 @@ export async function getStudentProfileDTO(userId: string): Promise<StudentProfi
 }
 
 /**
- * Fetches anonymized school roster DTO.
+ * Fetches pseudonymized school roster DTO (Art. 4 Nr. 5 DSGVO).
  */
 export async function getSchoolRosterDTO(schoolId: string): Promise<SchoolRosterDTO | null> {
   if (!schoolId) return null;

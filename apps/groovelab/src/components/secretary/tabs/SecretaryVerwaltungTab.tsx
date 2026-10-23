@@ -63,6 +63,10 @@ export interface SecretaryVerwaltungTabProps {
   logoUrl?: string;
   setLogoUrl?: (val: string) => void;
   setSchoolName?: (val: string) => void;
+  lessonBufferBefore?: number;
+  setLessonBufferBefore?: (val: number) => void;
+  lessonBufferAfter?: number;
+  setLessonBufferAfter?: (val: number) => void;
   currentSchoolProfile: any;
   setCurrentSchoolProfile: React.Dispatch<React.SetStateAction<any>> | ((profile: any) => void);
   currentUserProfile: any;
@@ -505,6 +509,10 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     logoUrl,
     setLogoUrl,
     setSchoolName,
+    lessonBufferBefore,
+    setLessonBufferBefore,
+    lessonBufferAfter,
+    setLessonBufferAfter,
     setSchoolStreet,
     setSchoolHouseNumber,
     setSchoolZipCode,
@@ -1364,6 +1372,11 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Einstellungen...</div>}>
           <SecretarySetupView
             schoolId={schoolId}
+            currentSchoolProfile={currentSchoolProfile}
+            lessonBufferBefore={lessonBufferBefore}
+            setLessonBufferBefore={setLessonBufferBefore}
+            lessonBufferAfter={lessonBufferAfter}
+            setLessonBufferAfter={setLessonBufferAfter}
             schoolName={schoolName || ''}
             setSchoolName={setSchoolName as any}
             schoolSubdomain={schoolSubdomain || ''}

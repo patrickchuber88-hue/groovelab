@@ -14,9 +14,10 @@ import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStude
 import { SkillRadarPentagon } from '../../common/SkillRadarPentagon';
 import { SKILL_TAGS } from '../meisterwerk.types';
 import QRCode from 'react-qr-code';
-import { formatTeacherFullName } from '../../../utils/nameHelper';
+import { formatTeacherFullName, revealStudentFullNameViaVault } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 import { TeacherMakeupTokenModal } from '../../teacher/TeacherMakeupTokenModal';
+import { StepUpPinModal } from '../../ui/StepUpPinModal';
 
 const TEACHER_GREEN = '#34a853';
 const TEACHER_YELLOW = '#facc15';
@@ -70,6 +71,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
   const [selectedTokenForRedeem, setSelectedTokenForRedeem] = useState<any>(null);
   const [schoolRooms, setSchoolRooms] = useState<any[]>([]);
   const [currentTeacherId, setCurrentTeacherId] = useState<string>('');
+  const [showStepUpModal, setShowStepUpModal] = useState<boolean>(false);
 
   // 5 Säulen Kompetenz-Stufen & Wochenschwerpunkt (Single Source of Truth)
   const [pillarLevels, setPillarLevels] = useState<Record<string, number>>(() => {
@@ -507,7 +509,28 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           memberSince={memberSince}
           activeColor={activeThemeColor}
           isLastNameRevealedLocally={isLastNameRevealedLocally}
-          onToggleLastNameRevealed={() => setIsLastNameRevealedLocally((prev) => !prev)}
+          onToggleLastNameRevealed={async () => {
+            if (isLastNameRevealedLocally) {
+              setIsLastNameRevealedLocally(false);
+              return;
+            }
+            if (student?.id) {
+              const res = await revealStudentFullNameViaVault(student.id, undefined, supabase);
+              if (res.success && res.lastName) {
+                setLastName(res.lastName);
+                setIsLastNameRevealedLocally(true);
+                setTimeout(() => {
+                  setIsLastNameRevealedLocally(false);
+                }, 60000);
+                return;
+              }
+              // Falls PIN erforderlich ist (Step-Up Authentifizierung nach NIST SP 800-63B)
+              if (res.error === 'PIN_REQUIRED' || res.error === 'INVALID_PIN' || !res.success) {
+                setShowStepUpModal(true);
+                return;
+              }
+            }
+          }}
           onQuickQr={() => setShowQrOverlay(true)}
           onClose={onClose}
         />
@@ -1628,6 +1651,26 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           }}
         />
       )}
+
+      {/* 🔒 0,1% Step-Up PIN Modal (NIST SP 800-63B / BSI TR-02102-1) */}
+      <StepUpPinModal
+        isOpen={showStepUpModal}
+        onClose={() => setShowStepUpModal(false)}
+        studentName={firstName}
+        onSuccess={async (enteredPin) => {
+          if (!student?.id) return false;
+          const res = await revealStudentFullNameViaVault(student.id, enteredPin, supabase);
+          if (res.success && res.lastName) {
+            setLastName(res.lastName);
+            setIsLastNameRevealedLocally(true);
+            setTimeout(() => {
+              setIsLastNameRevealedLocally(false);
+            }, 60000);
+            return true;
+          }
+          return false;
+        }}
+      />
     </div>
   );
 };

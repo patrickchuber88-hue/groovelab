@@ -232,10 +232,15 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
     else if (showStorageTerminationModal) setShowStorageTerminationModal(false);
     else if (selectedInvoice) setSelectedInvoice(null);
     else if (showStorageManagerModal) setShowStorageManagerModal(false);
+    else if (activeStudentsModalList) {
+      setActiveStudentsModalList(null);
+      setModalStudentSearchQuery('');
+    }
   };
   const isAnyBillingModalOpen = Boolean(
     showChangeTariffModal || showModuleUpgradeModal || showSwitchBillingModelModal ||
-    showCancelModal || showStorageTerminationModal || selectedInvoice || showStorageManagerModal
+    showCancelModal || showStorageTerminationModal || selectedInvoice || showStorageManagerModal ||
+    Boolean(activeStudentsModalList)
   );
   const billingModalRef = useModalA11y(isAnyBillingModalOpen, handleCloseActiveBillingModal);
 
@@ -402,7 +407,7 @@ export const SecretaryBillingModalsHub: React.FC<SecretaryBillingModalsHubProps>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
               <div>
                 <h3 id="active-students-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                  Aktivierte Schüler ({activeStudentsModalList.list.length})
+                  Aktivierte Schüler ({activeStudentsModalList.list?.length || 0})
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
                   <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>

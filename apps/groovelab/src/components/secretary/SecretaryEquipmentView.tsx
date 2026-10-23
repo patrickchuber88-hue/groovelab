@@ -592,16 +592,16 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
           {/* Left: Search & Segmented Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: 1 }}>
             
-            {/* Search Input */}
+            {/* Search Input (Apple Spotlight Style) */}
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '8px', 
               background: '#ffffff', 
               padding: '0 14px', 
-              borderRadius: '14px', 
-              border: '1px solid #e2e8f0', 
-              height: '44px', 
+              borderRadius: '13px', 
+              border: '1px solid rgba(15, 23, 42, 0.08)', 
+              height: '42px', 
               boxSizing: 'border-box',
               minWidth: '220px',
               maxWidth: '340px',
@@ -624,16 +624,29 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   <X size={14} />
                 </button>
               ) : (
-                <kbd style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '1px 5px', fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>
+                <kbd style={{ background: 'rgba(15, 23, 42, 0.05)', border: '1px solid rgba(15, 23, 42, 0.08)', borderRadius: '5px', padding: '1px 6px', fontSize: '0.64rem', color: '#64748b', fontWeight: 700 }}>
                   /
                 </kbd>
               )}
             </div>
 
             {/* Apple-Grade Segmented Control */}
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '2px' }}>
+            <div 
+              role="tablist"
+              aria-label="Filter nach Belegung"
+              style={{ 
+                display: 'inline-flex', 
+                background: 'rgba(15, 23, 42, 0.06)', 
+                padding: '3px', 
+                borderRadius: '11px', 
+                gap: '2px',
+                boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.04)'
+              }}
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={quickFilter === 'all' && !equipmentSortFreeFirst}
                 onClick={() => {
                   setQuickFilter('all');
                   setEquipmentSortFreeFirst(false);
@@ -642,13 +655,13 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   border: 'none',
                   background: quickFilter === 'all' && !equipmentSortFreeFirst ? '#ffffff' : 'transparent',
                   color: quickFilter === 'all' && !equipmentSortFreeFirst ? '#0f172a' : '#64748b',
-                  fontWeight: 800,
+                  fontWeight: quickFilter === 'all' && !equipmentSortFreeFirst ? 800 : 650,
                   fontSize: '0.74rem',
-                  padding: '7px 14px',
-                  borderRadius: '9px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  boxShadow: quickFilter === 'all' && !equipmentSortFreeFirst ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
-                  transition: 'all 0.15s'
+                  boxShadow: quickFilter === 'all' && !equipmentSortFreeFirst ? '0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 Alle ({allInstances.length})
@@ -656,6 +669,8 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
               
               <button
                 type="button"
+                role="tab"
+                aria-selected={quickFilter === 'free' || equipmentSortFreeFirst}
                 onClick={() => {
                   setQuickFilter('free');
                   setEquipmentSortFreeFirst(true);
@@ -664,16 +679,16 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   border: 'none',
                   background: quickFilter === 'free' || equipmentSortFreeFirst ? '#ffffff' : 'transparent',
                   color: quickFilter === 'free' || equipmentSortFreeFirst ? '#15803d' : '#64748b',
-                  fontWeight: 800,
+                  fontWeight: quickFilter === 'free' || equipmentSortFreeFirst ? 800 : 650,
                   fontSize: '0.74rem',
-                  padding: '7px 14px',
-                  borderRadius: '9px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  boxShadow: quickFilter === 'free' || equipmentSortFreeFirst ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
+                  boxShadow: quickFilter === 'free' || equipmentSortFreeFirst ? '0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04)' : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
-                  transition: 'all 0.15s'
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 <Sparkles size={13} color={quickFilter === 'free' || equipmentSortFreeFirst ? '#16a34a' : '#94a3b8'} />
@@ -682,6 +697,8 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
 
               <button
                 type="button"
+                role="tab"
+                aria-selected={quickFilter === 'assigned'}
                 onClick={() => {
                   setQuickFilter('assigned');
                   setEquipmentSortFreeFirst(false);
@@ -690,13 +707,13 @@ export const SecretaryEquipmentView: React.FC<SecretaryEquipmentViewProps> = ({
                   border: 'none',
                   background: quickFilter === 'assigned' ? '#ffffff' : 'transparent',
                   color: quickFilter === 'assigned' ? '#0f172a' : '#64748b',
-                  fontWeight: 800,
+                  fontWeight: quickFilter === 'assigned' ? 800 : 650,
                   fontSize: '0.74rem',
-                  padding: '7px 14px',
-                  borderRadius: '9px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  boxShadow: quickFilter === 'assigned' ? '0 1px 4px rgba(15, 23, 42, 0.08)' : 'none',
-                  transition: 'all 0.15s'
+                  boxShadow: quickFilter === 'assigned' ? '0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 1px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
                 Im Raum ({kpis.assigned})

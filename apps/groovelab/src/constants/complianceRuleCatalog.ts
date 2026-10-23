@@ -356,11 +356,11 @@ export const COMPLIANCE_RULES_180: ComplianceRuleDefinition[] = [
     pillar: 1,
     pillarName: COMPLIANCE_PILLARS_18[1],
     norm: 'DSGVO Art. 32',
-    description: 'PBKDF2 Zero-Knowledge Hashing mit mind. 100.000 Runden (SHA-512) für PINs und Passwörter',
+    description: 'Duale Kryptografie: Serverseitig Salted Bcrypt (Cost >= 10) in private_auth + clientseitig WebCrypto PBKDF2 (100.000 Runden SHA-512) & AES-256-GCM',
     severity: 'CRITICAL',
     category: 'DATABASE_KERNEL',
     invariantTarget: 'supabase/migrations/323_enterprise_physical_secret_purge_and_zero_knowledge_auth.sql',
-    enforcementMechanism: 'PBKDF2 SHA-512 100.000 Runden in Auth RPCs'
+    enforcementMechanism: 'Server Bcrypt Cost >= 10 in Auth RPCs & Client PBKDF2-SHA-512'
   },
   {
     id: 'RULE-029',

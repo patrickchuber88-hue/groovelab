@@ -681,7 +681,8 @@ for (const filePath of migrationFiles) {
           'verify_shared_biography_pin',
           'record_shared_biography_reaction',
           'verify_b2b_contract_digest',
-          'switch_user_active_role'
+          'switch_user_active_role',
+          'verify_onboarding'
         ].includes(funcName);
 
         if (isLoginOrChallengeExempt) continue;

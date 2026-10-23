@@ -237,7 +237,9 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         });
       });
     }
-    if (totalMinutes === 0) totalMinutes = workloadMinutes > 0 ? workloadMinutes * 5 : (totalTeacherStudentsCount > 0 ? totalTeacherStudentsCount * 30 : 18 * 45);
+    if (totalMinutes === 0) {
+      totalMinutes = workloadMinutes > 0 ? workloadMinutes * 5 : (totalTeacherStudentsCount > 0 ? totalTeacherStudentsCount * 30 : 0);
+    }
     const hours = Math.floor(totalMinutes / 60);
     const remMins = totalMinutes % 60;
     return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
@@ -340,20 +342,34 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         </div>
 
         {/* KPI 3: Tages-Pensum / Wochen-Pensum */}
-        <div style={{
-          flex: '1 1 0px',
-          minWidth: 0,
-          position: 'relative', overflow: 'hidden',
-          background: '#facc15',
-          color: '#0f172a',
-          borderRadius: '20px',
-          boxShadow: 'none',
-          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-          minHeight: '72px',
-          padding: '14px 16px',
-          boxSizing: 'border-box',
-          border: 'none'
-        }}>
+        <div 
+          onClick={() => onTabChange?.('live')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onTabChange?.('live');
+            }
+          }}
+          role={onTabChange ? 'button' : undefined}
+          tabIndex={onTabChange ? 0 : undefined}
+          aria-label={isRestDay ? `Wochen-Pensum: ${regularWeeklyPensum}. Zum Stundenplan wechseln.` : `Tages-Pensum: ${workloadHoursStr}. Zum Stundenplan wechseln.`}
+          style={{
+            flex: '1 1 0px',
+            minWidth: 0,
+            position: 'relative', overflow: 'hidden',
+            background: '#facc15',
+            color: '#0f172a',
+            borderRadius: '20px',
+            boxShadow: 'none',
+            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+            minHeight: '72px',
+            padding: '14px 16px',
+            boxSizing: 'border-box',
+            border: 'none',
+            cursor: onTabChange ? 'pointer' : 'default',
+            outline: 'none'
+          }}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
             <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a' }}>
               {isRestDay ? 'Wochen-Pensum' : 'Tages-Pensum'}
@@ -367,7 +383,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
               {isRestDay ? regularWeeklyPensum : workloadHoursStr}
             </span>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
-              {isRestDay ? 'Regulär' : 'Heute'}
+              {isRestDay ? (regularWeeklyPensum === '0h' ? 'Noch offen' : 'Regulär') : 'Heute'}
             </span>
           </div>
         </div>
@@ -1507,16 +1523,31 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     </div>
 
                     {/* Card 3: Tages-Pensum / Wochen-Pensum */}
-                    <div style={{
-                      position: 'relative', overflow: 'hidden',
-                      background: '#facc15', color: '#0f172a',
-                      borderRadius: '22px', 
-                      boxShadow: 'none',
-                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
-                      padding: '16px 18px', boxSizing: 'border-box',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      border: 'none'
-                    }} className="hover-scale">
+                    <div 
+                      onClick={() => onTabChange?.('live')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onTabChange?.('live');
+                        }
+                      }}
+                      role={onTabChange ? 'button' : undefined}
+                      tabIndex={onTabChange ? 0 : undefined}
+                      aria-label={isRestDay ? `Wochen-Pensum: ${regularWeeklyPensum}. Zum Stundenplan wechseln.` : `Tages-Pensum: ${workloadHoursStr}. Zum Stundenplan wechseln.`}
+                      style={{
+                        position: 'relative', overflow: 'hidden',
+                        background: '#facc15', color: '#0f172a',
+                        borderRadius: '22px', 
+                        boxShadow: 'none',
+                        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '74px',
+                        padding: '16px 18px', boxSizing: 'border-box',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: 'none',
+                        cursor: onTabChange ? 'pointer' : 'default',
+                        outline: 'none'
+                      }} 
+                      className="hover-scale focus-visible:ring-2 focus-visible:ring-amber-500"
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                           {isRestDay ? 'Wochen-Pensum' : 'Tages-Pensum'}
@@ -1530,7 +1561,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                           {isRestDay ? regularWeeklyPensum : workloadHoursStr}
                         </span>
                         <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px', color: '#0f172a' }}>
-                          {isRestDay ? '/ Woche' : 'Heute'}
+                          {isRestDay ? (regularWeeklyPensum === '0h' ? 'Noch offen' : '/ Woche') : 'Heute'}
                         </span>
                       </div>
                     </div>

@@ -12,7 +12,7 @@ import { StudentAccessSection } from './shared/StudentAccessSection';
 import { StudentConsentProtocol } from './shared/StudentConsentProtocol';
 import { StudentIdCardPrintModal } from './modals/StudentIdCardPrintModal';
 import { resolveUserCampusId } from '../../../utils/campusIdHelper';
-import { formatTeacherFullName } from '../../../utils/nameHelper';
+import { formatTeacherFullName, revealStudentFullNameViaVault } from '../../../utils/nameHelper';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../../StudioAvatar';
 import QRCode from 'react-qr-code';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
@@ -146,7 +146,15 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
   useEffect(() => {
     setActiveStudent(student);
     setFirstName(student.first_name || (student.name ? student.name.split(' ')[0] : ''));
-    setLastName(student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : ''));
+    const initialLast = student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : '');
+    setLastName(initialLast);
+    if (student?.id && (!initialLast || initialLast.endsWith('.'))) {
+      revealStudentFullNameViaVault(student.id, undefined, supabase).then(res => {
+        if (res.success && res.lastName) {
+          setLastName(res.lastName);
+        }
+      });
+    }
     setInstrument(student.instrument || 'Musiker');
     setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
     setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);

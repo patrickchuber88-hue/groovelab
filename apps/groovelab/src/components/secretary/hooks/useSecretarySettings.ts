@@ -9,6 +9,7 @@ import {
   BiometricVaultProfile
 } from '../../../utils/webauthn';
 import { resolveStateFromZipCode } from '../../../utils/schoolHolidayEngine';
+import { isSubdomainReserved } from '../../../constants/reservedSubdomains';
 
 export interface UseSecretarySettingsOptions {
   schoolId: string;
@@ -43,6 +44,10 @@ export function useSecretarySettings({
   // 1b. Statutory School Holidays & Feiertage
   const [showSchoolHolidays, setShowSchoolHolidays] = useState<boolean>(true);
   const [holidayJurisdiction, setHolidayJurisdiction] = useState<string>('DE_BW');
+
+  // 1c. Unterrichts-Pufferzeiten (Standard: 15 Min vor 1. und nach letztem Termin)
+  const [lessonBufferBefore, setLessonBufferBefore] = useState<number>(15);
+  const [lessonBufferAfter, setLessonBufferAfter] = useState<number>(15);
 
   // 2. Operational & Kiosk Settings
   const [kioskPinLength, setKioskPinLength] = useState<number>(4);
@@ -109,6 +114,8 @@ export function useSecretarySettings({
     return (
       schoolName !== initialSettings.schoolName ||
       schoolSubdomain !== initialSettings.schoolSubdomain ||
+      lessonBufferBefore !== initialSettings.lessonBufferBefore ||
+      lessonBufferAfter !== initialSettings.lessonBufferAfter ||
       schoolZipCode !== initialSettings.schoolZipCode ||
       schoolCity !== initialSettings.schoolCity ||
       schoolStreet !== initialSettings.schoolStreet ||
@@ -130,7 +137,7 @@ export function useSecretarySettings({
     );
   }, [
     initialSettings,
-    schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail, absenceEmail,
+    schoolName, schoolSubdomain, lessonBufferBefore, lessonBufferAfter, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail, absenceEmail,
     logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval,
     schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers,
     showSchoolHolidays, holidayJurisdiction
@@ -157,8 +164,21 @@ export function useSecretarySettings({
     const loadedShowHolidays = campusSettings.show_school_holidays !== false;
     const loadedHolidayJurisdiction = campusSettings.holiday_jurisdiction || resolveStateFromZipCode(schoolData.zip_code, schoolData.country);
 
+    const loadedBufferBefore = Number(
+      campusSettings.lesson_buffer_before_min ?? 
+      (typeof window !== 'undefined' ? localStorage.getItem(`groovelab_buffer_before_${schoolData.id}`) : null) ?? 
+      15
+    );
+    const loadedBufferAfter = Number(
+      campusSettings.lesson_buffer_after_min ?? 
+      (typeof window !== 'undefined' ? localStorage.getItem(`groovelab_buffer_after_${schoolData.id}`) : null) ?? 
+      15
+    );
+
     setShowSchoolHolidays(loadedShowHolidays);
     setHolidayJurisdiction(loadedHolidayJurisdiction);
+    setLessonBufferBefore(loadedBufferBefore);
+    setLessonBufferAfter(loadedBufferAfter);
 
     let parsedUrls: string[] = [];
     const rawUrl = schoolData.calendar_url;
@@ -213,7 +233,9 @@ export function useSecretarySettings({
       schoolYearStartDay: loadedStartDay,
       autoDeleteExpiredUsers: loadedAutoDelete,
       showSchoolHolidays: loadedShowHolidays,
-      holidayJurisdiction: loadedHolidayJurisdiction
+      holidayJurisdiction: loadedHolidayJurisdiction,
+      lessonBufferBefore: loadedBufferBefore,
+      lessonBufferAfter: loadedBufferAfter
     });
   }, []);
 
@@ -369,6 +391,52 @@ export function useSecretarySettings({
     }
     setIsSavingSettings(true);
     try {
+      // 1. Sanitize & Validate Desired Subdomain (0,1% Goldstandard)
+      const rawSub = (schoolSubdomain || '').trim().toLowerCase();
+      let cleanSub: string | null = null;
+      if (rawSub) {
+        cleanSub = rawSub
+          .replace(/[äöüß]/g, (match) => {
+            const mapping: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' };
+            return mapping[match] || match;
+          })
+          .replace(/[^a-z0-9-]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
+
+      if (cleanSub && cleanSub.length > 0) {
+        if (cleanSub.length < 3) {
+          alert('Die Wunsch-Subdomain muss mindestens 3 Zeichen lang sein.');
+          setIsSavingSettings(false);
+          return;
+        }
+        if (isSubdomainReserved(cleanSub)) {
+          alert(`Die Wunsch-Subdomain "${cleanSub}" ist ein geschützter Systemname und kann nicht vergeben werden. Bitte wähle eine andere Web-Adresse.`);
+          setIsSavingSettings(false);
+          return;
+        }
+        const initialSub = (initialSettings?.schoolSubdomain || '').trim().toLowerCase();
+        if (cleanSub !== initialSub) {
+          try {
+            const { data: existingSchool, error: checkErr } = await supabase
+              .from('schools')
+              .select('id')
+              .eq('subdomain', cleanSub)
+              .neq('id', schoolId)
+              .maybeSingle();
+
+            if (!checkErr && existingSchool) {
+              alert(`Die Wunsch-Subdomain "${cleanSub}" ist bereits durch eine andere Musikschule belegt. Bitte wähle eine alternative Adresse (z. B. "${cleanSub}-campus").`);
+              setIsSavingSettings(false);
+              return;
+            }
+          } catch (preCheckErr) {
+            console.warn('[SecretarySettings] Pre-flight subdomain check notice:', preCheckErr);
+          }
+        }
+      }
+
       const overrides = (customOverrides && typeof customOverrides === 'object' && !('nativeEvent' in customOverrides)) ? customOverrides : undefined;
       const effAutoDelete = overrides?.autoDeleteExpiredUsers !== undefined ? overrides.autoDeleteExpiredUsers : autoDeleteExpiredUsers;
       const effMonth = overrides?.schoolYearStartMonth !== undefined ? overrides.schoolYearStartMonth : schoolYearStartMonth;
@@ -383,7 +451,10 @@ export function useSecretarySettings({
       const updatedCampusSettings = {
         ...((openingHours || {}).campus_settings || {}),
         show_school_holidays: effShowHolidays,
-        holiday_jurisdiction: effHolidayJurisdiction
+        holiday_jurisdiction: effHolidayJurisdiction,
+        lesson_buffer_before_min: lessonBufferBefore,
+        lesson_buffer_after_min: lessonBufferAfter,
+        lesson_buffer_scope: 'block_boundaries'
       };
 
       const updatedOp = {
@@ -402,7 +473,7 @@ export function useSecretarySettings({
 
       const updatePayload: any = {
         name: schoolName,
-        subdomain: schoolSubdomain || null,
+        subdomain: cleanSub || null,
         street: schoolStreet || null,
         house_number: schoolHouseNumber || null,
         zip_code: schoolZipCode || null,
@@ -429,7 +500,7 @@ export function useSecretarySettings({
           .from('schools')
           .update({
             name: schoolName,
-            subdomain: schoolSubdomain || null,
+            subdomain: cleanSub || null,
             street: schoolStreet || null,
             house_number: schoolHouseNumber || null,
             zip_code: schoolZipCode || null,
@@ -453,10 +524,11 @@ export function useSecretarySettings({
       setBypassPin(effBypassPin);
       setLogRetention(effLogRetention);
       setSyncInterval(effSyncInterval);
+      if (cleanSub) setSchoolSubdomain(cleanSub);
 
       setInitialSettings({
         schoolName: schoolName || '',
-        schoolSubdomain: schoolSubdomain || '',
+        schoolSubdomain: cleanSub || '',
         schoolZipCode: schoolZipCode || '',
         schoolCity: schoolCity || '',
         schoolStreet: schoolStreet || '',
@@ -474,11 +546,17 @@ export function useSecretarySettings({
         schoolYearStartDay: effDay,
         autoDeleteExpiredUsers: effAutoDelete,
         showSchoolHolidays: effShowHolidays,
-        holidayJurisdiction: effHolidayJurisdiction
+        holidayJurisdiction: effHolidayJurisdiction,
+        lessonBufferBefore,
+        lessonBufferAfter
       });
 
       // Update local storage school profile & groovelab_school_overrides
       try {
+        if (schoolId) {
+          localStorage.setItem(`groovelab_buffer_before_${schoolId}`, String(lessonBufferBefore));
+          localStorage.setItem(`groovelab_buffer_after_${schoolId}`, String(lessonBufferAfter));
+        }
         const storedProfile = localStorage.getItem('groovelab_school_profile');
         if (storedProfile) {
           const parsed = JSON.parse(storedProfile);
@@ -486,6 +564,7 @@ export function useSecretarySettings({
           parsed.school_year_start_month = effMonth;
           parsed.school_year_start_day = effDay;
           parsed.opening_hours = updatedOp;
+          if (cleanSub) parsed.subdomain = cleanSub;
           localStorage.setItem('groovelab_school_profile', JSON.stringify(parsed));
         }
         const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
@@ -496,7 +575,8 @@ export function useSecretarySettings({
             auto_delete_expired_users: effAutoDelete,
             school_year_start_month: effMonth,
             school_year_start_day: effDay,
-            opening_hours: updatedOp
+            opening_hours: updatedOp,
+            subdomain: cleanSub || overrides[schoolId]?.subdomain
           };
           localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
         }
@@ -512,7 +592,12 @@ export function useSecretarySettings({
       alert('Einstellungen erfolgreich gespeichert.');
     } catch (err: any) {
       console.error('Error saving settings:', err);
-      alert('Fehler beim Speichern der Einstellungen: ' + err.message);
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('schools_subdomain_key') || err?.code === '23505') {
+        alert('Fehler beim Speichern: Diese Wunsch-Subdomain ist bereits durch eine andere Musikschule belegt. Bitte wähle eine alternative Adresse (z. B. mit Stadtkürzel).');
+      } else {
+        alert('Fehler beim Speichern der Einstellungen: ' + errMsg);
+      }
     } finally {
       setIsSavingSettings(false);
     }
@@ -956,6 +1041,12 @@ export function useSecretarySettings({
     showSchoolHolidays,
     setShowSchoolHolidays,
     holidayJurisdiction,
-    setHolidayJurisdiction
+    setHolidayJurisdiction,
+
+    // 10. Unterrichts-Pufferzeiten (SSOT)
+    lessonBufferBefore,
+    setLessonBufferBefore,
+    lessonBufferAfter,
+    setLessonBufferAfter
   };
 }

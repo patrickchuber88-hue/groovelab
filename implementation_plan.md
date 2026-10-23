@@ -1,83 +1,78 @@
-# Implementierungsplan: 10/10 Goldstandard der Nachrichten- & Lifecycle-Architektur
+# Implementierungsplan: 360° Legal-to-Code Canonical Parity & DPO Compliance Shield (0,1% Goldstandard)
 
-## Status Übersicht
-- ✅ **Teil A: Art. 9 DSGVO & Health-Data Protection Shield** (Abgeschlossen & verifiziert)
-  - Morphologische Stammwort- & Komposita-Engine ([`medicalTermGuard.ts`](apps/groovelab/src/utils/medicalTermGuard.ts))
-  - Alltagsstatus `krank` geschützt, Diagnosedaten fail-closed blockiert
-  - Smart-Guidance Dialog mit 1-Klick-Neutralisierung ([`CampusDirectMessages.tsx`](apps/groovelab/src/components/CampusDirectMessages.tsx))
-  - Serverseitige PostgreSQL-Governance ([`598_enterprise_art9_dsgvo_chat_shield.sql`](supabase/migrations/598_enterprise_art9_dsgvo_chat_shield.sql))
-  - Forensische Testsuite ([`test_medical_term_guard_forensic.ts`](apps/groovelab/src/tests/test_medical_term_guard_forensic.ts))
-- ⏳ **Teil B: 10/10 Alltags- & Lifecycle-Exzellenz im Musikschulbetrieb** (Bereit zur Umsetzung)
+## 1. Problemstellung & Zieldefinition
 
----
+### Bisherige Diskrepanz (Compliance-Drift):
+Die Plattform hat in den jüngsten technischen Härtungen wesentliche architektonische Schutzmechanismen etabliert:
+1. **Migration 600 & 601:** *Zero-Knowledge Identity Vault* (`private_auth.blind_student_lastname_vault`) mit HMAC-SHA256 Blind-Links und AES-256 PGP-Verschlüsselung; Nachnamen existieren nicht mehr unverschlüsselt in der Datenbank.
+2. **60-Sekunden Auto-Curtain Engine:** Step-Up Re-Authentication via persönlicher 4-stelliger PIN und autoritativer Batch-RPC `reveal_class_roster_names` (< 25 ms) mit flüchtigem Modul-RAM-Cache und automatischem Vorhang nach 60 Sekunden (Schutz gegen Schulterblicke im Unterricht / Shoulder-Surfing).
+3. **ReBAC-Schutz für Tonaufnahmen (§ 201 StGB):** Strikte Isolation auf Fachlehrer und Schüler – Schulleitung und Sekretariat haben keinen Zugriff auf Audioaufnahmen Minderjähriger.
+4. **Perimeter-DNS-Souveränität:** Nginx Edge verbietet US-DNS-Resolver (nur Hetzner DE `185.12.64.1` und DNS0.eu `193.110.81.0`) und neutralisiert IP-Spoofing.
 
-## Zielsetzung für Teil B
-Herstellung der **10/10 User Experience und DIN 66398 Datenhygiene** für den Musikschulalltag:
+Diese Innovationen fehlen derzeit in den vertraglichen Rechtstexten (AGB, AVV Anlage 1 & 2 TOMs, VVT Art. 30, DPO-Audit-Portal und PDF-Zertifikaten). Dadurch entsteht ein **juristisches Risiko**: Der Betreiber und die Schulträger können die gesetzliche Safe-Harbor-Wirkung gem. **Art. 34 Abs. 3 lit. a DSGVO / EuGH C-413/23 P** (Befreiung von Meldepflichten bei Datenpannen) vor Aufsichtsbehörden nicht formell einfordern, solange diese TOMs nicht kanonisch in den Verträgen verankert sind.
 
-1. **Offline-Outbox & Auto-Retry („Kellerraum-Sync“)**:
-   - Resilientes lokales Puffern von Nachrichten bei Verbindungsabbruch in schalldichten Übezellen mit optischem Status (`🕒 Wartet auf Verbindung...`) und automatischem Hintergrundversand bei Wiederverbindung.
-2. **Reduziertes Laden & Client-Side Sofort-Suche**:
-   - Initiales Laden der letzten 30–50 Nachrichten für < 50ms Startzeit; flüssiges Nachladen älterer Nachrichten nach oben.
-   - Integriertes Lupen-Suchfeld im Chat-Header für Echtzeit-Volltextsuche in < 5ms.
-3. **Schuljahres-Lifecycle-Engine & DIN 66398 Purge**:
-   - **Termingekoppelte Chats**: 100 % automatischer Hard-Purge zum Schuljahresende (1. August).
-   - **Themen-Persistenz mit `⭐ Dauerhaft`**: Ein-Klick-Toggle im Themen-Header (`⭐ Dauerhaft`), um zeitlose didaktische Themen (Repertoire, Etüdenpläne) über den Schuljahreswechsel mitzunehmen.
-   - **Schuljahres-Archivschublade**: Erledigte Themen und allgemeine Verläufe wandern zum Schuljahreswechsel in eine schreibgeschützte Lesekarte (`📁 Archiv [Vorjahr]`), die nach 1 weiteren Schuljahr automatisiert bereinigt wird.
-   - **Pinnwand-TTL**: Verfallsdatum für Board-Ankündigungen nach Event-Datum oder Schuljahresende.
+### 0,1% Goldstandard Zielzustand:
+100 % kanonische Parität zwischen Code, Datenbank-Kernel, AGBs, AVVs, VVTs, DPO-Dashboard und generierten PDF-Zertifikaten.
 
 ---
 
-## Detaillierter Maßnahmenkatalog (Teil B)
+## 2. Geplante Maßnahmen & Klausel-Definitionen
 
-### Phase 1: Offline-Outbox & Kellerraum-Resilienz
-**Dateien:**
-- [`apps/groovelab/src/hooks/useCampusChatActions.ts`](apps/groovelab/src/hooks/useCampusChatActions.ts)
-- [`apps/groovelab/src/components/CampusDirectMessages.tsx`](apps/groovelab/src/components/CampusDirectMessages.tsx)
-- [`apps/groovelab/src/components/messages/CampusMessageStatusTicks.tsx`](apps/groovelab/src/components/messages/CampusMessageStatusTicks.tsx)
+### A. Single Source of Truth (SSOT) – `apps/groovelab/src/constants/legalMasterWording.ts`
+1. **Erweiterung von `securityStandards`**:
+   - `zeroKnowledgeIdentityVault`: Dokumentation der HMAC-SHA256 Blind-Links und des AES-256 PGP Vaults (`private_auth.blind_student_lastname_vault`). Unverknüpfbarkeit gem. EuGH C-413/23 P und Safe-Harbor gem. Art. 34 Abs. 3 lit. a DSGVO.
+   - `autoCurtainEngine`: 60-Sekunden Auto-Curtain und Anti-Shoulder-Surfing Vorhang nach Step-Up PIN (NIST SP 800-63B).
+   - `audioRebacPrivacy`: Relationship-Based Access Control auf Schüler-Aufnahmen gem. § 201 StGB (Null Zugriff für Schuladministration).
+   - `dnsSovereigntyAndAntiSpoofing`: Verbot von US-DNS-Resolvern, Hetzner DE Resolver `185.12.64.1`, Nginx Edge Anti-IP-Spoofing.
 
-**Maßnahmen:**
-1. In `useCampusChatActions.ts`:
-   - Lokale Outbox-Queue für fehlgeschlagene Netzwerkübertragungen.
-   - Automatischer Retry-Listener bei `window.addEventListener('online', ...)`.
-2. In `CampusMessageStatusTicks.tsx`:
-   - Unterstützung des Offline-Zustands (`status === 'pending_offline'`) mit kleiner Uhr-Ikone (`Clock` 12px grau).
+### B. AVV, TOMs & Release-Changelog – `apps/groovelab/src/legal/legalContent.ts`
+1. **Release `2026.7`**:
+   - Aktivierung der Version `2026.7` mit Titel *"360° Zero-Knowledge Identity Vault, 60s Auto-Curtain & Safe-Harbor Governance"*.
+2. **Aktualisierung von `Anlage 2` (Art. 32 DSGVO TOMs)**:
+   - *1. Vertraulichkeit (Pseudonymisierung & Verschlüsselung)*: Aufnahme des Zero-Knowledge Vaults, der HMAC-Blind-Links und des 60s-Vorhangs.
+   - *3. Unterauftragsverhältnisse*: Bestätigung souveräner EU-DNS-Resolver.
+3. **Muster-Datenschutzinformationen (Art. 13 DSGVO)**:
+   - Aufnahme des ReBAC-Schutzes für Tonaufnahmen (§ 201 StGB) und der adaptiven Schüler-Namensmaskierung ("Vorname + N.").
 
----
+### C. Behördliches VVT – `docs/VVT_MUSTER_SCHULTRAEGER_ART30.md`
+1. **Abschnitt 4 B (Schülerdaten)**:
+   - Präzisierung der Schüler-Nachnamensverarbeitung (Zero-Knowledge Identity Vault, Blind-Link-Verschlüsselung, 60s Auto-Curtain).
+2. **Abschnitt 7 (TOMs gem. Art. 32 DSGVO)**:
+   - Hinzufügung der Punkte 8 (Zero-Knowledge Vault & Safe Harbor) und 9 (ReBAC-Kinderschutz gem. § 201 StGB).
 
-### Phase 2: Reduziertes Laden (Paginierung) & In-Memory-Suche
-**Dateien:**
-- [`apps/groovelab/src/components/CampusDirectMessages.tsx`](apps/groovelab/src/components/CampusDirectMessages.tsx)
-- [`apps/groovelab/src/hooks/useCampusMessagingData.ts`](apps/groovelab/src/hooks/useCampusMessagingData.ts)
+### D. Dossier & Whitepaper-Generatoren (`apps/groovelab/src/utils/`)
+1. **`securityWhitepaperGenerator.ts`**:
+   - Aktualisierung von Seite 1 (Feature B: Zero-Knowledge Identity Vault & 60s Auto-Curtain) und Seite 2 (TOM 1: Vertraulichkeit & Safe Harbor Art. 34 Abs. 3 lit. a DSGVO).
+2. **`dpoComplianceDossierGenerator.ts`**:
+   - Aufnahme der Vault- und Auto-Curtain-Kennzahlen in den behördlichen Audit-Bericht.
 
-**Maßnahmen:**
-1. Begrenzung des initialen Chat-Fensters auf die letzten 50 Nachrichten pro Empfänger.
-2. Schlichter „Ältere Nachrichten laden“-Trigger beim Scrollen an den oberen Rand.
-3. Lupen-Icon im Header des aktiven Chats:
-   - Öffnet ein schlankes Suchfeld.
-   - Filtert die entschlüsselten Nachrichten in Echtzeit und springt zur ausgewählten Nachricht.
-
----
-
-### Phase 3: Themen-Header mit `⭐ Dauerhaft` & Schuljahres-Archiv
-**Dateien:**
-- [`apps/groovelab/src/components/CampusTopicCard.tsx`](apps/groovelab/src/components/CampusTopicCard.tsx)
-- [`apps/groovelab/src/components/CampusDirectMessages.tsx`](apps/groovelab/src/components/CampusDirectMessages.tsx)
-- [`supabase/migrations/599_enterprise_campus_chat_school_year_lifecycle.sql`](supabase/migrations/599_enterprise_campus_chat_school_year_lifecycle.sql)
-
-**Maßnahmen:**
-1. In `CampusTopicCard.tsx`:
-   - Eleganter 1-Tap Toggle-Chip im Header: `[ ⭐ Dauerhaft ]` / `[ ⭐ Dauer-Thema ]`.
-   - Speichert das Flag `is_permanent: boolean` auf dem Thema.
-2. In `CampusDirectMessages.tsx`:
-   - Trennung zwischen aktiven Nachrichten des laufenden Schuljahres und der `📁 Archiv [Vorjahr]`-Schublade.
-3. In PostgreSQL (Migration 599):
-   - Spalte `is_permanent BOOLEAN DEFAULT false` auf `campus_direct_messages` (für Themen).
-   - Idempotente Funktion `public.purge_school_year_expired_chats(p_school_year TEXT)`:
-     - Löscht `occurrence_id IS NOT NULL` Nachrichten des abgelaufenen Schuljahres.
-     - Archiviert nicht-permanente Themen.
+### E. DPO-Audit-Portal & Schulleitungs-Governance
+1. **`apps/groovelab/src/components/DpoAuditPortal.tsx`**:
+   - Synchronisation der Audit-Punkte im Reiter "TOMs (Art. 32)" und "Identitäts-Schutz".
+2. **`docs/LEGAL_COMPLIANCE_360_DOSSIER.md`**:
+   - Vollständiger Abgleich der kanonischen Nachweise.
 
 ---
 
-### Phase 4: Forensische Tests & Verifikation
-**Dateien:**
-- [`apps/groovelab/src/tests/test_chat_lifecycle_and_offline_forensic.ts`](apps/groovelab/src/tests/test_chat_lifecycle_and_offline_forensic.ts) (Neu)
+## 3. Betroffene Dateien
+
+### SSOT & Verträge:
+- `apps/groovelab/src/constants/legalMasterWording.ts`
+- `apps/groovelab/src/legal/legalContent.ts`
+
+### Dokumentation & Behördenmuster:
+- `docs/VVT_MUSTER_SCHULTRAEGER_ART30.md`
+- `docs/LEGAL_COMPLIANCE_360_DOSSIER.md`
+
+### PDF-Generatoren & UI-Portale:
+- `apps/groovelab/src/utils/securityWhitepaperGenerator.ts`
+- `apps/groovelab/src/utils/dpoComplianceDossierGenerator.ts`
+- `apps/groovelab/src/components/DpoAuditPortal.tsx`
+
+---
+
+## 4. Verifikationsplan
+
+1. **Statischer AST-Scan**: `npm run legal:check` (14 Säulen & 24 Checks müssen mit Exit-Code 0 bestehen).
+2. **BSI 360°-Matrix**: `npm run bsi:matrix` (24/24 Checks bestanden, Score 100/100).
+3. **TypeScript Typecheck**: Parallelcheck über Monorepo.

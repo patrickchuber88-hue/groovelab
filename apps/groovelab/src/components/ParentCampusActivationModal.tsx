@@ -546,7 +546,8 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.text(`Laufzeit & Entgelt: ${periodDescription} (${remainingMonths} Monate) • Gesamtpreis: ${totalAmountStr} ${currencySuffix} (inkl. 1 Probemonat kostenfrei)`, 25, p2Y + 26);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(22, 101, 52);
-      doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.08.`, 25, p2Y + 30);
+      const contractEndDateFormatted = periodDescription.split('–')[1]?.trim() || 'Schuljahresende';
+      doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am ${contractEndDateFormatted}.`, 25, p2Y + 30);
 
       p2Y += 38;
 
@@ -2072,7 +2073,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               <span style={{ color: '#059669' }}>{isThirdOrMoreChild ? '0,00 € (3. Kind Befreiung)' : `${isChf ? `CHF ${totalAmountStr} Endpreis (Art. 8 MWSTG)` : `${totalAmountStr} € ${OPERATOR_BANKING_CONFIG.isVatStandardTaxed ? 'Endpreis inkl. 19% MwSt.' : 'Endpreis (§ 19 UStG)'}`}`}</span>
             </div>
             <div style={{ color: '#64748b' }}>
-              Laufzeit: Bis Schuljahresende (31.08. • endet automatisch, kein Abo) • 1. Monat kostenfreie Schnupperphase (0,00 € Wertersatz bei Widerruf binnen 14 Tagen)
+              Laufzeit: Bis Schuljahresende ({periodDescription.split('–')[1]?.trim() || 'Schuljahresende'} • endet automatisch, kein Abo) • 1. Monat kostenfreie Schnupperphase (0,00 € Wertersatz bei Widerruf binnen 14 Tagen)
             </div>
           </div>
 

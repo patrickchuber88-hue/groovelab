@@ -256,7 +256,10 @@ export const SecretaryGeneralModalsHub: React.FC<SecretaryGeneralModalsHubProps>
           <Suspense fallback={null}>
             <DpoAuditPortal
               onClose={() => setShowDpoPortalModal(false)}
-              schoolName={schoolName || 'Stadtmusikschule'}
+              schoolName={schoolName || currentSchoolProfile?.name || 'Stadtmusikschule'}
+              schoolAddress={currentSchoolProfile?.address ? `${currentSchoolProfile.address}, ${currentSchoolProfile.zip || ''} ${currentSchoolProfile.city || ''}`.trim() : undefined}
+              schoolSigneeName={currentSchoolProfile?.legal_representative || undefined}
+              school={currentSchoolProfile || { id: schoolId, name: schoolName || 'Stadtmusikschule' }}
             />
           </Suspense>
         </div>

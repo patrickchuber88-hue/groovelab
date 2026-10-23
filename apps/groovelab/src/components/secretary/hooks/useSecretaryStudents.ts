@@ -123,7 +123,7 @@ export function useSecretaryStudents({
       const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
       const finalBirthDate = null;
 
-      // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
+      // 1. Call import_student RPC (5-Tabellen pseudonymisiertes Onboarding)
       const { error: insertError } = await supabase.rpc('import_student', {
         first_name: newStudentFirstName,
         last_name: finalLastName,
@@ -349,9 +349,9 @@ export function useSecretaryStudents({
       }
 
       if (errors.length > 0) {
-        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
+        alert(`Pseudonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
       } else {
-        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
+        alert(`Pseudonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
       }
 
       setStudentCsvText('');

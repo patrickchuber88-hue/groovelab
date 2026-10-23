@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert, Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown, ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2, HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet } from 'lucide-react';
+import { AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert, Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown, ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2, HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { SecretaryRoomCollisionAlertCard } from './widgets/SecretaryRoomCollisionAlertCard';
 import { SecretaryRoomKpiRow } from './widgets/SecretaryRoomKpiRow';
 import { SecretaryRoomLocationTree } from './widgets/SecretaryRoomLocationTree';
@@ -78,6 +78,23 @@ export function SecretaryRoomsView({
   const [buildingFormAddress, setBuildingFormAddress] = useState<string>('');
   const [roomFormBuildingId, setRoomFormBuildingId] = useState<string>('');
   const [dragHoveredBuildingId, setDragHoveredBuildingId] = useState<string | null>(null);
+  const [isLocationTreeCollapsed, setIsLocationTreeCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('campus_room_location_tree_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleLocationTreeCollapse = () => {
+    setIsLocationTreeCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('campus_room_location_tree_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const [internalRoomsSubView, setInternalRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
   const roomsSubView = controlledRoomsSubView !== undefined ? controlledRoomsSubView : internalRoomsSubView;
@@ -550,13 +567,15 @@ export function SecretaryRoomsView({
             return numA - numB;
           });
 
-          // Sort helper for floors: EG is standard top (100), OGs are positive, UGs are negative
+          // Sort helper for floors: OGs are positive, EG is ground level (0), UGs are negative
           const getFloorWeight = (f: string) => {
-            if (f === 'EG') return 100;
-            const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
-            if (ogMatch) return parseInt(ogMatch[1]);
-            const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
-            if (ugMatch) return -parseInt(ugMatch[1]);
+            const clean = (f || '').trim();
+            if (!clean || clean === 'Allgemein' || clean === 'EG' || clean === 'Erdgeschoss') return 0;
+            if (/^DG$/i.test(clean) || /Dachgeschoss/i.test(clean)) return 999;
+            const ogMatch = clean.match(/^(\d+)\.\s*OG$/i);
+            if (ogMatch) return parseInt(ogMatch[1], 10);
+            const ugMatch = clean.match(/^(\d+)\.\s*(UG|KG)$/i);
+            if (ugMatch) return -parseInt(ugMatch[1], 10);
             return -9999;
           };
 
@@ -1154,81 +1173,85 @@ export function SecretaryRoomsView({
                   <div style={{ display: 'flex', gap: '20px', width: '100%', alignItems: 'start' }}>
                     
                     {/* HIERARCHICAL 270px LOCATION & FLOORS NAVIGATION */}
-                    <SecretaryRoomLocationTree
-                      buildings={buildings}
-                      rooms={uniqueRooms}
-                      selectedBuildingId={selectedBuildingId}
-                      onSelectBuilding={(id) => setSelectedBuildingId(id)}
-                      selectedFloor={roomFilterFloor}
-                      onSelectFloor={(fl) => setRoomFilterFloor(fl)}
-                      onOpenBuildingEditor={openBuildingEditor}
-                      onDeleteBuilding={handleDeleteBuilding}
-                      onAddFloor={() => {
-                        let maxOG = 0;
-                        let maxUG = 0;
-                        allFloorsList.forEach(f => {
-                          const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
-                          if (ogMatch) {
-                            const num = parseInt(ogMatch[1]);
-                            if (num > maxOG) maxOG = num;
-                          }
-                          const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
-                          if (ugMatch) {
-                            const num = parseInt(ugMatch[1]);
-                            if (num > maxUG) maxUG = num;
-                          }
-                        });
-                        const nextOG = `${maxOG + 1}. OG`;
-                        const nextUG = `${maxUG + 1}. UG`;
-                        const choice = window.prompt(`Neues Stockwerk anlegen:
+                    {!isLocationTreeCollapsed && (
+                      <SecretaryRoomLocationTree
+                        buildings={buildings}
+                        rooms={uniqueRooms}
+                        selectedBuildingId={selectedBuildingId}
+                        onSelectBuilding={(id) => setSelectedBuildingId(id)}
+                        selectedFloor={roomFilterFloor}
+                        onSelectFloor={(fl) => setRoomFilterFloor(fl)}
+                        onOpenBuildingEditor={openBuildingEditor}
+                        onDeleteBuilding={handleDeleteBuilding}
+                        onAddFloor={() => {
+                          let maxOG = 0;
+                          let maxUG = 0;
+                          allFloorsList.forEach(f => {
+                            const ogMatch = f.match(/^(\d+)\.\s*OG$/i);
+                            if (ogMatch) {
+                              const num = parseInt(ogMatch[1]);
+                              if (num > maxOG) maxOG = num;
+                            }
+                            const ugMatch = f.match(/^(\d+)\.\s*UG$/i);
+                            if (ugMatch) {
+                              const num = parseInt(ugMatch[1]);
+                              if (num > maxUG) maxUG = num;
+                            }
+                          });
+                          const nextOG = `${maxOG + 1}. OG`;
+                          const nextUG = `${maxUG + 1}. UG`;
+                          const choice = window.prompt(`Neues Stockwerk anlegen:
 1 für „${nextOG}“
 2 für „${nextUG}“
 Oder Freitext eingeben:`, nextOG);
-                        if (choice) {
-                          let finalFloor = choice.trim();
-                          if (finalFloor === '1') finalFloor = nextOG;
-                          if (finalFloor === '2') finalFloor = nextUG;
-                          if (finalFloor && !allFloorsList.includes(finalFloor)) {
-                            setAddedFloors(prev => [...prev, finalFloor]);
+                          if (choice) {
+                            let finalFloor = choice.trim();
+                            if (finalFloor === '1') finalFloor = nextOG;
+                            if (finalFloor === '2') finalFloor = nextUG;
+                            if (finalFloor && !allFloorsList.includes(finalFloor)) {
+                              setAddedFloors(prev => [...prev, finalFloor]);
+                            }
                           }
-                        }
-                      }}
-                      onDeleteFloor={(flName) => {
-                        if (window.confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
-                          supabase.from('rooms').update({ floor: 'EG' }).eq('floor', flName).then(() => {
-                            setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
-                            const updated = addedFloors.filter(f => f !== flName);
-                            setAddedFloors(updated);
-                            if (roomFilterFloor === flName) setRoomFilterFloor('All');
-                          });
-                        }
-                      }}
-                      dragHoveredBuildingId={dragHoveredBuildingId}
-                      setDragHoveredBuildingId={setDragHoveredBuildingId}
-                      dragHoveredFloor={dragHoveredFloor}
-                      setDragHoveredFloor={setDragHoveredFloor}
-                      onDropRoomToBuilding={async (roomId, buildingId) => {
-                        const previousRooms = rooms;
-                        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: buildingId } : r));
-                        const { error } = await supabase.from('rooms').update({ building_id: buildingId }).eq('id', roomId);
-                        if (error) {
-                          setRooms(previousRooms);
-                          alert("Fehler beim Zuweisen des Gebäudes: " + error.message);
-                        }
-                      }}
-                      onDropRoomToFloor={async (roomId, floor) => {
-                        const previousRooms = rooms;
-                        setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: floor } : r));
-                        const { error } = await supabase.from('rooms').update({ floor: floor }).eq('id', roomId);
-                        if (error) {
-                          setRooms(previousRooms);
-                          alert("Fehler beim Zuweisen des Stockwerks: " + error.message);
-                        }
-                      }}
-                      allFloorsList={allFloorsList}
-                      addedFloors={addedFloors}
-                      getFloorColor={getFloorColor}
-                    />
+                        }}
+                        onDeleteFloor={(flName) => {
+                          if (window.confirm(`Stockwerk „${flName}“ löschen? Zugeordnete Räume werden zurück auf „EG“ gesetzt.`)) {
+                            supabase.from('rooms').update({ floor: 'EG' }).eq('floor', flName).then(() => {
+                              setRooms(prev => prev.map(r => (r.floor || 'EG') === flName ? { ...r, floor: 'EG' } : r));
+                              const updated = addedFloors.filter(f => f !== flName);
+                              setAddedFloors(updated);
+                              if (roomFilterFloor === flName) setRoomFilterFloor('All');
+                            });
+                          }
+                        }}
+                        dragHoveredBuildingId={dragHoveredBuildingId}
+                        setDragHoveredBuildingId={setDragHoveredBuildingId}
+                        dragHoveredFloor={dragHoveredFloor}
+                        setDragHoveredFloor={setDragHoveredFloor}
+                        onDropRoomToBuilding={async (roomId, buildingId) => {
+                          const previousRooms = rooms;
+                          setRooms(prev => prev.map(r => r.id === roomId ? { ...r, building_id: buildingId } : r));
+                          const { error } = await supabase.from('rooms').update({ building_id: buildingId }).eq('id', roomId);
+                          if (error) {
+                            setRooms(previousRooms);
+                            alert("Fehler beim Zuweisen des Gebäudes: " + error.message);
+                          }
+                        }}
+                        onDropRoomToFloor={async (roomId, floor) => {
+                          const previousRooms = rooms;
+                          setRooms(prev => prev.map(r => r.id === roomId ? { ...r, floor: floor } : r));
+                          const { error } = await supabase.from('rooms').update({ floor: floor }).eq('id', roomId);
+                          if (error) {
+                            setRooms(previousRooms);
+                            alert("Fehler beim Zuweisen des Stockwerks: " + error.message);
+                          }
+                        }}
+                        allFloorsList={allFloorsList}
+                        addedFloors={addedFloors}
+                        getFloorColor={getFloorColor}
+                        isCollapsed={isLocationTreeCollapsed}
+                        onToggleCollapse={toggleLocationTreeCollapse}
+                      />
+                    )}
 
                     {/* EXPANSIVE 2-COLUMN ROOM WORKSPACE */}
                     <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
@@ -1245,6 +1268,34 @@ Oder Freitext eingeben:`, nextOG);
                         flexWrap: 'wrap',
                         alignItems: 'center'
                       }}>
+                        {isLocationTreeCollapsed && (
+                          <button
+                            type="button"
+                            aria-label="Standort & Ebenen einblenden"
+                            title="Standort & Ebenen einblenden"
+                            onClick={toggleLocationTreeCollapse}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 11px',
+                              borderRadius: '10px',
+                              border: '1px solid #cbd5e1',
+                              background: '#f8fafc',
+                              color: '#0f172a',
+                              fontSize: '0.76rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              fontFamily: 'Urbanist',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <PanelLeftOpen size={14} style={{ color: '#ea4335' }} />
+                            <span>Standort & Ebenen</span>
+                          </button>
+                        )}
                         <div style={{ flex: 1.5, minWidth: '180px', position: 'relative' }}>
                           <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                           <input 

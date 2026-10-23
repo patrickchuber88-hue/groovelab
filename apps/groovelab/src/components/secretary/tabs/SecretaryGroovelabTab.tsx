@@ -775,7 +775,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                           const instColor = getStationColor(sName, station.color);
                           const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
                           const hasHelp = helpRequests.some(r => r.station_id === station.id);
-                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
+                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames, sess.users.id)}` : '';
 
                           return (
                             <div
@@ -1507,7 +1507,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1d1d1f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {student.first_name} {maskLastName(student.last_name, showRealNames)}
+                                  {student.first_name} {maskLastName(student.last_name, showRealNames, student.id)}
                                 </span>
                                 {student.nickname && (
                                   <span style={{ fontSize: '0.72rem', color: '#86868b', fontStyle: 'italic', marginTop: '1px' }}>

@@ -378,7 +378,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155' }}>
-                  Name anonymisieren
+                  Name pseudonymisieren (maskieren)
                 </span>
                 <div
                   role="switch"
