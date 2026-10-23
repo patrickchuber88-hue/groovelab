@@ -29,7 +29,7 @@ import {
   Shield
 } from 'lucide-react';
 import { generateConsentPDF, generateDSBCompliancePDF } from '../utils/pdfGenerator';
-import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile } from '../utils/webauthn';
 import { CourtProofExportModal } from './admin/CourtProofExportModal';
 
 const FeedbackHubModal = React.lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
@@ -1132,6 +1132,17 @@ export function CampusSetupScreen({
                     if (regErr || !regResult?.success) {
                       throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
                     }
+
+                    // 🛡️ Save to local Biometric Device Vault for instant Quick-Login persistence
+                    saveBiometricProfile({
+                      userId: currentUserId,
+                      firstName: admin?.first_name || '',
+                      lastName: admin?.last_name || '',
+                      role: admin?.role || 'admin',
+                      credentialId: passkeyResult.id,
+                      sessionToken: currentUserId,
+                      createdAt: new Date().toISOString()
+                    });
 
                     alert('Erfolg: Dein biometrischer Passkey wurde erfolgreich auf diesem Gerät aktiviert!');
                     await fetchSecurityOverview();

@@ -964,7 +964,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             {renderEmergencyCallout(false)}
             <CampusSponsorIngressBanner schoolId={schoolData?.id || teacher?.school_id} sponsorSettings={schoolData?.sponsor_settings} isReady={!briefingLoading} />
             <UpdateAnnouncementHero userId={userId} activePlatform={activePlatform} />
-            <TeacherPasskeyNudgeBanner user={teacher} schoolData={schoolData} />
+            <TeacherPasskeyNudgeBanner 
+              user={teacher} 
+              schoolData={schoolData} 
+              onPasskeyRegistered={() => {
+                // Biometrischer Passkey erfolgreich aktiviert
+              }}
+            />
 
             {/* Planning Active Banners */}
             {activePlanningEvents.map(ev => {

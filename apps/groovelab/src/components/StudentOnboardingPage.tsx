@@ -12,7 +12,7 @@ import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard } from './IDBadgeCard';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { downloadAppleWalletPass } from '../utils/walletPassGenerator';
-import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile } from '../utils/webauthn';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 import { LegalTextModal } from './LegalTextModal';
 import { logSecurityEvent } from '../services/auditLogService';
@@ -555,6 +555,18 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       if (regErr || !regResult?.success) {
         throw new Error(regErr?.message || regResult?.error || 'Passkey-Registrierung fehlgeschlagen.');
       }
+
+      // 🛡️ Save to local Biometric Device Vault for instant Quick-Login persistence
+      saveBiometricProfile({
+        userId: student.id,
+        firstName: student.first_name || '',
+        lastName: student.last_name || '',
+        role: 'student',
+        instrument: (student as any)?.instrument || null,
+        credentialId: passkeyResult.id,
+        sessionToken: student.id,
+        createdAt: new Date().toISOString()
+      });
 
       setBiometricsRegistered(true);
     } catch (err: any) {

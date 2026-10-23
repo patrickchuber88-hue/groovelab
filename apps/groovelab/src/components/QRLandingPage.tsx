@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, ChevronRight, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy, RefreshCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
-import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
+import { isWebAuthnSupported, registerAuthoritativeStudentPasskey, getStoredBiometricProfiles } from '../utils/webauthn';
 import { validateNewPin } from '../utils/pinValidation';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
@@ -348,22 +348,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (!profile) return;
     setBiometricsLoading(true);
     try {
-      const userEmail = `${profile.first_name}.${profile.last_name}@campus-groovelab.de`;
-      await registerUserBiometrics(
-        userEmail,
-        profile.id,
-        profile.first_name,
-        profile.last_name,
-        profile.role,
-        token,
-        profile.instrument,
-        profile.photo_url
-      );
-      showToastMsg('Fingerabdruck erfolgreich für dieses Gerät verknüpft!', 'success');
+      await registerAuthoritativeStudentPasskey(supabase, profile, token);
+      showToastMsg('Fingerabdruck / Face ID erfolgreich verknüpft!', 'success');
       setShowBiometricsModal(false);
     } catch (err: any) {
       console.error('Biometrics registration error:', err);
-      showToastMsg('Biometrie-Einrichtung abgebrochen: ' + (err.message || ''), 'error');
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        showToastMsg('Biometrie-Einrichtung fehlgeschlagen: ' + (err.message || ''), 'error');
+      }
     } finally {
       setBiometricsLoading(false);
     }

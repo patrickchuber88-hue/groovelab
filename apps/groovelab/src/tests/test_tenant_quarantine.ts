@@ -158,7 +158,8 @@ async function runTenantQuarantineDrill() {
   const aggregatorCode = fs.readFileSync(aggregatorPath, 'utf8');
 
   assert(
-    aggregatorCode.includes("if (school.status === 'suspended' || school.is_paused)") &&
+    aggregatorCode.includes("school.status === 'suspended'") &&
+    aggregatorCode.includes("school.is_paused") &&
     aggregatorCode.includes("status === 'suspended') ? 0.00 : subtotal"),
     'schoolMetricsAggregator freezes server and student fees to 0.00 € during quarantine'
   );

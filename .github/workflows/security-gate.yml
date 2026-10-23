@@ -13,6 +13,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      security-events: write
 
     steps:
       - name: "1. Checkout Repository"
@@ -30,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: "4. Gitleaks Secret & Private Key Scanner"
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml

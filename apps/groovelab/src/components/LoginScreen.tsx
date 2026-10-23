@@ -783,32 +783,86 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     setBiometricLoading(true);
     setBiometricError(null);
     try {
-      const profile = await authenticateUserBiometrics(targetId);
-      
-      // Ensure user ID is primed in sessionStorage for authorized RLS fetching
-      if (profile.userId) {
-        sessionStorage.setItem('groovelab_user_id', profile.userId);
+      if (!isWebAuthnSupported()) {
+        throw new Error('Biometrisches Anmelden wird von diesem Gerät oder Browser nicht unterstützt.');
       }
 
-      // Fetch full user and school record
-      const { data: user, error: userErr } = await supabase
-        .from('users')
-        .select('*, schools(*)')
-        .eq('id', profile.userId)
-        .maybeSingle();
+      // 1. 🛡️ Authoritative cryptographic challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: targetId || null,
+        p_type: 'auth'
+      });
 
-      if (user) {
-        await finalizeLogin(user, loginStationId, false);
-      } else {
-        console.error('Biometric user profile not found in database:', userErr);
-        setBiometricError('Benutzerprofil konnte nicht verifiziert werden. Bitte melden Sie sich mit Ihren Zugangsdaten an.');
-        setBiometricLoading(false);
-        return;
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
       }
+
+      const challengeBuffer = new Uint8Array(
+        chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+      ).buffer;
+
+      const rpId = getSanitizedRpId();
+
+      // Find selected credential descriptor if a specific profile is targeted
+      let allowCredentials: PublicKeyCredentialDescriptor[] | undefined = undefined;
+      if (targetId) {
+        const stored = getStoredBiometricProfiles();
+        const targetedProfile = stored.find(p => p.userId === targetId);
+        if (targetedProfile?.credentialId) {
+          try {
+            const rawCredId = new Uint8Array(
+              atob(targetedProfile.credentialId.replace(/-/g, '+').replace(/_/g, '/'))
+                .split('')
+                .map(c => c.charCodeAt(0))
+            ).buffer;
+            allowCredentials = [{
+              type: 'public-key',
+              id: rawCredId
+            }];
+          } catch {}
+        }
+      }
+
+      // 2. 🛡️ Native FIDO2 Assertion (Resident Key or device-bound credential)
+      const assertion = (await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBuffer,
+          userVerification: 'required',
+          timeout: 60000,
+          ...(rpId ? { rpId } : {}),
+          ...(allowCredentials && allowCredentials.length > 0 ? { allowCredentials } : {})
+        },
+      })) as PublicKeyCredential;
+
+      if (!assertion) {
+        throw new Error('Keine biometrischen Daten empfangen.');
+      }
+
+      const credentialId = assertion.id;
+      const assertionPayload = extractWebAuthnAssertionPayload(assertion);
+
+      // 3. 🛡️ Authoritative server verification & session lease minting via authenticate_webauthn_credential
+      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+        p_credential_id: credentialId,
+        p_challenge: chalData.challenge,
+        p_school_id: schoolData?.id || null,
+        ...assertionPayload
+      });
+
+      if (authErr || !authResult?.success || !authResult?.user) {
+        throw new Error(authResult?.error || authErr?.message || 'Biometrischer Passkey konnte nicht verifiziert werden.');
+      }
+
+      if (authResult.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+      }
+
+      // 4. 🛡️ Finalize login with server-verified profile
+      await finalizeLogin(authResult.user, loginStationId, false);
     } catch (err: any) {
       console.error('Biometrics login error:', err);
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
-        setBiometricError('Biometrische Anmeldung fehlgeschlagen.');
+        setBiometricError(err.message || 'Biometrische Anmeldung fehlgeschlagen.');
       }
     } finally {
       setBiometricLoading(false);
@@ -1667,7 +1721,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setExpandedSection('pin');
     } else {
       setExpandedSection('none');
-      if (method === 'passkey' && scopedBiometricProfiles.length > 0) {
+      if (method === 'passkey') {
         handleTriggerBiometricLogin();
       }
     }
@@ -3112,72 +3166,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   };
 
   const handleBiometricsLogin = async () => {
-    setLoading(true);
-    try {
-      if (!isWebAuthnSupported()) {
-        alert("Biometrisches Anmelden wird von diesem Gerät oder Browser nicht unterstützt.");
-        setLoading(false);
-        return;
-      }
-
-      // 1. Request cryptographic challenge from server
-      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
-        p_user_id: null,
-        p_type: 'auth'
-      });
-
-      if (chalErr || !chalData?.challenge) {
-        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
-      }
-
-      const challengeBuffer = new Uint8Array(
-        chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
-      ).buffer;
-
-      const rpId = getSanitizedRpId();
-      // 2. Fetch the resident credential assertion
-      const assertion = (await navigator.credentials.get({
-        publicKey: {
-          challenge: challengeBuffer,
-          userVerification: 'required',
-          timeout: 60000,
-          ...(rpId ? { rpId } : {})
-        },
-      })) as PublicKeyCredential;
-
-      if (!assertion) {
-        throw new Error("Keine biometrischen Daten empfangen.");
-      }
-
-      const credentialId = assertion.id;
-      const assertionPayload = extractWebAuthnAssertionPayload(assertion);
-
-      // 3. Authenticate credential and receive verified lease & sanitized profile via server RPC
-      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
-        p_credential_id: credentialId,
-        p_challenge: chalData.challenge,
-        p_school_id: schoolData?.id || null,
-        ...assertionPayload
-      });
-
-      if (authErr || !authResult?.success || !authResult?.user) {
-        throw new Error(authResult?.error || authErr?.message || "Dieses Passkey-Gerät ist keinem Benutzerkonto zugeordnet.");
-      }
-
-      if (authResult.lease_token) {
-        sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-      }
-
-      // 4. Finalize login with verified server profile
-      await finalizeLogin(authResult.user, loginStationId, false);
-
-    } catch (err: any) {
-      console.error('Biometrics login failed:', err);
-      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
-        alert(err.message || 'Anmeldung per Fingerabdruck/FaceID fehlgeschlagen.');
-      }
-      setLoading(false);
-    }
+    await handleTriggerBiometricLogin();
   };
 
   const downloadParentQrCode = async () => {

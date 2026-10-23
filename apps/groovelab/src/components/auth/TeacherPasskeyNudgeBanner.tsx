@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Fingerprint, Sparkles, X, Check, AlertCircle } from 'lucide-react';
-import { isWebAuthnSupported, registerBiometrics } from '../../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile, getStoredBiometricProfiles } from '../../utils/webauthn';
 import { supabase } from '../../lib/supabase';
 
 export interface TeacherPasskeyNudgeBannerProps {
@@ -30,6 +30,20 @@ export function TeacherPasskeyNudgeBanner({
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? window.innerWidth <= 768 : false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const isMac = typeof navigator !== 'undefined' && /Macintosh|MacIntel|MacPPC|Mac68K/.test(navigator.userAgent) && !isIOS;
+  const isApple = isIOS || isMac;
+  const platformName = isApple ? 'Touch ID / Face ID' : 'Passkey';
 
   useEffect(() => {
     if (!user || user.has_passkey) {
@@ -41,6 +55,17 @@ export function TeacherPasskeyNudgeBanner({
     if (!isWebAuthnSupported()) {
       setIsVisible(false);
       return;
+    }
+
+    // Check if passkey is already active on this device
+    try {
+      const storedProfiles = getStoredBiometricProfiles();
+      if (storedProfiles.some((p) => p.userId === user.id)) {
+        setIsVisible(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Passkey Nudge] Error checking stored biometric profiles:', e);
     }
 
     // Check local dismissal preference
@@ -59,7 +84,7 @@ export function TeacherPasskeyNudgeBanner({
 
   if (!isVisible || !user) return null;
 
-  const brandColor = schoolData?.primary_color || '#16a34a';
+  const brandColor = schoolData?.primary_color || '#15803d';
 
   const handleDismiss = (days: number = 7) => {
     const dismissKey = `campus_passkey_nudge_dismissed_${user.id}`;
@@ -85,24 +110,39 @@ export function TeacherPasskeyNudgeBanner({
       }
 
       const userHandle = `teacher_${user.id.substring(0, 8)}`;
+      const teacherName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Lehrkraft';
       const result = await registerBiometrics(
         userHandle,
         user.id,
-        chalData.challenge
+        chalData.challenge,
+        `${teacherName} (Lehrkraft)`
       );
+
+      const deviceName = isApple ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
 
       // 2. Store & bind credential via server-side RPC
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: user.id,
         p_credential_id: result.id,
         p_public_key: JSON.stringify(result.response),
-        p_device_name: 'Lehrkraft Passkey',
+        p_device_name: deviceName,
         p_challenge: chalData.challenge
       });
 
       if (regErr || !regResult?.success) {
         throw new Error(regErr?.message || regResult?.error || 'Registrierung des Passkeys fehlgeschlagen.');
       }
+
+      // 3. 🛡️ Save to local Biometric Device Vault for instant Quick-Login persistence
+      saveBiometricProfile({
+        userId: user.id,
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        role: user.role || 'teacher',
+        credentialId: result.id,
+        sessionToken: user.id,
+        createdAt: new Date().toISOString()
+      });
 
       setStatus('success');
       if (onPasskeyRegistered) {
@@ -130,9 +170,13 @@ export function TeacherPasskeyNudgeBanner({
   if (status === 'success') {
     return (
       <div
+        role="status"
+        aria-live="polite"
         style={{
-          margin: '16px auto',
-          maxWidth: '860px',
+          width: '100%',
+          maxWidth: '100%',
+          margin: '0 0 16px 0',
+          boxSizing: 'border-box',
           background: '#f0fdf4',
           border: 'none',
           borderRadius: '24px',
@@ -149,7 +193,7 @@ export function TeacherPasskeyNudgeBanner({
             width: '40px',
             height: '40px',
             borderRadius: '50%',
-            background: '#34a853',
+            background: '#15803d',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
@@ -161,7 +205,7 @@ export function TeacherPasskeyNudgeBanner({
         </div>
         <div>
           <div style={{ fontWeight: 800, fontSize: '14px' }}>
-            Touch ID / Face ID erfolgreich aktiviert!
+            {platformName} erfolgreich aktiviert!
           </div>
           <div style={{ fontSize: '12.5px', color: '#15803d', marginTop: '2px' }}>
             Ab dem nächsten Login genügt ein Fingertipp. Deine Unterrichts-Sitzungen sind optimal geschützt.
@@ -173,29 +217,34 @@ export function TeacherPasskeyNudgeBanner({
 
   return (
     <div
+      role="region"
+      aria-label="Sicherheitsempfehlung: Passkey aktivieren"
       style={{
-        margin: '16px auto',
-        maxWidth: '860px',
+        width: '100%',
+        maxWidth: '100%',
+        margin: '0 0 16px 0',
+        boxSizing: 'border-box',
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '24px',
-        padding: '18px 24px',
+        padding: isMobile ? '16px' : '18px 24px',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        gap: '20px',
+        gap: isMobile ? '14px' : '20px',
         boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
         position: 'relative'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: '16px' }}>
         <div
           style={{
             width: '48px',
             height: '48px',
             borderRadius: '16px',
             background: '#ecfdf5',
-            color: brandColor,
+            color: '#15803d',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -206,9 +255,9 @@ export function TeacherPasskeyNudgeBanner({
         </div>
 
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 800, fontSize: '14.5px', color: '#0f172a' }}>
-              Schneller &amp; sicherer einloggen mit Touch ID / Face ID
+              Schneller &amp; sicherer einloggen mit {platformName}
             </span>
             <span
               style={{
@@ -221,7 +270,7 @@ export function TeacherPasskeyNudgeBanner({
                 letterSpacing: '0.04em'
               }}
             >
-              0,1% GOLDSTANDARD
+              EMPFOHLEN
             </span>
           </div>
 
@@ -238,24 +287,38 @@ export function TeacherPasskeyNudgeBanner({
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: isMobile ? 'column-reverse' : 'row',
+        alignItems: 'center', 
+        gap: '10px', 
+        flexShrink: 0,
+        width: isMobile ? '100%' : 'auto'
+      }}>
         <button
           type="button"
           onClick={() => handleDismiss(7)}
           disabled={loading}
+          aria-label="Passkey-Einrichtung später erinnern"
           style={{
             background: 'none',
             border: 'none',
-            color: '#94a3b8',
-            fontSize: '12px',
+            color: '#475569',
+            fontSize: '13px',
             fontWeight: 700,
             cursor: 'pointer',
-            padding: '8px 12px',
+            padding: '10px 16px',
             borderRadius: '12px',
-            transition: 'all 0.15s ease'
+            transition: 'all 0.15s ease',
+            minHeight: '44px',
+            minWidth: '44px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: isMobile ? '100%' : 'auto'
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#475569'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.background = '#f1f5f9'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = 'none'; }}
         >
           Später
         </button>
@@ -265,20 +328,25 @@ export function TeacherPasskeyNudgeBanner({
           onClick={handleRegisterPasskey}
           disabled={loading}
           style={{
-            background: brandColor,
+            background: '#15803d',
             color: '#ffffff',
             border: 'none',
             borderRadius: '14px',
-            padding: '10px 18px',
+            padding: '10px 20px',
             fontSize: '13px',
             fontWeight: 800,
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '8px',
             cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: `0 3px 10px ${brandColor}35`,
-            transition: 'all 0.15s ease'
+            boxShadow: '0 3px 10px rgba(21, 128, 61, 0.25)',
+            transition: 'all 0.15s ease',
+            minHeight: '44px',
+            width: isMobile ? '100%' : 'auto'
           }}
+          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#166534'; }}
+          onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#15803d'; }}
         >
           <Sparkles size={15} />
           {loading ? 'Wird aktiviert...' : 'In 5 Sek. aktivieren'}

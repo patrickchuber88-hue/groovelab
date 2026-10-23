@@ -797,3 +797,61 @@ export const revokeUserPasskeysAuthoritative = async (
   }
 };
 
+/**
+ * 🛡️ Authoritative Student Passkey Registration Helper for QR Landing Page
+ */
+export const registerAuthoritativeStudentPasskey = async (
+  supabase: any,
+  profile: any,
+  token: string
+): Promise<void> => {
+  if (!isWebAuthnSupported()) {
+    throw new Error('Biometrie wird von diesem Gerät nicht unterstützt.');
+  }
+
+  const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+    p_user_id: profile.id,
+    p_type: 'register'
+  });
+
+  if (chalErr || !chalData?.challenge) {
+    throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+  }
+
+  const userHandle = `schueler_${profile.id.substring(0, 8)}`;
+  const studentName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Schüler';
+
+  const passkeyResult = await registerBiometrics(
+    userHandle,
+    profile.id,
+    chalData.challenge,
+    studentName
+  );
+
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const deviceName = isIOS ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
+
+  const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+    p_user_id: profile.id,
+    p_credential_id: passkeyResult.id,
+    p_public_key: JSON.stringify(passkeyResult.response),
+    p_device_name: deviceName,
+    p_challenge: chalData.challenge
+  });
+
+  if (regErr || !regResult?.success) {
+    throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
+  }
+
+  saveBiometricProfile({
+    userId: profile.id,
+    firstName: profile.first_name || '',
+    lastName: profile.last_name || '',
+    role: profile.role || 'student',
+    instrument: profile.instrument || null,
+    credentialId: passkeyResult.id,
+    sessionToken: token,
+    createdAt: new Date().toISOString()
+  });
+};
+

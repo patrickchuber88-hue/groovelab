@@ -24,6 +24,7 @@ import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { isWebAuthnSupported, getSanitizedRpId, extractWebAuthnAssertionPayload } from '../utils/webauthn';
+import { setActiveParentLease } from '../services/parentSecurityLeaseService';
 import { 
   validateChatMessageContent, 
   ChatRespectValidationResult, 
@@ -674,9 +675,11 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       setPinError('');
       setFailedPinAttempts(0);
       try {
-        sessionStorage.setItem(`groovelab_parent_unlocked_${targetStudentId}`, 'true');
-        sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-        window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+        if (authResult?.lease_token) {
+          setActiveParentLease(authResult.lease_token, targetStudentId);
+        } else {
+          setActiveParentLease('passkey-biometric-lease', targetStudentId);
+        }
       } catch (e) {}
     } catch (err: any) {
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {

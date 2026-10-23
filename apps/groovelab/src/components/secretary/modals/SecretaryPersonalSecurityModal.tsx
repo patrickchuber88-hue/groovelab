@@ -20,7 +20,8 @@ import { supabase } from '../../../lib/supabase';
 import {
   isWebAuthnSupported,
   getStoredBiometricProfiles,
-  registerUserBiometrics,
+  registerBiometrics,
+  saveBiometricProfile,
   authenticateUserBiometrics,
   removeBiometricProfile,
   BiometricVaultProfile
@@ -103,24 +104,55 @@ export const SecretaryPersonalSecurityModal: React.FC<SecretaryPersonalSecurityM
       if (!isWebAuthnSupported()) {
         throw new Error('Biometrisches Anmelden (Touch ID / Face ID) wird von diesem Browser/Gerät nicht unterstützt.');
       }
-      const email = currentUserProfile.email || `${currentUserProfile.id}@campus-groovelab.de`;
-      const profile = await registerUserBiometrics(
-        email,
+
+      // 1. Authoritative cryptographic challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: currentUserProfile.id,
+        p_type: 'register'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+      }
+
+      const userHandle = `${currentUserProfile.role || 'secretary'}_${currentUserProfile.id.substring(0, 8)}`;
+      const userName = `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() || 'Mitarbeiter';
+      const roleLabel = currentUserProfile.role === 'admin' ? 'Schulleitung' : 'Sekretariat';
+
+      const passkeyResult = await registerBiometrics(
+        userHandle,
         currentUserProfile.id,
-        currentUserProfile.first_name || 'Mitarbeiter',
-        currentUserProfile.last_name || '',
-        currentUserProfile.role || 'secretary',
-        currentUserProfile.id,
-        null,
-        '/campus_login_hero.png',
-        schoolName
+        chalData.challenge,
+        `${userName} (${roleLabel})`
       );
 
-      await supabase.from('user_credentials').insert({
-        user_id: currentUserProfile.id,
-        credential_id: profile.credentialId,
-        public_key: JSON.stringify({ registered: true, device: navigator.userAgent }),
-        device_name: navigator.userAgent.includes('Mac') ? 'Mac Touch ID' : 'WebAuthn Device'
+      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+      const isMac = typeof navigator !== 'undefined' && /Macintosh|MacIntel|MacPPC|Mac68K/.test(navigator.userAgent) && !isIOS;
+      const deviceName = (isIOS || isMac) ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
+
+      // 2. Authoritative server binding
+      const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+        p_user_id: currentUserProfile.id,
+        p_credential_id: passkeyResult.id,
+        p_public_key: JSON.stringify(passkeyResult.response),
+        p_device_name: deviceName,
+        p_challenge: chalData.challenge
+      });
+
+      if (regErr || !regResult?.success) {
+        throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
+      }
+
+      // 3. 🛡️ Save to local Biometric Device Vault
+      saveBiometricProfile({
+        userId: currentUserProfile.id,
+        firstName: currentUserProfile.first_name || '',
+        lastName: currentUserProfile.last_name || '',
+        role: currentUserProfile.role || 'secretary',
+        schoolName: schoolName || null,
+        credentialId: passkeyResult.id,
+        sessionToken: currentUserProfile.id,
+        createdAt: new Date().toISOString()
       });
 
       setHasDevicePasskey(true);
@@ -128,6 +160,10 @@ export const SecretaryPersonalSecurityModal: React.FC<SecretaryPersonalSecurityM
       setBiometricsMessage('Touch ID / Face ID wurde erfolgreich für dieses Gerät eingerichtet!');
       setTimeout(() => setBiometricsStatus('idle'), 4000);
     } catch (err: any) {
+      if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+        setBiometricsStatus('idle');
+        return;
+      }
       setBiometricsStatus('error');
       setBiometricsMessage(err.message || 'Die Einrichtung wurde abgebrochen oder ist fehlgeschlagen.');
     }

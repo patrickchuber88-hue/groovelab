@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useParentSessionLock } from '../../../hooks/useParentSessionLock';
-import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics, extractWebAuthnAssertionPayload } from '../../../utils/webauthn';
+import { isWebAuthnSupported, getSanitizedRpId, registerBiometrics, extractWebAuthnAssertionPayload, saveBiometricProfile } from '../../../utils/webauthn';
 import { getOrCreateDeviceKey } from '../../../utils/sessionLeaseManager';
 import {
   verifyParentPinAuthoritative,
@@ -308,6 +308,17 @@ export function useStudentParentControls({
       if (regErr || !regResult?.success) {
         throw new Error(regErr?.message || regResult?.error || 'Passkey-Registrierung fehlgeschlagen.');
       }
+
+      // 🛡️ Save to local Biometric Device Vault for instant Quick-Login persistence
+      saveBiometricProfile({
+        userId: targetId,
+        firstName: studentUser?.first_name || '',
+        lastName: studentUser?.last_name || '',
+        role: 'parent',
+        credentialId: passkeyResult.id,
+        sessionToken: targetId,
+        createdAt: new Date().toISOString()
+      });
 
       return { success: true };
     } catch (err: any) {

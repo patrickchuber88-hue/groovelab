@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
-import { isWebAuthnSupported, registerBiometrics } from '../../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile } from '../../utils/webauthn';
 import { formatTeacherFullName } from '../../utils/nameHelper';
 import { resolveUserCampusId } from '../../utils/campusIdHelper';
 
@@ -906,6 +906,17 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         if (regErr || !regResult?.success) {
                           throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
                         }
+
+                        // 🛡️ Save to local Biometric Device Vault for instant Quick-Login persistence
+                        saveBiometricProfile({
+                          userId: teacher.id,
+                          firstName: teacher.first_name || '',
+                          lastName: teacher.last_name || '',
+                          role: teacher.role || 'teacher',
+                          credentialId: passkeyResult.id,
+                          sessionToken: teacher.id,
+                          createdAt: new Date().toISOString()
+                        });
 
                         alert('Erfolg: Dein biometrischer Passkey wurde erfolgreich auf diesem Gerät aktiviert!');
                         await fetchSecurityOverview();

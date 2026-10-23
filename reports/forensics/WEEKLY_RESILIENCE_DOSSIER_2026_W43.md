@@ -4,13 +4,13 @@
 ---
 
 ### 📋 Dossier-Metadaten
-- **Ausstellungszeitpunkt:** 2026-10-22T16:24:32.721Z
+- **Ausstellungszeitpunkt:** 2026-10-23T11:26:27.766Z
 - **Kalenderwoche:** KW 43 / 2026
 - **Prüfumfang:** BSI 360° Bewertungsmatrix (6 Domänen / 24 Checks) + 3 Master-Runner (25+ Forensic Test-Suites)
 - **BSI 0,1% Goldstandard-Gesamtscore:** **100.0 / 100.0 Punkte** (24/24 Invarianten erfüllt)
 - **Gesamtergebnis:** ✅ 100% BESTANDEN (Enterprise Grade A+ / BSI 0,1% Goldstandard)
-- **Laufzeit:** 28.2 Sekunden
-- **Kryptografisches SHA-256 Siegel:** `7b12bedc5c685bacd3b60e46363d4310dc39429f2ead8e5d847353bb5801fbf3`
+- **Laufzeit:** 32.8 Sekunden
+- **Kryptografisches SHA-256 Siegel:** `89df4c16fcdaed71dac3d2cd1e75744e4024d9bc08526f96ab0c400fa1401bc3`
 
 ---
 
@@ -30,9 +30,9 @@
 ### 🧪 Master-Runner Prüfergebnisse
 | ID | Prüffeld & Master-Runner | Status | Dauer |
 | :--- | :--- | :---: | :---: |
-| **RUNNER_1** | Master-Runner 1 (Dashboards & Bounding-Box Forensics) | `PASS` | 7.4s |
-| **RUNNER_2** | Master-Runner 2 (Resilience & Fault Isolation Forensics) | `PASS` | 4.6s |
-| **RUNNER_3** | Master-Runner 3 (Sovereignty, WORM & Legal Forensics) | `PASS` | 16.1s |
+| **RUNNER_1** | Master-Runner 1 (Dashboards & Bounding-Box Forensics) | `PASS` | 7.6s |
+| **RUNNER_2** | Master-Runner 2 (Resilience & Fault Isolation Forensics) | `PASS` | 4.7s |
+| **RUNNER_3** | Master-Runner 3 (Sovereignty, WORM & Legal Forensics) | `PASS` | 20.5s |
 
 ---
 

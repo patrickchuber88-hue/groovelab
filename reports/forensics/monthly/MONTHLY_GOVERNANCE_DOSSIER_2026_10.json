@@ -1,17 +1,17 @@
 {
   "organization": "Campus-Groovelab Enterprise Systems",
   "jurisdiction": "EU / DACH (DSGVO, BFSG 2025, BGB, SGB VIII, KUG, UrhG, revDSG)",
-  "timestamp": "2026-10-03T07:57:08.493Z",
+  "timestamp": "2026-10-23T11:27:18.954Z",
   "year": 2026,
   "month": 10,
-  "totalDurationMs": 28022,
+  "totalDurationMs": 46132,
   "overallVerdict": "PASSED_100_PERCENT",
   "horizonMetrics": {
-    "gitCommitsLast30d": 139,
-    "maxMigrationNum": 519,
+    "gitCommitsLast30d": 62,
+    "maxMigrationNum": 599,
     "workspacesCount": 4,
-    "discoveredRoutinesCount": 41,
-    "recentRoutinesCount": 24,
+    "discoveredRoutinesCount": 58,
+    "recentRoutinesCount": 32,
     "isoStandardsAuditCount": 10
   },
   "isoStandardsMatrix": [
@@ -124,9 +124,51 @@
       "isRecent": false
     },
     {
+      "name": "guard:shadows",
+      "source": "package.json",
+      "commandOrPath": "node scripts/shadow_compliance_guard.mjs",
+      "isRecent": false
+    },
+    {
+      "name": "guard:parent-portal",
+      "source": "package.json",
+      "commandOrPath": "node scripts/parent_portal_governance_guard.mjs",
+      "isRecent": false
+    },
+    {
+      "name": "guard:test-facade",
+      "source": "package.json",
+      "commandOrPath": "node scripts/test_facade_guard.mjs",
+      "isRecent": false
+    },
+    {
+      "name": "guard:sw",
+      "source": "package.json",
+      "commandOrPath": "node scripts/verify_sw_integrity.mjs",
+      "isRecent": false
+    },
+    {
+      "name": "guard:exocortex",
+      "source": "package.json",
+      "commandOrPath": "node scripts/product_bible_guard.mjs --check",
+      "isRecent": false
+    },
+    {
+      "name": "guard:bsi-matrix",
+      "source": "package.json",
+      "commandOrPath": "node scripts/bsi_360_cybersecurity_matrix_guard.mjs",
+      "isRecent": false
+    },
+    {
       "name": "verify:invariants",
       "source": "package.json",
-      "commandOrPath": "tsx scripts/verify_rls_catalog_invariants.ts",
+      "commandOrPath": "tsx scripts/verify_rls_catalog_invariants.ts && tsx scripts/verify_workspace_invariants.ts",
+      "isRecent": false
+    },
+    {
+      "name": "verify:workspace",
+      "source": "package.json",
+      "commandOrPath": "tsx scripts/verify_workspace_invariants.ts",
       "isRecent": false
     },
     {
@@ -184,10 +226,24 @@
       "isRecent": false
     },
     {
+      "name": "verify:parity",
+      "source": "package.json",
+      "commandOrPath": "node scripts/verify_live_parity.mjs",
+      "isRecent": false
+    },
+    {
+      "name": "bsi_360_cybersecurity_matrix_guard.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/bsi_360_cybersecurity_matrix_guard.mjs",
+      "lastModified": "2026-10-21",
+      "ageDays": 2,
+      "isRecent": true
+    },
+    {
       "name": "button_interaction_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/button_interaction_guard.mjs",
-      "lastModified": "2026-09-28",
+      "lastModified": "2026-10-21",
       "ageDays": 4,
       "isRecent": true
     },
@@ -195,32 +251,32 @@
       "name": "export_annual_governance_dossier.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_annual_governance_dossier.ts",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-04",
+      "ageDays": 20,
       "isRecent": true
     },
     {
       "name": "export_annual_resilience_dossier.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_annual_resilience_dossier.ts",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-04",
+      "ageDays": 20,
       "isRecent": true
     },
     {
       "name": "export_monthly_executive_dossier.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_monthly_executive_dossier.ts",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-04",
+      "ageDays": 20,
       "isRecent": true
     },
     {
       "name": "export_monthly_governance_dossier.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_monthly_governance_dossier.ts",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-21",
+      "ageDays": 2,
       "isRecent": true
     },
     {
@@ -228,7 +284,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_sample_b2b_contract.ts",
       "lastModified": "2026-10-03",
-      "ageDays": 1,
+      "ageDays": 21,
       "isRecent": true
     },
     {
@@ -236,39 +292,39 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_signed_audit_gobd.ts",
       "lastModified": "2026-09-14",
-      "ageDays": 19,
-      "isRecent": true
+      "ageDays": 39,
+      "isRecent": false
     },
     {
       "name": "export_weekly_resilience_dossier.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/export_weekly_resilience_dossier.ts",
-      "lastModified": "2026-10-03",
-      "ageDays": 1,
+      "lastModified": "2026-10-21",
+      "ageDays": 2,
       "isRecent": true
     },
     {
       "name": "iso27001_compliance_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/iso27001_compliance_guard.mjs",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-21",
+      "ageDays": 4,
       "isRecent": true
     },
     {
       "name": "legal_compliance_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/legal_compliance_guard.mjs",
-      "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "lastModified": "2026-10-21",
+      "ageDays": 4,
       "isRecent": true
     },
     {
       "name": "license_compliance_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/license_compliance_guard.mjs",
-      "lastModified": "2026-09-28",
-      "ageDays": 0,
+      "lastModified": "2026-10-04",
+      "ageDays": 20,
       "isRecent": true
     },
     {
@@ -276,15 +332,31 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/monolith_growth_guard.mjs",
       "lastModified": "2026-10-03",
-      "ageDays": 0,
+      "ageDays": 20,
+      "isRecent": true
+    },
+    {
+      "name": "parent_portal_governance_guard.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/parent_portal_governance_guard.mjs",
+      "lastModified": "2026-10-10",
+      "ageDays": 13,
+      "isRecent": true
+    },
+    {
+      "name": "product_bible_guard.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/product_bible_guard.mjs",
+      "lastModified": "2026-10-08",
+      "ageDays": 16,
       "isRecent": true
     },
     {
       "name": "pwa_mobile_architecture_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/pwa_mobile_architecture_guard.mjs",
-      "lastModified": "2026-09-28",
-      "ageDays": 4,
+      "lastModified": "2026-10-21",
+      "ageDays": 1,
       "isRecent": true
     },
     {
@@ -292,7 +364,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/run_dashboard_forensics.ts",
       "lastModified": "2026-09-29",
-      "ageDays": 3,
+      "ageDays": 23,
       "isRecent": true
     },
     {
@@ -300,23 +372,39 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/run_resilience_forensics.ts",
       "lastModified": "2026-09-23",
-      "ageDays": 10,
+      "ageDays": 30,
       "isRecent": true
     },
     {
       "name": "run_sovereign_forensics.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/run_sovereign_forensics.ts",
-      "lastModified": "2026-09-23",
-      "ageDays": 6,
+      "lastModified": "2026-10-10",
+      "ageDays": 13,
       "isRecent": true
     },
     {
       "name": "security_drift_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/security_drift_guard.mjs",
-      "lastModified": "2026-09-28",
-      "ageDays": 4,
+      "lastModified": "2026-10-22",
+      "ageDays": 0,
+      "isRecent": true
+    },
+    {
+      "name": "shadow_compliance_guard.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/shadow_compliance_guard.mjs",
+      "lastModified": "2026-10-09",
+      "ageDays": 14,
+      "isRecent": true
+    },
+    {
+      "name": "test_facade_guard.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/test_facade_guard.mjs",
+      "lastModified": "2026-10-08",
+      "ageDays": 16,
       "isRecent": true
     },
     {
@@ -324,7 +412,7 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_backup_integrity.sh",
       "lastModified": "2026-08-31",
-      "ageDays": 33,
+      "ageDays": 53,
       "isRecent": false
     },
     {
@@ -332,55 +420,87 @@
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_backup_restore.sh",
       "lastModified": "2026-10-01",
-      "ageDays": 2,
+      "ageDays": 22,
+      "isRecent": true
+    },
+    {
+      "name": "verify_live_parity.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/verify_live_parity.mjs",
+      "lastModified": "2026-10-11",
+      "ageDays": 11,
       "isRecent": true
     },
     {
       "name": "verify_neutral_ausfall_invariants.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_neutral_ausfall_invariants.mjs",
-      "lastModified": "2026-09-15",
-      "ageDays": 17,
+      "lastModified": "2026-10-23",
+      "ageDays": 0,
       "isRecent": true
     },
     {
       "name": "verify_perimeter_headers.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_perimeter_headers.mjs",
-      "lastModified": "2026-10-01",
-      "ageDays": 0,
+      "lastModified": "2026-10-16",
+      "ageDays": 9,
       "isRecent": true
     },
     {
       "name": "verify_rls_catalog_invariants.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_rls_catalog_invariants.ts",
-      "lastModified": "2026-09-25",
-      "ageDays": 0,
+      "lastModified": "2026-10-09",
+      "ageDays": 15,
       "isRecent": true
     },
     {
       "name": "verify_static_security_headers.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_static_security_headers.mjs",
-      "lastModified": "2026-10-01",
-      "ageDays": 2,
+      "lastModified": "2026-10-09",
+      "ageDays": 13,
+      "isRecent": true
+    },
+    {
+      "name": "verify_storage_box_integrity.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/verify_storage_box_integrity.mjs",
+      "lastModified": "2026-10-16",
+      "ageDays": 10,
+      "isRecent": true
+    },
+    {
+      "name": "verify_sw_integrity.mjs",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/verify_sw_integrity.mjs",
+      "lastModified": "2026-10-09",
+      "ageDays": 13,
+      "isRecent": true
+    },
+    {
+      "name": "verify_workspace_invariants.ts",
+      "source": "scripts-dir",
+      "commandOrPath": "scripts/verify_workspace_invariants.ts",
+      "lastModified": "2026-10-09",
+      "ageDays": 14,
       "isRecent": true
     },
     {
       "name": "verify_world_tour_invariants.ts",
       "source": "scripts-dir",
       "commandOrPath": "scripts/verify_world_tour_invariants.ts",
-      "lastModified": "2026-09-27",
-      "ageDays": 5,
+      "lastModified": "2026-10-09",
+      "ageDays": 15,
       "isRecent": true
     },
     {
       "name": "zero_overlap_guard.mjs",
       "source": "scripts-dir",
       "commandOrPath": "scripts/zero_overlap_guard.mjs",
-      "lastModified": "2026-09-29",
-      "ageDays": 3,
+      "lastModified": "2026-10-21",
+      "ageDays": 1,
       "isRecent": true
     }
   ],
@@ -389,49 +509,79 @@
       "id": "MUT_SECRET",
       "name": "Secret Scanner Fail-Closed Mutation (High-Entropy Secret)",
       "passed": true,
-      "durationMs": 7630
+      "durationMs": 9766
     },
     {
       "id": "MUT_AUSFALL",
       "name": "Neutral Ausfall Guard Mutation (DSGVO Art. 9 Technical Sick Token)",
       "passed": true,
-      "durationMs": 364
+      "durationMs": 532
     },
     {
       "id": "MUT_BUTTON",
       "name": "Universal Button Guard Mutation (BFSG 2025 Dead Button)",
       "passed": true,
-      "durationMs": 239
+      "durationMs": 483
     },
     {
       "id": "MUT_MONOLITH",
       "name": "Monolith Ceiling Guard Mutation (1.500-Zeilen Obergrenze)",
       "passed": true,
-      "durationMs": 79
+      "durationMs": 163
     },
     {
       "id": "MUT_DRIFT",
       "name": "Security Drift Guard Mutation (Direct users_raw Access)",
       "passed": true,
-      "durationMs": 1273
+      "durationMs": 2006
     },
     {
       "id": "MUT_LEGAL",
       "name": "Legal Compliance Guard Mutation (DSGVO Art. 5/25 Secret in SELECT)",
       "passed": true,
-      "durationMs": 2733
+      "durationMs": 3675
     },
     {
       "id": "MUT_OVERLAP",
       "name": "Zero-Overlap Guard Mutation (Anti-Collision Fixed Height Violation)",
       "passed": true,
-      "durationMs": 136
+      "durationMs": 246
+    },
+    {
+      "id": "MUT_MID_WORD_SPLIT",
+      "name": "Zero-Overlap Guard Mutation (Anti-Mid-Word-Split Heading Violation)",
+      "passed": true,
+      "durationMs": 202
+    },
+    {
+      "id": "MUT_RIGID_GRID_MOBILE",
+      "name": "Zero-Overlap Guard Mutation (Unguarded 4-Column Mobile KPI Grid Violation)",
+      "passed": true,
+      "durationMs": 437
     },
     {
       "id": "MUT_RLS",
       "name": "RLS Catalog Invariant Mutation (Post-470 Unmanaged Table without RLS)",
       "passed": true,
-      "durationMs": 367
+      "durationMs": 822
+    },
+    {
+      "id": "MUT_BSI_MATRIX",
+      "name": "BSI 360° Matrix Guard Mutation (SECURITY DEFINER current_user Privilege Bypass)",
+      "passed": true,
+      "durationMs": 279
+    },
+    {
+      "id": "MUT_RLS_REBAC_DOWNGRADE",
+      "name": "BSI 360° Matrix Guard Mutation (§ 201 StGB Audio Policy Leadership Downgrade)",
+      "passed": true,
+      "durationMs": 153
+    },
+    {
+      "id": "MUT_BFF_UNVERIFIED_COOKIE",
+      "name": "Security Drift Guard BFF-01 Mutation (Unverified Cookie Existence Bypass)",
+      "passed": true,
+      "durationMs": 2161
     }
   ],
   "guards": [
@@ -440,108 +590,171 @@
       "name": "Security Drift Guard",
       "standard": "Architecture Invariants & No-Bypass",
       "passed": true,
-      "durationMs": 811
+      "durationMs": 1475
     },
     {
       "id": "GUARD_02",
       "name": "Legal Compliance Guard",
       "standard": "12 Säulen / 18 Checks (DSGVO, BFSG, KUG, UrhG)",
       "passed": true,
-      "durationMs": 2915
+      "durationMs": 3162
     },
     {
       "id": "GUARD_03",
       "name": "Universal Button Guard",
       "standard": "3.700+ Buttons, BFSG 2025, Anti-Freeze",
       "passed": true,
-      "durationMs": 334
+      "durationMs": 424
     },
     {
       "id": "GUARD_04",
       "name": "PWA Mobile Architecture Guard",
       "standard": "Apple HIG, 100dvh, Safe Areas, Touch Targets",
       "passed": true,
-      "durationMs": 35
+      "durationMs": 42
     },
     {
       "id": "GUARD_05",
       "name": "License Compliance Guard",
       "standard": "ISO/IEC 5230 OpenChain (4 Workspaces)",
       "passed": true,
-      "durationMs": 77
+      "durationMs": 165
     },
     {
       "id": "GUARD_06",
       "name": "Zero-Overlap & Fluid-Layout Guard",
       "standard": "Zero Content Occlusion & Desktop Immunity",
       "passed": true,
-      "durationMs": 146
+      "durationMs": 210
     },
     {
       "id": "GUARD_07",
       "name": "Static Security Headers Guard",
       "standard": "Mozilla Observatory A+ & PQC Ingress",
       "passed": true,
-      "durationMs": 91
+      "durationMs": 51
     },
     {
       "id": "GUARD_08",
       "name": "Secret Leak & Entropy Scanner",
       "standard": "OWASP ASVS L3 High-Entropy Token Linter",
       "passed": true,
-      "durationMs": 7559
+      "durationMs": 10264
     },
     {
       "id": "GUARD_09",
       "name": "ISO 27001 / ISO 27701 Guard",
       "standard": "ISO/IEC 27001:2022 Annex A.8.20 / A.8.24",
       "passed": true,
-      "durationMs": 43
+      "durationMs": 322
     },
     {
       "id": "GUARD_10",
       "name": "Monolith Ceiling Guard",
       "standard": "Zero-Inline-Feature Axiom & Ratchet-Down",
       "passed": true,
-      "durationMs": 80
+      "durationMs": 285
     },
     {
       "id": "GUARD_11",
       "name": "Neutral Ausfall Guard",
       "standard": "DSGVO Art. 9 Neutralitäts-Doktrin",
       "passed": true,
-      "durationMs": 189
+      "durationMs": 475
     },
     {
       "id": "GUARD_12",
       "name": "RLS & Schema Catalog Invariants",
       "standard": "22 Forensic Invariants (Migrations 471-519+)",
       "passed": true,
-      "durationMs": 580
+      "durationMs": 668
     },
     {
       "id": "GUARD_13",
       "name": "World Tour Invariants Verifier",
       "standard": "Urtext & UrhG § 64 Gemeinfreiheit",
       "passed": true,
-      "durationMs": 306
+      "durationMs": 407
     },
     {
       "id": "GUARD_14",
       "name": "Users View Security Leakage Audit",
       "standard": "OWASP ASVS L3 Zero-Secret Airgap",
       "passed": true,
-      "durationMs": 393
+      "durationMs": 378
     },
     {
       "id": "GUARD_15",
       "name": "Perimeter Headers & Precache Smoke",
       "standard": "Tri-Observatory (Observatory/Qualys/SecHeaders)",
       "passed": true,
-      "durationMs": 1225
+      "durationMs": 1873
+    },
+    {
+      "id": "GUARD_16",
+      "name": "BSI 360° Cybersecurity Matrix Guard",
+      "standard": "6 Domänen / 24 Checks (BSI / OWASP ASVS L3)",
+      "passed": true,
+      "durationMs": 264
+    },
+    {
+      "id": "GUARD_DYN_17",
+      "name": "[DYNAMIC AUTO-DISCOVERED] parent_portal_governance_guard.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 34
+    },
+    {
+      "id": "GUARD_DYN_18",
+      "name": "[DYNAMIC AUTO-DISCOVERED] product_bible_guard.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 75
+    },
+    {
+      "id": "GUARD_DYN_19",
+      "name": "[DYNAMIC AUTO-DISCOVERED] shadow_compliance_guard.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 478
+    },
+    {
+      "id": "GUARD_DYN_20",
+      "name": "[DYNAMIC AUTO-DISCOVERED] test_facade_guard.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 712
+    },
+    {
+      "id": "GUARD_DYN_21",
+      "name": "[DYNAMIC AUTO-DISCOVERED] verify_live_parity.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 166
+    },
+    {
+      "id": "GUARD_DYN_22",
+      "name": "[DYNAMIC AUTO-DISCOVERED] verify_storage_box_integrity.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 1244
+    },
+    {
+      "id": "GUARD_DYN_23",
+      "name": "[DYNAMIC AUTO-DISCOVERED] verify_sw_integrity.mjs",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 85
+    },
+    {
+      "id": "GUARD_DYN_24",
+      "name": "[DYNAMIC AUTO-DISCOVERED] verify_workspace_invariants.ts",
+      "standard": "Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)",
+      "passed": true,
+      "durationMs": 1119
     }
   ],
-  "sha256Seal": "7c910fa3e2332d52bcd9889bcd7302d6f3d298420aa4e49ffc2e2efdafcfa4a7",
+  "sha256Seal": "8e3f2d489e0ab3a40b5df13ca417de11d5cf6c8527c32da1e9119e8fe522b882",
   "regulatoryFrameworks": [
     "§ 43 GmbHG (Sorgfaltspflicht der Geschäftsführung)",
     "DSGVO Art. 5 Abs. 2 (Rechenschaftspflicht / Accountability)",

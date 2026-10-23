@@ -4,18 +4,18 @@
 ---
 
 ### 📋 Dossier-Metadaten
-- **Ausstellungszeitpunkt:** 2026-10-03T07:57:08.493Z
+- **Ausstellungszeitpunkt:** 2026-10-23T11:27:18.954Z
 - **Abrechnungs- & Prüfzeitraum:** 2026-10
-- **Prüfumfang:** 3 Stufen (Horizon Preflight inkl. 10 ISO-Normen & Routine-Discovery, 8/8 Mutation-Tests, 15/15 Monorepo-Wächter)
+- **Prüfumfang:** 3 Stufen (Horizon Preflight inkl. 10 ISO-Normen & Routine-Discovery, 13/13 Mutation-Tests, 24/24 Monorepo-Wächter)
 - **Gesamtergebnis:** ✅ 100% BESTANDEN (Enterprise Grade A+)
-- **Gesamtlaufzeit:** 28.0 Sekunden
-- **Kryptografisches SHA-256 Siegel:** `7c910fa3e2332d52bcd9889bcd7302d6f3d298420aa4e49ffc2e2efdafcfa4a7`
+- **Gesamtlaufzeit:** 46.1 Sekunden
+- **Kryptografisches SHA-256 Siegel:** `8e3f2d489e0ab3a40b5df13ca417de11d5cf6c8527c32da1e9119e8fe522b882`
 
 ---
 
 ### 🧭 Stage 1A: Normativer Horizont & Drift-Preflight
-- **Git-Aktivität (letzte 30 Tage):** 139 Commits
-- **SQL-Migrationen Höchststand:** Migration 519 (Dynamisch verifiziert, Höchststand >= 519)
+- **Git-Aktivität (letzte 30 Tage):** 62 Commits
+- **SQL-Migrationen Höchststand:** Migration 599 (Dynamisch verifiziert, Höchststand >= 519)
 - **Workspace-Parität:** 4 Workspaces aktiv (`apps/groovelab`, `packages/backend-core`, `packages/bff-server`, `packages/shared`)
 
 ### 🌐 Stage 1B: ISO 360° Standards Matrix (10 Normen)
@@ -33,8 +33,8 @@
 | **DIN 66398:2016** | Leitfaden zur Entwicklung eines Löschkonzepts | *DSGVO Art. 17 Datenlöschkonzept mit 5 Löschklassen (LK 1 bis LK 5)* | `docs/COMPLIANCE_DOSSIER_DSGVO_DIN66398.md & scripts/iso27001_compliance_guard.mjs` | `COMPLIANT` |
 
 ### ⚡ Stage 1C: Dynamic Routine Auto-Discovery & Recency Audit
-- **Gesamtzahl inventarisierter Routinen:** 41 Routinen
-- **In den letzten 30 Tagen modifiziert / neu erstellt:** 24 Routinen
+- **Gesamtzahl inventarisierter Routinen:** 58 Routinen
+- **In den letzten 30 Tagen modifiziert / neu erstellt:** 32 Routinen
 
 | Routine-Bezeichner | Quelle | Pfad / Befehl | Status & Aktualität |
 | :--- | :--- | :--- | :--- |
@@ -44,53 +44,67 @@
 | `guard:overlap` | package.json | `node scripts/zero_overlap_guard.mjs` | `ESTABLISHED` |
 | `guard:iso27001` | package.json | `node scripts/iso27001_compliance_guard.mjs` | `ESTABLISHED` |
 | `guard:monolith-ceiling` | package.json | `node scripts/monolith_growth_guard.mjs` | `ESTABLISHED` |
-| `verify:invariants` | package.json | `tsx scripts/verify_rls_catalog_invariants.ts` | `ESTABLISHED` |
+| `guard:shadows` | package.json | `node scripts/shadow_compliance_guard.mjs` | `ESTABLISHED` |
+| `guard:parent-portal` | package.json | `node scripts/parent_portal_governance_guard.mjs` | `ESTABLISHED` |
+| `guard:test-facade` | package.json | `node scripts/test_facade_guard.mjs` | `ESTABLISHED` |
+| `guard:sw` | package.json | `node scripts/verify_sw_integrity.mjs` | `ESTABLISHED` |
+| `guard:exocortex` | package.json | `node scripts/product_bible_guard.mjs --check` | `ESTABLISHED` |
+| `guard:bsi-matrix` | package.json | `node scripts/bsi_360_cybersecurity_matrix_guard.mjs` | `ESTABLISHED` |
+| `verify:invariants` | package.json | `tsx scripts/verify_rls_catalog_invariants.ts && tsx scripts/verify_workspace_invariants.ts` | `ESTABLISHED` |
+| `verify:workspace` | package.json | `tsx scripts/verify_workspace_invariants.ts` | `ESTABLISHED` |
 | `verify:worldtour` | package.json | `tsx scripts/verify_world_tour_invariants.ts` | `ESTABLISHED` |
-| `operator:morning` | package.json | `npm run gate` | `ESTABLISHED` |
-| `operator:weekly` | package.json | `npx tsx scripts/export_weekly_resilience_dossier.ts` | `ESTABLISHED` |
-| `operator:monthly` | package.json | `npx tsx scripts/export_monthly_governance_dossier.ts` | `ESTABLISHED` |
-| `operator:annual` | package.json | `npx tsx scripts/export_annual_governance_dossier.ts` | `ESTABLISHED` |
-| `operator:post-deploy` | package.json | `npm run verify:perimeter` | `ESTABLISHED` |
-| `verify:enterprise` | package.json | `npm run gate && npm run test:pyramid && npm run test:forensics:all && npm run check:budget` | `ESTABLISHED` |
-| `verify:headers:static` | package.json | `node scripts/verify_static_security_headers.mjs` | `ESTABLISHED` |
-*... und 26 weitere Routinen lückenlos überwacht.*
+*... und 43 weitere Routinen lückenlos überwacht.*
 
 ---
 
 ### 🧪 Stage 2: Sandboxed Mutation Testing („Wächter der Wächter“)
 | ID | Mutation-Test | Ziel-Wächter | Status | Dauer |
 | :--- | :--- | :--- | :---: | :---: |
-| **MUT_SECRET** | Secret Scanner Fail-Closed Mutation (High-Entropy Secret) | `scripts/pre_commit_secret_scanner.sh` | `PASS (FAIL-CLOSED)` | 7630ms |
-| **MUT_AUSFALL** | Neutral Ausfall Guard Mutation (DSGVO Art. 9 Technical Sick Token) | `scripts/verify_neutral_ausfall_invariants.mjs` | `PASS (FAIL-CLOSED)` | 364ms |
-| **MUT_BUTTON** | Universal Button Guard Mutation (BFSG 2025 Dead Button) | `scripts/button_interaction_guard.mjs` | `PASS (FAIL-CLOSED)` | 239ms |
-| **MUT_MONOLITH** | Monolith Ceiling Guard Mutation (1.500-Zeilen Obergrenze) | `scripts/monolith_growth_guard.mjs` | `PASS (FAIL-CLOSED)` | 79ms |
-| **MUT_DRIFT** | Security Drift Guard Mutation (Direct users_raw Access) | `scripts/security_drift_guard.mjs` | `PASS (FAIL-CLOSED)` | 1273ms |
-| **MUT_LEGAL** | Legal Compliance Guard Mutation (DSGVO Art. 5/25 Secret in SELECT) | `scripts/legal_compliance_guard.mjs` | `PASS (FAIL-CLOSED)` | 2733ms |
-| **MUT_OVERLAP** | Zero-Overlap Guard Mutation (Anti-Collision Fixed Height Violation) | `scripts/zero_overlap_guard.mjs` | `PASS (FAIL-CLOSED)` | 136ms |
-| **MUT_RLS** | RLS Catalog Invariant Mutation (Post-470 Unmanaged Table without RLS) | `scripts/verify_rls_catalog_invariants.ts` | `PASS (FAIL-CLOSED)` | 367ms |
+| **MUT_SECRET** | Secret Scanner Fail-Closed Mutation (High-Entropy Secret) | `scripts/pre_commit_secret_scanner.sh` | `PASS (FAIL-CLOSED)` | 9766ms |
+| **MUT_AUSFALL** | Neutral Ausfall Guard Mutation (DSGVO Art. 9 Technical Sick Token) | `scripts/verify_neutral_ausfall_invariants.mjs` | `PASS (FAIL-CLOSED)` | 532ms |
+| **MUT_BUTTON** | Universal Button Guard Mutation (BFSG 2025 Dead Button) | `scripts/button_interaction_guard.mjs` | `PASS (FAIL-CLOSED)` | 483ms |
+| **MUT_MONOLITH** | Monolith Ceiling Guard Mutation (1.500-Zeilen Obergrenze) | `scripts/monolith_growth_guard.mjs` | `PASS (FAIL-CLOSED)` | 163ms |
+| **MUT_DRIFT** | Security Drift Guard Mutation (Direct users_raw Access) | `scripts/security_drift_guard.mjs` | `PASS (FAIL-CLOSED)` | 2006ms |
+| **MUT_LEGAL** | Legal Compliance Guard Mutation (DSGVO Art. 5/25 Secret in SELECT) | `scripts/legal_compliance_guard.mjs` | `PASS (FAIL-CLOSED)` | 3675ms |
+| **MUT_OVERLAP** | Zero-Overlap Guard Mutation (Anti-Collision Fixed Height Violation) | `scripts/zero_overlap_guard.mjs` | `PASS (FAIL-CLOSED)` | 246ms |
+| **MUT_MID_WORD_SPLIT** | Zero-Overlap Guard Mutation (Anti-Mid-Word-Split Heading Violation) | `scripts/zero_overlap_guard.mjs` | `PASS (FAIL-CLOSED)` | 202ms |
+| **MUT_RIGID_GRID_MOBILE** | Zero-Overlap Guard Mutation (Unguarded 4-Column Mobile KPI Grid Violation) | `scripts/zero_overlap_guard.mjs` | `PASS (FAIL-CLOSED)` | 437ms |
+| **MUT_RLS** | RLS Catalog Invariant Mutation (Post-470 Unmanaged Table without RLS) | `scripts/verify_rls_catalog_invariants.ts` | `PASS (FAIL-CLOSED)` | 822ms |
+| **MUT_BSI_MATRIX** | BSI 360° Matrix Guard Mutation (SECURITY DEFINER current_user Privilege Bypass) | `scripts/bsi_360_cybersecurity_matrix_guard.mjs` | `PASS (FAIL-CLOSED)` | 279ms |
+| **MUT_RLS_REBAC_DOWNGRADE** | BSI 360° Matrix Guard Mutation (§ 201 StGB Audio Policy Leadership Downgrade) | `scripts/bsi_360_cybersecurity_matrix_guard.mjs` | `PASS (FAIL-CLOSED)` | 153ms |
+| **MUT_BFF_UNVERIFIED_COOKIE** | Security Drift Guard BFF-01 Mutation (Unverified Cookie Existence Bypass) | `scripts/security_drift_guard.mjs` | `PASS (FAIL-CLOSED)` | 2161ms |
 
 *Hinweis: Alle Mutation-Tests wurden in temporären Sandboxes ausgeführt und rückstandslos bereinigt (0 Byte Testrückstände).*
 
 ---
 
-### 🛡️ Stage 3: Produktiver Wächter-Durchlauf (15/15)
+### 🛡️ Stage 3: Produktiver Wächter-Durchlauf (24/24)
 | ID | Wächter-Kern | Regulatorischer Standard | Status | Dauer |
 | :--- | :--- | :--- | :---: | :---: |
-| **GUARD_01** | Security Drift Guard | *Architecture Invariants & No-Bypass* | `PASS` | 0.8s |
-| **GUARD_02** | Legal Compliance Guard | *12 Säulen / 18 Checks (DSGVO, BFSG, KUG, UrhG)* | `PASS` | 2.9s |
-| **GUARD_03** | Universal Button Guard | *3.700+ Buttons, BFSG 2025, Anti-Freeze* | `PASS` | 0.3s |
+| **GUARD_01** | Security Drift Guard | *Architecture Invariants & No-Bypass* | `PASS` | 1.5s |
+| **GUARD_02** | Legal Compliance Guard | *12 Säulen / 18 Checks (DSGVO, BFSG, KUG, UrhG)* | `PASS` | 3.2s |
+| **GUARD_03** | Universal Button Guard | *3.700+ Buttons, BFSG 2025, Anti-Freeze* | `PASS` | 0.4s |
 | **GUARD_04** | PWA Mobile Architecture Guard | *Apple HIG, 100dvh, Safe Areas, Touch Targets* | `PASS` | 0.0s |
-| **GUARD_05** | License Compliance Guard | *ISO/IEC 5230 OpenChain (4 Workspaces)* | `PASS` | 0.1s |
-| **GUARD_06** | Zero-Overlap & Fluid-Layout Guard | *Zero Content Occlusion & Desktop Immunity* | `PASS` | 0.1s |
+| **GUARD_05** | License Compliance Guard | *ISO/IEC 5230 OpenChain (4 Workspaces)* | `PASS` | 0.2s |
+| **GUARD_06** | Zero-Overlap & Fluid-Layout Guard | *Zero Content Occlusion & Desktop Immunity* | `PASS` | 0.2s |
 | **GUARD_07** | Static Security Headers Guard | *Mozilla Observatory A+ & PQC Ingress* | `PASS` | 0.1s |
-| **GUARD_08** | Secret Leak & Entropy Scanner | *OWASP ASVS L3 High-Entropy Token Linter* | `PASS` | 7.6s |
-| **GUARD_09** | ISO 27001 / ISO 27701 Guard | *ISO/IEC 27001:2022 Annex A.8.20 / A.8.24* | `PASS` | 0.0s |
-| **GUARD_10** | Monolith Ceiling Guard | *Zero-Inline-Feature Axiom & Ratchet-Down* | `PASS` | 0.1s |
-| **GUARD_11** | Neutral Ausfall Guard | *DSGVO Art. 9 Neutralitäts-Doktrin* | `PASS` | 0.2s |
-| **GUARD_12** | RLS & Schema Catalog Invariants | *22 Forensic Invariants (Migrations 471-519+)* | `PASS` | 0.6s |
-| **GUARD_13** | World Tour Invariants Verifier | *Urtext & UrhG § 64 Gemeinfreiheit* | `PASS` | 0.3s |
+| **GUARD_08** | Secret Leak & Entropy Scanner | *OWASP ASVS L3 High-Entropy Token Linter* | `PASS` | 10.3s |
+| **GUARD_09** | ISO 27001 / ISO 27701 Guard | *ISO/IEC 27001:2022 Annex A.8.20 / A.8.24* | `PASS` | 0.3s |
+| **GUARD_10** | Monolith Ceiling Guard | *Zero-Inline-Feature Axiom & Ratchet-Down* | `PASS` | 0.3s |
+| **GUARD_11** | Neutral Ausfall Guard | *DSGVO Art. 9 Neutralitäts-Doktrin* | `PASS` | 0.5s |
+| **GUARD_12** | RLS & Schema Catalog Invariants | *22 Forensic Invariants (Migrations 471-519+)* | `PASS` | 0.7s |
+| **GUARD_13** | World Tour Invariants Verifier | *Urtext & UrhG § 64 Gemeinfreiheit* | `PASS` | 0.4s |
 | **GUARD_14** | Users View Security Leakage Audit | *OWASP ASVS L3 Zero-Secret Airgap* | `PASS` | 0.4s |
-| **GUARD_15** | Perimeter Headers & Precache Smoke | *Tri-Observatory (Observatory/Qualys/SecHeaders)* | `PASS` | 1.2s |
+| **GUARD_15** | Perimeter Headers & Precache Smoke | *Tri-Observatory (Observatory/Qualys/SecHeaders)* | `PASS` | 1.9s |
+| **GUARD_16** | BSI 360° Cybersecurity Matrix Guard | *6 Domänen / 24 Checks (BSI / OWASP ASVS L3)* | `PASS` | 0.3s |
+| **GUARD_DYN_17** | [DYNAMIC AUTO-DISCOVERED] parent_portal_governance_guard.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.0s |
+| **GUARD_DYN_18** | [DYNAMIC AUTO-DISCOVERED] product_bible_guard.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.1s |
+| **GUARD_DYN_19** | [DYNAMIC AUTO-DISCOVERED] shadow_compliance_guard.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.5s |
+| **GUARD_DYN_20** | [DYNAMIC AUTO-DISCOVERED] test_facade_guard.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.7s |
+| **GUARD_DYN_21** | [DYNAMIC AUTO-DISCOVERED] verify_live_parity.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.2s |
+| **GUARD_DYN_22** | [DYNAMIC AUTO-DISCOVERED] verify_storage_box_integrity.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 1.2s |
+| **GUARD_DYN_23** | [DYNAMIC AUTO-DISCOVERED] verify_sw_integrity.mjs | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 0.1s |
+| **GUARD_DYN_24** | [DYNAMIC AUTO-DISCOVERED] verify_workspace_invariants.ts | *Auto-Discovered Monorepo Routine (Zero-Blindspot Invariant)* | `PASS` | 1.1s |
 
 ---
 
