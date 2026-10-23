@@ -38,20 +38,19 @@ Sollten Sie die Überweisung zwischenzeitlich bereits veranlasst haben, betracht
 Mit freundlichen Grüßen
 Ihr Campus-Groovelab Abrechnungsteam`;
     } else if (dunningLevel === 2) {
-      const fee = 5.00;
-      const totalWithFee = (Number(invoice.amount || 0) + fee).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
       subject = `1. Mahnung zu Rechnung ${invoiceId} – ${schoolName}`;
       body = `Sehr geehrte Damen und Herren der ${schoolName},
 
 auf unsere vorangegangene Zahlungserinnerung zum Beleg ${invoiceId} konnten wir bisher leider noch keinen Zahlungseingang auf unserem Geschäftskonto feststellen.
 
-Gemäß § 286 BGB befinden Sie sich im Zahlungsverzug. Wir berechnen Ihnen hiermit eine moderate Bearbeitungspauschale in Höhe von 5,00 €.
+Gemäß § 286 Abs. 3 BGB befinden Sie sich im Zahlungsverzug. Im Rahmen unserer kommunalen Kulanzfrist berechnen wir Ihnen auf dieser Stufe noch keine Mahnpauschale (0,00 €).
 
-Fälliger Gesamtbetrag: ${totalWithFee}
-(Hauptforderung: ${formattedAmount} zzgl. 5,00 € Bearbeitungspauschale)
+Fälliger Gesamtbetrag: ${formattedAmount}
 Zahlungsfrist: 7 Tage ab Zugang dieses Schreibens.
 
-Bitte überweisen Sie den Gesamtbetrag unverzüglich unter Angabe des Verwendungszwecks auf unser Geschäftskonto:
+Hinweis: Sie können im Sekretariats-Cockpit jederzeit per 1-Klick die 48h-Sofort-Freigabe aktivieren, sobald Ihre Kämmerei die Überweisung angewiesen hat.
+
+Bitte überweisen Sie den Gesamtbetrag unter Angabe des Verwendungszwecks auf unser Geschäftskonto:
 Empfänger:         ${operator.operatorCompany}
 IBAN:              ${operator.operatorIban}
 BIC:               ${operator.operatorBic}
@@ -60,29 +59,32 @@ Verwendungszweck:  ${invoiceId}
 Mit freundlichen Grüßen
 Ihr Campus-Groovelab Abrechnungsteam`;
     } else {
-      const b2bFee = 40.00;
-      const totalWithFee = (Number(invoice.amount || 0) + b2bFee).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
-      subject = `LETZTE MAHNUNG / ANDROHUNG SYSTEMSPERRE: Rechnung ${invoiceId} – ${schoolName}`;
+      const canonicalFee = inv?.dunningStatus?.dunningFee
+        ?? ((inv?.hasCampus && inv?.hasGroovelab) ? 19.90 : 14.90);
+      const formattedFee = canonicalFee.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+      const totalWithFee = (Number(invoice.amount || 0) + canonicalFee).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+      subject = `2. MAHNUNG / VERWALTUNGS-SCHREIBSCHUTZ: Rechnung ${invoiceId} – ${schoolName}`;
       body = `Sehr geehrte Damen und Herren der ${schoolName},
 
-trotz mehrfacher Zahlungserinnerungen und Mahnungen ist die Abrechnung ${invoiceId} über ${formattedAmount} weiterhin unbeglichen.
+trotz Ablauf der mehrwöchigen Kulanzfrist ist die Abrechnung ${invoiceId} über ${formattedAmount} weiterhin unbeglichen.
 
-Wir machen nunmehr die gesetzliche Verzugspauschale gemäß § 288 Abs. 5 BGB in Höhe von 40,00 € geltend.
+Anstelle der gesetzlichen Verzugspauschale von 40,00 € (§ 288 Abs. 5 BGB) berechnen wir Ihnen lediglich unsere reduzierte B2B-Kulanzpauschale in Höhe von ${formattedFee}.
 
-Gesamtforderung inkl. gesetzlicher B2B-Verzugspauschale (§ 288 Abs. 5 BGB): ${totalWithFee}
-(Hauptforderung: ${formattedAmount} zzgl. 40,00 € gesetzliche Verzugspauschale gem. § 288 Abs. 5 BGB)
+Gesamtforderung inkl. B2B-Verzugspauschale: ${totalWithFee}
+(Hauptforderung: ${formattedAmount} zzgl. ${formattedFee} B2B-Verzugspauschale gem. § 288 Abs. 5 BGB)
 Letzte Zahlungsfrist: 5 Werktage ab Zugang dieses Schreibens.
 
-WICHTIGER HINWEIS: Sollte bis zum Fristablauf kein Zahlungseingang auf unserem Geschäftskonto verbucht sein, machen wir von unserem gesetzlichen Zurückbehaltungsrecht gemäß §§ 273, 320 BGB Gebrauch. Der Cloud-Zugang für Ihre Musikschule wird sodann in den schreibgeschützten Sperr-Modus versetzt und die Gesamtforderung an unseren Inkasso-Partner übergeben.
+WICHTIGER HINWEIS (100 % DIDAKTISCHE IMMUNITÄT):
+Bis zum Zahlungseingang (oder der Aktivierung der 48h-Sofort-Freigabe im Sekretariat) befindet sich ausschließlich die Sekretariats-Verwaltung im schreibgeschützten Lesemodus (§§ 273, 320 BGB). Schüler und Lehrkräfte genießen 100 % Didaktische Immunität und haben weiterhin uneingeschränkten Zugriff auf den Unterricht.
 
-Bitte vermeiden Sie weitere Unannehmlichkeiten und Mehrkosten durch sofortigen Ausgleich:
+Bitte überweisen Sie den Gesamtbetrag unter Angabe des Verwendungszwecks auf unser Geschäftskonto:
 Empfänger:         ${operator.operatorCompany}
 IBAN:              ${operator.operatorIban}
 BIC:               ${operator.operatorBic}
 Verwendungszweck:  ${invoiceId}
 
 Mit freundlichen Grüßen
-Campus-Groovelab Mahnwesen & Rechtsabteilung`;
+Campus-Groovelab Mahnwesen & Abrechnungsteam`;
     }
 
     try {

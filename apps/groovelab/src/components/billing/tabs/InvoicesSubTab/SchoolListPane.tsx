@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Clock } from 'lucide-react';
 import { Invoice } from '../../types';
 
 interface SchoolListPaneProps {
@@ -262,12 +262,52 @@ export const SchoolListPane: React.FC<SchoolListPaneProps> = ({
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <span style={{ display: 'block', fontSize: '0.90rem', fontWeight: 800, color: '#0f172a' }}>
-                    {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
-                  </span>
-                  <span style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                    Monatsbeitrag
-                  </span>
+                  {inv.status === 'trial' ? (
+                    <>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        color: '#b45309',
+                        background: '#fef3c7',
+                        padding: '2px 6px',
+                        borderRadius: '6px'
+                      }}>
+                        <Clock size={10} /> Testphase
+                      </span>
+                      <span style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                        0,00 € (Tarif: {inv.subtotal.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })})
+                      </span>
+                    </>
+                  ) : inv.status === 'bypass' ? (
+                    <>
+                      <span style={{
+                        display: 'inline-block',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        color: '#0284c7',
+                        background: '#e0f2fe',
+                        padding: '2px 6px',
+                        borderRadius: '6px'
+                      }}>
+                        VIP-Bypass
+                      </span>
+                      <span style={{ display: 'block', fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>
+                        0,00 €
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ display: 'block', fontSize: '0.90rem', fontWeight: 800, color: '#0f172a' }}>
+                        {inv.total.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      </span>
+                      <span style={{ fontSize: '0.58rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        Aktiv • Monatsbeitrag
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             );

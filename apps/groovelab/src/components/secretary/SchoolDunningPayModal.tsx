@@ -5,25 +5,28 @@ import {
   CheckCircle2, ChevronRight, ChevronDown, Zap, FileText, Layers 
 } from 'lucide-react';
 import { generateEpcGiroCodePayload, formatIbanWithSpaces } from '../../utils/epcGiroCode';
-import { SchoolDunningStatus, getDunningVisualConfig, OverdueInvoiceSummary } from '../../domain/schoolDunningEngine';
+import { SchoolDunningStatus, getDunningVisualConfig, OverdueInvoiceSummary, resolveEffectiveBillingDate } from '../../domain/schoolDunningEngine';
 import { OPERATOR_BANKING_CONFIG, formatOperatorIban } from '../../config/operatorBanking';
+import { supabase } from '../../lib/supabase';
 
 export interface SchoolDunningPayModalProps {
   isOpen: boolean;
   onClose: () => void;
   dunningStatus: SchoolDunningStatus;
+  schoolId?: string;
   schoolName: string;
   operatorCompany?: string;
   operatorIban?: string;
   operatorBic?: string;
   onGoToLicenses?: () => void;
-  onActivateTrustExtension?: () => void;
+  onActivateTrustExtension?: (expiresAtIso?: string) => void;
 }
 
 export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
   isOpen,
   onClose,
   dunningStatus,
+  schoolId,
   schoolName,
   operatorCompany = OPERATOR_BANKING_CONFIG.companyName,
   operatorIban = formatOperatorIban(),
@@ -36,7 +39,9 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
   const [showInvoiceDetails, setShowInvoiceDetails] = useState<boolean>(false);
   const [localTrustActive, setLocalTrustActive] = useState<boolean>(() => {
     const invId = dunningStatus.oldestOverdueInvoice?.id || 'default';
-    return Boolean(localStorage.getItem(`groovelab_trust_token_${invId}`));
+    const raw = localStorage.getItem(`groovelab_trust_token_${invId}`);
+    if (!raw) return false;
+    return new Date(raw).getTime() > resolveEffectiveBillingDate().getTime();
   });
 
   if (!isOpen) return null;
@@ -47,6 +52,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
     ? dunningStatus.overdueInvoicesList
     : (oldestInv ? [oldestInv] : []);
   const isTrustActive = dunningStatus.isTrustExtended || localTrustActive;
+  const isTrustExhausted = Boolean(dunningStatus.isTrustUsedForCycle && !isTrustActive);
 
   // Selected single invoice vs all
   const activeSingleInv = selectedInvoiceFilter !== 'all'
@@ -80,13 +86,30 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
     return `RE-${schoolName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toUpperCase()}`;
   })();
 
-  const handleTriggerTrustPass = () => {
+  const handleTriggerTrustPass = async () => {
+    if (isTrustExhausted) return;
     const invId = oldestInv?.id || 'default';
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const effectiveNow = resolveEffectiveBillingDate();
+    const expiresAt = new Date(effectiveNow.getTime() + 48 * 60 * 60 * 1000).toISOString();
     localStorage.setItem(`groovelab_trust_token_${invId}`, expiresAt);
+    if (schoolId) {
+      localStorage.setItem(`groovelab_trust_token_school_${schoolId}`, expiresAt);
+      localStorage.setItem(`groovelab_trust_used_${schoolId}_${invId}`, 'true');
+      try {
+        await supabase
+          .from('schools')
+          .update({ dunning_trust_extension_until: expiresAt })
+          .eq('id', schoolId);
+      } catch (e) {
+        console.warn('[SchoolDunningPayModal] Non-fatal trust extension DB sync notice:', e);
+      }
+    }
     setLocalTrustActive(true);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('groovelab_school_updated'));
+    }
     if (onActivateTrustExtension) {
-      onActivateTrustExtension();
+      onActivateTrustExtension(expiresAt);
     }
   };
 
@@ -264,11 +287,11 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                     {activeSingleInv ? 'Einzelbetrag' : (overdueList.length > 1 ? `Sammelbetrag (${overdueList.length} Belege)` : 'Gesamtbetrag')}
                   </span>
                   <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                    {amountToPay.toFixed(2)} €
+                    {amountToPay.toFixed(2).replace('.', ',')} €
                   </div>
                   {shouldIncludeFee && fee > 0 && (
                     <span style={{ fontSize: '0.7rem', color: '#b91c1c', fontWeight: 600 }}>
-                      Inkl. {fee.toFixed(2)} € Kulanz-Pauschale
+                      Inkl. {fee.toFixed(2).replace('.', ',')} € Kulanz-Pauschale
                     </span>
                   )}
                 </div>
@@ -369,14 +392,14 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                   {activeSingleInv ? `Einzelbeleg (${activeSingleInv.id})` : `${overdueList.length} offene Belege`}
                 </span>
                 <span style={{ color: '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                  {baseAmount.toFixed(2)} €
+                  {baseAmount.toFixed(2).replace('.', ',')} €
                 </span>
               </div>
 
               {fee > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#b91c1c' }}>
                   <span>Verzugspauschale (Kulanzsatz)</span>
-                  <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+ {fee.toFixed(2)} €</span>
+                  <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+ {fee.toFixed(2).replace('.', ',')} €</span>
                 </div>
               )}
 
@@ -420,7 +443,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                   >
                     <option value="all">Alle Belege (Sammelausgleich)</option>
                     {overdueList.map(inv => (
-                      <option key={inv.id} value={inv.id}>Nur {inv.id} ({inv.amount.toFixed(2)} €)</option>
+                      <option key={inv.id} value={inv.id}>Nur {inv.id} ({inv.amount.toFixed(2).replace('.', ',')} €)</option>
                     ))}
                   </select>
                 )}
@@ -457,7 +480,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                           </span>
                         </div>
                         <span style={{ fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
-                          {inv.amount.toFixed(2)} €
+                          {inv.amount.toFixed(2).replace('.', ',')} €
                         </span>
                       </div>
                     );
@@ -469,8 +492,8 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
 
           {/* 4. 48h-Sofortfreigabe & Garantien (Schlank & beruhigend) */}
           <div style={{
-            background: isTrustActive ? '#f0fdf4' : '#eff6ff',
-            border: isTrustActive ? '1px solid #bbf7d0' : '1px solid #bfdbfe',
+            background: isTrustActive ? '#f0fdf4' : (isTrustExhausted ? '#f8fafc' : '#eff6ff'),
+            border: isTrustActive ? '1px solid #bbf7d0' : (isTrustExhausted ? '1px solid #e2e8f0' : '1px solid #bfdbfe'),
             borderRadius: '14px',
             padding: '12px 14px',
             display: 'flex',
@@ -480,20 +503,24 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
             gap: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Zap size={16} color={isTrustActive ? '#16a34a' : '#2563eb'} />
+              <Zap size={16} color={isTrustActive ? '#16a34a' : (isTrustExhausted ? '#64748b' : '#2563eb')} />
               <div>
                 <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>
-                  {isTrustActive ? '48h-Sofort-Freigabe aktiv ⚡' : 'Bereits überwiesen?'}
+                  {isTrustActive
+                    ? '48h-Sofort-Freigabe aktiv ⚡'
+                    : (isTrustExhausted ? '48h-Sofort-Freigabe für diesen Zyklus ausgeschöpft' : 'Bereits überwiesen?')}
                 </span>
                 <span style={{ fontSize: '0.72rem', color: '#475569' }}>
                   {isTrustActive 
                     ? `Schreibrechte für ${dunningStatus.trustRemainingHours || 48} Std. entsperrt.` 
-                    : 'Mit 1 Klick alle Schreibrechte während der Banklaufzeit freischalten.'}
+                    : (isTrustExhausted
+                        ? 'Für eine weitere Kulanzverlängerung (+30 Tage) wenden Sie sich bitte an den Support.'
+                        : 'Mit 1 Klick alle Schreibrechte einmalig für 48 Std. während der Banklaufzeit freischalten.')}
                 </span>
               </div>
             </div>
 
-            {!isTrustActive && (
+            {!isTrustActive && !isTrustExhausted && (
               <button
                 type="button"
                 onClick={handleTriggerTrustPass}

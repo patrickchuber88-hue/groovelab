@@ -112,6 +112,83 @@ Sämtliche Komponenten und Engines sind im Codebase-Fundament 100 % einsatzberei
 
 ---
 
+## 🎧 Modul: Zuhörender Übebegleiter & Dezentrale Edge-Audio-KI (Adaptive Companion Capsule, Ambient Halo & Local-First Intonations-Feedback)
+
+* **Status:** 🟡 **AUF DER ROADMAP (Architektur, UI/UX-Spezifikation & Rechtsgutachten 100% abgeschlossen / Ready for Development)**
+* **Bereich:** Hausaufgabenheft (`MeisterwerkDocumentTab.tsx`), Akustik-Labor (`CampusTuner.tsx`, `EarLabStudioModal.tsx`), Play-Along Studio, board-übergreifendes Header-HUD
+* **Zielgruppe:** Schülerinnen & Schüler (Junior / Teen / Pro), Lehrkräfte (Notenschnipsel-Erstellung & Live-Match), Erziehungsberechtigte
+
+### 1. Pädagogische Motivation & 0,1% Goldstandard UX
+Der **zuhörende Übebegleiter** löst das fundamentale Dilemma des Musikunterrichts: Zu Hause üben Kinder und Jugendliche allein, ohne Gehör-Orientierung, und eignen sich unbemerkt Intonations- und Rhythmusfehler an.
+1. **Hands-Free & Zero-Touch Ergonomie:**
+   - *4-Beat Visual Countdown:* Vor dem Start zählt ein sanfter optischer 4-Schlag-Einzähler (`● ○ ○ ○` ➔ `● ● ● ●`) ein. Das Kind hat beide Hände am Instrument und den Blick auf den Noten.
+   - *Acoustic Auto-Arming & Smart Silence:* Das System startet die Analyse automatisch mit dem ersten Ton und schließt nach 3 Sekunden Stille am Ende des Licks selbstständig ab.
+   - *Pedal- & Leertasten-Steuerung:* Start/Stopp lässt sich blind über die Tastatur oder handelsübliche Bluetooth-Fußpedale bedienen.
+2. **Peripheres Ambient Halo Feedback (Optische Randkontrolle):**
+   - Während des Musizierens werden **keine Zahlenfluten oder ablenkenden Graphen** eingeblendet, die Noten verdecken könnten.
+   - Sanft pulsierender **Ambient Glow** am Bildschirmrand:
+     - *Smaragdgrüner Halo-Atem:* Intonation ($\pm 3$ Cent) und Metrum sitzen bühnenreif.
+     - *Warmer Bernstein-Puls:* Note leicht zu tief oder Rhythmus eilt voraus. **Niemals grelles Rot oder Fehler-Töne.**
+3. **Didaktische Notenschnipsel & Urheberrechts-Immunität:**
+   - Technisches Verbot ganzer Notenheft-Uploads (Schutz vor VG Musikedition / § 60a Abs. 3 Nr. 2 UrhG).
+   - Fokus auf **1–4 Takt Notenschnipsel (Licks, Riffs, Übungen)**, die von der Lehrkraft direkt im Aufgabenheft erstellt werden (§ 51 UrhG Zitatrecht / freie Schöpfung).
+4. **Altersadaptive Campus UI-Level:**
+   - *Junior (6–10 J.):* Große 3D-Avatare, Tier-Puls-Metaphern (Bär = ruhiger Beat 🐻), Smileys statt Cent-Zahlen.
+   - *Teen (11–15 J.):* Moderner Apple-Music/Spotify-Look, BPM-Stepper, Streaks und XP-Meilensteine.
+   - *Pro / Dozent (16+ & Erwachsene):* Cent-Skalen ($\pm 1$ ct), Pitch Ribbon Tonhöhenkurve und Micro-Timing in Millisekunden.
+5. **Reaktivierung des „Blind-Tipp & Live-Match“-Moduls:**
+   - Kind gibt nach dem Durchlauf eine intuitive Selbstschätzung ab (*„Blind-Tipp: 85 %“*).
+   - In der nächsten Stunde folgt der gemeinsame **1,2s Live-Match Showdown** mit der Lehrkraft (Treffer $\le 10\%$ Differenz = *Meister-Ohr Sticker*).
+
+### 2. Die 3 UI-Zustände der „Adaptive Companion Capsule“
+Anstelle eines unkontrolliert frei fliegenden Fensters, das Noten verdeckt und Gesten kollidieren lässt, agiert das Werkzeug als intelligenter, morphing Apple-Style Begleiter:
+1. **Zustand A (Dynamic Island Capsule - 36px Standard):**
+   - Sitzt unaufdringlich im Sticky Frosted-Glass Header. Verdeckt **0 % der Noten**. Zeigt dezent Live-Puls und Intonations-Status.
+2. **Zustand B (Magnetic Corner Snap / PiP-Modus):**
+   - Löst sich bei Bedarf und snappt magnetisch in eine der vier Ecken (Apple Picture-in-Picture).
+   - Mit einem Wisch an den Bildschirmrand als dezenter Tab parkbar.
+3. **Zustand C (Expanded Slide-Over Drawer / Bottom Sheet):**
+   - Öffnet sich auf Desktop/iPad Landscape als fester 360px Drawer von rechts (*Desktop Layout Immunity*).
+   - Auf Smartphones als sanftes Bottom-Sheet zur detaillierten Analyse (Pitch Ribbon Tonband & Anschlags-Tacho).
+
+### 3. Technische Spezifikation & 3-Thread Zero-GC Architektur
+Um butterweiche 120 FPS auf iPads und Smartphones ohne Überhitzung zu garantieren, läuft die Signalverarbeitung vollständig entkoppelt vom React-UI-Thread:
+* **Physikalische Eckdaten:**
+  - *Sampling:* 48 kHz Hardware ➔ Polyphasen-Downsampling auf 16 kHz im AudioWorklet.
+  - *Analyse-Fenster:* 1024 Samples (64,0 ms) mit 256 Samples Hop-Size (alle 16 ms neuer Inferenz-Frame = 60 Hz).
+  - *Latenz-Budget:* 18–24 ms Glass-to-Display (menschliches Gehirn nimmt $< 30$ ms als synchron wahr).
+  - *Frequenz-Range:* 41,2 Hz (Kontra-E Bass) bis 2.093 Hz (C7 Sopran).
+* **3-Thread Zero-GC Pipeline:**
+  - *Thread 1 (Realtime AudioWorklet):* `EdgeAudioProcessor.worklet.ts` füllt einen vorab allokierten Lock-Free Ringbuffer (`SharedArrayBuffer`). **0 neue Heap-Allokationen** im 128-Sample Audio-Loop (Zero Garbage Collection).
+  - *Thread 2 (Inferenz-Worker):* `EdgeAudioEngine.worker.ts` berechnet ONNX Runtime Web via WebGPU (Apple Metal) mit automatischem Fallback auf WASM-SIMD. Quantisiertes Int8-Netzwerk ($\le 1,8$ MB Modell-Footprint).
+  - *Thread 3 (React UI-Thread):* Reiner Empfänger komprimierter Vektordaten (`{ note: "A4", centOffset: +2, timingOffsetMs: -8 }`) für 120 FPS Visuals.
+* **Globaler Audio-Singleton:**
+  - Einbindung über `apps/groovelab/src/utils/audioContextPool.ts` (Schutz vor dem iOS Safari Limit von max. 4 `AudioContext`-Instanzen).
+  - Läuft beim Navigieren zwischen Aufgabenheft, CampusTuner, EarLab und Play-Along nahtlos ohne Mikrofon-Neuinitialisierung weiter.
+
+### 4. Rechtliche Immunität & Kinderrechts-Compliance (Volljurist-Zertifizierung)
+Das Modul ist durch architektonische Invarianten zu 100 % immun gegen Abmahnungen und Bußgelder:
+* **0 Bytes Cloud-Transfer (Art. 5 & 25 DSGVO):** Das Audiosignal verlässt den RAM des Client-Geräts zu keinem Zeitpunkt. Volle Offline-Fähigkeit im schallgedämmten Übekeller.
+* **Keine biometrischen Daten (Art. 9 DSGVO):** Reines physikalisches Frequenz- ($f_0$) und Transienten-Tracking. Keine spektralen Formanten, kein Voice-Fingerprinting, keine Sprecher-Identifikation.
+* **EU AI Act Konformität (VO (EU) 2024/1689):** 
+  - Keine Emotionserkennung (strikter Ausschluss nach Art. 5 Abs. 1 lit. f AI Act).
+  - Keine Hochrisiko-Einstufung (Anhang III Nr. 3): Reines formatives Übewerkzeug, keine Prüfungsnoten oder Zulassungsentscheidungen.
+* **Strafrechts-Immunität (§ 201 StGB):** Flüchtige Ringspeicher im Arbeitsspeicher, die unmittelbar überschrieben werden, sind keine Tonträger im Sinne des BGH. Instrumentenklänge sind kein „gesprochenes Wort“.
+
+### 5. Technische Schnittstellen & Implementierungs-Plan
+* **Core DSP & Inferenz:**
+  - `apps/groovelab/src/engine/audio/EdgeAudioProcessor.worklet.ts` (Lock-Free AudioWorklet)
+  - `apps/groovelab/src/engine/audio/EdgeAudioEngine.worker.ts` (ONNX Runtime Web Worker)
+  - `apps/groovelab/src/engine/audio/models/tiny_pitch_int8.onnx` (~1,8 MB quantisiertes Modell)
+* **UI & Provider:**
+  - `apps/groovelab/src/components/companion/CompanionAudioProvider.tsx` (Singleton-Host an `audioContextPool.ts`)
+  - `apps/groovelab/src/components/companion/CompanionCapsule.tsx` (Dynamic Island & Snap-HUD)
+  - `apps/groovelab/src/components/companion/AmbientHaloRenderer.tsx` (Peripherer Glow)
+* **Mounting:**
+  - In `MeisterwerkDocumentTab.tsx`: Einbindung oberhalb der 2-Takt-Lick-Sektion via `<CompanionCapsule mode="homework_lick" />`.
+
+---
+
 ## 🎪 Modul: Event-Planung & Konzert-Koordination (Bühnen, Acts, Packliste & Programmheft)
 
 * **Status:** 🟡 **IN IMPLEMENTIERUNG / AKTIV** (Frontend-Shell & Modals integriert, Server-RPC Migration 454 in Bereitstellung)

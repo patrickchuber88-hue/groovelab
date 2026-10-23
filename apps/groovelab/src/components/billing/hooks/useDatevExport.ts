@@ -76,7 +76,7 @@ export function useDatevExport(showActionToast: (msg: string) => void, externalT
               accountNumber: revAccount,
               contraAccountNumber: debtorsAccount,
               bookingDate: new Date(datevPeriodYear, datevPeriodMonth - 1, 28),
-              documentNumber: `RE-${numId}-${yy}${mm}-01`,
+              documentNumber: `INF-${numId}-${yy}${mm}-01`,
               bookingText: `SaaS-Hosting ${inv.schoolName.substring(0, 30)}`,
               taxRate: datevTaxMode === 'standard_vat' ? 19 : 0,
               isFixed: true

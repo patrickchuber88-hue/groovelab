@@ -47,7 +47,7 @@ export function useTariffLedger(showActionToast: (msg: string) => void) {
               storage_addon_status: inv.storageAddonGb > 0 ? 'active' : 'none',
               storage_pending_downgrade_gb: null,
               storage_pending_effective_date: null,
-              total_monthly_rate_net: (inv.hasCampus && inv.hasGroovelab ? 19.90 : inv.hasCampus ? 14.90 : 9.90) + (inv.storageAddonMonthlyFee || 0),
+              total_monthly_rate_net: inv.total > 0 ? inv.total : ((inv.hasCampus && inv.hasGroovelab ? 24.90 : inv.hasCampus ? 19.90 : 12.90) + (inv.storageAddonMonthlyFee || 0)),
               currency: 'EUR',
               effective_date: inv.contractStartDate || '2026-09-01',
               notes: 'Initialer Schuljahres-Vertragsabschluss 2026/2027 (Campus-Groovelab)',

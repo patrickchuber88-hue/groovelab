@@ -4,7 +4,7 @@
   "policy": "0,1% Enterprise Goldstandard Monolith Ceiling & Zero-Inline-Feature Axiom",
   "max_new_file_lines": 1500,
   "max_host_wiring_buffer_lines": 15,
-  "last_updated": "2026-10-22T14:01:12.609Z",
+  "last_updated": "2026-10-23T05:34:47.794Z",
   "total_monoliths_tracked": 80,
   "baselines": {
     "apps/groovelab/src/components/AudioTrackCarousel.tsx": 2248,
@@ -40,7 +40,7 @@
     "apps/groovelab/src/components/groovelab/GrooveLabProfileView.tsx": 1820,
     "apps/groovelab/src/components/groovelab/GrooveLoopstation.tsx": 19,
     "apps/groovelab/src/components/groovelab/GroovePracticeCompanion.tsx": 5593,
-    "apps/groovelab/src/components/masterAdmin/drawers/SchoolDetailDrawer.tsx": 1446,
+    "apps/groovelab/src/components/masterAdmin/drawers/SchoolDetailDrawer.tsx": 1407,
     "apps/groovelab/src/components/masterAdmin/tabs/BackupResetTab.tsx": 913,
     "apps/groovelab/src/components/masterAdmin/tabs/ExecutiveTab.tsx": 1102,
     "apps/groovelab/src/components/masterAdmin/tabs/MaintenanceTab.tsx": 1285,
@@ -48,7 +48,7 @@
     "apps/groovelab/src/components/notes/BriefingNotesCard.tsx": 109,
     "apps/groovelab/src/components/notes/TeacherNotesBoardModal.tsx": 131,
     "apps/groovelab/src/components/secretary/SecretaryBillingModalsHub.tsx": 2494,
-    "apps/groovelab/src/components/secretary/SecretaryBriefingView.tsx": 2198,
+    "apps/groovelab/src/components/secretary/SecretaryBriefingView.tsx": 2184,
     "apps/groovelab/src/components/secretary/SecretaryLicensesView.tsx": 4409,
     "apps/groovelab/src/components/secretary/SecretaryRoomsView.tsx": 2107,
     "apps/groovelab/src/components/secretary/SecretarySetupView.tsx": 1966,
@@ -89,6 +89,6 @@
     "apps/groovelab/src/services/audio/RelationalHarmonicEngine.ts": 1563,
     "apps/groovelab/src/tests/e2e_test_cases.ts": 3365,
     "apps/groovelab/src/utils/audioMasteringEngine.ts": 2155,
-    "apps/groovelab/src/utils/pdfGenerator.ts": 4378
+    "apps/groovelab/src/utils/pdfGenerator.ts": 4375
   }
 }

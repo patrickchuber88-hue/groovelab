@@ -156,8 +156,26 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
             has_groovelab_subscription: rpc.has_groovelab_subscription ?? existing.has_groovelab_subscription,
             is_paused: rpc.is_paused ?? existing.is_paused,
             subscription_bypass: rpc.subscription_bypass ?? existing.subscription_bypass,
-            storage_addon_gb: rpc.storage_addon_gb ?? existing.storage_addon_gb,
-            storage_addon_monthly_fee: rpc.storage_addon_monthly_fee ?? existing.storage_addon_monthly_fee,
+            is_billing_booked: rpc.is_billing_booked ?? existing.is_billing_booked ?? false,
+            contract_start_date: rpc.contract_start_date ?? existing.contract_start_date ?? null,
+            storage_addon_gb: (() => {
+              let gb = Math.max(Number(rpc.storage_addon_gb || 0), Number(existing.storage_addon_gb || 0));
+              if (gb === 0 && ((rpc as any).extra_billing_option === 'option1' || (existing as any).extra_billing_option === 'option1')) gb = 25;
+              if (gb === 0 && typeof window !== 'undefined') {
+                try {
+                  const localGb = localStorage.getItem(`groovelab_storage_addon_gb_${rpc.school_id}`) || localStorage.getItem(`campus_storage_addon_gb_${rpc.school_id}`);
+                  if (localGb) gb = Math.max(gb, Number(localGb));
+                } catch {}
+              }
+              return gb;
+            })(),
+            storage_addon_monthly_fee: (() => {
+              let fee = Math.max(Number(rpc.storage_addon_monthly_fee || 0), Number(existing.storage_addon_monthly_fee || 0));
+              const gb = Math.max(Number(rpc.storage_addon_gb || 0), Number(existing.storage_addon_gb || 0));
+              if (fee === 0 && gb >= 25) fee = 4.90;
+              else if (fee === 0 && gb === 10) fee = 2.90;
+              return fee;
+            })(),
             created_at: rpc.created_at ?? existing.created_at,
             operator_notes: rpc.operator_notes ?? existing.operator_notes,
             invite_token: rpc.invite_token ?? existing.invite_token,
@@ -188,8 +206,26 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
             has_groovelab_subscription: Boolean(rpc.has_groovelab_subscription),
             is_paused: Boolean(rpc.is_paused),
             subscription_bypass: Boolean(rpc.subscription_bypass),
-            storage_addon_gb: rpc.storage_addon_gb || 0,
-            storage_addon_monthly_fee: rpc.storage_addon_monthly_fee || 0,
+            is_billing_booked: Boolean(rpc.is_billing_booked),
+            contract_start_date: rpc.contract_start_date || null,
+            storage_addon_gb: (() => {
+              let gb = Number(rpc.storage_addon_gb || 0);
+              if (gb === 0 && (rpc as any).extra_billing_option === 'option1') gb = 25;
+              if (gb === 0 && typeof window !== 'undefined') {
+                try {
+                  const localGb = localStorage.getItem(`groovelab_storage_addon_gb_${rpc.school_id}`) || localStorage.getItem(`campus_storage_addon_gb_${rpc.school_id}`);
+                  if (localGb) gb = Math.max(gb, Number(localGb));
+                } catch {}
+              }
+              return gb;
+            })(),
+            storage_addon_monthly_fee: (() => {
+              let fee = Number(rpc.storage_addon_monthly_fee || 0);
+              const gb = Number(rpc.storage_addon_gb || 0);
+              if (fee === 0 && gb >= 25) fee = 4.90;
+              else if (fee === 0 && gb === 10) fee = 2.90;
+              return fee;
+            })(),
             created_at: rpc.created_at || new Date().toISOString(),
             operator_notes: rpc.operator_notes || null,
             invite_token: rpc.invite_token || null,
@@ -583,7 +619,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       setLoadingPending(true);
       const { data, error } = await supabase
         .from('users')
-        .select('id, first_name, last_name, role, ausweis_nummer, student_billing_payment_method, student_billing_cash_paid, is_campus_active, is_groovelab_active, is_trial, is_hardship_exempt, created_at, school_id, last_seen')
+        .select('id, first_name, last_name, role, ausweis_nummer, instrument, student_billing_payment_method, student_billing_cash_paid, is_campus_active, is_groovelab_active, is_trial, exempt_from_direct_billing, contract_ends_at, coach_notes, created_at, school_id, last_seen')
         .eq('role', 'student')
         .order('created_at', { ascending: false });
 
@@ -606,13 +642,14 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     const filtered = rawPendingUsers.filter((u: any) => {
       const isFromDirectBillingSchool = directBillingSchoolIds.has(u.school_id);
       const hasPaymentMethod = Boolean(u.student_billing_payment_method);
-      const isPendingActivation = !u.is_campus_active;
-      const isExempt = Boolean(u.is_hardship_exempt);
+      const isExplicitlyDirectBilled = Boolean(u.is_direct_billed);
+      const isExempt = Boolean(u.exempt_from_direct_billing || u.is_hardship_exempt);
 
+      // 0,1% Goldstandard: Strikte B2B/B2C-Trennung - Keine B2B-Sammelzahler im B2C-Cockpit
       if (directBillingSchoolIds.size > 0) {
-        return isFromDirectBillingSchool || hasPaymentMethod || isPendingActivation || isExempt;
+        return isFromDirectBillingSchool || isExplicitlyDirectBilled || hasPaymentMethod;
       }
-      return true;
+      return isExplicitlyDirectBilled || hasPaymentMethod || isExempt;
     });
 
     setPendingUsers(filtered);
@@ -623,20 +660,32 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       const user = pendingUsers.find(u => u.id === userId);
       if (!user) return;
 
-      const updates: any = {
-        is_campus_active: true,
-        student_billing_cash_paid: true,
-        payment_status: 'paid'
-      };
-      if (!user.is_groovelab_active) {
-        updates.is_groovelab_active = true;
+      let rpcSucceeded = false;
+      try {
+        const { data, error } = await supabase.rpc('admin_manage_b2c_student_subscription', {
+          p_student_id: userId,
+          p_action: 'activate_paid'
+        });
+        if (!error && (data as any)?.success) {
+          rpcSucceeded = true;
+        }
+      } catch {
+        rpcSucceeded = false;
       }
 
-      const { error } = await supabase
-        .from('users')
-        .update(updates)
-        .eq('id', userId);
-      if (error) throw error;
+      const updates: any = {
+        is_campus_active: true,
+        is_groovelab_active: true,
+        student_billing_cash_paid: true
+      };
+
+      if (!rpcSucceeded) {
+        const { error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('id', userId);
+        if (error) throw error;
+      }
       
       setRawPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
       setPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
@@ -654,8 +703,7 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
       const updates = { 
         is_campus_active: true,
         is_groovelab_active: true,
-        student_billing_cash_paid: true,
-        payment_status: 'paid'
+        student_billing_cash_paid: true
       };
       const { error } = await supabase
         .from('users')

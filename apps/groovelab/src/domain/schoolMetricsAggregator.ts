@@ -8,6 +8,7 @@
 
 import { calculateSchoolEffectiveRates, MasterPricingRates, SchoolPricingData } from './pricingEngine';
 import { calculateCampusGroovelabBilling, BillingCalculationResult } from './billingCalculator';
+import { resolveEffectiveBillingDate } from './schoolDunningEngine';
 
 export interface RawUserRecord {
   id?: string;
@@ -292,12 +293,26 @@ export function aggregateSchoolMetrics(
   });
 
   let storageAddonGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
-  if (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive') {
-    storageAddonGb = 0;
-  } else if (storageAddonGb === 0 && school.extra_billing_option === 'option1' && school.storage_addon_status === 'active') {
-    storageAddonGb = 20;
+  if (storageAddonGb === 0 && (school.extra_billing_option === 'option1' || (school as any).storage_addon_status === 'active')) {
+    storageAddonGb = 25;
   }
-  const storageAddonMonthlyFee = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || storageAddonGb === 0) 
+  if (storageAddonGb === 0 && typeof window !== 'undefined' && schId) {
+    try {
+      const directKey = localStorage.getItem(`groovelab_storage_addon_gb_${schId}`) || localStorage.getItem(`campus_storage_addon_gb_${schId}`);
+      if (directKey) storageAddonGb = Math.max(storageAddonGb, Number(directKey));
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        if (overrides[schId]?.storage_addon_gb) {
+          storageAddonGb = Math.max(storageAddonGb, Number(overrides[schId].storage_addon_gb));
+        }
+      }
+    } catch {}
+  }
+  if (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || school.storage_addon_status === 'cancelled') {
+    storageAddonGb = 0;
+  }
+  const storageAddonMonthlyFee = (school.storage_addon_status === 'none' || school.storage_addon_status === 'inactive' || school.storage_addon_status === 'cancelled' || storageAddonGb === 0) 
     ? 0 
     : resolveStorageAddonFee(storageAddonGb, school.storage_addon_monthly_fee);
   let storageUsedBytes = Number(school.storage_used_bytes || 0);
@@ -346,36 +361,37 @@ export function aggregateSchoolMetrics(
 /**
  * Evaluates whether a school is currently in an active trial period.
  * Strict Tier-1 Time-Decay Evaluation:
+ * - If school has subscription_bypass, it is a VIP bypass (not trial).
  * - If school is booked (is_billing_booked === true), trial is inactive.
- * - If trial_ends_at is set, trial expires when Date.now() >= trial_ends_at.
- * - If only created_at is available, trial expires 30 days after created_at.
- * - If is_trial is false/null, trial is inactive.
+ * - If trial_ends_at or trial_until is set:
+ *   Trial is active if current simulated time < trial end date.
+ * - If explicitly flagged as trial (is_trial === true or status === 'trial'):
+ *   Trial is active.
+ * - If school has NEVER booked a paid plan (is_billing_booked !== true) and is not suspended/archived:
+ *   The school is in trial mode (0,00 € billed, 24,90 € preview subtotal).
  */
 export function isSchoolTrialActive(school: any): boolean {
   if (!school) return false;
-  if (school.subscription_bypass) return false;
-  if (school.is_billing_booked) return false;
+  if (school.subscription_bypass || school.status === 'bypass' || school.billing_status === 'bypass') return false;
+  if (school.is_billing_booked || school.status === 'active') return false;
   
-  const isTrialFlag = Boolean(school.is_trial || school.status === 'trial');
-  if (!isTrialFlag) return false;
+  const isSuspended = school.status === 'suspended' || school.is_paused || school.status === 'archived';
+  if (isSuspended) return false;
 
-  const now = Date.now();
-  if (school.trial_ends_at) {
-    const trialEnd = new Date(school.trial_ends_at).getTime();
+  const now = resolveEffectiveBillingDate().getTime();
+  const trialEndDateStr = school.trial_ends_at || school.trial_until;
+  if (trialEndDateStr) {
+    const trialEnd = new Date(trialEndDateStr).getTime();
     if (!isNaN(trialEnd)) {
       return trialEnd > now;
     }
   }
 
-  if (school.created_at) {
-    const createdTime = new Date(school.created_at).getTime();
-    if (!isNaN(createdTime)) {
-      const trialEnd = createdTime + (30 * 24 * 60 * 60 * 1000);
-      return trialEnd > now;
-    }
-  }
+  const isTrialFlag = Boolean(school.is_trial || school.status === 'trial');
+  if (isTrialFlag) return true;
 
-  return isTrialFlag;
+  // An unbooked school (is_billing_booked !== true) that has no active paid contract is in trial
+  return true;
 }
 
 export interface CanonicalSchoolBillingSummary {
@@ -399,15 +415,30 @@ export function getSchoolCanonicalBilling(
   masterPricing: MasterPricingRates
 ): CanonicalSchoolBillingSummary {
   const effectiveRates = calculateSchoolEffectiveRates(school, masterPricing);
-  const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
+  const isBypass = Boolean(school.subscription_bypass || school.status === 'bypass' || school.billing_status === 'bypass');
+  const isSuspended = school.status === 'suspended' || school.status === 'archived' || school.is_paused;
+  const isBooked = (Boolean(school.is_billing_booked) || school.status === 'active') && !isSuspended && !isBypass;
+  const isTrial = !isBypass && !isSuspended && isSchoolTrialActive(school);
+
+  let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
+  if (isSuspended) {
+    status = 'suspended';
+  } else if (isBypass) {
+    status = 'bypass';
+  } else if (isTrial) {
+    status = 'trial';
+  } else {
+    status = 'active';
+  }
+
   let hasCampus = Boolean(school.has_campus_subscription);
   let hasGroovelab = Boolean(school.has_groovelab_subscription);
-  if (isBooked && !hasCampus && !hasGroovelab) {
+  if (!hasCampus && !hasGroovelab) {
     hasCampus = true;
     hasGroovelab = true;
   }
 
-  const now = new Date();
+  const now = resolveEffectiveBillingDate();
   const directEffectiveDateStr = school.direct_billing_effective_date;
   const isPendingTransition = Boolean(directEffectiveDateStr && new Date(directEffectiveDateStr).getTime() > now.getTime());
 
@@ -438,19 +469,9 @@ export function getSchoolCanonicalBilling(
     }
   });
 
-  const isBypass = Boolean(school.subscription_bypass);
-  const isTrial = isSchoolTrialActive(school);
-  let status: 'trial' | 'active' | 'bypass' | 'suspended' = 'active';
-  if (school.status === 'suspended' || school.is_paused) {
-    status = 'suspended';
-  } else if (isBypass) {
-    status = 'bypass';
-  } else if (isTrial) {
-    status = 'trial';
-  }
-
   const subtotal = billingResult.totalMonthlySchoolInvoice;
   const total = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : subtotal;
+  const b2bRevenue = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : total;
   const b2cRevenue = (isBypass || status === 'trial' || status === 'suspended') ? 0.00 : Number((billingResult.parentContributionTotal || 0).toFixed(2));
 
   // Runtime Invariant Sanity Guard for Developer Mode

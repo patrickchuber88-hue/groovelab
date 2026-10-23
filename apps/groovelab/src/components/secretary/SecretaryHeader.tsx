@@ -456,20 +456,26 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
         </div>
       )}
 
-      {/* Enterprise B2B Delinquency & Grace Period Escalation Banner */}
+      {/* Enterprise B2B Delinquency & Grace Period Escalation Banner (Single Source of Truth) */}
       {!subscriptionBypass && dunningStatus.isDelinquent && dunningStatus.totalOverdueAmount > 0 && (
         <div style={{
-          background: dunningStatus.isSecretaryReadOnly
-            ? '#fef2f2'
-            : (dunningStatus.level === 'level_2_warning' ? '#fffbeb' : '#eff6ff'),
-          borderBottom: dunningStatus.isSecretaryReadOnly
-            ? '1px solid #fee2e2'
-            : (dunningStatus.level === 'level_2_warning' ? '1px solid #fef3c7' : '1px solid #dbeafe'),
+          background: dunningStatus.isTrustExtended
+            ? '#ecfdf5'
+            : dunningStatus.isSecretaryReadOnly
+              ? '#fef2f2'
+              : (dunningStatus.level === 'level_2_warning' ? '#fffbeb' : '#eff6ff'),
+          borderBottom: dunningStatus.isTrustExtended
+            ? '1px solid #a7f3d0'
+            : dunningStatus.isSecretaryReadOnly
+              ? '1px solid #fee2e2'
+              : (dunningStatus.level === 'level_2_warning' ? '1px solid #fef3c7' : '1px solid #dbeafe'),
           padding: windowWidth <= 768 ? '12px 16px 12px 66px' : '12px 40px',
           fontSize: '0.84rem',
-          color: dunningStatus.isSecretaryReadOnly
-            ? '#991b1b'
-            : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e40af'),
+          color: dunningStatus.isTrustExtended
+            ? '#065f46'
+            : dunningStatus.isSecretaryReadOnly
+              ? '#991b1b'
+              : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e40af'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -482,29 +488,69 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 220px' }}>
             <span style={{ fontSize: '1.2rem' }}>
-              {dunningStatus.isSecretaryReadOnly ? '🚨' : (dunningStatus.level === 'level_2_warning' ? '⚠️' : 'ℹ️')}
+              {dunningStatus.isTrustExtended
+                ? '🛡️'
+                : dunningStatus.isSecretaryReadOnly
+                  ? '🚨'
+                  : (dunningStatus.level === 'level_2_warning' ? '⚠️' : 'ℹ️')}
             </span>
             <span>
-              {dunningStatus.isSecretaryReadOnly ? (
-                <>
-                  <strong>Administrativer Schreibschutz aktiv:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> (überfällig seit {dunningStatus.overdueDays} Tagen). Neuanlagen sind pausiert. Schüler &amp; Unterrichtsbetrieb bleiben uneingeschränkt geschützt.
-                </>
-              ) : dunningStatus.level === 'level_2_warning' ? (
-                <>
-                  <strong>Dringende Mahnung:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz im Sekretariat.
-                </>
-              ) : (
-                <>
-                  <strong>Zahlungserinnerung:</strong> Für die Musikschule liegt eine offene B2B-Infrastrukturrechnung über <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> vor (Fällig seit {dunningStatus.overdueDays} Tagen).
-                </>
-              )}
+              {(() => {
+                const countLabel = `${dunningStatus.unpaidInvoicesCount} ${dunningStatus.unpaidInvoicesCount === 1 ? 'Beleg' : 'Belege'}`;
+                const baseFormatted = dunningStatus.totalOverdueAmount.toFixed(2).replace('.', ',');
+                const feeFormatted = (dunningStatus.appliedDunningFee || 0).toFixed(2).replace('.', ',');
+                const totalFormatted = (dunningStatus.totalPayableAmount || dunningStatus.totalOverdueAmount).toFixed(2).replace('.', ',');
+                const amountText = (dunningStatus.appliedDunningFee || 0) > 0
+                  ? `${totalFormatted} € (${baseFormatted} € Hauptforderung + ${feeFormatted} € Mahnpauschale)`
+                  : `${baseFormatted} €`;
+
+                if (dunningStatus.isTrustExtended) {
+                  return (
+                    <>
+                      <strong>
+                        {dunningStatus.isKulanzActive
+                          ? 'Master-Admin Kulanz-Stundung aktiv (+30 Tage):'
+                          : `48h-Überweisungs-Brücke aktiv (noch ${dunningStatus.trustRemainingHours} Std.):`}
+                      </strong>{' '}
+                      Administrativer Schreibschutz für <strong>{countLabel} ({amountText})</strong> ist vorübergehend aufgehoben. Schüler &amp; Lehrkräfte genießen 100 % Didaktische Immunität.
+                    </>
+                  );
+                }
+                if (dunningStatus.isSecretaryReadOnly) {
+                  return (
+                    <>
+                      <strong>Administrativer Schreibschutz aktiv ({countLabel} überfällig seit {dunningStatus.overdueDays} Tagen):</strong>{' '}
+                      Ausstehender Gesamtbetrag: <strong>{amountText}</strong>. Neuanlagen im Sekretariat sind pausiert. Schüler &amp; Unterrichtsbetrieb bleiben zu 100 % geschützt (Didaktische Immunität).
+                    </>
+                  );
+                }
+                if (dunningStatus.level === 'level_2_warning') {
+                  return (
+                    <>
+                      <strong>2. Mahnung ({countLabel} überfällig seit {dunningStatus.overdueDays} Tagen):</strong>{' '}
+                      Ausstehender Gesamtbetrag: <strong>{amountText}</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz im Sekretariat.
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <strong>Freundliche Zahlungserinnerung ({countLabel}):</strong>{' '}
+                    Für die Musikschule liegt ein offener Rechnungssaldo über <strong>{amountText}</strong> vor (fällig seit {dunningStatus.overdueDays} Tagen).
+                  </>
+                );
+              })()}
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
+              type="button"
               onClick={() => setShowDunningPayModal(true)}
               style={{
-                background: dunningStatus.isSecretaryReadOnly ? '#dc2626' : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'),
+                background: dunningStatus.isTrustExtended
+                  ? '#059669'
+                  : dunningStatus.isSecretaryReadOnly
+                    ? '#dc2626'
+                    : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'),
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '100px',

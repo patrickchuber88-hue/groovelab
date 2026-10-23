@@ -83,7 +83,24 @@ export function resolveCanonicalStorageFee(
     return { gb: 0, fee: 0 };
   }
 
-  const rawGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
+  let rawGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
+  if (rawGb === 0 && ((school as any).extra_billing_option === 'option1' || (school as any).storage_addon_status === 'active')) {
+    rawGb = 25;
+  }
+  if (rawGb === 0 && typeof window !== 'undefined' && school.id) {
+    try {
+      const directKey = localStorage.getItem(`groovelab_storage_addon_gb_${school.id}`) || localStorage.getItem(`campus_storage_addon_gb_${school.id}`);
+      if (directKey) rawGb = Math.max(rawGb, Number(directKey));
+      const overridesStr = localStorage.getItem('groovelab_school_overrides');
+      if (overridesStr) {
+        const overrides = JSON.parse(overridesStr);
+        if (overrides[school.id]?.storage_addon_gb) {
+          rawGb = Math.max(rawGb, Number(overrides[school.id].storage_addon_gb));
+        }
+      }
+    } catch {}
+  }
+
   if (!Number.isFinite(rawGb) || rawGb <= 0) {
     return { gb: 0, fee: 0 };
   }

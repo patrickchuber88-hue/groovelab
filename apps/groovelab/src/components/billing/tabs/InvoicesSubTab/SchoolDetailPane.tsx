@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Download, Landmark, HardDrive, Info, AlertTriangle } from 'lucide-react';
-import { Invoice } from '../../types';
+import { Invoice, formatSchoolNumericId } from '../../types';
 
 interface SchoolDetailPaneProps {
   inv: Invoice;
@@ -82,7 +82,9 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
           onClick={() => {
             const today = new Date();
             const yymm = `${String(today.getFullYear()).slice(2)}${String(today.getMonth() + 1).padStart(2, '0')}`;
-            const invNumber = `RE-${(inv.schoolId || 'SCH').slice(0, 8).toUpperCase()}-${yymm}-01`;
+            const numId = formatSchoolNumericId(inv.schoolId, 3);
+            const isSammel = !['both', 'debit', 'cash', 'option1'].includes(inv.studentBillingOption);
+            const invNumber = `VS-${numId}-${yymm}`;
             setViewingInvoice({
               invoiceId: invNumber,
               schoolId: inv.schoolId,
@@ -93,7 +95,8 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
               date: today.toISOString(),
               amount: inv.total,
               status: 'Vorschau',
-              type: 'INF',
+              type: isSammel ? 'ALL' : 'INF',
+              isSammelzahler: isSammel,
               isCurrentMonth: true,
               hasCampus: inv.hasCampus,
               hasGroovelab: inv.hasGroovelab,
@@ -217,7 +220,7 @@ export const SchoolDetailPane: React.FC<SchoolDetailPaneProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Kombi-Vorteilsrabatt</span>
               <span style={{ fontWeight: 700, color: inv.hasKombiDiscount ? '#34a853' : '#64748b', fontSize: '0.82rem' }}>
-                {inv.hasKombiDiscount ? `Aktiv (-${(masterPricing?.kombiSavings ?? 4.90).toFixed(2).replace('.', ',')} €)` : 'Keiner'}
+                {inv.hasKombiDiscount ? `Aktiv (-${Number(inv.kombiDiscountAmount || masterPricing?.kombiSavings || 7.90).toFixed(2).replace('.', ',')} €)` : 'Keiner'}
               </span>
             </div>
           </div>

@@ -9,6 +9,10 @@ import { supabase } from '../../../lib/supabase';
 import { generateB2CParentContractPDF } from '../../../utils/pdfGenerator';
 import { CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
 import type { PendingUser, School } from '../MasterAdminTypes';
+import {
+  B2CStudentSubscriptionInspector,
+  formatMaskedStudentDisplayName
+} from './B2CStudentSubscriptionInspector';
 
 interface ReconciliationTabProps {
   pendingUsers: PendingUser[];
@@ -97,19 +101,35 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
   };
 
   const handleSaveNoteToDb = async (userId: string) => {
-    const note = operatorNotes[userId] ?? (inspectedUser?.operator_notes || '');
+    const note = operatorNotes[userId] ?? (inspectedUser?.operator_notes || inspectedUser?.coach_notes || '');
     setSavingNote(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ operator_notes: note })
-        .eq('id', userId);
-      if (error) throw error;
+      let rpcOk = false;
+      try {
+        const { error: rpcErr } = await supabase.rpc('admin_manage_b2c_student_subscription', {
+          p_student_id: userId,
+          p_action: 'save_note',
+          p_operator_note: note
+        });
+        if (!rpcErr) rpcOk = true;
+      } catch {
+        rpcOk = false;
+      }
+
+      if (!rpcOk) {
+        const { error } = await supabase
+          .from('users')
+          .update({ coach_notes: note })
+          .eq('id', userId);
+        if (error) throw error;
+      }
+
       notify({
         type: 'success',
         title: 'Notiz gespeichert',
         message: 'Interne Betreiber-Notiz wurde revisionssicher in der Datenbank hinterlegt.'
       });
+      onRefresh();
     } catch (err) {
       console.error('Error saving operator note:', err);
       notify({
@@ -204,21 +224,35 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
   const handleExemptStudent = async (user: PendingUser) => {
     setActivating(true);
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          is_hardship_exempt: true,
-          exempt_from_direct_billing: true,
-          is_campus_active: true
-        })
-        .eq('id', user.id);
-      if (error) throw error;
+      let rpcOk = false;
+      try {
+        const { error: rpcErr } = await supabase.rpc('admin_manage_b2c_student_subscription', {
+          p_student_id: user.id,
+          p_action: 'set_hardship_exempt',
+          p_operator_note: operatorNotes[user.id] || null
+        });
+        if (!rpcErr) rpcOk = true;
+      } catch {
+        rpcOk = false;
+      }
+
+      if (!rpcOk) {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            exempt_from_direct_billing: true,
+            is_campus_active: true,
+            is_groovelab_active: true
+          })
+          .eq('id', user.id);
+        if (error) throw error;
+      }
 
       await onSingleActivate(user.id);
       setInspectedUser(prev => prev ? {
         ...prev,
-        is_hardship_exempt: true,
         exempt_from_direct_billing: true,
+        is_hardship_exempt: true,
         is_campus_active: true
       } : null);
       notify({
@@ -226,6 +260,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
         title: 'Kulanz-Freistellung gespeichert',
         message: 'Schüler wurde gebührenfrei gestellt (0,00 €) und für Campus aktiviert.'
       });
+      onRefresh();
     } catch (err) {
       console.error('Error exempting student:', err);
       notify({
@@ -238,12 +273,105 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
     }
   };
 
+  // Grant Courtesy Months via authoritative RPC (§ 327l BGB Probemonate / Folgejahr)
+  const handleGrantCourtesyMonths = async (user: PendingUser, months: number) => {
+    setActivating(true);
+    try {
+      const { data, error } = await supabase.rpc('admin_manage_b2c_student_subscription', {
+        p_student_id: user.id,
+        p_action: 'grant_courtesy_months',
+        p_courtesy_months: months,
+        p_operator_note: operatorNotes[user.id] || null
+      });
+      if (error) throw error;
+
+      setInspectedUser(prev => prev ? {
+        ...prev,
+        is_campus_active: true,
+        contract_ends_at: (data as any)?.contract_ends_at,
+        b2c_courtesy_months: (prev.b2c_courtesy_months || 0) + months
+      } : null);
+
+      notify({
+        type: 'success',
+        title: 'Kulanz-Gutschrift gebucht',
+        message: `${months} Probemonat(e) wurden dem Schülerprofil gutgeschrieben.`
+      });
+      onRefresh();
+    } catch (err: any) {
+      console.error('Error granting courtesy months:', err);
+      notify({
+        type: 'error',
+        title: 'Fehler bei Kulanz-Gutschrift',
+        message: err?.message || 'Gutschrift konnte nicht in der Datenbank verbucht werden.'
+      });
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Revoke Subscription / Storno / Widerruf via authoritative RPC (§ 312k BGB)
+  const handleRevokeSubscription = async (user: PendingUser) => {
+    setActivating(true);
+    try {
+      const { error } = await supabase.rpc('admin_manage_b2c_student_subscription', {
+        p_student_id: user.id,
+        p_action: 'revoke_or_cancel',
+        p_operator_note: operatorNotes[user.id] || null
+      });
+      if (error) throw error;
+
+      setInspectedUser(prev => prev ? {
+        ...prev,
+        is_campus_active: false,
+        student_billing_cash_paid: false,
+        exempt_from_direct_billing: false,
+        is_hardship_exempt: false
+      } : null);
+
+      notify({
+        type: 'success',
+        title: 'Abo-Status aktualisiert',
+        message: 'Abo-Freischaltung wurde widerrufen / pausiert.'
+      });
+      onRefresh();
+    } catch (err: any) {
+      console.error('Error revoking subscription:', err);
+      notify({
+        type: 'error',
+        title: 'Fehler bei Statusänderung',
+        message: err?.message || 'Aktion konnte nicht ausgeführt werden.'
+      });
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Audited Just-In-Time (JIT) Full Name Reveal (Progressive Privacy Disclosure)
+  const handleRevealFullNameAudit = async (studentId: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase.rpc('admin_reveal_b2c_student_lastname', {
+        p_student_id: studentId,
+        p_reason: 'B2C Zahlungsabgleich & Kundenbetreuung im Masteradmin-Leitstand'
+      });
+      if (error) throw error;
+      return (data as any)?.full_name || null;
+    } catch (err) {
+      console.warn('JIT reveal RPC not available or failed:', err);
+      return null;
+    }
+  };
+
   // Generate Official GoBD Receipt PDF for Student/Parents
-  const handleDownloadStudentReceipt = (user: PendingUser) => {
+  const handleDownloadStudentReceipt = (user: PendingUser, includeFullName: boolean = false) => {
     const rate = getStudentAnnualRate(user.school_id);
     const isExempt = Boolean(user.is_hardship_exempt || user.exempt_from_direct_billing);
+    const displayName = includeFullName
+      ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Schülerprofil'
+      : formatMaskedStudentDisplayName(user);
+
     void generateB2CParentContractPDF({
-      studentName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.name || 'Schüler/in',
+      studentName: displayName,
       studentId: user.id,
       schoolName: getSchoolName(user.school_id),
       isDirectBilled: !isExempt,
@@ -873,6 +1001,9 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                     {/* Student & School */}
                     <div style={{ paddingRight: '10px', minWidth: 0 }}>
                       <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
                         fontWeight: 800,
                         color: '#0f172a',
                         fontSize: '0.88rem',
@@ -880,11 +1011,24 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                         overflow: 'hidden',
                         textOverflow: 'ellipsis'
                       }}>
-                        {fullName}
+                        <span>{formatMaskedStudentDisplayName(u)}</span>
+                        {u.ausweis_nummer && (
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            color: '#475569',
+                            background: '#f1f5f9',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            #{u.ausweis_nummer}
+                          </span>
+                        )}
                       </div>
                       <div style={{
                         fontSize: '0.74rem',
-                        color: '#64748b',
+                        color: '#475569',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
@@ -895,6 +1039,7 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
                       }}>
                         <Building size={11} />
                         <span>{getSchoolName(u.school_id)}</span>
+                        {u.instrument && <span>• {u.instrument}</span>}
                       </div>
                     </div>
 
@@ -1061,233 +1206,28 @@ export const ReconciliationTab: React.FC<ReconciliationTabProps> = ({
           )}
         </div>
 
-        {/* RIGHT COLUMN: 360° STUDENT PAYMENT INSPECTOR */}
-        {inspectedUser && (() => {
-          const inspectedRate = getStudentAnnualRate(inspectedUser.school_id);
-          const isExempt = Boolean(inspectedUser.is_hardship_exempt || inspectedUser.exempt_from_direct_billing);
-          const isPaid = Boolean(inspectedUser.is_campus_active || inspectedUser.student_billing_cash_paid || isExempt);
-          return (
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '24px',
-              border: '1px solid rgba(15, 23, 42, 0.1)',
-              boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)',
-              padding: '24px',
-              position: 'sticky',
-              top: '24px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px'
-            }}>
-              {/* Inspector Header */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                <div>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    color: '#059669',
-                    background: '#ecfdf5',
-                    padding: '3px 8px',
-                    borderRadius: '6px'
-                  }}>
-                    Beleg- &amp; Profil-Inspektor
-                  </span>
-                  <h3 style={{ margin: '8px 0 2px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-                    {`${inspectedUser.first_name || ''} ${inspectedUser.last_name || ''}`.trim() || inspectedUser.name}
-                  </h3>
-                  <div style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
-                    {getSchoolName(inspectedUser.school_id)}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Inspektor schließen"
-                  onClick={() => setInspectedUser(null)}
-                  style={{
-                    background: '#f1f5f9',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#64748b'
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Payment Reference & Breakdown Box */}
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '16px',
-                padding: '16px',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Verwendungszweck:</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: '0.85rem', color: '#0f172a', background: '#e2e8f0', padding: '2px 8px', borderRadius: '6px' }}>
-                    {getReferenceCode(inspectedUser)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>Empfänger-IBAN:</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#334155' }}>
-                    {OPERATOR_BANKING_CONFIG.ibanFormatted}
-                  </span>
-                </div>
-                <div style={{ height: '1px', background: '#e2e8f0', margin: '2px 0' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
-                  <span>Nettobetrag (11 Schulmonate, 12. Monat frei):</span>
-                  <strong>{isExempt ? '0,00' : inspectedRate.net.toFixed(2).replace('.', ',')} {inspectedRate.currencySymbol}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
-                  <span>
-                    {effectiveTaxMode === 'small_business' || inspectedRate.currencySymbol === 'CHF'
-                      ? 'Umsatzsteuer (Kleinunternehmerregelung 0%):'
-                      : 'Umsatzsteuer (19% MwSt.):'}
-                  </span>
-                  <strong>{isExempt ? '0,00' : inspectedRate.vat.toFixed(2).replace('.', ',')} {inspectedRate.currencySymbol}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', paddingTop: '4px', borderTop: '1px dashed #cbd5e1' }}>
-                  <span>Gesamtbetrag (Brutto):</span>
-                  <span style={{ color: '#059669' }}>
-                    {isExempt ? `0,00 ${inspectedRate.currencySymbol} (Kulanz)` : inspectedRate.formattedGross}
-                  </span>
-                </div>
-              </div>
-
-              {/* Operator Notes */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
-                    Interne Betreiber-Notiz (Kulanz / Überweisungsdetails)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveNoteToDb(inspectedUser.id)}
-                    disabled={savingNote}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: '#0f172a',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {savingNote ? 'Speichert...' : 'Notiz speichern'}
-                  </button>
-                </div>
-                <textarea
-                  rows={2}
-                  placeholder="z.B. Überweisung durch Großmutter (abweichender Kontoinhaber) oder Sozialfonds-Vermerk..."
-                  value={operatorNotes[inspectedUser.id] ?? (inspectedUser.operator_notes || '')}
-                  onChange={(e) => handleUpdateNote(inspectedUser.id, e.target.value)}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    border: '1px solid #cbd5e1',
-                    fontSize: '0.82rem',
-                    fontFamily: 'inherit',
-                    resize: 'vertical'
-                  }}
-                />
-              </div>
-
-              {/* Inspector Actions */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {!isPaid && (
-                  <button
-                    type="button"
-                    onClick={() => handleSingleActivateClick(inspectedUser.id)}
-                    disabled={activating}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      borderRadius: '14px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontWeight: 800,
-                      fontSize: '0.88rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <CheckCircle2 size={17} />
-                    <span>Zahlung bestätigen &amp; Profil freischalten</span>
-                  </button>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadStudentReceipt(inspectedUser)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      color: '#0f172a',
-                      fontWeight: 800,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <FileText size={14} />
-                    <span>Quittung (PDF)</span>
-                  </button>
-
-                  {!isExempt && (
-                    <button
-                      type="button"
-                      onClick={() => handleExemptStudent(inspectedUser)}
-                      disabled={activating}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: '12px',
-                        background: '#eff6ff',
-                        border: 'none',
-                        color: '#1d4ed8',
-                        fontWeight: 800,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
-                      title="Befreit den Schüler im Rahmen des Sozialfonds / Kulanz vollständig von der Jahresgebühr (0,00 €)"
-                    >
-                      <Sparkles size={14} />
-                      <span>Kulanz (0,00 €)</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* RIGHT COLUMN: 360° STUDENT PAYMENT & SUBSCRIPTION INSPECTOR */}
+        {inspectedUser && (
+          <B2CStudentSubscriptionInspector
+            inspectedUser={inspectedUser}
+            schoolName={getSchoolName(inspectedUser.school_id)}
+            referenceCode={getReferenceCode(inspectedUser)}
+            rate={getStudentAnnualRate(inspectedUser.school_id)}
+            effectiveTaxMode={effectiveTaxMode}
+            activating={activating}
+            savingNote={savingNote}
+            noteValue={operatorNotes[inspectedUser.id] ?? (inspectedUser.operator_notes || inspectedUser.coach_notes || '')}
+            onNoteChange={(val) => handleUpdateNote(inspectedUser.id, val)}
+            onSaveNote={() => handleSaveNoteToDb(inspectedUser.id)}
+            onActivatePaid={() => handleSingleActivateClick(inspectedUser.id)}
+            onGrantCourtesyMonths={(months) => handleGrantCourtesyMonths(inspectedUser, months)}
+            onSetHardshipExempt={() => handleExemptStudent(inspectedUser)}
+            onRevokeSubscription={() => handleRevokeSubscription(inspectedUser)}
+            onDownloadReceipt={(includeFullName) => handleDownloadStudentReceipt(inspectedUser, includeFullName)}
+            onRevealFullNameAudit={handleRevealFullNameAudit}
+            onClose={() => setInspectedUser(null)}
+          />
+        )}
       </div>
     </div>
   );

@@ -7,10 +7,12 @@ import { DpoAuditPortal } from '../../DpoAuditPortal';
 import { supabase } from '../../../lib/supabase';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../../domain/pricingEngine';
 import { isSchoolTrialActive } from '../../../domain/schoolMetricsAggregator';
+import { resolveEffectiveBillingDate } from '../../../domain/schoolDunningEngine';
 import { generateB2BSchoolInvoicePDF } from '../../../utils/pdfGenerator';
 import { computeSchoolBillingMetrics, resolveCanonicalStorageFee, CanonicalBillingRates } from '../utils/computeSchoolBillingMetrics';
 import type { School, SchoolStat } from '../MasterAdminTypes';
 import { SchoolDetailSidebarWidgets } from '../components/SchoolDetailSidebarWidgets';
+import { SchoolDunningExtensionControl } from './SchoolDunningExtensionControl';
 
 interface SchoolDetailDrawerProps {
   school: School | null;
@@ -878,52 +880,11 @@ export const SchoolDetailDrawer: React.FC<SchoolDetailDrawerProps> = ({
                   </div>
                 </label>
 
-                <div style={{
-                  padding: '14px 16px',
-                  borderRadius: '14px',
-                  background: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? '#ecfdf5' : '#f8fafc',
-                  border: dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? 'none' : '1px solid #e2e8f0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px'
-                }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Award size={16} color="#0f172a" />
-                      <span style={{ fontWeight: 850, fontSize: '0.86rem', color: '#0f172a' }}>
-                        Kulanzjoker (+30 Tage Stundung &amp; Erlass Verzugspauschale)
-                      </span>
-                    </div>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>
-                      {dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now()
-                        ? `Aktiv bis ${new Date(dunningKulanzUntil).toLocaleDateString('de-DE')} – Verzugspauschale auf 0,00 € erlassen, Schreibsperren suspendiert.`
-                        : 'Gewährt der Schule per 1-Click sofort 30 zusätzliche Tage Zahlungsziel und erlässt etwaige Mahngebühren.'}
-                    </p>
-                  </div>
-
-                  {dunningKulanzUntil && new Date(dunningKulanzUntil).getTime() > Date.now() ? (
-                    <button
-                      type="button"
-                      onClick={() => setDunningKulanzUntil('')}
-                      style={{ padding: '6px 12px', borderRadius: '10px', background: '#ffffff', border: '1px solid #fca5a5', color: '#dc2626', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      Widerrufen
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-                        setDunningKulanzUntil(until);
-                      }}
-                      style={{ padding: '6px 14px', borderRadius: '10px', background: '#0f172a', border: 'none', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                    >
-                      <Sparkles size={13} />
-                      <span>Joker ziehen (+30 T)</span>
-                    </button>
-                  )}
-                </div>
+                <SchoolDunningExtensionControl
+                  school={school}
+                  dunningKulanzUntil={dunningKulanzUntil}
+                  setDunningKulanzUntil={setDunningKulanzUntil}
+                />
               </div>
             </div>
           </div>

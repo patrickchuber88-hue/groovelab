@@ -178,11 +178,11 @@ export const downloadUpgradeConfirmationPdf = async (upgradeInfo: {
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text('Neuer Infrastruktur-Hosting-Tarif: 19,90 € / Mo. (Kombi-Paket Campus + GrooveLab)', 22, 88);
+    doc.text('Neuer Infrastruktur-Hosting-Tarif: 24,90 € / Mo. (Kombi-Paket Campus + GrooveLab)', 22, 88);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text('Kombi-Vorteilsrabatt: -4,90 € / Mo. dauerhaft auf das Infrastruktur-Bündel.', 22, 96);
+    doc.text('Kombi-Vorteilsrabatt: -7,90 € / Mo. dauerhaft auf das Infrastruktur-Bündel.', 22, 96);
     doc.text(`Laufzeit-Synchronisation: Co-Terminus bis Schuljahresende (${upgradeInfo.effectiveEndDateFormatted}).`, 22, 103);
     doc.text('Datenschutz (Art. 28 DSGVO): AVV automatisch um neue Modul-Verarbeitungskategorien erweitert.', 22, 110);
     doc.text('Sofortige Freischaltung: Alle Funktionen ab sofort für Lehrkräfte & Schüler aktiv.', 22, 117);

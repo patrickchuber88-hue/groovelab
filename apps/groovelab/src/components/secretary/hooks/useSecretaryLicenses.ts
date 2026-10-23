@@ -347,7 +347,7 @@ export const useSecretaryLicenses = ({
           const sDowngradeDate = schoolObj?.storage_pending_effective_date ?? null;
           const sContractStart = schoolObj?.contract_start_date || '2026-09-01';
 
-          const baseRate = (sCampus && sGroove) ? 19.90 : sCampus ? 14.90 : sGroove ? 9.90 : 19.90;
+          const baseRate = (sCampus && sGroove) ? 24.90 : sCampus ? 19.90 : sGroove ? 12.90 : 24.90;
           const totalNet = baseRate + sStorageFee;
           const schoolHex = (schoolId || '000000').replace(/-/g, '').slice(0, 6).toUpperCase();
 
@@ -785,11 +785,11 @@ export const useSecretaryLicenses = ({
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text('Neuer Infrastruktur-Hosting-Tarif: 19,90 € / Mo. (Kombi-Paket Campus + GrooveLab)', 22, 88);
+      doc.text('Neuer Infrastruktur-Hosting-Tarif: 24,90 € / Mo. (Kombi-Paket Campus + GrooveLab)', 22, 88);
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      doc.text('Kombi-Vorteilsrabatt: -4,90 € / Mo. dauerhaft auf das Infrastruktur-Bündel.', 22, 96);
+      doc.text('Kombi-Vorteilsrabatt: -7,90 € / Mo. dauerhaft auf das Infrastruktur-Bündel.', 22, 96);
       doc.text(`Laufzeit-Synchronisation: Co-Terminus bis Schuljahresende (${upgradeInfo.effectiveEndDateFormatted}).`, 22, 103);
       doc.text('Datenschutz (Art. 28 DSGVO): AVV automatisch um neue Modul-Verarbeitungskategorien erweitert.', 22, 110);
       doc.text('Sofortige Freischaltung: Alle Funktionen ab sofort für Lehrkräfte & Schüler aktiv.', 22, 117);

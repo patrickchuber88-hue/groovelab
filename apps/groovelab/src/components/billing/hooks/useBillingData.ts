@@ -6,6 +6,11 @@ import { computeSchoolStorageUsedBytes } from '../../../utils/audioStorageHelper
 import { ensureMasterAdminSessionLease } from '../../../utils/sessionLeaseManager';
 import { Invoice, PlatformSummary, getSchoolNumericId, formatSchoolNumericId } from '../types';
 import { OPERATOR_BANKING_CONFIG } from '../../../config/operatorBanking';
+import {
+  computeSchoolDunningStatus,
+  computeCanonicalDueDate,
+  resolveEffectiveBillingDate
+} from '../../../domain/schoolDunningEngine';
 
 export function useBillingData(initialSchoolId?: string) {
   const masterPricing = useMasterPricing();
@@ -61,11 +66,22 @@ export function useBillingData(initialSchoolId?: string) {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  const getPaidInvoices = (schoolId: string): string[] => {
-    // Zero-Trust: Read exclusively from authoritative PostgreSQL dbInvoices state
-    return dbInvoices
-      .filter(i => i.school_id === schoolId && i.status === 'paid')
+  const getPaidInvoices = (schoolId: string, overrideDbInvoices?: any[]): string[] => {
+    const source = overrideDbInvoices || dbInvoices;
+    const dbPaid = source
+      .filter(i => i.school_id === schoolId && (i.status === 'paid' || i.status === 'Bezahlt'))
       .map(i => i.invoice_number || i.id);
+    if (typeof window !== 'undefined') {
+      try {
+        const localPaid = JSON.parse(localStorage.getItem(`paid_invoices_${schoolId}`) || '[]');
+        if (Array.isArray(localPaid)) {
+          return Array.from(new Set([...dbPaid, ...localPaid]));
+        }
+      } catch (_e) {
+        // ignore
+      }
+    }
+    return dbPaid;
   };
 
   const toggleInvoicePaid = async (schoolId: string, invoiceId: string) => {
@@ -98,8 +114,10 @@ export function useBillingData(initialSchoolId?: string) {
     schoolStatus?: string,
     contractStartDate?: string | null,
     createdAt?: string | null,
-    schoolMetrics?: any
+    schoolMetrics?: any,
+    overrideDbInvoices?: any[]
   ) => {
+    const activeDbInvoices = overrideDbInvoices || dbInvoices;
     let storedDate: string | null = null;
     if (typeof window !== 'undefined') {
       storedDate = localStorage.getItem(`contractStartDate_${schoolId}`);
@@ -107,7 +125,7 @@ export function useBillingData(initialSchoolId?: string) {
 
     // 0,1% Goldstandard: Fallback auf frühestes Belegdatum der DB oder Gründungsepoche (2026-07-01)
     let fallbackDate = '2026-07-01';
-    const schoolDbInvs = dbInvoices.filter(i => i.school_id === schoolId && i.billing_date);
+    const schoolDbInvs = activeDbInvoices.filter(i => i.school_id === schoolId && i.billing_date);
     if (schoolDbInvs.length > 0) {
       const dates = schoolDbInvs.map(i => new Date(i.billing_date).getTime()).filter(t => !isNaN(t));
       if (dates.length > 0) {
@@ -121,7 +139,7 @@ export function useBillingData(initialSchoolId?: string) {
     const startYear = isNaN(contractDateObj.getFullYear()) ? 2026 : contractDateObj.getFullYear();
     const startMonth = isNaN(contractDateObj.getMonth()) ? 7 : (contractDateObj.getMonth() + 1);
 
-    const systemDate = new Date();
+    const systemDate = resolveEffectiveBillingDate();
     const currentYear = systemDate.getFullYear();
     const currentMonth = systemDate.getMonth() + 1;
 
@@ -129,6 +147,34 @@ export function useBillingData(initialSchoolId?: string) {
       '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 
       'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
     ];
+
+    // Kanonisch: Schulen im Probemonat oder Bypass haben keine offenen Belege
+    if (schoolStatus === 'trial' || schoolStatus === 'bypass') {
+      const monthStr = currentMonth < 10 ? `0${currentMonth}` : `${currentMonth}`;
+      const numId = formatSchoolNumericId(schoolId, 3);
+      const yy = String(currentYear).slice(-2);
+      const lastDay = new Date(currentYear, currentMonth, 0).getDate();
+      const monthName = deMonths[currentMonth];
+      const invoiceDateStr = `${lastDay}. ${monthName} ${currentYear}`;
+      const billingDateIso = `${currentYear}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+      const canonicalDue = computeCanonicalDueDate(currentYear, currentMonth);
+
+      return [{
+        id: `INF-${numId}-${yy}${monthStr}-01`,
+        date: invoiceDateStr,
+        billing_date: billingDateIso,
+        due_date: canonicalDue.dueDateIso,
+        dueDateStr: canonicalDue.dueDateDisplay,
+        monthName,
+        year: String(currentYear),
+        amount: 0.00,
+        subtotal: currentInvoiceAmount,
+        status: schoolStatus === 'bypass' ? 'Bypass' : 'Probemonat',
+        type: 'INF',
+        isCreated: false,
+        isCurrentMonth: true
+      }];
+    }
 
     const list: any[] = [];
     let y = startYear;
@@ -142,16 +188,18 @@ export function useBillingData(initialSchoolId?: string) {
       const lastDay = new Date(y, m, 0).getDate();
       const monthName = deMonths[m];
       const invoiceDateStr = `${lastDay}. ${monthName} ${y}`;
+      const billingDateIso = `${y}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+      const canonicalDue = computeCanonicalDueDate(y, m);
       
       const isCurrent = (y === currentYear && m === currentMonth);
       const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
       const isCreated = systemDate.getTime() >= creationTime.getTime();
 
-      const paidInvoicesList = getPaidInvoices(schoolId);
+      const paidInvoicesList = getPaidInvoices(schoolId, activeDbInvoices);
 
-      // 1. Infrastruktur- & Service-Rechnung (INF)
-      const infId = isCreated ? `INF-${numId}-${yy}${monthStr}-01` : `VS-${numId}-${yy}${monthStr}`;
-      const isInfMarkedPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${numId}-${yy}${monthStr}-01`);
+      const isSammelzahler = schoolMetrics?.billingPayer === 'school' ||
+        !['both', 'debit', 'cash', 'option1'].includes(schoolMetrics?.studentBillingOption || '') ||
+        Boolean(schoolMetrics?.isSammelzahler);
 
       const glStudentFee = ((schoolMetrics?.activeGroovelabCount || 0) * 0.49);
       const infAmount = schoolMetrics 
@@ -164,46 +212,66 @@ export function useBillingData(initialSchoolId?: string) {
           ).toFixed(2))
         : currentInvoiceAmount;
 
-      const infStatus = (infAmount === 0.00)
-        ? (schoolStatus === 'bypass' ? 'Bypass' : schoolStatus === 'trial' ? 'Probemonat' : 'Kostenfrei')
-        : (isInfMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
-
-      list.push({
-        id: infId,
-        date: invoiceDateStr,
-        monthName,
-        year: String(y),
-        amount: infAmount,
-        status: infStatus,
-        type: 'INF',
-        isCreated,
-        isCurrentMonth: isCurrent
-      });
-
-      // 2. Sammelrechnung Schüleraktivierungen (AKT)
       const aktAmount = schoolMetrics
         ? parseFloat((
             ((schoolMetrics.activeCampusCount !== undefined ? schoolMetrics.activeCampusCount : schoolMetrics.activeStudents || 0) * 0.49)
           ).toFixed(2))
         : 0;
 
-      if (aktAmount > 0) {
-        const aktId = `AKT-${numId}-${yy}${monthStr}-01`;
-        const isAktMarkedPaid = paidInvoicesList.includes(aktId);
-        const aktStatus = (aktAmount === 0.00)
-          ? 'Kostenfrei'
-          : (isAktMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
+      if (isSammelzahler) {
+        // 0,1% Goldstandard: Konsolidierte Monatsrechnung für Sammelzahler (Abschnitt A + Abschnitt B)
+        const consolidatedAmount = parseFloat((infAmount + aktAmount).toFixed(2));
+        const consolidatedId = isCreated ? `RE-${numId}-${yy}${monthStr}-01` : `VS-${numId}-${yy}${monthStr}`;
+        const isMarkedPaid = paidInvoicesList.includes(consolidatedId) || 
+          paidInvoicesList.includes(`INF-${numId}-${yy}${monthStr}-01`) || 
+          paidInvoicesList.includes(`RE-${numId}-${yy}${monthStr}-01`) ||
+          paidInvoicesList.includes(`AKT-${numId}-${yy}${monthStr}-01`);
+
+        const consolidatedStatus = (consolidatedAmount === 0.00)
+          ? (schoolStatus === 'bypass' ? 'Bypass' : schoolStatus === 'trial' ? 'Probemonat' : 'Kostenfrei')
+          : (isMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
 
         list.push({
-          id: aktId,
+          id: consolidatedId,
           date: invoiceDateStr,
+          billing_date: billingDateIso,
+          due_date: canonicalDue.dueDateIso,
+          dueDateStr: canonicalDue.dueDateDisplay,
           monthName,
           year: String(y),
-          amount: aktAmount,
-          status: aktStatus,
-          type: 'AKT',
+          amount: consolidatedAmount,
+          status: consolidatedStatus,
+          type: 'ALL',
           isCreated,
-          isCurrentMonth: isCurrent
+          isCurrentMonth: isCurrent,
+          isSammelzahler: true,
+          infAmount,
+          aktAmount
+        });
+      } else {
+        // Direktabrechnung durch Erziehungsberechtigte: Träger zahlt nur Infrastruktur
+        const infId = isCreated ? `INF-${numId}-${yy}${monthStr}-01` : `VS-${numId}-${yy}${monthStr}`;
+        const isInfMarkedPaid = paidInvoicesList.includes(infId) || paidInvoicesList.includes(`RE-${numId}-${yy}${monthStr}-01`);
+        const infStatus = (infAmount === 0.00)
+          ? (schoolStatus === 'bypass' ? 'Bypass' : schoolStatus === 'trial' ? 'Probemonat' : 'Kostenfrei')
+          : (isInfMarkedPaid ? 'Bezahlt' : (isCreated ? 'Versendet' : 'Vorschau'));
+
+        list.push({
+          id: infId,
+          date: invoiceDateStr,
+          billing_date: billingDateIso,
+          due_date: canonicalDue.dueDateIso,
+          dueDateStr: canonicalDue.dueDateDisplay,
+          monthName,
+          year: String(y),
+          amount: infAmount,
+          status: infStatus,
+          type: 'INF',
+          isCreated,
+          isCurrentMonth: isCurrent,
+          isSammelzahler: false,
+          infAmount,
+          aktAmount: 0
         });
       }
 
@@ -326,14 +394,31 @@ export function useBillingData(initialSchoolId?: string) {
         }
       }
 
-      // 0,1% Goldstandard: Bevorzuge autoritative Schulstammdaten aus dem Master-RPC (mit contract_start_date & created_at)
+      // 0,1% Goldstandard: Mergen von DB-Tabelle schools und Master-RPC schools
       const rpcSchools = (rpcBillingBundle && (rpcBillingBundle as any).schools && Array.isArray((rpcBillingBundle as any).schools))
         ? (rpcBillingBundle as any).schools
         : null;
 
-      let schools: any[] = (rpcSchools && rpcSchools.length > 0)
-        ? rpcSchools
-        : ((rawSchools as any[]) || []);
+      const rawSchoolsList = (rawSchools as any[]) || [];
+      const rawMap = new Map(rawSchoolsList.map(s => [s.id, s]));
+
+      let schools: any[] = [];
+      if (rpcSchools && rpcSchools.length > 0) {
+        schools = rpcSchools.map((rpcS: any) => {
+          const raw = rawMap.get(rpcS.id) || {};
+          return {
+            ...raw,
+            ...rpcS,
+            is_trial: rpcS.is_trial ?? raw.is_trial ?? false,
+            trial_ends_at: rpcS.trial_ends_at ?? rpcS.trial_until ?? raw.trial_ends_at ?? raw.trial_until ?? null,
+            is_billing_booked: rpcS.is_billing_booked ?? raw.is_billing_booked ?? false,
+            storage_addon_gb: Math.max(Number(rpcS.storage_addon_gb || 0), Number(raw.storage_addon_gb || 0)),
+            storage_addon_monthly_fee: Math.max(Number(rpcS.storage_addon_monthly_fee || 0), Number(raw.storage_addon_monthly_fee || 0)),
+          };
+        });
+      } else {
+        schools = rawSchoolsList;
+      }
 
       if (schools.length === 0) {
         console.warn('Primary schools query notice in useBillingData:', schoolsErr);
@@ -428,14 +513,14 @@ export function useBillingData(initialSchoolId?: string) {
           const canonical = getSchoolCanonicalBilling(school, stats, masterPricing);
           const activeCampusUsers = metricsMap[school.id] || stats.campusStudents || 0;
           const isBypass = canonical.isBypass;
-          const isBooked = Boolean(school.is_billing_booked) || school.status === 'active';
+          const isBooked = Boolean(school.is_billing_booked) && canonical.status !== 'trial' && canonical.status !== 'bypass';
           let hasCampus = Boolean(school.has_campus_subscription);
           let hasGroovelab = Boolean(school.has_groovelab_subscription);
-          if (isBooked && !hasCampus && !hasGroovelab) {
+          if (!hasCampus && !hasGroovelab) {
             hasCampus = true;
             hasGroovelab = true;
           }
-          const hasKombi = school.has_kombi_discount || (hasCampus && hasGroovelab);
+          const hasKombi = hasCampus && hasGroovelab;
 
           return {
             schoolId: school.id,
@@ -492,7 +577,12 @@ export function useBillingData(initialSchoolId?: string) {
             sepaAccountHolder: (school as any).sepa_account_holder || school.name || '',
             sepaMandateId: (school as any).sepa_mandate_id || '',
             sepaMandateDate: (school as any).sepa_mandate_date || '',
-            billingIban: (school as any).billing_iban || ''
+            billingIban: (school as any).billing_iban || '',
+            leitwegId: (school as any).leitweg_id || '',
+            leitweg_id: (school as any).leitweg_id || '',
+            summerMoratoriumActive: Boolean((school as any).summer_moratorium_active),
+            dunningKulanzUntil: (school as any).dunning_kulanz_until || null,
+            dunningTrustExtensionUntil: (school as any).dunning_trust_extension_until || null
           };
         });
 
@@ -513,78 +603,103 @@ export function useBillingData(initialSchoolId?: string) {
 
       setDbInvoices(realInvoices);
 
+      const effectiveNow = resolveEffectiveBillingDate();
       let totalUnpaid = 0;
-      calculatedInvoices.forEach(inv => {
-        if (inv.total <= 0 || inv.status === 'bypass' || inv.status === 'trial') {
-          return;
-        }
+
+      const enrichedInvoices: Invoice[] = calculatedInvoices.map(inv => {
+        const rawSchool = (schools || []).find((s: any) => s.id === inv.schoolId) || {};
+        const generatedList = getSchoolInvoices(
+          inv.schoolId,
+          inv.total,
+          inv.status,
+          inv.contractStartDate,
+          inv.createdAt,
+          inv,
+          realInvoices
+        );
 
         const schoolInvoicesFromDb = realInvoices.filter((i: any) => i.school_id === inv.schoolId);
-        let storedDate: string | null = null;
-        if (typeof window !== 'undefined') {
-          storedDate = localStorage.getItem(`contractStartDate_${inv.schoolId}`);
-        }
-        const validDateStr = inv.contractStartDate || inv.createdAt || storedDate || '2026-07-01';
-        const contractDateObj = new Date(validDateStr);
-        const startYear = isNaN(contractDateObj.getFullYear()) ? 2026 : contractDateObj.getFullYear();
-        const startMonth = isNaN(contractDateObj.getMonth()) ? 7 : (contractDateObj.getMonth() + 1);
-        const systemDate = new Date();
-        const currentYear = systemDate.getFullYear();
-        const currentMonth = systemDate.getMonth() + 1;
-        
-        let y = startYear;
-        let m = startMonth;
-        while (y < currentYear || (y === currentYear && m <= currentMonth)) {
-          const monthStr = m < 10 ? `0${m}` : `${m}`;
-          const numId = formatSchoolNumericId(inv.schoolId, 3);
-          const yy = String(y).slice(-2);
-          const lastDay = new Date(y, m, 0).getDate();
-          const creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
-          const isCreated = systemDate.getTime() >= creationTime.getTime();
-
-          const canonicalInvId = `RE-${numId}-${yy}${monthStr}-01`;
-          const legacyInvId = `RE-${y}-${monthStr}`;
-          const previewId = `VS-${numId}-${yy}${monthStr}`;
-          const invId = isCreated ? canonicalInvId : previewId;
-
-          const dbMatch = schoolInvoicesFromDb.find((i: any) => 
-            i.id === canonicalInvId || i.id === legacyInvId || i.id === `INV-${y}-${monthStr}` || i.id === invId
+        const mergedInvoices = generatedList.map((genInv: any) => {
+          const dbMatch = schoolInvoicesFromDb.find((d: any) =>
+            d.id === genInv.id || d.invoice_number === genInv.id
           );
-
-          const isMarkedPaid = dbMatch ? (dbMatch.status === 'paid' || dbMatch.status === 'Bezahlt') : false;
-
-          let status = isCreated ? 'Versendet' : 'Vorschau';
-          let amount = inv.total;
           if (dbMatch) {
-            status = dbMatch.status;
-            amount = dbMatch.amount;
+            return {
+              ...genInv,
+              status: dbMatch.status === 'paid' ? 'Bezahlt' : (dbMatch.status || genInv.status),
+              amount: typeof dbMatch.amount === 'number' ? dbMatch.amount : genInv.amount,
+              due_date: dbMatch.due_date || genInv.due_date,
+              billing_date: dbMatch.billing_date || genInv.billing_date
+            };
           }
+          return genInv;
+        });
 
-          if (isCreated && status !== 'paid' && status !== 'cancelled' && status !== 'Bezahlt') {
-            totalUnpaid += amount;
-          }
-
-          m++;
-          if (m > 12) {
-            m = 1;
-            y++;
-          }
+        let localTrustUntil: string | null = inv.dunningTrustExtensionUntil || null;
+        if (!localTrustUntil && typeof window !== 'undefined') {
+          localTrustUntil = localStorage.getItem(`groovelab_trust_token_school_${inv.schoolId}`);
         }
+
+        const schoolDunningRecord = {
+          ...rawSchool,
+          id: inv.schoolId,
+          status: inv.status,
+          subscription_bypass: inv.subscriptionBypass,
+          has_campus_subscription: inv.hasCampus,
+          has_groovelab_subscription: inv.hasGroovelab,
+          summer_moratorium_active: inv.summerMoratoriumActive,
+          dunning_kulanz_until: inv.dunningKulanzUntil,
+          dunning_trust_extension_until: localTrustUntil,
+          sepa_iban: inv.sepaIban,
+          sepa_mandate_id: inv.sepaMandateId,
+          billing_iban: inv.billingIban
+        };
+
+        const dunningStatus = computeSchoolDunningStatus(
+          schoolDunningRecord,
+          mergedInvoices,
+          effectiveNow
+        );
+
+        if (inv.total > 0 && inv.status !== 'bypass' && inv.status !== 'trial') {
+          mergedInvoices.forEach((mInv: any) => {
+            if (
+              mInv.isCreated &&
+              mInv.status !== 'paid' &&
+              mInv.status !== 'Bezahlt' &&
+              mInv.status !== 'cancelled' &&
+              mInv.status !== 'Storniert' &&
+              mInv.status !== 'Vorschau' &&
+              mInv.status !== 'Bypass' &&
+              mInv.status !== 'Probemonat' &&
+              mInv.status !== 'Kostenfrei'
+            ) {
+              totalUnpaid += Number(mInv.amount || 0);
+            }
+          });
+        }
+
+        return {
+          ...inv,
+          dunningTrustExtensionUntil: localTrustUntil,
+          dunningStatus,
+          overdueInvoices: dunningStatus.overdueInvoicesList
+        };
       });
 
-      setInvoices(calculatedInvoices);
+      setInvoices(enrichedInvoices);
 
-      if (calculatedInvoices.length > 0) {
-        const currentValid = calculatedInvoices.some(inv => inv.schoolId === expandedSchoolId);
+      if (enrichedInvoices.length > 0) {
+        const currentValid = enrichedInvoices.some(inv => inv.schoolId === expandedSchoolId);
         if (!expandedSchoolId || !currentValid) {
-          const topSchool = [...calculatedInvoices].sort((a, b) => b.activeStudents - a.activeStudents)[0];
+          const topSchool = [...enrichedInvoices].sort((a, b) => b.activeStudents - a.activeStudents)[0];
           if (topSchool) {
             setExpandedSchoolId(topSchool.schoolId);
           }
         }
       }
       setSummary({
-        totalSchools: calculatedInvoices.length,
+        totalSchools: enrichedInvoices.length,
         totalActiveCampusUsers,
         totalMonthlyRevenue: parseFloat(totalRevenue.toFixed(2)),
         bypassedSchools,
@@ -614,8 +729,10 @@ export function useBillingData(initialSchoolId?: string) {
     };
 
     window.addEventListener('groovelab_school_updated', handleSchoolUpdate);
+    window.addEventListener('groovelab_simulated_date_changed', handleSchoolUpdate);
     return () => {
       window.removeEventListener('groovelab_school_updated', handleSchoolUpdate);
+      window.removeEventListener('groovelab_simulated_date_changed', handleSchoolUpdate);
     };
   }, []);
 

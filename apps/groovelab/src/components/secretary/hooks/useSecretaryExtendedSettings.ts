@@ -218,11 +218,57 @@ export function useSecretaryExtendedSettings({
   const [trustRefreshToken, setTrustRefreshToken] = useState<number>(0);
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
 
+  useEffect(() => {
+    const handleSync = () => setTrustRefreshToken(prev => prev + 1);
+    window.addEventListener('groovelab_school_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('groovelab_school_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
   const dunningStatus = useMemo<SchoolDunningStatus>(() => {
-    const oldest = Array.isArray(schoolInvoices) 
-      ? schoolInvoices.find((i: any) => i && i.due_date && String(i.status || '').toLowerCase() !== 'paid' && String(i.status || '').toLowerCase() !== 'bezahlt') 
-      : null;
-    const localTrustUntil = oldest ? localStorage.getItem(`groovelab_trust_token_${oldest.id}`) : null;
+    let paidInvoicesSet = new Set<string>();
+    if (typeof window !== 'undefined' && schoolId) {
+      try {
+        const storedPaid = localStorage.getItem(`paid_invoices_${schoolId}`);
+        if (storedPaid) {
+          const parsed = JSON.parse(storedPaid);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(id => paidInvoicesSet.add(String(id)));
+          }
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }
+
+    const reconciledInvoices = Array.isArray(schoolInvoices)
+      ? schoolInvoices.map((inv: any) => {
+          if (!inv) return inv;
+          const invId = String(inv.id || inv.invoice_number || '');
+          if (paidInvoicesSet.has(invId)) {
+            return { ...inv, status: 'paid', paid: true };
+          }
+          return inv;
+        })
+      : [];
+
+    const oldest = reconciledInvoices.find(
+      (i: any) =>
+        i &&
+        i.due_date &&
+        String(i.status || '').toLowerCase() !== 'paid' &&
+        String(i.status || '').toLowerCase() !== 'bezahlt'
+    );
+    const localTrustUntil =
+      (typeof window !== 'undefined' && schoolId
+        ? localStorage.getItem(`groovelab_trust_token_school_${schoolId}`)
+        : null) ||
+      (oldest && typeof window !== 'undefined'
+        ? localStorage.getItem(`groovelab_trust_token_${oldest.id}`)
+        : null);
 
     const effectiveSchool = {
       ...(currentSchoolProfile || {
@@ -231,9 +277,14 @@ export function useSecretaryExtendedSettings({
         trial_ends_at: schoolTrialEndsAt,
         subscription_bypass: subscriptionBypass
       }),
-      dunning_trust_extension_until: currentSchoolProfile?.dunning_trust_extension_until || localTrustUntil || undefined
+      id: schoolId || currentSchoolProfile?.id,
+      is_trial: isSchoolTrial,
+      trial_ends_at: schoolTrialEndsAt,
+      subscription_bypass: subscriptionBypass,
+      dunning_trust_extension_until:
+        currentSchoolProfile?.dunning_trust_extension_until || localTrustUntil || undefined
     };
-    return computeSchoolDunningStatus(effectiveSchool, schoolInvoices, simulatedToday || undefined);
+    return computeSchoolDunningStatus(effectiveSchool, reconciledInvoices, simulatedToday || undefined);
   }, [currentSchoolProfile, schoolId, isSchoolTrial, schoolTrialEndsAt, subscriptionBypass, schoolInvoices, simulatedToday, trustRefreshToken]);
 
   useEffect(() => {
@@ -254,11 +305,14 @@ export function useSecretaryExtendedSettings({
 
   const assertSecretaryWriteAccess = useCallback((actionLabel?: string): boolean => {
     if (dunningStatus.isSecretaryReadOnly) {
-      alert(`Administrativer Schreibschutz aktiv: Da die B2B-Infrastrukturrechnung seit über 30 Tagen aussteht, ist diese Aktion (${actionLabel || 'Bearbeiten/Erstellen'}) vorübergehend gesperrt. Bitte begleiche den Betrag über den angezeigten EPC-QR GiroCode.`);
+      const formattedTotal = dunningStatus.totalPayableAmount.toFixed(2).replace('.', ',');
+      alert(
+        `Administrativer Schreibschutz aktiv: Da ${dunningStatus.unpaidInvoicesCount} B2B-Beleg(e) seit ${dunningStatus.overdueDays} Tagen überfällig sind (Gesamtbetrag: ${formattedTotal} €), ist diese Verwaltungs-Aktion (${actionLabel || 'Bearbeiten/Erstellen'}) vorübergehend pausiert. Schüler & Lehrkräfte genießen 100 % Didaktische Immunität. Bitte gleiche den Betrag über den angezeigten EPC-QR GiroCode aus.`
+      );
       return false;
     }
     return true;
-  }, [dunningStatus.isSecretaryReadOnly]);
+  }, [dunningStatus.isSecretaryReadOnly, dunningStatus.unpaidInvoicesCount, dunningStatus.overdueDays, dunningStatus.totalPayableAmount]);
 
   // Dev Date Simulation
   const [showDateSimulation, setShowDateSimulation] = useState<boolean>(() => {

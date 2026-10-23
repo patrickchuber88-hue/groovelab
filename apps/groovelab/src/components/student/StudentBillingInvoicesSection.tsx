@@ -45,12 +45,15 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
     try {
       setIsGenerating(true);
       const { generateB2CParentContractPDF } = await import('../../utils/pdfGenerator');
+      const cleanId = (effectiveStudentId || '0000').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+      const canonicalRefCode = studentUser?.payment_reference || `CG-${new Date().getFullYear()}-${cleanId}`;
       await generateB2CParentContractPDF({
         studentName,
         studentId: effectiveStudentId,
         schoolName,
         isDirectBilled,
-        isHardship
+        isHardship,
+        referenceCode: canonicalRefCode
       });
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 3500);

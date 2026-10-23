@@ -1870,18 +1870,19 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   }
 
   // Invoice Meta Box (Right Side)
-  const metaY = 45;
+  const metaY = 42;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
-  doc.text('Rechnungs-Nr.:', 130, metaY + 12);
-  doc.text('Datum:', 130, metaY + 17);
-  doc.text('Zahlbar bis:', 130, metaY + 22);
-
+  doc.text('Rechnungs-Nr.:', 125, metaY + 10);
+  doc.text('Datum:', 125, metaY + 15);
+  doc.text('Leistungszeitraum:', 125, metaY + 20);
+  doc.text('Zahlbar bis:', 125, metaY + 25);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text(cleanInvoiceId, 185, metaY + 12, { align: 'right' });
-  doc.text(params.invoiceDate || new Date().toLocaleDateString('de-DE'), 185, metaY + 17, { align: 'right' });
-  doc.text(params.dueDateStr || '30 Tage', 185, metaY + 22, { align: 'right' });
+  doc.text(cleanInvoiceId, 185, metaY + 10, { align: 'right' });
+  doc.text(params.invoiceDate || new Date().toLocaleDateString('de-DE'), 185, metaY + 15, { align: 'right' });
+  doc.text(params.period || 'Laufender Monat', 185, metaY + 20, { align: 'right' });
+  doc.text(params.dueDateStr || '30 Tage', 185, metaY + 25, { align: 'right' });
 
   // Table of Items
   y = 85;
@@ -1931,19 +1932,11 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   };
 
   // Pos 1: Software Provisioning
-  addRow(
-    'Campus-Groovelab Software-Bereitstellung',
-    'Basis-Software inklusive • 0 € Lizenzkaufgebühren',
-    '0,00 € (Inklusive)'
-  );
+  addRow('Campus-Groovelab Software-Bereitstellung', 'Basis-Software inklusive • 0 € Lizenzkaufgebühren', '0,00 € (Inklusive)');
 
   // Pos 2: Hosting Campus
   if (params.hasCampus) {
-    addRow(
-      'Cloud- & Datenbank-Hosting: Modul Campus',
-      'Intelligenter Stundenplan, Raum-Engine & Hausaufgabenheft-Sync',
-      '19,90 € / Mo.'
-    );
+    addRow('Cloud- & Datenbank-Hosting: Modul Campus', 'Intelligenter Stundenplan, Raum-Engine & Hausaufgabenheft-Sync', '14,90 € / Mo.');
   }
 
   // Pos 3: Hosting GrooveLab
@@ -1951,7 +1944,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
     addRow(
       'Cloud- & Datenbank-Hosting: Modul GrooveLab',
       'Band-Management, Repertoire-Planer & Songs meistern',
-      '12,90 € / Mo.'
+      '9,90 € / Mo.'
     );
   }
 
@@ -1959,8 +1952,8 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   if (params.hasKombiDiscount || (params.hasCampus && params.hasGroovelab)) {
     addRow(
       'Kombi-Vorteilsrabatt (Infrastruktur-Bündel)',
-      'Vergünstigter Hosting-Kombipreis bei Doppelbuchung',
-      '-7,90 € / Mo.',
+      'Vergünstigter Hosting-Kombipreis bei Doppelbuchung (19,90 € statt 24,80 €)',
+      '-4,90 € / Mo.',
       true
     );
   }
@@ -1970,7 +1963,7 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   if (teachersCount > 0) {
     addRow(
       'Service- & Administrationspauschale',
-      `${teachersCount} aktive Lehrkräfte & Verwaltung × 0,49 € / Mo.`,
+      `${teachersCount} aktive Lehrkraft-Profile × 0,49 € / Mo. (Schulleitung & Sekretariat 0,00 € inkl.)`,
       `${(teachersCount * 0.49).toFixed(2).replace('.', ',')} € / Mo.`
     );
   }
@@ -2053,9 +2046,13 @@ export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  const rawPdfIban = (params.operatorIban || formatOperatorIban() || '').trim();
+  const cleanPdfIban = rawPdfIban.replace(/\s+/g, '').toUpperCase();
+  const isPdfIbanConfigured = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(cleanPdfIban) && !cleanPdfIban.includes('EINRICHTUNG');
+  const displayPdfIban = isPdfIbanConfigured ? cleanPdfIban.replace(/(.{4})/g, '$1 ').trim() : 'Wird vor Rechnungsversand hinterlegt (Betreiber-Konfiguration)';
   doc.text(`Empfänger: ${opCompany}`, 25, y + 11);
-  doc.text(`IBAN: ${params.operatorIban || formatOperatorIban()}`, 25, y + 15.5);
-  doc.text(`BIC: ${params.operatorBic || OPERATOR_BANKING_CONFIG.bic}`, 25, y + 20);
+  doc.text(`IBAN: ${displayPdfIban}`, 25, y + 15.5);
+  doc.text((isPdfIbanConfigured && params.operatorBic && !params.operatorBic.includes('XXX')) ? `BIC: ${params.operatorBic}` : 'BIC: Nicht erforderlich (SEPA IBAN-Only)', 25, y + 20);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
@@ -4107,7 +4104,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF('p', 'mm', 'a4');
 
-  const refCode = params.referenceCode || `CAMPUS-${params.studentId.slice(0, 6).toUpperCase()}-${new Date().getFullYear()}`;
+  const refCode = params.referenceCode || `CG-${new Date().getFullYear()}-${params.studentId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase()}`;
   const totalAmount = params.totalAmountStr || (params.isHardship ? '0,00' : params.isDirectBilled ? '5,39' : '0,00');
   const curr = params.currencySuffix || 'EUR';
   const period = params.periodDescription || `Schuljahr bis 31.08.${new Date().getFullYear() + (new Date().getMonth() >= 8 ? 1 : 0)}`;
@@ -4147,7 +4144,7 @@ export const generateB2CParentContractPDF = async (params: B2CParentContractPara
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Profil / Nutzer: ${params.studentName}`, 22, 65);
+  doc.text(`Begünstigtes Schülerprofil (§ 328 BGB): ${params.studentName}`, 22, 65);
   doc.setFontSize(9);
   doc.setTextColor(100, 116, 139);
   doc.setFont('helvetica', 'normal');

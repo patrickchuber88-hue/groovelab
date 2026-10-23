@@ -7,17 +7,18 @@
  */
 
 export type SchoolDunningLevel =
-  | 'level_0_current'           // Days 1–14 (or no overdue invoices): Normal operation, Grace Period
-  | 'level_1_reminder'          // Days 15–22: 1st Reminder, subtle dashboard hint in Secretariat
-  | 'level_2_warning'           // Days 23–29: 7-day countdown warning before Admin Read-Only
-  | 'level_3_admin_readonly'    // Days 30–37: Admin Read-Only in Secretariat, Audio-Tresor Read-Only
-  | 'level_4_teacher_warning'   // Days 38–44: 7-day countdown before Didactic Read-Only for Teachers
-  | 'level_5_full_readonly';    // Days 45+: Didactic Read-Only for Teachers. Students stay 100% active.
+  | 'level_0_current'           // Tag 1–28 nach Fälligkeit (bzw. 1–42 im Ferien-Moratorium): Reguläre Kommunal-Karenzphase (0 €)
+  | 'level_1_reminder'          // Tag 29–36 nach Fälligkeit: 1. Freundliche Zahlungserinnerung im Cockpit (0 €)
+  | 'level_2_warning'           // Tag 37–43 nach Fälligkeit: 2. Mahnung & 7-Tage-Vorwarnung vor Schreibschutz (inkl. Kulanzpauschale)
+  | 'level_3_admin_readonly'    // Tag 44–51 nach Fälligkeit: Administrativer Schreibschutz im Sekretariat (100 % Didaktische Immunität)
+  | 'level_4_teacher_warning'   // Tag 52–58 nach Fälligkeit: Dringende Träger-Mahnung bei aktivem Verwaltungs-Schreibschutz
+  | 'level_5_full_readonly';    // Tag 59+ nach Fälligkeit: Eskalierter Verwaltungs-Schreibschutz (Schüler & Lehrkräfte 100 % geschützt)
 
 export interface OverdueInvoiceSummary {
   id: string;
   amount: number;
   due_date: string;
+  billing_date?: string;
   type: string;
   overdueDays: number;
 }
@@ -27,10 +28,12 @@ export interface SchoolDunningStatus {
   overdueDays: number;
   oldestOverdueInvoice: OverdueInvoiceSummary | null;
   totalOverdueAmount: number;
+  appliedDunningFee: number;
+  totalPayableAmount: number;
   unpaidInvoicesCount: number;
   overdueInvoicesList: OverdueInvoiceSummary[];
 
-  // Behavioral Access Flags (Unantastbares Didactic Immunity Axiom)
+  // Behavioral Access Flags (Unantastbares Didactic Immunity Axiom gem. § 242 BGB)
   isSecretaryReadOnly: boolean;
   isAudioTresorReadOnly: boolean; // Immer false: Didaktische Immunität für Schulinhalte & Übetracks
   isTeacherReadOnly: boolean;     // Immer false: Keine Aussperrung von Lehrkräften aus dem Unterricht
@@ -41,18 +44,103 @@ export interface SchoolDunningStatus {
 
   // Status Meta
   isDelinquent: boolean;        // True if level >= level_1_reminder
-  isExempt: boolean;            // True if bypass or active trial protects the school
-  exemptionReason?: 'subscription_bypass' | 'active_trial' | 'no_overdue';
+  isExempt: boolean;            // True if bypass, active trial, or SEPA direct debit protects the school
+  exemptionReason?: 'subscription_bypass' | 'active_trial' | 'sepa_direct_debit' | 'no_overdue';
 
   // Veredelungs-Metriken
-  dunningFee: number;           // 14.90, 9.90, or 19.90 € based on booked modules
-  isDunningFeeApplied: boolean; // True if level >= level_3_admin_readonly
-  isTrustExtended: boolean;     // True if 48h trust pass is active
+  dunningFee: number;           // 14.90, 9.90, or 19.90 € based on booked modules (Kulanz statt 40 € gem. § 288 Abs. 5 BGB)
+  isDunningFeeApplied: boolean; // True if level >= level_2_warning and not waived by Kulanzjoker
+  isTrustExtended: boolean;     // True if 48h trust pass or Kulanzjoker is currently active
   trustRemainingHours: number;  // Hours remaining on 48h trust pass
+  isTrustUsedForCycle: boolean; // True if the one-time 48h trust pass was already used for the current overdue cycle
   isKulanzActive: boolean;      // True if Master Admin granted +30 days grace extension
   isMunicipal: boolean;         // True if school is public/municipal
   isSummerMoratorium: boolean;  // True if summer break moratorium is applied
-  baseGraceDays: number;        // 14, 28, or 35
+  hasSepaMandate: boolean;      // True if school has an active SEPA direct debit mandate (§ 286 Abs. 4 BGB Holschuld)
+  baseGraceDays: number;        // 28 (Standard) or 42 (Ferien-Moratorium), +30 with Kulanzjoker
+}
+
+/**
+ * Resolves the authoritative reference date across Secretariat and Master-Admin,
+ * honoring the developer/operator time machine (`groovelab_simulated_date`).
+ */
+export function resolveEffectiveBillingDate(explicitDate?: Date | string | null): Date {
+  if (explicitDate) {
+    const parsed = new Date(explicitDate);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const sim = localStorage.getItem('groovelab_simulated_date');
+      if (sim) {
+        const parsed = new Date(sim);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return new Date();
+}
+
+/**
+ * Computes canonical B2B invoice creation date (last day of month 23:58) and
+ * statutory due date (+30 days net per § 286 Abs. 3 BGB, shifted to Monday if
+ * falling on Saturday/Sunday per § 193 BGB).
+ */
+export function computeCanonicalDueDate(year: number, month1Based: number): {
+  creationDate: Date;
+  dueDate: Date;
+  billingDateIso: string;
+  dueDateIso: string;
+  dueDateDisplay: string;
+} {
+  const deMonths = [
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+  ];
+  const lastDay = new Date(year, month1Based, 0).getDate();
+  const creationDate = new Date(year, month1Based - 1, lastDay, 23, 58, 0);
+  const dueDate = new Date(year, month1Based - 1, lastDay + 30, 23, 59, 59);
+  const dayOfWeek = dueDate.getDay();
+  if (dayOfWeek === 6) {
+    dueDate.setDate(dueDate.getDate() + 2); // Samstag -> Montag (§ 193 BGB)
+  } else if (dayOfWeek === 0) {
+    dueDate.setDate(dueDate.getDate() + 1); // Sonntag -> Montag (§ 193 BGB)
+  }
+  const fmtIso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dueDateDisplay = `${dueDate.getDate()}. ${deMonths[dueDate.getMonth()]} ${dueDate.getFullYear()}`;
+  return {
+    creationDate,
+    dueDate,
+    billingDateIso: fmtIso(creationDate),
+    dueDateIso: fmtIso(dueDate),
+    dueDateDisplay
+  };
+}
+
+/**
+ * Checks whether a school has an active SEPA Direct Debit Mandate (§ 286 Abs. 4 BGB Gläubiger-Holschuld).
+ */
+export function hasActiveSepaMandate(school: any): boolean {
+  if (!school) return false;
+  if (school.agreed_to_sepa === true || school.sepa_mandate_active === true) return true;
+  const iban = String(school.sepa_iban || school.billing_iban || '').trim();
+  const mandateId = String(school.sepa_mandate_id || '').trim();
+  if (iban.length >= 15 && mandateId.length >= 3) return true;
+  if (typeof window !== 'undefined' && school.id) {
+    try {
+      const localSepa = localStorage.getItem(`agreedToSepa_${school.id}`);
+      const localIban = localStorage.getItem(`billingIban_${school.id}`);
+      if (localSepa === 'true' && localIban && localIban.trim().length >= 15) {
+        return true;
+      }
+    } catch {
+      // ignore storage access errors
+    }
+  }
+  return false;
 }
 
 /**
@@ -72,7 +160,8 @@ export function computeSchoolDunningStatus(
   invoices: any[] = [],
   simulatedDate?: Date | string
 ): SchoolDunningStatus {
-  const refDate = parseDateToMidnight(simulatedDate || new Date());
+  const effectiveNow = resolveEffectiveBillingDate(simulatedDate);
+  const refDate = parseDateToMidnight(effectiveNow);
 
   // Calculate module-specific late fee: Campus 14.90, GrooveLab 9.90, Kombi 19.90 €
   const hasCampus = school?.has_campus_subscription !== false;
@@ -83,6 +172,8 @@ export function computeSchoolDunningStatus(
   } else if (!hasCampus && hasGroovelab) {
     dunningFee = 9.90;
   }
+
+  const hasSepa = hasActiveSepaMandate(school);
 
   // Check Municipal status (Leitweg-ID or explicit flag)
   const isMunicipal = Boolean(
@@ -105,12 +196,13 @@ export function computeSchoolDunningStatus(
     baseGraceDays = 42; // 6 weeks during summer holidays (July/August)
   }
 
-  // Check 48h Trust Extension
+  // Check 48h Trust Extension (against exact timestamp, not midnight-truncated)
   let isTrustExtended = false;
   let trustRemainingHours = 0;
-  if (school?.dunning_trust_extension_until) {
-    const trustUntil = new Date(school.dunning_trust_extension_until).getTime();
-    const nowTime = refDate.getTime();
+  const rawTrustUntil = school?.dunning_trust_extension_until;
+  if (rawTrustUntil) {
+    const trustUntil = new Date(rawTrustUntil).getTime();
+    const nowTime = effectiveNow.getTime();
     if (trustUntil > nowTime) {
       isTrustExtended = true;
       trustRemainingHours = Math.max(1, Math.ceil((trustUntil - nowTime) / (1000 * 60 * 60)));
@@ -121,7 +213,7 @@ export function computeSchoolDunningStatus(
   let isKulanzActive = false;
   if (school?.dunning_kulanz_until) {
     const kulanzUntil = new Date(school.dunning_kulanz_until).getTime();
-    if (kulanzUntil > refDate.getTime()) {
+    if (kulanzUntil > effectiveNow.getTime()) {
       isKulanzActive = true;
       baseGraceDays += 30;
       dunningFee = 0;
@@ -135,6 +227,7 @@ export function computeSchoolDunningStatus(
       dunningFee,
       isMunicipal,
       isSummerMoratorium,
+      hasSepaMandate: hasSepa,
       baseGraceDays
     });
   }
@@ -146,6 +239,7 @@ export function computeSchoolDunningStatus(
         dunningFee,
         isMunicipal,
         isSummerMoratorium,
+        hasSepaMandate: hasSepa,
         baseGraceDays
       });
     }
@@ -155,6 +249,7 @@ export function computeSchoolDunningStatus(
         dunningFee,
         isMunicipal,
         isSummerMoratorium,
+        hasSepaMandate: hasSepa,
         baseGraceDays
       });
     }
@@ -167,14 +262,27 @@ export function computeSchoolDunningStatus(
   if (Array.isArray(invoices)) {
     for (const inv of invoices) {
       if (!inv || !inv.due_date) continue;
+      if (String(inv.id || '').startsWith('VS-')) continue;
 
       const statusLower = String(inv.status || '').toLowerCase().trim();
       const isPaid = statusLower === 'paid' || 
                      statusLower === 'bezahlt' || 
                      statusLower === 'cancelled' || 
-                     statusLower === 'storniert';
+                     statusLower === 'storniert' ||
+                     statusLower === 'preview' ||
+                     statusLower === 'vorschau' ||
+                     statusLower === 'probemonat' ||
+                     statusLower === 'bypass' ||
+                     statusLower === 'kostenfrei';
 
       if (isPaid) continue;
+
+      // § 286 Abs. 4 BGB SEPA-Holschuld-Immunität:
+      // Bei aktivem SEPA-Lastschriftmandat gerät die Schule nur bei expliziter Rücklastschrift in Verzug.
+      const isChargeback = statusLower === 'chargeback' || statusLower === 'ruecklastschrift' || statusLower === 'failed';
+      if (hasSepa && !isChargeback) {
+        continue;
+      }
 
       const dueDate = parseDateToMidnight(inv.due_date);
       const diffMs = refDate.getTime() - dueDate.getTime();
@@ -182,12 +290,14 @@ export function computeSchoolDunningStatus(
 
       // Overdue starts when reference date is strictly after due date (overdueDays >= 1)
       if (overdueDays >= 1) {
-        const amount = Number(inv.amount || (inv.items && inv.items.amount) || 0);
+        const amount = Number(inv.amount ?? (inv.items && inv.items.amount) ?? 0);
+        if (amount <= 0) continue;
         overdueInvoices.push({
-          id: String(inv.id || ''),
+          id: String(inv.id || inv.invoice_number || ''),
           amount: isNaN(amount) ? 0 : Math.round(amount * 100) / 100,
           due_date: String(inv.due_date),
-          type: String(inv.type || 'INF'),
+          billing_date: inv.billing_date ? String(inv.billing_date) : undefined,
+          type: String(inv.type || (String(inv.id || '').startsWith('AKT-') ? 'AKT' : 'INF')),
           overdueDays
         });
         totalOverdueAmount += isNaN(amount) ? 0 : amount;
@@ -203,20 +313,41 @@ export function computeSchoolDunningStatus(
   totalOverdueAmount = Math.round(totalOverdueAmount * 100) / 100;
 
   if (maxOverdueDays <= 0 || overdueInvoices.length === 0) {
-    return createExemptStatus('no_overdue', {
+    return createExemptStatus(hasSepa ? 'sepa_direct_debit' : 'no_overdue', {
       dunningFee,
       isMunicipal,
       isSummerMoratorium,
-      baseGraceDays
+      hasSepaMandate: hasSepa,
+      baseGraceDays,
+      isKulanzActive
     });
   }
 
-  // 4. Map overdueDays to Dunning Level based on baseGraceDays
-  const level1Threshold = baseGraceDays + 1;  // e.g. 15
-  const level2Threshold = baseGraceDays + 9;  // e.g. 23
-  const level3Threshold = baseGraceDays + 16; // e.g. 30
-  const level4Threshold = baseGraceDays + 24; // e.g. 38
-  const level5Threshold = baseGraceDays + 31; // e.g. 45
+  // Check if the one-time 48h trust pass was already consumed for this overdue cycle
+  let isTrustUsedForCycle = false;
+  if (rawTrustUntil && oldestOverdue) {
+    const trustUntilMs = new Date(rawTrustUntil).getTime();
+    const oldestDueMs = parseDateToMidnight(oldestOverdue.due_date).getTime();
+    if (trustUntilMs > oldestDueMs) {
+      isTrustUsedForCycle = true;
+    }
+  }
+  if (!isTrustUsedForCycle && typeof window !== 'undefined' && school?.id && oldestOverdue?.id) {
+    try {
+      if (localStorage.getItem(`groovelab_trust_used_${school.id}_${oldestOverdue.id}`) === 'true') {
+        isTrustUsedForCycle = true;
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  // 4. Map overdueDays to Dunning Level based on baseGraceDays (28 days standard / 42 days summer)
+  const level1Threshold = baseGraceDays + 1;  // Tag 29 (bzw. 43 im Sommer)
+  const level2Threshold = baseGraceDays + 9;  // Tag 37 (bzw. 51 im Sommer)
+  const level3Threshold = baseGraceDays + 16; // Tag 44 (bzw. 58 im Sommer)
+  const level4Threshold = baseGraceDays + 24; // Tag 52
+  const level5Threshold = baseGraceDays + 31; // Tag 59
 
   let level: SchoolDunningLevel = 'level_0_current';
   if (maxOverdueDays >= level5Threshold) {
@@ -230,19 +361,22 @@ export function computeSchoolDunningStatus(
   } else if (maxOverdueDays >= level1Threshold) {
     level = 'level_1_reminder';
   } else {
-    level = 'level_0_current'; // Grace Period
+    level = 'level_0_current'; // Grace Period (Tag 1–28)
   }
 
   // 5. Behavioral Flags (Didaktische Immunität gem. § 242 BGB)
   // Rechnungsrückstände des Schulträgers dürfen niemals den Unterrichtsbetrieb
   // oder pädagogische Übetracks gefährden (Verhältnismäßigkeitsgrundsatz).
-  const isDunningFeeApplied = maxOverdueDays >= level3Threshold;
+  const isDunningFeeApplied = maxOverdueDays >= level3Threshold && !isKulanzActive && dunningFee > 0;
+  const appliedDunningFee = isDunningFeeApplied ? dunningFee : 0;
+  const totalPayableAmount = Math.round((totalOverdueAmount + appliedDunningFee) * 100) / 100;
+
   let isSecretaryReadOnly = maxOverdueDays >= level3Threshold;
-  const isAudioTresorReadOnly = false; // Didaktische Immunität
-  const isTeacherReadOnly = false;     // Didaktische Immunität
+  const isAudioTresorReadOnly = false; // 100 % Didaktische Immunität
+  const isTeacherReadOnly = false;     // 100 % Didaktische Immunität
 
   if (isTrustExtended) {
-    // 48h Vertrauenspass hebt auch den administrativen Schreibschutz im Sekretariat auf
+    // 48h Vertrauenspass oder Master-Admin Kulanzjoker hebt den administrativen Schreibschutz im Sekretariat auf
     isSecretaryReadOnly = false;
   }
 
@@ -258,6 +392,8 @@ export function computeSchoolDunningStatus(
     overdueDays: maxOverdueDays,
     oldestOverdueInvoice: oldestOverdue,
     totalOverdueAmount,
+    appliedDunningFee,
+    totalPayableAmount,
     unpaidInvoicesCount: overdueInvoices.length,
     overdueInvoicesList: overdueInvoices,
     isSecretaryReadOnly,
@@ -271,19 +407,22 @@ export function computeSchoolDunningStatus(
     isDunningFeeApplied,
     isTrustExtended,
     trustRemainingHours,
+    isTrustUsedForCycle,
     isKulanzActive,
     isMunicipal,
     isSummerMoratorium,
+    hasSepaMandate: hasSepa,
     baseGraceDays
   };
 }
 
 function createExemptStatus(
-  reason: 'subscription_bypass' | 'active_trial' | 'no_overdue',
+  reason: 'subscription_bypass' | 'active_trial' | 'sepa_direct_debit' | 'no_overdue',
   extras?: {
     dunningFee?: number;
     isMunicipal?: boolean;
     isSummerMoratorium?: boolean;
+    hasSepaMandate?: boolean;
     baseGraceDays?: number;
     isKulanzActive?: boolean;
   }
@@ -293,6 +432,8 @@ function createExemptStatus(
     overdueDays: 0,
     oldestOverdueInvoice: null,
     totalOverdueAmount: 0,
+    appliedDunningFee: 0,
+    totalPayableAmount: 0,
     unpaidInvoicesCount: 0,
     overdueInvoicesList: [],
     isSecretaryReadOnly: false,
@@ -307,9 +448,11 @@ function createExemptStatus(
     isDunningFeeApplied: false,
     isTrustExtended: false,
     trustRemainingHours: 0,
+    isTrustUsedForCycle: false,
     isKulanzActive: extras?.isKulanzActive ?? false,
     isMunicipal: extras?.isMunicipal ?? false,
     isSummerMoratorium: extras?.isSummerMoratorium ?? false,
+    hasSepaMandate: extras?.hasSepaMandate ?? false,
     baseGraceDays: extras?.baseGraceDays ?? 28
   };
 }

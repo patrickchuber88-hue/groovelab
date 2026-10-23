@@ -1,6 +1,7 @@
 import { ChartOfAccounts, DatevBookingRecord } from '../../utils/datevExporter';
 import { ParsedBankTransaction, BankStatementParseResult } from '../../utils/camtParser';
 import { SepaDirectDebitBatchOptions, SepaDebtorTransaction } from '../../utils/sepaXmlGenerator';
+import type { SchoolDunningStatus, OverdueInvoiceSummary } from '../../domain/schoolDunningEngine';
 
 export type FinanceSubTab = 'invoices' | 'datev' | 'banking' | 'prap' | 'dunning' | 'ledger';
 
@@ -69,6 +70,11 @@ export interface Invoice {
   sepaMandateId?: string;
   sepaMandateDate?: string;
   billingIban?: string;
+  summerMoratoriumActive?: boolean;
+  dunningKulanzUntil?: string | null;
+  dunningTrustExtensionUntil?: string | null;
+  dunningStatus?: SchoolDunningStatus;
+  overdueInvoices?: OverdueInvoiceSummary[];
 }
 
 export interface PlatformSummary {

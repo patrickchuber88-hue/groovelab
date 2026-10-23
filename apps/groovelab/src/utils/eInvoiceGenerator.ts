@@ -40,6 +40,8 @@ export interface EInvoicePayload {
   paymentReference?: string;
   buyerReference?: string; // Leitweg-ID for municipal Kämmereien
   notes?: string;
+  billingPeriodStart?: string; // YYYY-MM-DD (BT-73)
+  billingPeriodEnd?: string;   // YYYY-MM-DD (BT-74)
 }
 
 /**
@@ -253,15 +255,28 @@ export const generateXRechnungXML = (data: EInvoicePayload): string => {
       <ram:PaymentReference>${data.paymentReference || data.invoiceNumber}</ram:PaymentReference>
       <ram:InvoiceCurrencyCode>${currency}</ram:InvoiceCurrencyCode>
 
+      ${(data.billingPeriodStart && data.billingPeriodEnd) ? `
+      <!-- Billing Specified Period (BT-73 / BT-74) -->
+      <ram:BillingSpecifiedPeriod>
+        <ram:StartDateTime>
+          <udt:DateTimeString format="102">${formatUNCEFACTDate(data.billingPeriodStart)}</udt:DateTimeString>
+        </ram:StartDateTime>
+        <ram:EndDateTime>
+          <udt:DateTimeString format="102">${formatUNCEFACTDate(data.billingPeriodEnd)}</udt:DateTimeString>
+        </ram:EndDateTime>
+      </ram:BillingSpecifiedPeriod>` : ''}
+
       <!-- Payment Means (SEPA Transfer) -->
       <ram:SpecifiedTradeSettlementPaymentMeans>
-        <ram:TypeCode>58</ram:TypeCode>
+        <ram:TypeCode>${(data.seller.iban && /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(data.seller.iban.replace(/\s+/g, ''))) ? '58' : '30'}</ram:TypeCode>
+        ${(data.seller.iban && /^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(data.seller.iban.replace(/\s+/g, ''))) ? `
         <ram:PayeePartyCreditorFinancialAccount>
-          <ram:IBANID>${(data.seller.iban || '').replace(/\s+/g, '')}</ram:IBANID>
+          <ram:IBANID>${data.seller.iban.replace(/\s+/g, '')}</ram:IBANID>
         </ram:PayeePartyCreditorFinancialAccount>
+        ${data.seller.bic && !data.seller.bic.includes('XXX') ? `
         <ram:PayeeSpecifiedCreditorFinancialInstitution>
-          <ram:BICID>${(data.seller.bic || '').replace(/\s+/g, '')}</ram:BICID>
-        </ram:PayeeSpecifiedCreditorFinancialInstitution>
+          <ram:BICID>${data.seller.bic.replace(/\s+/g, '')}</ram:BICID>
+        </ram:PayeeSpecifiedCreditorFinancialInstitution>` : ''}` : ''}
       </ram:SpecifiedTradeSettlementPaymentMeans>
 
       <!-- VAT Summary -->

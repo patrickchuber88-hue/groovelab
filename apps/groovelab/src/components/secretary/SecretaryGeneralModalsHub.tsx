@@ -167,6 +167,7 @@ export const SecretaryGeneralModalsHub: React.FC<SecretaryGeneralModalsHubProps>
             isOpen={showDunningPayModal}
             onClose={() => setShowDunningPayModal(false)}
             dunningStatus={dunningStatus}
+            schoolId={schoolId}
             schoolName={schoolName || currentSchoolProfile?.name || 'Musikschule'}
             operatorCompany={operatorCompany}
             operatorIban={operatorIban}
@@ -175,7 +176,13 @@ export const SecretaryGeneralModalsHub: React.FC<SecretaryGeneralModalsHubProps>
               setActiveTab('secretary');
               setSecretarySubTab('licenses');
             }}
-            onActivateTrustExtension={() => {
+            onActivateTrustExtension={(expiresAt) => {
+              if (currentSchoolProfile && setCurrentSchoolProfile) {
+                setCurrentSchoolProfile({
+                  ...currentSchoolProfile,
+                  dunning_trust_extension_until: expiresAt,
+                });
+              }
               setTrustRefreshToken(Date.now());
             }}
           />

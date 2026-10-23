@@ -372,34 +372,13 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     </div>
                   )}
 
-                  {/* Enterprise B2B Delinquency Alert in Secretary Briefing */}
-                  {!subscriptionBypass && dunningStatus?.isDelinquent && dunningStatus.totalOverdueAmount > 0 && (
-                    <div style={{ background: dunningStatus.isSecretaryReadOnly ? '#fee2e2' : (dunningStatus.level === 'level_2_warning' ? '#fef3c7' : '#dbeafe'), border: 'none', borderRadius: '24px', padding: isMobileView ? '16px' : '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', boxShadow: 'none' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
-                        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', flexShrink: 0 }}>
-                          {dunningStatus.isSecretaryReadOnly ? <ShieldAlert size={24} style={{ color: '#dc2626' }} /> : <Clock size={24} style={{ color: dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb' }} />}
-                        </div>
-                        <div>
-                          <strong style={{ display: 'block', fontSize: '1rem', color: dunningStatus.isSecretaryReadOnly ? '#991b1b' : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e3a8a'), marginBottom: '4px' }}>
-                            {dunningStatus.isSecretaryReadOnly ? `Administrativer Schreibschutz aktiv (${dunningStatus.unpaidInvoicesCount} ${dunningStatus.unpaidInvoicesCount === 1 ? 'Beleg' : 'Belege'} überfällig)` : `Offene B2B-Abrechnung (${dunningStatus.unpaidInvoicesCount} ${dunningStatus.unpaidInvoicesCount === 1 ? 'Beleg' : 'Belege'} seit ${dunningStatus.overdueDays} Tagen fällig)`}
-                          </strong>
-                          <span style={{ fontSize: '0.84rem', color: dunningStatus.isSecretaryReadOnly ? '#7f1d1d' : (dunningStatus.level === 'level_2_warning' ? '#78350f' : '#1e40af'), lineHeight: '1.4' }}>
-                            Ausstehender Gesamtbetrag: <strong>{dunningStatus.totalOverdueAmount.toFixed(2).replace('.', ',')} €</strong>. Schüler- &amp; Lehrkräfte-Accounts genießen 100 % didaktische Immunität und werden niemals gesperrt.
-                          </span>
-                        </div>
-                      </div>
-                      <button type="button" aria-label="B2B-Sofortausgleich via EPC-QR öffnen" onClick={() => { if (onOpenDunningPayModal) onOpenDunningPayModal(); else setSecretarySubTab('licenses'); }} style={{ background: dunningStatus.isSecretaryReadOnly ? '#dc2626' : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'), color: '#ffffff', border: 'none', borderRadius: '12px', padding: '10px 20px', fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: 'none', transition: 'transform 0.15s, background-color 0.15s' }}>
-                        ⚡ Sofort ausgleichen (EPC-QR)
-                      </button>
-                    </div>
-                  )}
-
                   {(() => {
                     if (!isBillingBooked || dismissedInvoiceAlert) return null;
                     const today = simulatedToday ? new Date(simulatedToday + 'T23:59:59') : new Date(), y = today.getFullYear(), m = today.getMonth() + 1;
                     const lastDay = new Date(y, m, 0).getDate(), creationTime = new Date(y, m - 1, lastDay, 23, 58, 0);
                     if (today.getTime() < creationTime.getTime()) return null;
-                    const monthStr = m < 10 ? `0${m}` : `${m}`, yearShort = String(y).slice(-2), currentInvoiceId = `RE-${schoolNumericId}-${yearShort}${monthStr}-01`;
+                    const paddedNumId = String(schoolNumericId).padStart(3, '0');
+                    const monthStr = m < 10 ? `0${m}` : `${m}`, yearShort = String(y).slice(-2), currentInvoiceId = `INF-${paddedNumId}-${yearShort}${monthStr}-01`;
                     const deMonths = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
                     const monthName = deMonths[m], invoiceDateStr = `${lastDay}. ${monthName} ${y}`, dueDateObj = new Date(y, m - 1, lastDay);
                     dueDateObj.setDate(dueDateObj.getDate() + 30);
@@ -412,9 +391,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: '1 1 240px' }}>
                           <div style={{ background: '#3b82f6', color: '#ffffff', width: '38px', height: '38px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', flexShrink: 0 }}>📧</div>
                           <div>
-                            <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>Monatsrechnung ${currentInvoiceId} versendet</h4>
+                            <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#1e3a8a', fontFamily: 'Urbanist' }}>Monatsrechnung {currentInvoiceId} versendet</h4>
                             <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#1e40af', lineHeight: '1.4', fontWeight: 500 }}>
-                              Die Rechnung für den Leistungszeitraum ${monthName} ${y} über <strong>{(Number(mixedTotal_global) || 0).toFixed(2).replace('.', ',')} €</strong> wurde am ${invoiceDateStr} per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
+                              Die Rechnung für den Leistungszeitraum {monthName} {y} über <strong>{(Number(mixedTotal_global) || 0).toFixed(2).replace('.', ',')} €</strong> wurde am {invoiceDateStr} per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
                             </p>
                           </div>
                         </div>

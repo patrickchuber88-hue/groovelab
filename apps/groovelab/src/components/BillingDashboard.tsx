@@ -793,7 +793,8 @@ export function BillingDashboard({ preselectedSchoolId }: { preselectedSchoolId?
             activationsCount: viewingInvoice.activeStudents,
             activeStudentFee: viewingInvoice.activeStudentFee,
             subscriptionBypass: viewingInvoice.subscriptionBypass,
-            isTrialMonth: viewingInvoice.isTrialMonth
+            isTrialMonth: viewingInvoice.isTrialMonth,
+            isSammelzahler: viewingInvoice.isSammelzahler !== undefined ? viewingInvoice.isSammelzahler : !['both', 'debit', 'cash', 'option1'].includes(viewingInvoice.studentBillingOption)
           }}
           schoolName={viewingInvoice.schoolName}
           schoolStreet={viewingInvoice.schoolStreet}
