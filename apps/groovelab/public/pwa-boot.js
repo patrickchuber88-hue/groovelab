@@ -16,7 +16,7 @@
   var isGrooveLab = platformParam === 'groovelab' || 
                     (platformParam !== 'campus' && safeGetItem('groovelab_active_platform') === 'groovelab' && window.location.pathname.indexOf('/onboarding') === -1);
   
-  var themeColor = isGrooveLab ? '#eab308' : '#34a853';
+  var themeColor = '#ffffff';
   var title = isGrooveLab ? 'GrooveLab' : 'Campus-Groovelab';
   var appleTouchIcon = isGrooveLab ? '/apple-touch-icon-groovelab.png' : '/apple-touch-icon.png';
   var favicon = isGrooveLab ? '/pwa-icon-groovelab.png' : '/pwa-icon.png';

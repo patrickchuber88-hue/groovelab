@@ -24,8 +24,8 @@
   "start_url": "/?platform=groovelab",
   "id": "/?platform=groovelab",
   "scope": "/",
-  "background_color": "#0c0f12",
-  "theme_color": "#eab308",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "display": "standalone",
   "orientation": "any",
   "shortcuts": [

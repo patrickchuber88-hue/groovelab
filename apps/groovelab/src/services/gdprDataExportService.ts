@@ -92,11 +92,13 @@ export async function exportStudentGdprDossier(
     schul_id: studentUser.school_id || 'unbekannt',
     vorname: studentUser.first_name || 'Schüler',
     nachname_initial: studentUser.last_name ? `${studentUser.last_name[0]}.` : '',
+    nachname_projektion: 'NULL für Mitschüler (relativ anonymisiert gem. EuGH C-413/23 P)',
+    nachname_vault: 'PGP-AES-256 fremdschlüsselfrei in private_auth.blind_student_lastname_vault (Art. 34 Abs. 3 lit. a DSGVO Safe-Harbor)',
     rolle: 'student',
     didaktik_level: studentUser.campus_ui_level || studentUser.ui_level || 'junior',
     hauptinstrument: studentUser.instrument || 'Allgemein',
     erstellt_am: studentUser.created_at || exportTimestamp,
-    datenschutz_status: 'DSGVO-konform pseudonymisiert'
+    datenschutz_status: '3-Stufen Zero-Knowledge Identity Vault (Migrations 600–605)'
   };
 
   // 2. Evolution, Übezeiten & Didaktische Meilensteine

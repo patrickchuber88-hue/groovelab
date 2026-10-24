@@ -11,6 +11,7 @@ import {
   extractCanonicalAudioStoragePath,
   isMetadataOrSnapshotNote
 } from '../tabs/briefing/homeworkSummaryHelper';
+import { deduplicateAndMergeProgressMatrixRows } from '../../../utils/homeworkSnapshotHelper';
 import { MicroScoreSnippet } from '../meisterwerk/microscore/microScore.types';
 
 export type TaskReflectionStatus = 'super' | 'wackelig' | 'hilfe' | undefined;
@@ -622,8 +623,9 @@ export const AuthoritativeHomeworkProvider: React.FC<AuthoritativeHomeworkProvid
       }
     };
 
-    // 1. Identify weekly snapshot containers (sorted newest first)
-    const candidates = (progressItems || []).filter((item: any) =>
+    // 1. Identify weekly snapshot containers (sorted newest first, deduplicated verlustfrei)
+    const consolidatedItems = deduplicateAndMergeProgressMatrixRows(progressItems || []);
+    const candidates = consolidatedItems.filter((item: any) =>
       item.topic_name?.startsWith('Hausaufgabe KW ') &&
       item.is_current_homework !== false &&
       Boolean(item.homework_notes || item.teacher_notes)

@@ -549,7 +549,8 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
         rawSnapshotSongsToken: existingPayload?.rawSnapshotSongsToken || currentPrep.currentRawSnapshotSongsToken || currentPrep.rawSnapshotSongsToken,
         audioTokens: remainingAudioTokens,
         loopTokens: existingPayload?.loopItems?.map(l => l.rawToken) || currentNotes.filter((n: string) => typeof n === 'string' && n.startsWith('LOOP:')),
-        microScores: existingPayload?.microScores?.map(m => m.rawToken) || []
+        microScores: existingPayload?.microScores?.map(m => m.rawToken) || [],
+        studentQuestions: existingPayload?.studentQuestions?.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`) || []
       });
 
       if (existingRows && existingRows.length > 0) {

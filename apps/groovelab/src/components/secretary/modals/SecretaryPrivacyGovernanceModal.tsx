@@ -933,9 +933,9 @@ export const SecretaryPrivacyGovernanceModal: React.FC<SecretaryPrivacyGovernanc
                 }}
               >
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>LK 1 • Kiosk-Tokens</div>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Sofort bei Session-Ende</div>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>RAM-Zeroization via Cache-Scrubbing</div>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>LK 1 • Kiosk &amp; Step-Up</div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Sofort / 60s Auto-Curtain</div>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px' }}>Zero-PIN Leases &amp; Art. 17 Kernel-Purge</div>
                 </div>
 
                 <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>

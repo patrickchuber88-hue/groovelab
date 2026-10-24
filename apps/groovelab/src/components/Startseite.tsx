@@ -447,22 +447,27 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
   return (
     <div 
+      className="pwa-scroll-container pwa-standalone-screen"
       onClick={handleBackgroundClick}
       onTouchEnd={handleBackgroundClick}
       style={{
         minHeight: '100vh',
+        height: '100dvh',
+        maxHeight: '100dvh',
         background: '#050505',
         fontFamily: '"Outfit", "Inter", system-ui, -apple-system, sans-serif',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        padding: '48px 20px 60px',
+        padding: '36px 16px 80px',
         color: '#f4f4f5',
         textAlign: 'center',
         position: 'relative',
         overflowX: 'hidden',
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehaviorY: 'contain',
         boxSizing: 'border-box'
       }}
     >

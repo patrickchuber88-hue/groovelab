@@ -895,9 +895,7 @@ export const TagesplanHomeworkFahrplanModal: React.FC<TagesplanHomeworkFahrplanM
           .from('progress_matrix')
           .select('id, homework_notes')
           .eq('student_id', sId)
-          .ilike('topic_name', `Hausaufgabe KW %`)
-          .order('updated_at', { ascending: false })
-          .limit(1)
+          .eq('topic_name', topicName)
           .maybeSingle();
         existingMatrixRow = existingMatrix || null;
       }

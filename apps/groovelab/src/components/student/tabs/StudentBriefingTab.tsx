@@ -6020,7 +6020,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
-                            fontSize: '0.68rem', 
+                            fontSize: '0.78rem', 
                             fontWeight: 900, 
                             opacity: 0.95, 
                             textTransform: 'uppercase', 
@@ -6031,16 +6031,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </span>
                           <div style={{ 
                             background: isXpPulsing ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.2)', 
-                            padding: '6px', 
+                            padding: '7px', 
                             borderRadius: '10px',
                             transition: 'all 0.3s ease'
                           }}>
-                            <Star size={14} color={isXpPulsing ? '#fef08a' : 'white'} fill={isXpPulsing ? '#fef08a' : 'white'} />
+                            <Star size={17} color={isXpPulsing ? '#fef08a' : 'white'} fill={isXpPulsing ? '#fef08a' : 'white'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                           <span style={{ 
-                            fontSize: '1.6rem', 
+                            fontSize: '1.75rem', 
                             fontWeight: 950, 
                             fontFamily: "'Plus Jakarta Sans', sans-serif", 
                             letterSpacing: '-0.02em',
@@ -6048,7 +6048,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           }}>
                             {displayXp}
                           </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                             XP
                           </span>
                         </div>
@@ -6073,7 +6073,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     }} className="hover-scale">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                         <span style={{ 
-                          fontSize: '0.68rem', 
+                          fontSize: '0.78rem', 
                           fontWeight: 900, 
                           opacity: 0.95, 
                           textTransform: 'uppercase', 
@@ -6084,15 +6084,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         </span>
                         <div style={{ 
                           background: 'rgba(255, 255, 255, 0.2)', 
-                          padding: '6px', 
+                          padding: '7px', 
                           borderRadius: '10px' 
                         }}>
-                          <Award size={14} color="white" />
+                          <Award size={17} color="white" />
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                         <span style={{ 
-                          fontSize: '1.6rem', 
+                          fontSize: '1.75rem', 
                           fontWeight: 950, 
                           fontFamily: "'Plus Jakarta Sans', sans-serif", 
                           letterSpacing: '-0.02em',
@@ -6100,7 +6100,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }}>
                           {songStats.assignedCount ? `${songStats.masteredCount}/${songStats.assignedCount}` : `${songStats.masteredCount || 0}`}
                         </span>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                           Songs
                         </span>
                       </div>
@@ -6125,7 +6125,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
-                            fontSize: '0.68rem', 
+                            fontSize: '0.78rem', 
                             fontWeight: 900, 
                             textTransform: 'uppercase', 
                             letterSpacing: '0.08em',
@@ -6135,10 +6135,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </span>
                           <div style={{ 
                             background: 'rgba(0, 0, 0, 0.12)', 
-                            padding: '6px', 
+                            padding: '7px', 
                             borderRadius: '10px' 
                           }}>
-                            <Clock size={14} color="#451a03" />
+                            <Clock size={17} color="#451a03" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
@@ -6150,7 +6150,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               return (
                                 <>
                                   <span style={{ 
-                                    fontSize: '1.6rem', 
+                                    fontSize: '1.75rem', 
                                     fontWeight: 950, 
                                     fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                     letterSpacing: '-0.02em',
@@ -6158,7 +6158,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   }}>
                                     {Math.round(totalSecs)}
                                   </span>
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#78350f' }}>
                                     Sek.
                                   </span>
                                 </>
@@ -6167,7 +6167,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             return (
                               <>
                                 <span style={{ 
-                                  fontSize: '1.6rem', 
+                                  fontSize: '1.75rem', 
                                   fontWeight: 950, 
                                   fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                   letterSpacing: '-0.02em',
@@ -6175,7 +6175,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 }}>
                                   {secondsToDisplayMinutes(totalSecs)}
                                 </span>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#78350f' }}>
+                                <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#78350f' }}>
                                   Min.
                                 </span>
                               </>
@@ -6204,7 +6204,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }} className="hover-scale">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
-                            fontSize: '0.68rem', 
+                            fontSize: '0.78rem', 
                             fontWeight: 900, 
                             opacity: 0.95, 
                             textTransform: 'uppercase', 
@@ -6215,15 +6215,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           </span>
                           <div style={{ 
                             background: 'rgba(255, 255, 255, 0.25)', 
-                            padding: '6px', 
+                            padding: '7px', 
                             borderRadius: '10px' 
                           }}>
-                            <Flame size={14} color="white" fill="white" />
+                            <Flame size={17} color="white" fill="white" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
                           <span style={{ 
-                            fontSize: '1.6rem', 
+                            fontSize: '1.75rem', 
                             fontWeight: 950, 
                             fontFamily: "'Plus Jakarta Sans', sans-serif", 
                             letterSpacing: '-0.02em',
@@ -6231,7 +6231,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           }}>
                             {effectiveStreak === 0 ? 'Startklar' : effectiveStreak}
                           </span>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
+                          <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
                             {effectiveStreak === 0 ? 'Tag 1' : (effectiveStreak === 1 ? 'Tag' : 'Tage')}
                           </span>
                         </div>
@@ -7482,6 +7482,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     isOpen={isMobileSidebarSheetOpen}
                     onClose={() => setIsMobileSidebarSheetOpen(false)}
                     initialTab={mobileSidebarInitialTab}
+                    onTabChange={(t) => setMobileSidebarInitialTab(t)}
                     appointmentAlertsCount={sidebarAppointmentChanges.length}
                     feedAlertsCount={unreadClassFeedCount}
                   />

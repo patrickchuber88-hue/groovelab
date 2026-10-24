@@ -630,6 +630,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
     const weekSongs: any[] = [];
     const weekAudioTracks: ArchiveAudioTrackItem[] = [];
     const weekNotes: string[] = [];
+    const weekMicroScores: any[] = [];
     let weekQuestion: { timestamp?: string; text: string } | null = null;
 
     // Check direct weekItems
@@ -743,7 +744,15 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
         }
       });
 
-      // 5. Question
+      // 5. Notenschnipsel (MicroScores)
+      const snapScores = parseMicroScoreEntries(parsedNotes);
+      snapScores.forEach(ms => {
+        if (!weekMicroScores.some(existing => existing.id === ms.id)) {
+          weekMicroScores.push(ms);
+        }
+      });
+
+      // 6. Question
       if (!weekQuestion) {
         const qParsed = parseStudentQuestionFromNotes(parsedNotes);
         if (qParsed.hasQuestion && qParsed.text) {
@@ -757,7 +766,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
       groupedLehrwerke[title].pages.sort((a, b) => a - b);
     });
 
-    const totalTasksCount = Object.keys(groupedLehrwerke).length + weekSongs.length;
+    const totalTasksCount = Object.keys(groupedLehrwerke).length + weekSongs.length + weekMicroScores.length;
 
     return {
       weekNum,
@@ -766,6 +775,7 @@ export const QrAuthoritativeHomeworkSection: React.FC<QrAuthoritativeHomeworkSec
       songs: weekSongs,
       audioTracks: weekAudioTracks,
       notes: weekNotes,
+      microScores: weekMicroScores,
       studentQuestion: weekQuestion,
       totalTasksCount
     };

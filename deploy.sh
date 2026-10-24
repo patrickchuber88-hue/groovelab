@@ -145,26 +145,35 @@ rsync -avz --delete \
 echo "⚡ Schalte Symlink atomar auf $RELEASE_ID..."
 ssh "$SERVER" "ln -sfn '$TARGET_RELEASE' '$CURRENT_LINK'"
 
-# 5. Atomare Nginx-Aktualisierung (Zero-Downtime, 100% Reboot-resistent)
+# 5. Atomare Nginx-Aktualisierung (Zero-Downtime, 100% Reboot-resistent & Fail-Closed Config Rollback)
 echo "🚀 Validiere und aktualisiere Live-Webserver & Security Headers..."
 WEB_CONTAINER=$(ssh "$SERVER" "docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1" || true)
-ssh "$SERVER" "mkdir -p /tmp/nginx_sync"
-scp deploy/nginx/security-headers.conf deploy/nginx/campus-groovelab.de.conf deploy/nginx/supabase.campus-groovelab.de.conf apps/groovelab/public/nginx.default.conf "$SERVER:/tmp/nginx_sync/" || true
-ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
-  sudo mkdir -p /etc/nginx/snippets /etc/nginx/sites-available /etc/nginx/sites-enabled && \
-  sudo cp /tmp/nginx_sync/security-headers.conf /etc/nginx/snippets/ 2>/dev/null || true; \
-  sudo cp /tmp/nginx_sync/campus-groovelab.de.conf /etc/nginx/sites-available/ 2>/dev/null || true; \
-  sudo cp /tmp/nginx_sync/supabase.campus-groovelab.de.conf /etc/nginx/sites-available/ 2>/dev/null || true; \
-  sudo ln -sf /etc/nginx/sites-available/campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
-  sudo ln -sf /etc/nginx/sites-available/supabase.campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
-  sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress & Security Headers erfolgreich reloaded.'; \
+ssh "$SERVER" "mkdir -p /tmp/nginx_sync /tmp/nginx_pre_deploy_backup"
+scp deploy/nginx/security-headers.conf deploy/nginx/campus-groovelab.de.conf deploy/nginx/supabase.campus-groovelab.de.conf apps/groovelab/public/nginx.default.conf "$SERVER:/tmp/nginx_sync/" || rollback
+ssh "$SERVER" "set -eo pipefail; \
+if command -v nginx >/dev/null 2>&1; then \
+  sudo mkdir -p /etc/nginx/snippets /etc/nginx/sites-available /etc/nginx/sites-enabled /tmp/nginx_pre_deploy_backup && \
+  sudo rm -rf /tmp/nginx_pre_deploy_backup/* && \
+  sudo cp -a /etc/nginx/sites-available/*.conf /tmp/nginx_pre_deploy_backup/ 2>/dev/null || true; \
+  sudo rm -f /etc/nginx/conf.d/rate-limits.conf /etc/nginx/sites-available/*.bak 2>/dev/null || true; \
+  sudo cp /tmp/nginx_sync/security-headers.conf /etc/nginx/snippets/ && \
+  sudo cp /tmp/nginx_sync/campus-groovelab.de.conf /etc/nginx/sites-available/ && \
+  sudo cp /tmp/nginx_sync/supabase.campus-groovelab.de.conf /etc/nginx/sites-available/ && \
+  sudo ln -sf /etc/nginx/sites-available/campus-groovelab.de.conf /etc/nginx/sites-enabled/ && \
+  sudo ln -sf /etc/nginx/sites-available/supabase.campus-groovelab.de.conf /etc/nginx/sites-enabled/; \
+  if ! sudo nginx -t; then \
+    echo '🚨 KRITISCHER FEHLER: nginx -t fehlgeschlagen! Stelle vorherige Nginx-Konfiguration auf Disk wieder her...'; \
+    sudo cp -a /tmp/nginx_pre_deploy_backup/*.conf /etc/nginx/sites-available/ 2>/dev/null || true; \
+    exit 1; \
+  fi; \
+  sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress & Security Headers erfolgreich reloaded.'; \
 fi; \
 if [ -n \"$WEB_CONTAINER\" ]; then \
   docker cp $TARGET_RELEASE/. $WEB_CONTAINER:/usr/share/nginx/html/ 2>/dev/null || true; \
   docker exec $WEB_CONTAINER mkdir -p /etc/nginx/snippets 2>/dev/null || true; \
   docker cp /tmp/nginx_sync/security-headers.conf $WEB_CONTAINER:/etc/nginx/snippets/security-headers.conf 2>/dev/null || true; \
   docker cp /tmp/nginx_sync/nginx.default.conf $WEB_CONTAINER:/etc/nginx/conf.d/default.conf 2>/dev/null || true; \
-  docker exec $WEB_CONTAINER nginx -t 2>/dev/null && docker exec $WEB_CONTAINER nginx -s reload 2>/dev/null || true; \
+  docker exec $WEB_CONTAINER nginx -t && docker exec $WEB_CONTAINER nginx -s reload; \
   echo \"  ✓ Live-Web-Container ($WEB_CONTAINER) & Security Headers synchronisiert & reloaded.\"; \
 fi" || rollback
 

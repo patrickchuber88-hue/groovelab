@@ -146,12 +146,12 @@ export const COMPLIANCE_RULES_180: ComplianceRuleDefinition[] = [
     id: 'RULE-009',
     pillar: 1,
     pillarName: COMPLIANCE_PILLARS_18[1],
-    norm: 'DSGVO Art. 5 Abs. 1 lit. c',
-    description: 'Schüler-Roster automatische Nachnamensmaskierung („Max M.“) auf Lehrkraft-Oberflächen',
+    norm: 'DSGVO Art. 5 Abs. 1 lit. c, Art. 25, Art. 34 Abs. 3 lit. a & EuGH C-413/23 P',
+    description: '3-Stufen-Identität & Zero-Knowledge Vault: NULL für Mitschüler (public.users), „Max M.“ im Alltag (public.users_raw), PGP-AES-256 Vault mit Step-Up Leases & Kernel-Triggern (trg_users_raw_zero_knowledge_vault / trg_users_raw_vault_purge, Migrations 600–605)',
     severity: 'HIGH',
     category: 'AST_POSITIVE_PATTERN',
     invariantTarget: 'apps/groovelab/src/services/studentRosterService.ts',
-    enforcementMechanism: 'maskLastName() formatiert Nachnamen zu Initialen'
+    enforcementMechanism: 'Kernel-Trigger & View public.users erzwingen 3-Stufen-Maskierung'
   },
   {
     id: 'RULE-010',

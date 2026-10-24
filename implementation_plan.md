@@ -1,141 +1,47 @@
-# Implementierungsplan: 0,1% Goldstandard PIN-Tresor & Step-Up Lease Token Architektur (NIST SP 800-63B / BSI TR-02102-1)
+# 📋 Implementierungsplan (Phase 2): 360° Legal-Text, Dashboard & PDF-Synchronisation (Migrations 600–605)
 
-## 1. Problemstellung & Sicherheits-Evaluation (Senior IT-Volljurist & Cryptographic Architect)
+## 1. Zielsetzung & Technischer Referenz-Maßstab (10/10 IST-Zustand)
+Synchronisation sämtlicher Rechtstexte, Datenschutz-Cockpits, Modals, Exocortex-Dossiers und **aller relevanten PDF-Generatoren** der Campus-Groovelab App auf den realen technischen Datenbank-IST-Zustand der **Migrationen 600 bis 605**:
 
-### Status Quo & Bedrohungsanalyse
-1. **Server- & DB-Ebene (Bereits gehärtet):**
-   * Persönliche PINs werden in `private_auth.user_secrets.argon2_personal_pin_hash` als unumkehrbare Bcrypt/Argon2-Hashes (`$2a$10$...`) mit Salts gespeichert. Im Quellcode und in Datenbank-Views existiert kein Klartext.
-   * `verify_personal_pin` führt konstante Zeitvergleiche (`hmac`), IP-Rate-Limiting (max. 20 Fehlversuche / 15 Min) und automatische Kontensperren (`pin_locked_until`) durch.
-2. **Kritischer Vektor im Client (Browser-RAM):**
-   * In `apps/groovelab/src/utils/nameHelper.ts` wurde bisher `window.__glStepUpPin = pin;` flüchtig für ein 5-Minuten-Gleitfenster im Arbeitsspeicher gehalten, damit Folgeaufrufe von `reveal_class_roster_names` oder Detailabfragen nicht bei jedem Klick erneut den Dialog öffnen.
-   * **Risiko nach OWASP ASVS Level 3 & BSI TR-02102-1:**
-     Obwohl die PIN nicht persistent (`localStorage`) gespeichert wird, verbleibt ein 4-stelliger Klartext im JavaScript-Heap. Bei DOM-XSS, Browser-Extensions oder Speicherdumps könnte dieser Klartext kompromittiert werden.
-
----
-
-## 2. Zielarchitektur: Der 0,1% Goldstandard (Zero-Client-PIN)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Lehrkraft / Admin
-    participant UI as StepUpPinModal / UI
-    participant Helper as nameHelper.ts (Client RAM)
-    participant RPC as reveal_class_roster_names
-    participant Vault as private_auth.step_up_leases & Vault
-
-    User->>UI: Eingabe der 4-stelligen PIN
-    UI->>Helper: revealClassRosterNamesViaVault(pin)
-    Helper->>RPC: POST { p_pin: "1234", p_step_up_token: null }
-    Note over Helper: Zeroize: pin = null;
-    RPC->>Vault: verify_personal_pin(user_id, p_pin)
-    Vault-->>RPC: PIN Gültig (Bcrypt OK)
-    RPC->>Vault: mint_step_up_lease(user_id, TTL 300s)
-    Vault-->>RPC: Neues Step-Up Token (UUID v4)
-    RPC->>Vault: Entschlüssele Schülernachnamen via PGP-Sym
-    RPC-->>Helper: { success: true, step_up_token: "c8f1...", students: [...] }
-    Note over Helper: Speichere NUR token im RAM (__glStepUpToken)<br/>KEINE Klartext-PIN im Client!
-    Helper-->>UI: Klarnamen gerendert (60s Auto-Curtain)
-
-    opt Nachfolgende Reveals innerhalb der 5 Min
-        User->>UI: Klick auf weiteren Schüler / Roster
-        UI->>Helper: revealClassRosterNamesViaVault()
-        Helper->>RPC: POST { p_pin: null, p_step_up_token: "c8f1..." }
-        RPC->>Vault: Validiere Step-Up Token & TTL
-        RPC-->>Helper: { success: true, students: [...] }
-    end
-
-    opt Auto-Curtain (60s) oder Manueller Vorhang
-        Helper->>RPC: revoke_step_up_lease(token)
-        Note over Helper: Token gelöscht & ungültig
-    end
-```
-
-### Die 3 Kern-Säulen des 0,1% Goldstandards:
-1. **Zero-Client-PIN Doktrin:**
-   * Die eingegebene PIN verlässt den Client ausschließlich im ersten Autorisierungs-Request und wird im JavaScript-Speicher unmittelbar danach genullt (`zeroized`).
-   * `window.__glStepUpPin` und `__glStepUpPinExpiresAt` werden restlos aus dem gesamten Monorepo eliminiert.
-2. **Kryptografische Step-Up Lease Tokens (`private_auth.step_up_leases`):**
-   * Nach erfolgreicher Bcrypt-Prüfung mintet die Datenbank ein kryptografisch zufälliges Step-Up Token (`UUID v4`) mit strikter Gültigkeitsdauer (300 Sekunden).
-   * Das Token ist an die `user_id` und `school_id` gebunden und kann serverseitig jederzeit vorzeitig widerrufen werden (`is_revoked = TRUE`).
-3. **Dual-Authentifizierungs-Schnittstelle in den Vault-RPCs:**
-   * `reveal_class_roster_names(p_pin TEXT DEFAULT NULL, p_student_ids UUID[] DEFAULT NULL, p_step_up_token UUID DEFAULT NULL)`
-   * `reveal_student_full_name(p_student_id UUID, p_pin TEXT DEFAULT NULL, p_step_up_token UUID DEFAULT NULL)`
-   * Wenn `p_step_up_token` gültig ist, erfolgt die Freigabe sofort ohne PIN.
-   * Wenn `p_pin` gültig ist, wird autorisiert und ein neues `step_up_token` zurückgegeben.
-   * Andernfalls: Fail-Closed (`PIN_REQUIRED` / `INVALID_PIN`).
+1. **3-Stufen-Identitätsprojektion (`public.users` View, Migration 600):**
+   - **Stufe 1 (Schüler / Mitschüler / Ensemble-Peers / Anon):** `last_name` wird auf SQL-View-Ebene technisch hart als **`NULL`** projiziert (`0 %` Nachname, `0 %` Initiale; Mitschüler sehen ausschließlich den Vornamen, z. B. `„Amelia“` -> *relative Anonymisierung* gem. EuGH C-413/23 P).
+   - **Stufe 2 (Lehrkraft / Schulleitung / Sekretariat im Regelbetrieb):** `public.users_raw.last_name` speichert physisch ausschließlich das 1-Buchstaben-Initial (`„N.“` -> `„Amelia N.“`; *kanonische Pseudonymisierung* gem. Art. 4 Nr. 5 & Art. 25 DSGVO).
+   - **Stufe 3 (On-Demand Step-Up Reveal im Verwaltungs-/Notfall, Migration 603–604):** Temporäre Entschlüsselung über `reveal_student_full_name` / `reveal_class_roster_names` mit striktem **Teacher-Scoping** (Lehrkräfte nur eigene zugewiesene Schüler, Schulleitung/Sekretariat nur eigene Schule), **60-Sekunden Auto-Curtain** (automatischer RAM-Wipe) und unveränderbarem **WORM-Audit-Log** (`REVEAL_STUDENT_FULL_NAME` / `REVEAL_CLASS_ROSTER_NAMES`).
+2. **Fremdschlüsselfreier 360° Zero-Knowledge Identity Vault (`private_auth.blind_student_lastname_vault`, Migration 600–605):**
+   - Speichert den Nachnamen als `PGP_SYM_ENCRYPT(..., 'cipher-algo=aes256')` Chiffrat **ohne `student_id`-Spalte**, adressiert ausschließlich über den kryptografischen Blind-Index `blind_link_hmac = HMAC-SHA256(student_id || ':' || school_id, school_secret)`.
+   - Mandantenspezifische Schlüsselkapselung (`private_auth.school_key_envelopes`) + Fail-Closed Master-Key-Tresor (`private_auth.vault_master_keys`, Migration 605, 0 % Hardcoded-Fallback) -> **Safe-Harbor-Privilegierung nach Art. 34 Abs. 3 lit. a DSGVO**.
+3. **Zero-Client-PIN Step-Up Leases (`private_auth.step_up_leases`, Migration 604):**
+   - Keine Speicherung der Klartext-PIN im Browser-RAM; das Frontend hält nur ein serverseitig ausgestelltes, auf **300 Sekunden** befristetes UUID-Lease-Token (`p_step_up_token`), das beim Auto-Curtain via `revoke_step_up_lease` widerrufen wird.
+4. **Kernel In-Flight Auto-Verschlüsselung (`private_auth.trg_users_raw_zero_knowledge_vault`, Migration 605):**
+   - `BEFORE INSERT OR UPDATE ON public.users_raw` fängt jeden eingehenden Klartext-Nachnamen (`length > 2`) eines Schülers noch vor dem Schreiben auf den Datenträger ab, verschlüsselt ihn PGP-AES-256 in den Blind-Vault und überschreibt `NEW.last_name` atomar auf `„X.“`.
+5. **Deterministischer Art. 17 DSGVO Kernel-Vault-Purge (`private_auth.trg_users_raw_vault_purge`, Migration 605):**
+   - `AFTER DELETE ON public.users_raw` berechnet deterministisch den `blind_link_hmac`, vernichtet das Nachnamens-Chiffrat im `blind_student_lastname_vault` rückstandslos und protokolliert den WORM-Nachweis `PURGE_STUDENT_VAULT_RECORD`.
+6. **Physische Vernichtung historischer Quarantäne-Tabellen (Migration 605):**
+   - `_deprecated_student_last_names_quarantine` und `_deprecated_student_first_names_quarantine` sind per `DROP TABLE ... CASCADE` physisch gelöscht.
 
 ---
 
-## 3. Detaillierter Umsetzungsplan
+## 2. Geplante chirurgische Änderungen nach Dateigruppen
 
-### Phase 1: PostgreSQL DDL & RPC Härtung (`supabase/migrations/604_enterprise_zero_knowledge_step_up_lease_and_peppered_pin.sql`)
-1. **Tabelle `private_auth.step_up_leases`:**
-   ```sql
-   CREATE TABLE IF NOT EXISTS private_auth.step_up_leases (
-       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-       user_id UUID NOT NULL REFERENCES public.users_raw(id) ON DELETE CASCADE,
-       school_id UUID NOT NULL,
-       purpose TEXT NOT NULL DEFAULT 'REVEAL_STUDENT_NAMES',
-       expires_at TIMESTAMPTZ NOT NULL,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-       is_revoked BOOLEAN NOT NULL DEFAULT FALSE
-   );
-   ```
-2. **Helper-Funktionen in `private_auth`:**
-   * `private_auth.mint_step_up_lease(p_user_id UUID, p_school_id UUID, p_duration_seconds INT DEFAULT 300) RETURNS UUID`
-   * `private_auth.verify_step_up_lease(p_token UUID, p_user_id UUID) RETURNS BOOLEAN`
-   * `public.revoke_step_up_lease(p_token UUID) RETURNS BOOLEAN`
-3. **Härtung von `reveal_class_roster_names` & `reveal_student_full_name`:**
-   * Ergänzung des Parameters `p_step_up_token UUID DEFAULT NULL`.
-   * Prüfung von `p_step_up_token` vor PIN-Anforderung.
-   * Rückgabe von `step_up_token` im Erfolgsfall.
-4. **Berechtigungen & Grants:**
-   * `REVOKE ALL ON private_auth.step_up_leases FROM PUBLIC, anon, authenticated;`
-   * `GRANT EXECUTE ON FUNCTION public.revoke_step_up_lease(UUID) TO authenticated, service_role;`
+### Gruppe A: Zentrale Rechtstexte & SSOT-Kataloge
+1. `apps/groovelab/src/constants/legalMasterWording.ts` (Säule 17 `pseudonymizationAndSoleProprietorProtection`)
+2. `apps/groovelab/src/legal/legalContent.ts` (`terms_student_platform`, `avv_standalone`, `school_parent_privacy_notice`, `platform_privacy`, `junior_privacy`)
+3. `apps/groovelab/src/constants/complianceRuleCatalog.ts` (`RULE-009`)
 
-### Phase 2: Client Memory-Zeroization & Token Management (`apps/groovelab/src/utils/nameHelper.ts`)
-1. **Window-Interface Typisierung:**
-   * Entfernen von `__glStepUpPin?: string;` und `__glStepUpPinExpiresAt?: number;`.
-   * Ergänzen von `__glStepUpToken?: string;` und `__glStepUpTokenExpiresAt?: number;`.
-2. **Methoden-Harmonisierung:**
-   * `getValidStepUpToken(): string | null`
-   * `setStepUpToken(token: string, durationMs?: number): void`
-   * `clearStepUpToken(): void`
-   * `isStepUpActive(): boolean`
-3. **Vault-RPC Integration:**
-   * In `revealClassRosterNamesViaVault`:
-     * Übergabe von `p_step_up_token: getValidStepUpToken()` und optional `p_pin: pin || null`.
-     * Wenn `data.step_up_token` empfangen wird: Speichern via `setStepUpToken(data.step_up_token)`.
-     * Sofortiges Nullen der lokalen `pin`-Referenz.
-   * In `setMode(true)` (Curtain Close & 60s Timeout):
-     * Aufruf von `clearStepUpToken()`.
+### Gruppe B: Dashboards, Boards, Modals & Services
+4. `apps/groovelab/src/components/AVVModal.tsx` (§ 2 Abs. 2 & § 5 Nr. 3–4)
+5. `apps/groovelab/src/components/DpoAuditPortal.tsx` (Fix `WORM-INIT-1005` Z. 274 + Tab 2 `AVV_TOM` + Tab 3 `RIGHTS` + Tab 4 `MUNICIPAL_DPO` VVT)
+6. `apps/groovelab/src/components/secretary/modals/SecretaryPrivacyGovernanceModal.tsx` (Sektion 1 & Sektion 4)
+7. `apps/groovelab/src/components/student/settings/ParentConsentSettingsView.tsx` (Eltern-Datenschutz-Box)
+8. `apps/groovelab/src/services/gdprDataExportService.ts` (Art. 15/20 JSON-Metadaten)
 
-### Phase 3: Modal Hub Refactoring (`apps/groovelab/src/components/modals/SecurityAuthModalsHub.tsx`)
-1. **Entfernen des Zwischenspeicherns von PINs:**
-   * Kein Aufruf von `setStepUpPin(enteredPin)`.
-   * Stattdessen atomare Delegation:
-     `const res = await revealClassRosterNamesViaVault(undefined, enteredPin, client);`
-   * Bei Erfolg erhält der Client das `step_up_token` direkt aus dem Response-Payload und `enteredPin` verlässt den Scope.
+### Gruppe C: Alle relevanten PDF-Generatoren (11 PDF-Ausgaben in 6 Generator-Modulen)
+9. `apps/groovelab/src/utils/b2bContractPdfGenerator.ts` (Anlage 2 AVV & TOMs)
+10. `apps/groovelab/src/utils/parentConsentPdfGenerator.ts` (Säule 2 & 4 im Eltern-Merkblatt-PDF)
+11. `apps/groovelab/src/utils/gdprDataTakeout.ts` (Art. 15/20 JSON-Manifest & DIN 5008 PDF-Bescheid)
+12. `apps/groovelab/src/utils/dpoComplianceDossierGenerator.ts` (4-Seiten Behörden-DSB-Dossier)
+13. `apps/groovelab/src/utils/securityWhitepaperGenerator.ts` (2-Seiten TOM-Whitepaper)
+14. `apps/groovelab/src/utils/pdfGenerator.ts` (`generateConsentPDF`, `generateDSBCompliancePDF`, `generateTeacherQuickstartPDF`, `generateGdprDataReportPDF`, `generateGdprDeletionCertificatePDF`, `generateB2BContractCertificatePDF`)
 
----
-
-## 4. Verifikationsplan & Prüfkriterien
-
-1. **Static Forensics:**
-   * `git grep -i "__glStepUpPin"` -> 0 Treffer im gesamten Codebase.
-   * `git grep -i "setStepUpPin"` -> 0 Treffer.
-2. **Typisierung & Invarianten:**
-   * Monorepo Typecheck (`tsc --noEmit`).
-   * Überprüfung der 23 Sicherheits-Invarianten (`scripts/verify_invariants.mjs`).
-3. **Datenbank- & API-Parität (IONOS Cluster):**
-   * Einspielen von Migration 604 auf IONOS `85.215.73.216`.
-   * Test-Aufruf mit PIN: Liefert `step_up_token UUID` und entschlüsselte Namen zurück.
-   * Test-Aufruf mit `step_up_token`: Liefert ohne PIN sofort entschlüsselte Namen zurück.
-   * Test-Aufruf nach Ablauf / Widerruf: Liefert `PIN_REQUIRED`.
-
----
-
-> [!IMPORTANT]
-> **Strikter Genehmigungsvorbehalt (Zero Auto-Execute):**
-> Die Implementierung startet erst nach deiner ausdrücklichen Freigabe im Chat.
+### Gruppe D: Exocortex-Dossiers & Automatisierter Legal-Compliance-Guard
+15. `docs/VVT_MUSTER_SCHULTRAEGER_ART30.md`, `docs/LEGAL_COMPLIANCE_360_DOSSIER.md` & `scripts/legal_compliance_guard.mjs` (`LEG-37`)

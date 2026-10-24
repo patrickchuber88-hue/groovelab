@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { syncMicroScoreSnippetToProgressMatrix } from './microScoreSyncSatellite';
 import { createPortal } from 'react-dom';
 import { X, Play, Square, Save, Music, Sparkles, Check, Minus, Plus, ChevronDown, ChevronLeft, ChevronRight, Headphones, Pencil, BookOpen, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
 import { MicroScoreDuration, MicroScoreInstrument, MicroScoreNote, MicroScoreSnippet, MicroScoreDisplayMode, MicroScoreTimeSignature } from './microScore.types';
@@ -988,7 +989,7 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
     }
   }, [isPlaying, stopPlayback, startPlayback]);
 
-  // Speichern in LocalStorage und optional DB-Callback
+  // Speichern in LocalStorage und autoritative DB-Synchronisation (0.1% Goldstandard)
   const handleSave = () => {
     try {
       const updatedSnippet = { 
@@ -1003,6 +1004,10 @@ export const MicroScoreStudioModal: React.FC<MicroScoreStudioModalProps> = ({
       if (onSaveSnippet) {
         onSaveSnippet(updatedSnippet);
       }
+
+      // 🛡️ Autoritativer PostgreSQL-Sync via Satellit (Monolith Ceiling)
+      void syncMicroScoreSnippetToProgressMatrix(studentId, updatedSnippet);
+
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 2500);
     } catch (e) {

@@ -456,11 +456,7 @@ export function parseHomeworkNotesPayload(rawNotes: unknown): ExtractedHomeworkP
   return result;
 }
 
-/**
- * Builds a canonical homework_notes JSON payload for progress_matrix upserts,
- * safely combining didactic notes with serialized snapshots, media tokens, and archived questions.
- */
-export function buildHomeworkNotesPayload(params: {
+export interface BuildHomeworkNotesParams {
   didacticNotes?: string[];
   lehrwerke?: any[];
   songs?: any[];
@@ -470,7 +466,126 @@ export function buildHomeworkNotesPayload(params: {
   loopTokens?: string[];
   microScores?: Array<any | string>;
   studentQuestions?: Array<{ question: string; timestamp?: string } | string>;
-}): string {
+  stickers?: string[];
+  feedbacks?: string[];
+  studentNotes?: string[];
+  worldtourMastery?: string[];
+  earlabScores?: string[];
+}
+
+/**
+ * 0.1% Goldstandard Helper: Konsolidiert und dedupliziert Zeilen aus public.progress_matrix
+ * Bevorzugt Zeilen mit is_current_homework = true und reichhaltigstem Inhalt,
+ * führt Tokens für Wochen-Container ('Hausaufgabe KW %') verlustfrei zusammen.
+ */
+export function deduplicateAndMergeProgressMatrixRows(rows?: any[] | null): any[] {
+  if (!rows || !Array.isArray(rows) || rows.length === 0) return [];
+
+  const weeklyContainerMap = new Map<string, any>();
+  const regularItemsMap = new Map<string, any>();
+
+  rows.forEach(item => {
+    if (!item) return;
+    const rawTopic = item.topic_name || item.title || '';
+    const cleanTopicKey = rawTopic.trim().toLowerCase();
+    if (!cleanTopicKey) return;
+
+    if (cleanTopicKey.startsWith('hausaufgabe kw')) {
+      const existing = weeklyContainerMap.get(cleanTopicKey);
+      if (!existing) {
+        weeklyContainerMap.set(cleanTopicKey, { ...item });
+      } else {
+        const preferCurrent = Boolean(item.is_current_homework) || Boolean(existing.is_current_homework);
+        const parsedExisting = parseHomeworkNotesPayload(existing.homework_notes);
+        const parsedNew = parseHomeworkNotesPayload(item.homework_notes);
+
+        // Führe Lehrwerke zusammen
+        const mergedLw = [...parsedExisting.lehrwerke];
+        parsedNew.lehrwerke.forEach(newLw => {
+          const exIdx = mergedLw.findIndex(b => cleanHomeworkTitle(b.title).toLowerCase() === cleanHomeworkTitle(newLw.title).toLowerCase());
+          if (exIdx >= 0) {
+            const combinedPages = Array.from(new Set([...mergedLw[exIdx].pages, ...newLw.pages])).sort((a, b) => a - b);
+            mergedLw[exIdx].pages = combinedPages;
+            mergedLw[exIdx].formattedPages = formatPageRangeString(combinedPages);
+          } else {
+            mergedLw.push(newLw);
+          }
+        });
+
+        // Führe Songs zusammen
+        const mergedSongs = [...parsedExisting.songs];
+        parsedNew.songs.forEach(newSong => {
+          const exIdx = mergedSongs.findIndex(s => cleanHomeworkTitle(s.title || s.topic_name || '').toLowerCase() === cleanHomeworkTitle(newSong.title || newSong.topic_name || '').toLowerCase());
+          if (exIdx === -1) {
+            mergedSongs.push(newSong);
+          }
+        });
+
+        // Führe Audio & Loops zusammen
+        const mergedAudio = Array.from(new Set([
+          ...parsedExisting.audioItems.map(a => a.rawToken),
+          ...parsedNew.audioItems.map(a => a.rawToken)
+        ])).filter(Boolean);
+
+        const mergedLoops = Array.from(new Set([
+          ...parsedExisting.loopItems.map(l => l.rawToken),
+          ...parsedNew.loopItems.map(l => l.rawToken)
+        ])).filter(Boolean);
+
+        // Führe MicroScores zusammen
+        const mergedMicroScores = Array.from(new Set([
+          ...parsedExisting.microScores.map(m => m.rawToken),
+          ...parsedNew.microScores.map(m => m.rawToken)
+        ])).filter(Boolean);
+
+        // Führe Didactic Notes & Questions zusammen
+        const mergedDidactic = Array.from(new Set([
+          ...parsedExisting.didacticNotes,
+          ...parsedNew.didacticNotes
+        ])).filter(Boolean);
+
+        const mergedQuestions = Array.from(new Set([
+          ...parsedExisting.studentQuestions.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`),
+          ...parsedNew.studentQuestions.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`)
+        ])).filter(Boolean);
+
+        const consolidatedNotes = buildHomeworkNotesPayload({
+          didacticNotes: mergedDidactic,
+          lehrwerke: mergedLw,
+          songs: mergedSongs,
+          audioTokens: mergedAudio,
+          loopTokens: mergedLoops,
+          microScores: mergedMicroScores,
+          studentQuestions: mergedQuestions
+        });
+
+        weeklyContainerMap.set(cleanTopicKey, {
+          ...(existing.id && !item.is_current_homework ? existing : item),
+          is_current_homework: preferCurrent,
+          homework_notes: consolidatedNotes,
+          updated_at: (new Date(item.updated_at || 0) > new Date(existing.updated_at || 0)) ? item.updated_at : existing.updated_at
+        });
+      }
+    } else {
+      if (!regularItemsMap.has(cleanTopicKey)) {
+        regularItemsMap.set(cleanTopicKey, item);
+      } else {
+        const prev = regularItemsMap.get(cleanTopicKey);
+        if (!prev.is_current_homework && item.is_current_homework) {
+          regularItemsMap.set(cleanTopicKey, item);
+        }
+      }
+    }
+  });
+
+  return [...weeklyContainerMap.values(), ...regularItemsMap.values()];
+}
+
+/**
+ * Builds a canonical homework_notes JSON payload for progress_matrix upserts,
+ * safely combining didactic notes with serialized snapshots, media tokens, and archived questions.
+ */
+export function buildHomeworkNotesPayload(params: BuildHomeworkNotesParams): string {
   const finalNotesList: string[] = [];
 
   // 1. Text notes
@@ -543,6 +658,39 @@ export function buildHomeworkNotesPayload(params: {
     });
   }
 
+  // 7. Stickers
+  if (params.stickers && params.stickers.length > 0) {
+    params.stickers.forEach(s => {
+      if (s && !finalNotesList.includes(s)) finalNotesList.push(s);
+    });
+  }
+
+  // 8. Feedbacks
+  if (params.feedbacks && params.feedbacks.length > 0) {
+    params.feedbacks.forEach(f => {
+      if (f && !finalNotesList.includes(f)) finalNotesList.push(f);
+    });
+  }
+
+  // 9. Student Notes (Private / Public)
+  if (params.studentNotes && params.studentNotes.length > 0) {
+    params.studentNotes.forEach(sn => {
+      if (sn && !finalNotesList.includes(sn)) finalNotesList.push(sn);
+    });
+  }
+
+  // 10. Worldtour Mastery & EarLab Scores
+  if (params.worldtourMastery && params.worldtourMastery.length > 0) {
+    params.worldtourMastery.forEach(w => {
+      if (w && !finalNotesList.includes(w)) finalNotesList.push(w);
+    });
+  }
+  if (params.earlabScores && params.earlabScores.length > 0) {
+    params.earlabScores.forEach(e => {
+      if (e && !finalNotesList.includes(e)) finalNotesList.push(e);
+    });
+  }
+
   return JSON.stringify(finalNotesList);
 }
 
@@ -578,12 +726,11 @@ export async function deleteCurrentHomeworkAuthoritative(
   const paddedKw = resolvedWeekNumStr.padStart(2, '0');
   const unpaddedKw = String(parseInt(resolvedWeekNumStr, 10) || resolvedWeekNumStr);
 
-  // 1. progress_matrix der aktuellen Woche bereinigen (sowohl KW 09 als auch KW 9 + alle aktiven KW-Container)
+  // 1. progress_matrix der aktuellen Woche deaktivieren (Revisionshistorie in homework_notes bleibt erhalten!)
   const { error: kwPaddedErr } = await supabase
     .from('progress_matrix')
     .update({
       is_current_homework: false,
-      homework_notes: null,
       updated_at: nowIso
     })
     .eq('student_id', studentId)
@@ -598,19 +745,17 @@ export async function deleteCurrentHomeworkAuthoritative(
       .from('progress_matrix')
       .update({
         is_current_homework: false,
-        homework_notes: null,
         updated_at: nowIso
       })
       .eq('student_id', studentId)
       .ilike('topic_name', `Hausaufgabe KW ${unpaddedKw}%`);
   }
 
-  // Auch jeden aktiv markierten Wochen-Container (is_current_homework = true) leeren
+  // Auch jeden aktiv markierten Wochen-Container (is_current_homework = true) deaktivieren
   await supabase
     .from('progress_matrix')
     .update({
       is_current_homework: false,
-      homework_notes: null,
       updated_at: nowIso
     })
     .eq('student_id', studentId)

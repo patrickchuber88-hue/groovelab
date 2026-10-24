@@ -605,7 +605,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
           flexDirection: 'column',
           flex: 1,
           minHeight: 0,
-          height: '100%',
+          height: windowWidth <= 768 ? 'auto' : '100%',
           width: '100%'
         }}>
           <ErrorBoundary>

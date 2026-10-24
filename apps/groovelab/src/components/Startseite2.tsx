@@ -208,15 +208,22 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
   ];
 
   return (
-    <div style={{
-      fontFamily: 'Inter, sans-serif',
-      backgroundColor: '#ffffff', // Pure White Background as requested
-      color: '#000000',
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflowX: 'hidden'
-    }}>
+    <div 
+      className="pwa-scroll-container pwa-standalone-screen"
+      style={{
+        fontFamily: 'Inter, sans-serif',
+        backgroundColor: '#ffffff', // Pure White Background as requested
+        color: '#000000',
+        minHeight: '100vh',
+        height: '100dvh',
+        maxHeight: '100dvh',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       
       {/* 🏛️ 1. Header & Navigation (Sticky) */}
       <header style={{

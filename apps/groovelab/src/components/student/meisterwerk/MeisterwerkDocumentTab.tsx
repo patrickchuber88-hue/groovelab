@@ -17,7 +17,7 @@ import { StudioModuleKey, ALL_STUDIO_MODULE_KEYS, isStudioModuleActive, DEFAULT_
 import { cleanSongOrBookTitle, formatHarmonizedAudioTitle, formatAudioDate } from '../../../utils/audioNamingHelper';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
-import { cleanHomeworkTitle } from '../../../utils/homeworkSnapshotHelper';
+import { cleanHomeworkTitle, deduplicateAndMergeProgressMatrixRows } from '../../../utils/homeworkSnapshotHelper';
 import { resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import { formatPageNumbers, getCleanPageNotes, getCleanTeacherHomeworkText, formatStudentNoteDisplay, parseStudentQuestionFromNotes, parseStudentAnnotation, parseSongArtistAndTitle, SKILL_TAGS, parseWorldTourMasteries, ParsedWorldTourMastery } from '../meisterwerk.types';
 import { WorldTourMasteryNoteCard } from './worldtour/WorldTourMasteryNoteCard';
@@ -7031,18 +7031,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             }
                           : getWeekDateRangeLocal(viewingWeekOffset);
 
-                        // 1. Deduplicate progress items
-                        const uniqueItemsMap = new Map<string, any>();
-                        (progressItems || []).forEach(item => {
-                          if (isDummyOrTestSong(item)) return;
-                          const canonicalKey = getCanonicalSongKey(item);
-                          const normTitle = getNormalizedSongTitle(item).toLowerCase();
-                          const name = canonicalKey || normTitle || (item.topic_name || '').trim().toLowerCase();
-                          if (name && !uniqueItemsMap.has(name)) {
-                            uniqueItemsMap.set(name, item);
-                          }
-                        });
-                        const deduplicatedItems = Array.from(uniqueItemsMap.values());
+                        // 1. Deduplicate progress items verlustfrei (0.1% Goldstandard)
+                        const deduplicatedItems = deduplicateAndMergeProgressMatrixRows(progressItems || []);
 
                         let lehrwerkeList: { title: string; pages: number[]; notes: string[] }[] = [];
                         let otherHWs: any[] = [];

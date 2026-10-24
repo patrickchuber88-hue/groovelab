@@ -336,9 +336,7 @@ export async function syncBookPagesToWeeklySnapshot(params: SyncBookPagesParams)
         .from('progress_matrix')
         .select('*')
         .eq('student_id', studentId)
-        .ilike('topic_name', `Hausaufgabe KW %`)
-        .order('updated_at', { ascending: false })
-        .limit(1)
+        .eq('topic_name', topicName)
         .maybeSingle();
 
       const existingPayload = existingMatrix?.homework_notes
@@ -368,13 +366,15 @@ export async function syncBookPagesToWeeklySnapshot(params: SyncBookPagesParams)
         existingPayload.lehrwerke.push(newLwEntry as any);
       }
 
-      // Baue den serialisierten JSON Payload
+      // Baue den serialisierten JSON Payload verlustfrei
       const updatedJson = buildHomeworkNotesPayload({
         didacticNotes: existingPayload.didacticNotes,
         lehrwerke: existingPayload.lehrwerke,
         songs: existingPayload.songs,
         audioTokens: existingPayload.audioItems.map(a => a.rawToken).filter(Boolean),
-        microScores: existingPayload.microScores.map(m => m.rawToken).filter(Boolean)
+        loopTokens: existingPayload.loopItems.map(l => l.rawToken).filter(Boolean),
+        microScores: existingPayload.microScores.map(m => m.rawToken).filter(Boolean),
+        studentQuestions: existingPayload.studentQuestions.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`).filter(Boolean)
       });
 
       if (existingMatrix?.id) {
@@ -463,9 +463,7 @@ export async function syncSingleBookPageFromMeisterwerk(params: SyncSinglePagePa
         .from('progress_matrix')
         .select('*')
         .eq('student_id', studentId)
-        .ilike('topic_name', 'Hausaufgabe KW %')
-        .order('updated_at', { ascending: false })
-        .limit(1)
+        .eq('topic_name', topicName)
         .maybeSingle();
 
       if (matrixRow) {
@@ -509,7 +507,9 @@ export async function syncSingleBookPageFromMeisterwerk(params: SyncSinglePagePa
           lehrwerke: payload.lehrwerke,
           songs: payload.songs,
           audioTokens: payload.audioItems.map(a => a.rawToken).filter(Boolean),
-          microScores: payload.microScores.map(m => m.rawToken).filter(Boolean)
+          loopTokens: payload.loopItems.map(l => l.rawToken).filter(Boolean),
+          microScores: payload.microScores.map(m => m.rawToken).filter(Boolean),
+          studentQuestions: payload.studentQuestions.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`).filter(Boolean)
         });
 
         await supabase
@@ -543,6 +543,7 @@ export async function syncSongToWeeklySnapshot(params: SyncSongParams): Promise<
   const cleanTitle = cleanHomeworkTitle(songTitle);
   const isMastered = status === 'MASTERED';
   const effectiveIsHomework = isCurrentHomework && !isMastered;
+  const { topicName } = getCurrentHomeworkWeekInfo();
 
   // A) In user_song_skills abspeichern
   if (isUUID(studentId)) {
@@ -576,9 +577,7 @@ export async function syncSongToWeeklySnapshot(params: SyncSongParams): Promise<
         .from('progress_matrix')
         .select('*')
         .eq('student_id', studentId)
-        .ilike('topic_name', 'Hausaufgabe KW %')
-        .order('updated_at', { ascending: false })
-        .limit(1)
+        .eq('topic_name', topicName)
         .maybeSingle();
 
       if (matrixRow) {
@@ -611,7 +610,9 @@ export async function syncSongToWeeklySnapshot(params: SyncSongParams): Promise<
           lehrwerke: payload.lehrwerke,
           songs: payload.songs,
           audioTokens: payload.audioItems.map(a => a.rawToken).filter(Boolean),
-          microScores: payload.microScores.map(m => m.rawToken).filter(Boolean)
+          loopTokens: payload.loopItems.map(l => l.rawToken).filter(Boolean),
+          microScores: payload.microScores.map(m => m.rawToken).filter(Boolean),
+          studentQuestions: payload.studentQuestions.map(q => q.rawToken || `STUDENT_QUESTION:${q.timestamp || ''}|${q.question}`).filter(Boolean)
         });
 
         await supabase

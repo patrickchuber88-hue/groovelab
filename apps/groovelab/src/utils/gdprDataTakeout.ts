@@ -199,6 +199,7 @@ export async function generateDpoReferenceArt15And20Takeout(
       jurisdiction: jurisdiction.regionName,
       compliancePillars: {
         zeroUsCloud: '100% Souveräne EU/DE-Hosting-Infrastruktur (IONOS SE & Hetzner Online GmbH, ISO/IEC 27001)',
+        zeroKnowledgeVault: '360° Zero-Knowledge Identity Vault (Migrations 600–605): PGP-AES-256 Vault mit HMAC-SHA256 Blind-Links (Art. 34 Abs. 3 lit. a DSGVO Safe-Harbor), NULL für Mitschüler, Step-Up Leases & Art. 17 Kernel-Purge',
         kug22ZeroPhotoAvatarOnly: 'Strikte 3D-Avatar-Doktrin gem. § 22 KUG (Keine realen Schüler- oder Kinderfotos)',
         urhG44bZeroAiTraining: 'Ausdrücklicher Nutzungsvorbehalt gem. § 44b Abs. 2 UrhG (Kein KI-Training, keine LLM-Verarbeitung)',
         migration515ZeroUserMail: 'E-Mail-Freiheit für Minderjährige gem. Art. 8 DSGVO (Keine Pflicht-Adressen für Schüler)',
@@ -329,7 +330,7 @@ export async function generateDpoArt15ReferenceNoticePDF(
   // Pflichtangaben Art. 15 Abs. 1 lit. a–h
   const rows = [
     { lit: 'lit. a: Verarbeitungszwecke', text: 'Pädagogische Unterrichtsbegleitung, Hausaufgaben-Sync & Raumplanung (Subsidiaritäts-Doktrin).' },
-    { lit: 'lit. b: Datenkategorien', text: 'Pseudonymisierte Stammdaten (Max M.), Instrument, Übenotizen. 0% Fotos (§ 22 KUG), 0% E-Mail (Mig. 515).' },
+    { lit: 'lit. b: Datenkategorien', text: '3-Stufen-Identität (Peers: NULL; Alltag: Max M.; Bürgerlicher Name im Zero-Knowledge Vault), Instrument. 0% Fotos (§ 22 KUG), 0% E-Mail (Mig. 515).' },
     { lit: 'lit. c: Empfänger & Hosting', text: 'Ausschließlich ISO 27001 RZ in Deutschland: IONOS SE (Montabaur) & Hetzner Online GmbH (0% US-Cloud).' },
     { lit: 'lit. d: Löschfristen (DIN 66398)', text: 'LK 1: Session-Ende | LK 2: Schuljahresende (+30 Tage Karenz) | LK 4: 30 Tage nach Exmatrikulation | LK 5: 10 Jahre AO.' },
     { lit: 'lit. e: Betroffenenrechte', text: 'Recht auf Berichtigung (Art. 16), Löschung / Eltern-Purge (Art. 17), Einschränkung (Art. 18), Portabilität (Art. 20).' },
@@ -387,7 +388,7 @@ export async function generateDpoArt15ReferenceNoticePDF(
   doc.setFontSize(7);
   doc.setTextColor(textGray[0], textGray[1], textGray[2]);
   const sampleProfileText = [
-    'Pseudonymisierter Name: Max M. (KUG § 22 konform ohne Profilfoto • Avatar ID: avatar_drummer_03)',
+    '3-Stufen-Name: Max M. (Mitschüler sehen nur Vorname; bürgerlicher Nachname im Zero-Knowledge Vault • Avatar: drummer_03)',
     'Schüler-Identifikator: MUSTER-REF-2026 (Mandanten-Schule: ' + cleanSchoolName + ')',
     'Angemeldete Fächer: Klavier, Band-Workshop | Didaktik-Level: junior',
     'Speicherfrist: DIN 66398 LK 4 (Revisionssichere physische Löschung 30 Tage nach Exmatrikulation)',

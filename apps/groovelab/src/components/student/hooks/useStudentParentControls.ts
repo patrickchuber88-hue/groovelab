@@ -300,7 +300,7 @@ export function useStudentParentControls({
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: targetId,
         p_credential_id: passkeyResult.id,
-        p_public_key: JSON.stringify(passkeyResult.response),
+        p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
         p_device_name: deviceName,
         p_challenge: chalData.challenge
       });
@@ -316,7 +316,7 @@ export function useStudentParentControls({
         lastName: studentUser?.last_name || '',
         role: 'parent',
         credentialId: passkeyResult.id,
-        sessionToken: targetId,
+        sessionToken: '',
         createdAt: new Date().toISOString()
       });
 

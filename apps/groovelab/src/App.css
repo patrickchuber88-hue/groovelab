@@ -933,6 +933,7 @@ div:hover > .photo-overlay {
     overflow: hidden !important;
     overscroll-behavior-y: contain !important;
     -webkit-overflow-scrolling: touch;
+    background-color: #ffffff !important;
   }
 
   .app-layout {

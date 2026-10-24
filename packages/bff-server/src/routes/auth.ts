@@ -151,6 +151,15 @@ router.post('/webauthn/verify', async (req, res) => {
       });
     }
 
+    let originHost = '';
+    try {
+      if (assertionOrigin.startsWith('http')) {
+        originHost = new URL(assertionOrigin).hostname;
+      }
+    } catch {
+      // ignore
+    }
+
     const rpIdHash = authDataBuf.subarray(0, 32);
     const validRpHashes = [
       cryptoMod.createHash('sha256').update('campus-groovelab.de').digest(),
@@ -158,6 +167,9 @@ router.post('/webauthn/verify', async (req, res) => {
       cryptoMod.createHash('sha256').update('localhost').digest(),
       cryptoMod.createHash('sha256').update('127.0.0.1').digest()
     ];
+    if (originHost) {
+      validRpHashes.push(cryptoMod.createHash('sha256').update(originHost).digest());
+    }
     if (!validRpHashes.some((expected) => expected.equals(rpIdHash))) {
       return res.status(401).json({
         success: false,
@@ -171,14 +183,31 @@ router.post('/webauthn/verify', async (req, res) => {
       const { data: keyMeta } = await supabaseService.rpc('get_webauthn_credential_public_key', {
         p_credential_id: String(credentialId)
       });
-      if (keyMeta?.found && typeof keyMeta.public_key === 'string' && keyMeta.public_key.trim().length > 0) {
-        authoritativePublicKeySpki = keyMeta.public_key.trim();
+      if ((keyMeta?.found || keyMeta?.success) && typeof keyMeta.public_key === 'string' && keyMeta.public_key.trim().length > 0) {
+        let rawKey = keyMeta.public_key.trim();
+        if (rawKey.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(rawKey);
+            rawKey = parsed.publicKeySpki || parsed.spki || rawKey;
+          } catch {
+            // fallback
+          }
+        }
+        authoritativePublicKeySpki = rawKey;
       }
     } catch {
       // Fallback handled below
     }
 
-    const effectiveSpki = authoritativePublicKeySpki || (typeof publicKeySpki === 'string' ? publicKeySpki.trim() : '');
+    let effectiveSpki = authoritativePublicKeySpki || (typeof publicKeySpki === 'string' ? publicKeySpki.trim() : '');
+    if (effectiveSpki.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(effectiveSpki);
+        effectiveSpki = parsed.publicKeySpki || parsed.spki || effectiveSpki;
+      } catch {
+        // fallback
+      }
+    }
     if (!effectiveSpki) {
       return res.status(401).json({
         success: false,
@@ -187,7 +216,8 @@ router.post('/webauthn/verify', async (req, res) => {
     }
 
     try {
-      const spkiDer = Buffer.from(effectiveSpki, 'base64url');
+      const spkiB64 = effectiveSpki.replace(/-/g, '+').replace(/_/g, '/');
+      const spkiDer = Buffer.from(spkiB64, 'base64');
       const pubKeyObj = cryptoMod.createPublicKey({
         key: spkiDer,
         format: 'der',

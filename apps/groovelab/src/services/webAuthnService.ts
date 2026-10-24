@@ -105,7 +105,9 @@ export async function registerPlatformPasskey({
   userId,
   userName,
   userDisplayName,
-  relyingPartyId = typeof window !== 'undefined' ? window.location.hostname : 'campus-groovelab.de',
+  relyingPartyId = typeof window !== 'undefined'
+    ? (window.location.hostname === 'campus-groovelab.de' || window.location.hostname.endsWith('.campus-groovelab.de') ? 'campus-groovelab.de' : window.location.hostname)
+    : 'campus-groovelab.de',
   relyingPartyName = 'Campus-Groovelab'
 }: RegisterPasskeyOptions): Promise<RegisterPasskeyResult> {
   if (typeof window === 'undefined' || !window.PublicKeyCredential) {
@@ -192,7 +194,9 @@ export interface AuthenticatePasskeyResult {
 export async function authenticatePlatformPasskey({
   challengeBase64,
   allowedCredentialIds = [],
-  relyingPartyId = typeof window !== 'undefined' ? window.location.hostname : 'campus-groovelab.de'
+  relyingPartyId = typeof window !== 'undefined'
+    ? (window.location.hostname === 'campus-groovelab.de' || window.location.hostname.endsWith('.campus-groovelab.de') ? 'campus-groovelab.de' : window.location.hostname)
+    : 'campus-groovelab.de'
 }: AuthenticatePasskeyOptions): Promise<AuthenticatePasskeyResult> {
   if (typeof window === 'undefined' || !window.PublicKeyCredential) {
     return { success: false, error: 'WebAuthn wird von diesem Browser nicht unterstützt.' };

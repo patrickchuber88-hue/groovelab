@@ -46,40 +46,46 @@ export function TeacherPasskeyNudgeBanner({
   const platformName = isApple ? 'Touch ID / Face ID' : 'Passkey';
 
   useEffect(() => {
-    if (!user || user.has_passkey) {
-      setIsVisible(false);
-      return;
-    }
-
-    // Only show if browser/OS supports WebAuthn
-    if (!isWebAuthnSupported()) {
-      setIsVisible(false);
-      return;
-    }
-
-    // Check if passkey is already active on this device
-    try {
-      const storedProfiles = getStoredBiometricProfiles();
-      if (storedProfiles.some((p) => p.userId === user.id)) {
+    const checkVisibility = () => {
+      if (!user || user.has_passkey) {
         setIsVisible(false);
         return;
       }
-    } catch (e) {
-      console.warn('[Passkey Nudge] Error checking stored biometric profiles:', e);
-    }
 
-    // Check local dismissal preference
-    const dismissKey = `campus_passkey_nudge_dismissed_${user.id}`;
-    const dismissedUntil = localStorage.getItem(dismissKey);
-    if (dismissedUntil) {
-      const expiry = parseInt(dismissedUntil, 10);
-      if (Date.now() < expiry) {
+      // Only show if browser/OS supports WebAuthn
+      if (!isWebAuthnSupported()) {
         setIsVisible(false);
         return;
       }
-    }
 
-    setIsVisible(true);
+      // Check if passkey is already active on this device
+      try {
+        const storedProfiles = getStoredBiometricProfiles();
+        if (storedProfiles.some((p) => p.userId === user.id)) {
+          setIsVisible(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('[Passkey Nudge] Error checking stored biometric profiles:', e);
+      }
+
+      // Check local dismissal preference
+      const dismissKey = `campus_passkey_nudge_dismissed_${user.id}`;
+      const dismissedUntil = localStorage.getItem(dismissKey);
+      if (dismissedUntil) {
+        const expiry = parseInt(dismissedUntil, 10);
+        if (Date.now() < expiry) {
+          setIsVisible(false);
+          return;
+        }
+      }
+
+      setIsVisible(true);
+    };
+
+    checkVisibility();
+    window.addEventListener('gl-biometric-vault-updated', checkVisibility);
+    return () => window.removeEventListener('gl-biometric-vault-updated', checkVisibility);
   }, [user]);
 
   if (!isVisible || !user) return null;
@@ -124,7 +130,7 @@ export function TeacherPasskeyNudgeBanner({
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: user.id,
         p_credential_id: result.id,
-        p_public_key: JSON.stringify(result.response),
+        p_public_key: result.response?.publicKeySpki || JSON.stringify(result.response),
         p_device_name: deviceName,
         p_challenge: chalData.challenge
       });
@@ -139,8 +145,9 @@ export function TeacherPasskeyNudgeBanner({
         firstName: user.first_name || '',
         lastName: user.last_name || '',
         role: user.role || 'teacher',
+        schoolName: schoolData?.name || null,
         credentialId: result.id,
-        sessionToken: user.id,
+        sessionToken: '',
         createdAt: new Date().toISOString()
       });
 

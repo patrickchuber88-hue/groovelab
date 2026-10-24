@@ -547,7 +547,7 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: student.id,
         p_credential_id: passkeyResult.id,
-        p_public_key: JSON.stringify(passkeyResult.response),
+        p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
         p_device_name: isIOS ? 'Apple Face/Touch ID' : isAndroid ? 'Android Fingerprint/Passkey' : 'Eltern-Passkey',
         p_challenge: chalData.challenge
       });
@@ -562,9 +562,10 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
         firstName: student.first_name || '',
         lastName: student.last_name || '',
         role: 'student',
+        schoolName: (school as any)?.name || null,
         instrument: (student as any)?.instrument || null,
         credentialId: passkeyResult.id,
-        sessionToken: student.id,
+        sessionToken: '',
         createdAt: new Date().toISOString()
       });
 

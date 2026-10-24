@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Fingerprint, X, ShieldCheck, Check, AlertCircle } from 'lucide-react';
-import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile } from '../../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, saveBiometricProfile, getStoredBiometricProfiles } from '../../utils/webauthn';
 import { supabase } from '../../lib/supabase';
 
 export interface PasskeyNudgeBannerProps {
@@ -21,35 +21,42 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    // Only nudge teachers, admins, and secretaries
-    if (!currentUser || !['admin', 'secretary', 'teacher'].includes(currentUser.role)) {
-      return;
-    }
+    const checkVisibility = () => {
+      // Only nudge teachers, admins, and secretaries
+      if (!currentUser || !['admin', 'secretary', 'teacher'].includes(currentUser.role)) {
+        setIsVisible(false);
+        return;
+      }
 
-    if (!isWebAuthnSupported()) {
-      return;
-    }
+      if (!isWebAuthnSupported()) {
+        setIsVisible(false);
+        return;
+      }
 
-    // Check if user dismissed the nudge
-    const dismissedUntil = localStorage.getItem(NUDGE_DISMISSED_KEY);
-    if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
-      return;
-    }
+      // Check if user dismissed the nudge
+      const dismissedUntil = localStorage.getItem(NUDGE_DISMISSED_KEY);
+      if (dismissedUntil && Number(dismissedUntil) > Date.now()) {
+        setIsVisible(false);
+        return;
+      }
 
-    // Check if biometric profiles already exist for this user
-    try {
-      const stored = localStorage.getItem('gl_biometric_profiles');
-      if (stored) {
-        const profiles = JSON.parse(stored);
-        if (Array.isArray(profiles) && profiles.some((p: any) => p.userId === currentUser.id)) {
+      // Check if biometric profiles already exist for this user in local vault
+      try {
+        const stored = getStoredBiometricProfiles();
+        if (stored.some((p: any) => p.userId === currentUser.id)) {
+          setIsVisible(false);
           return; // Already registered on this device!
         }
+      } catch (e) {
+        console.warn('Error reading biometric profiles:', e);
       }
-    } catch (e) {
-      console.warn('Error reading biometric profiles:', e);
-    }
 
-    setIsVisible(true);
+      setIsVisible(true);
+    };
+
+    checkVisibility();
+    window.addEventListener('gl-biometric-vault-updated', checkVisibility);
+    return () => window.removeEventListener('gl-biometric-vault-updated', checkVisibility);
   }, [currentUser]);
 
   const handleDismiss = () => {
@@ -96,7 +103,7 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: currentUser.id,
         p_credential_id: passkeyResult.id,
-        p_public_key: JSON.stringify(passkeyResult.response),
+        p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
         p_device_name: deviceName,
         p_challenge: chalData.challenge
       });
@@ -111,8 +118,9 @@ export const PasskeyNudgeBanner: React.FC<PasskeyNudgeBannerProps> = ({
         firstName: currentUser.first_name || '',
         lastName: currentUser.last_name || '',
         role: currentUser.role || 'teacher',
+        schoolName: currentUser.schools?.name || currentUser.school_name || null,
         credentialId: passkeyResult.id,
-        sessionToken: currentUser.id,
+        sessionToken: '',
         createdAt: new Date().toISOString()
       });
 

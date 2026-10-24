@@ -49,6 +49,7 @@ import {
   isDummyOrTestSong,
   isWeeklySnapshotContainer
 } from './student/meisterwerk/utils/meisterwerkSongHelpers';
+import { deduplicateAndMergeProgressMatrixRows } from '../utils/homeworkSnapshotHelper';
 const MeisterwerkRecordingsTab = lazy(() => import('./student/meisterwerk/MeisterwerkRecordingsTab').then(m => ({ default: m.MeisterwerkRecordingsTab })));
 const MeisterwerkLogbuchTab = lazy(() => import('./student/meisterwerk/MeisterwerkLogbuchTab').then(m => ({ default: m.MeisterwerkLogbuchTab })));
 const MeisterwerkStickerAlbumTab = lazy(() => import('./student/meisterwerk/MeisterwerkStickerAlbumTab').then(m => ({ default: m.MeisterwerkStickerAlbumTab })));
@@ -473,14 +474,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     try {
       const data = await fetchProgressMatrixRows(true);
       if (data) {
-        const uniqueItemsMap = new Map<string, any>();
-        (data || []).forEach((item: any) => {
-          const name = (item.topic_name || '').trim().toLowerCase();
-          if (name && !uniqueItemsMap.has(name)) {
-            uniqueItemsMap.set(name, item);
-          }
-        });
-        const loadedProgress = Array.from(uniqueItemsMap.values());
+        const loadedProgress = deduplicateAndMergeProgressMatrixRows(data);
 
         // 🛡️ Cold Cache / PWA: Unpack SNAPSHOT_SONGS into loadedProgress so assigned songs are never lost
         (data || []).forEach((item: any) => {

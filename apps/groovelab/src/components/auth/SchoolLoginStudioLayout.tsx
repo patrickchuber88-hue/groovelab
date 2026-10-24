@@ -201,10 +201,11 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
 
   return (
     <div 
-      className="login-studio-container"
+      className="login-studio-container pwa-scroll-container pwa-standalone-screen"
       onClick={handleCanvasClick}
       style={{
         position: 'relative', width: '100%', minHeight: '100vh',
+        height: '100dvh', maxHeight: '100dvh', overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
         background: '#0a361c',
         color: isGroovelabKiosk ? '#062413' : '#ffffff', boxSizing: 'border-box',
@@ -1101,9 +1102,26 @@ export const SchoolLoginStudioLayout: React.FC<SchoolLoginStudioLayoutProps> = (
                     Touch ID &amp; Face ID
                   </div>
                   <div style={{ fontSize: '12px', color: isGroovelabKiosk ? '#fde68a' : '#cbd5e1', marginTop: '6px', lineHeight: 1.4 }}>
-                    Auf diesem Gerät ist noch kein Passkey verknüpft. Melde dich einmalig an und aktiviere Passkey in deinen Profileinstellungen.
+                    Melde dich direkt mit deinem Touch ID / Face ID Passkey (z.&nbsp;B. via iCloud Schlüsselbund) an oder wechsle zu QR-Ausweis / PIN:
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTriggerBiometricLogin()}
+                  disabled={biometricLoading}
+                  style={{
+                    width: '100%', padding: '14px 18px', borderRadius: '16px',
+                    background: brandPrimaryColor, color: brandActiveTabColor,
+                    border: 'none', fontWeight: 800, fontSize: '13.5px', cursor: biometricLoading ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    boxShadow: isGroovelabKiosk ? '0 4px 14px rgba(250, 204, 21, 0.35)' : '0 4px 14px rgba(22, 163, 74, 0.35)',
+                    marginTop: '4px'
+                  }}
+                >
+                  <Fingerprint size={16} />
+                  <span>{biometricLoading ? 'Prüfe Hardware...' : 'Mit Touch ID / Face ID anmelden'}</span>
+                </button>
 
                 <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '4px' }}>
                   <button

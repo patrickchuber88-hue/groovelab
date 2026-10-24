@@ -153,9 +153,9 @@ export const generateConsentPDF = async (
   currentY += 8;
 
   const bulletPoints = [
-    { title: 'Automatischer Sichtschutz (Privacy by Default): ', desc: 'In der App und im Unterricht wird der Nachname zum Schutz vor Schulterblicken stets automatisch auf die Initiale maskiert (z. B. „Max M.“). Die Musikschule verwaltet den Klarnamen sicher im internen Sekretariat.' },
+    { title: '3-Stufen-Sichtschutz & Zero-Knowledge Vault: ', desc: 'Mitschüler sehen nur Vornamen (0% Nachname); Lehrkräfte im Alltag „Max M.“. Volle Nachnamen liegen fremdschlüsselfrei im Zero-Knowledge Vault (PGP-AES-256) mit 60s Auto-Curtain.' },
     { title: 'Datensparsamkeit: ', desc: 'Wir erheben keinerlei E-Mail-Adressen von Kindern, Telefonnummern oder Bankdaten. Kalender-Sync nutzt pseudonyme, jederzeit widerrufbare Tokens.' },
-    { title: 'Zertifiziertes Hosting: ', desc: 'Der Serverbetrieb erfolgt in DSGVO-konformen deutschen Rechenzentren (Hetzner Online GmbH, Standort Falkenstein).' },
+    { title: 'Zertifiziertes Hosting: ', desc: 'Der Serverbetrieb erfolgt in ISO 27001 zertifizierten deutschen Rechenzentren (IONOS SE & Hetzner Online GmbH, 0% US-Cloud).' },
     { title: 'Audio-Aufnahmen: ', desc: 'Aufnahmen dienen rein pädagogischen Zwecken (Übe-Nachweis). Bei Löschung des Accounts oder Beitrags werden die Audio-Daten sofort physisch vom Cloud-Speicher gelöscht.' },
     { title: 'Kostenregelung: ', desc: costDetailText }
   ];
@@ -305,7 +305,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.2);
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('Hosting 100% in Deutschland (Hetzner ISO 27001) • 0% US-Cloud-Act Risiko • Privacy by Design & Default', 25, y + 15);
+  doc.text('Hosting 100% in Deutschland (IONOS SE & Hetzner ISO 27001) • 0% US-Cloud-Act Risiko • Privacy by Default', 25, y + 15);
   doc.text('Vorbereitete Vorlage zur Unterstützung der Schulleitung und des behördlichen Datenschutzbeauftragten (bDSB).', 25, y + 20);
 
   y += 32;
@@ -320,7 +320,7 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   const dsfaPoints = [
     'Risikoanalyse Minderjährige: Extrem niedriges Schutzbedarf-Risiko durch konsequente Datenminimierung.',
     'Keine sensiblen Stammdaten: Keine Erfassung von Schüler-E-Mails, Wohnadressen, Telefonnummern oder Bankdaten.',
-    'Pflichtmaskierung von Nachnamen: Schutz vor Schulterblick-Spionage im Schulbetrieb (Vorname + 1. Buchstabe).',
+    '3-Stufen-Identität & Vault: Mitschüler sehen nur Vornamen (NULL); Alltag Vorname + Initiale; PGP-AES-256 Vault mit 60s Auto-Curtain.',
     'Hardware-Sicherheit: Automatische Mikrofon- & Kamera-Abschaltung beim Verlassen aller Audio-Module.',
     'Speicherbegrenzung (DIN 66398): Schuljahres-Löschung für Übedaten (31.08.) & 10-jährige GoBD-Belegarchivierung.'
   ];
@@ -340,14 +340,14 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   y += 6;
 
   const toms = [
-    ['Vertraulichkeit & TLS:', 'Transportweg mit TLS 1.3 + HSTS; Datenbank/Storage ruhend nach AES-256.'],
+    ['Zero-Knowledge Vault:', 'PGP-AES-256 Vault mit Kernel-Trigger trg_users_raw_zero_knowledge_vault & Art. 17 Purge.'],
+    ['Transport & Ruhedaten:', 'TLS 1.3 + HSTS für Übertragungen; Datenbank/Storage ruhend nach AES-256.'],
     ['Mandantentrennung:', 'PostgreSQL Row-Level Security (RLS) erzwingt strikte Multi-Tenancy Isolation.'],
     ['Append-Only Audit Logs:', 'WORM-Prinzip in Postgres – System-Logs für Nutzer & Admins unmodifizierbar.'],
     ['Content Security Policy:', 'Strikte CSP (script-src self) schützt vor Cross-Site Scripting (XSS).'],
-    ['PIN & Passwort Hashing:', 'Kryptografische Einweg-Hashes (Bcrypt 10 Runden) im Schema private_auth.'],
+    ['PIN & Bcrypt Hashing:', 'Kryptografische Hashes (Bcrypt 10 Runden) im Schema private_auth.'],
     ['Infrastruktur Throttling:', 'Netzwerk-Rate-Limiting (Nginx/BFF) schützt vor Brute-Force & DDoS.'],
-    ['Background-Blurring:', 'Automatisches Unscharfschalten (blur: 16px) bei Tab- oder App-Wechsel.'],
-    ['Offsite-Backups:', 'Stündliche verschlüsselte Backups (Age X25519) inkl. WORM-Tombstone-Abgleich.']
+    ['Offsite-Backups:', 'Stündliche Backups (Age X25519) inkl. WORM-Tombstone-Abgleich gegen Zombies.']
   ];
 
   toms.forEach(([label, desc]) => {
@@ -427,8 +427,9 @@ export const generateDSBCompliancePDF = async (schoolName: string) => {
   y += 8;
 
   const subProcessors = [
-    ['Hetzner Online GmbH', 'High-Security Rechenzentrum & Host', 'Falkenstein / Nürnberg', 'ISO 27001'],
-    ['PostgreSQL / PostgREST (Self-Hosted)', 'Datenhaltung & RLS Engine', 'Inhouse (Hetzner DE)', 'DSGVO / RLS'],
+    ['IONOS SE', 'Primärer Produktions-Cluster', 'Montabaur / Frankfurt', 'ISO 27001'],
+    ['Hetzner Online GmbH', 'Georedundantes Backup & Host', 'Falkenstein / Nürnberg', 'ISO 27001'],
+    ['PostgreSQL / PostgREST (Self-Hosted)', 'Datenhaltung & RLS Engine', 'Inhouse (IONOS / Hetzner DE)', 'DSGVO / RLS'],
   ];
 
   subProcessors.forEach(([name, functionDesc, location, cert]) => {
@@ -682,7 +683,7 @@ export const generateTeacherQuickstartPDF = async (schoolName: string, schoolSub
   doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
   const dsgvoText = [
     '• Keine privaten Telefonnummern/E-Mails nötig: Die gesamte Kommunikation läuft geschützt über die Plattform.',
-    '• Schülernamen sind automatisch maskiert (z. B. Max M.), um Schulterblick-Spionage zu verhindern.',
+    '• 3-Stufen-Sichtschutz: Mitschüler sehen nur Vornamen, im Alltag „Max M.“; Klarnamen per Lehrer-PIN für 60s entschlüsselbar.',
     '• Automatischer Hardware-Schutz: Mikrofone werden beim Schließen von Audio-Modulen sofort abgeschaltet.',
     '• Gehostet nach deutschem Schulrecht auf nach ISO 27001 zertifizierten Servern in Deutschland.'
   ];
@@ -1383,8 +1384,8 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
   const fullName = data.studentFullName || data.studentName;
   const maskedName = data.studentMaskedName || data.studentName;
-  doc.text(`• Gespeicherter Schülername: ${fullName} (Vollständiger Vor- & Nachname)`, 25, y + 15);
-  doc.text(`• Anzeige im Schulnetzwerk: ${maskedName} (DSGVO-Schutzmaskierung aktiv)`, 25, y + 21);
+  doc.text(`• Gespeicherter Schülername: ${fullName} (Bürgerlicher Name fremdschlüsselfrei im Zero-Knowledge Vault)`, 25, y + 15);
+  doc.text(`• Anzeige im Schulnetzwerk: ${maskedName} (3-Stufen-Identität: Peers sehen NULL; Alltag: Initiale)`, 25, y + 21);
   doc.text(`• Verantwortliche Musikschule (Art. 4 Nr. 7 DSGVO): ${data.schoolName || 'Campus-Groovelab Partner-Musikschule'}`, 25, y + 27);
   doc.text(`• Zugeordnete Lehrkraft: ${data.teacherName || 'Fachliche Lehrkraft (Musikschule)'}`, 25, y + 33);
   doc.text(`• Hauptinstrument & Design-Stufe: ${data.instrument || 'Instrumentalunterricht'} | Stufe: ${data.campusUiLevel.toUpperCase()}`, 25, y + 39);
@@ -1526,7 +1527,7 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.text('c) Empfänger & Kategorien von Empfängern (lit. c):', 25, subY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
-  const empfText = 'Ausschließlich die beauftragte Musikschule, die zuständige Lehrkraft und Erziehungsberechtigte. Hosting: Hetzner Online GmbH (ISO 27001 Rechenzentren, Deutschland) via Auftragsverarbeitung (Art. 28 DSGVO). Keine Weitergabe an Werbedritte.';
+  const empfText = 'Ausschließlich die Musikschule, Lehrkraft und Eltern. Hosting: IONOS SE & Hetzner Online GmbH (ISO 27001, Deutschland) via AVV (Art. 28 DSGVO). 0% US-Cloud, keine Werbedritte.';
   doc.text(doc.splitTextToSize(empfText, 158), 25, subY + 4);
 
   subY += 16;
@@ -1535,7 +1536,7 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.text('d) Speicherdauer & Löschfristen (lit. d):', 25, subY);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
-  const dauerText = 'Für die Dauer des aktiven Unterrichtsvertrags. Automatische Deaktivierung nach 2 Monaten Inaktivität. Bei Vertragsende oder Löschungsantrag erfolgt die vollständige physische Löschung aller Profildaten und Cloud-Audios.';
+  const dauerText = 'Dauer des Unterrichtsvertrags. Bei Vertragsende oder Löschantrag erfolgt die physische Löschung inkl. deterministischer Art. 17 Vault-Vernichtung (trg_users_raw_vault_purge) aller Datensätze.';
   doc.text(doc.splitTextToSize(dauerText, 158), 25, subY + 4);
 
   subY += 16;
@@ -1717,7 +1718,7 @@ export const generateGdprDeletionCertificatePDF = async (data: GdprDeletionCerti
   doc.text(`Status des Benutzerprofils:`, 25, y + 45);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryRed[0], primaryRed[1], primaryRed[2]);
-  doc.text(`Dauerhaft deaktiviert & Zugänge gesperrt`, 80, y + 45);
+  doc.text(`Gelöscht & Vault-Chiffrat via trg_users_raw_vault_purge vernichtet`, 80, y + 45);
 
   y += 58;
 
@@ -1753,7 +1754,7 @@ export const generateGdprDeletionCertificatePDF = async (data: GdprDeletionCerti
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
-  const sealText = `Hiermit wird zertifiziert, dass alle personenbezogenen Daten sowie persönlichen Audio-Dateien des Schülers auf Veranlassung der Musikschule physisch und unwiderruflich gelöscht wurden. Die Plattform Campus-Groovelab garantiert die Einhaltung aller Vorgaben nach Art. 17 Abs. 1 DSGVO.`;
+  const sealText = `Hiermit wird zertifiziert, dass alle personenbezogenen Daten, Audio-Dateien sowie das Nachnamens-Chiffrat im Zero-Knowledge Vault (trg_users_raw_vault_purge) auf Veranlassung der Musikschule physisch und unwiderruflich gelöscht wurden. Campus-Groovelab garantiert die Einhaltung aller Vorgaben nach Art. 17 Abs. 1 DSGVO.`;
   doc.text(doc.splitTextToSize(sealText, 158), 25, y + 15);
 
   // Footer
@@ -4013,7 +4014,7 @@ export const generateB2BContractCertificatePDF = async (params: B2BContractCerti
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  const p3 = `Die Parteien haben die gesetzlich vorgeschriebene Vereinbarung zur Auftragsverarbeitung (AVV) nach Art. 28 DSGVO geschlossen. Die Verarbeitung erfolgt ausschließlich auf ISO 27001-zertifizierten Servern in Deutschland (IONOS SE, Montabaur & Hetzner Online GmbH, Falkenstein/Nürnberg). Unterauftragnehmer-Änderungen unterliegen einer 14-tägigen Widerspruchsfrist. Datenschutzverletzungen werden unverzüglich binnen maximal 48 Stunden gemeldet. Löschungen erfolgen nach DIN 66398.`;
+  const p3 = `Die Parteien haben die Vereinbarung zur Auftragsverarbeitung (AVV) nach Art. 28 DSGVO geschlossen. Die Verarbeitung erfolgt ausschließlich auf ISO 27001-Servern in Deutschland (IONOS SE & Hetzner Online GmbH). 360° Zero-Knowledge Identity Vault (Art. 34 Abs. 3 lit. a DSGVO Safe-Harbor) mit 3-Stufen-Identität & Art. 17 Vault-Purge-Garantie. Meldung binnen max. 48 Stunden. Löschungen nach DIN 66398.`;
   const splitP3 = doc.splitTextToSize(p3, 170);
   doc.text(splitP3, 20, y);
   y += splitP3.length * 4 + 4;

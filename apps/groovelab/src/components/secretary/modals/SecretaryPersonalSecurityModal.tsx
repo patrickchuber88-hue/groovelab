@@ -134,7 +134,7 @@ export const SecretaryPersonalSecurityModal: React.FC<SecretaryPersonalSecurityM
       const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
         p_user_id: currentUserProfile.id,
         p_credential_id: passkeyResult.id,
-        p_public_key: JSON.stringify(passkeyResult.response),
+        p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
         p_device_name: deviceName,
         p_challenge: chalData.challenge
       });
@@ -151,7 +151,7 @@ export const SecretaryPersonalSecurityModal: React.FC<SecretaryPersonalSecurityM
         role: currentUserProfile.role || 'secretary',
         schoolName: schoolName || null,
         credentialId: passkeyResult.id,
-        sessionToken: currentUserProfile.id,
+        sessionToken: '',
         createdAt: new Date().toISOString()
       });
 

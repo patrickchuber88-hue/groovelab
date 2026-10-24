@@ -408,7 +408,7 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
                 </h5>
               </div>
               <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.45, fontWeight: 550 }}>
-                Beantragt die Löschung aller nicht gesetzlich aufbewahrungspflichtigen Daten. Revisionssichere Buchungsbelege bleiben gemäß 147 AO für 10 Jahre archiviert.
+                Beantragt die Löschung des Profils inkl. automatischer Art. 17 Vernichtung des Chiffrats im Zero-Knowledge Identity Vault (<code style={{ background: '#e2e8f0', padding: '1px 4px', borderRadius: '4px' }}>trg_users_raw_vault_purge</code>). Mitschüler sehen ohnehin nur den Vornamen (0% Nachname).
               </p>
             </div>
 

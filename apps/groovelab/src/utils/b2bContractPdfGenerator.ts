@@ -427,9 +427,10 @@ export async function generateB2BContractPackagePDF(options: B2BContractOptions)
   const avvSections = [
     '1. Gegenstand, Zweck & Dauer der Verarbeitung: Bereitstellung der Cloud-Infrastruktur zur didaktischen Unterrichtsbegleitung, Stundenplansynchronisation und Schülerkommunikation für die Dauer des Hauptvertrages.',
     '2. Kategorien betroffener Personen: Schülerinnen und Schüler der Musikschule, Erziehungsberechtigte, Lehrkräfte, Schulleitung und Verwaltungspersonal.',
-    '3. Arten personenbezogener Daten: Didaktische Notizen, Übe-Protokolle, Stundenplanzeiten, Raumzuteilungen, verschlüsselte Passwörter/PINs, Schulausweis-Tokens. Keine Gesundheitsdaten (Art. 9 DSGVO) und keine Bankdaten von Familien.',
+    '3. Arten personenbezogener Daten: 3-Stufen-Identität (Mitschüler: last_name = NULL; Regelbetrieb: Vorname + Initiale; bürgerliche Nachnamen fremdschlüsselfrei im Zero-Knowledge Vault mit Step-Up Leases), didaktische Notizen, Übe-Protokolle, Stundenplanzeiten, Raumzuteilungen, Schulausweis-Tokens. Keine Gesundheitsdaten (Art. 9) oder Bankdaten von Familien.',
     '4. Technische und organisatorische Maßnahmen (TOMs gem. Art. 32 DSGVO):',
     '   • Rechenzentrum: Ausschließliches Hosting in ISO/IEC-27001 zertifizierten deutschen Rechenzentren der IONOS SE (Montabaur, Primärer Produktions-Cluster) und der Hetzner Online GmbH (Falkenstein/Nürnberg, Georedundantes Backup, Failover & Storage Box). 0 % US-Cloud-Abhängigkeit.',
+    '   • Zero-Knowledge Identity Vault: PGP-AES-256 Vault (blind_student_lastname_vault) mit HMAC-SHA256 Blind-Links gem. EuGH C-413/23 P & Art. 34 Abs. 3 lit. a DSGVO Safe-Harbor, Kernel-Verschlüsselung trg_users_raw_zero_knowledge_vault, Art. 17 Vault-Purge trg_users_raw_vault_purge und 60s Auto-Curtain.',
     '   • Verschlüsselung: Durchgehende Transportverschlüsselung via TLS 1.3 mit HSTS; Ruhedatenverschlüsselung (Encryption at Rest) via AES-256.',
     '   • Mandantentrennung: Strikte Trennung über PostgreSQL Row-Level Security (RLS) mit schulspezifischer Schul-ID Isolation (Default-Deny).',
     '   • Authentifizierung: Passwortloser Zugang über QR-Schulausweis, serverseitige PIN-Prüfung (Bcrypt 10 Runden Blowfish gem. BSI TR-02102) und optionale hardwaregebundene FIDO2/WebAuthn Passkeys.',

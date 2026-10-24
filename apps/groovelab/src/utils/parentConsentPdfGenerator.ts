@@ -154,8 +154,8 @@ export async function generateParentConsentPDF(
       },
       {
         num: '2',
-        title: 'Zero US-Cloud & Konsequenter Kinderschutz (Art. 25 & Art. 32 DSGVO / KUG § 22)',
-        desc: '100% Hosting in zertifizierten deutschen Hochsicherheits-Rechenzentren (IONOS SE & Hetzner Online GmbH, ISO/IEC 27001). 0% Drittlandtransfer, volle Immunität gegen US CLOUD Act. Vollständiges Zero-Mail-Prinzip (0% Schüler-E-Mails), standardmäßige Nachnamens-Maskierung („Jonas M.“), 3D-Avatare statt Fotos (KUG § 22) und strikt 0,00% Noten-Uploads (§ 53 Abs. 4 UrhG).'
+        title: 'Zero US-Cloud & 3-Stufen Zero-Knowledge Identity Vault (Art. 25, 32 & 34 DSGVO / KUG § 22)',
+        desc: '100% Hosting in zertifizierten deutschen Rechenzentren (IONOS SE & Hetzner, ISO 27001). 3-Stufen-Identität: Mitschüler sehen nur Vornamen (0% Nachname); Lehrkräfte im Alltag „Jonas M.“; bürgerliche Nachnamen fremdschlüsselfrei im Zero-Knowledge Vault (PGP-AES-256) mit 60s Auto-Curtain. 3D-Avatare statt Fotos (KUG § 22).'
       },
       {
         num: '3',
@@ -165,7 +165,7 @@ export async function generateParentConsentPDF(
       {
         num: '4',
         title: 'Ihre Betroffenenrechte & Regellöschung nach DIN 66398 (Art. 13 Abs. 2, 15–21 DSGVO)',
-        desc: 'Sie haben jederzeit das Recht auf unentgeltliche Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17) sowie Datenübertragbarkeit (Art. 20) – u. a. per 1-Klick-Datenexport im Eltern-Cockpit. Nach Abmeldung Ihres Kindes werden alle Unterrichtsdaten nach Ablauf der 30-tägigen Nachfrist gem. DIN 66398 automatisch und restlos gelöscht.'
+        desc: 'Sie haben jederzeit das Recht auf unentgeltliche Auskunft (Art. 15), Berichtigung (Art. 16), Löschung (Art. 17) & Datenübertragbarkeit (Art. 20) via 1-Klick-Export. Bei Kontolöschung vernichtet der Kernel-Trigger trg_users_raw_vault_purge das Vault-Chiffrat deterministisch; Regellöschung nach DIN 66398.'
       }
     ];
 

@@ -279,7 +279,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         )}
 
         {/* Right Workspace Area */}
-        <div style={{ padding: isMobileViewport ? '20px 16px' : '44px 54px', overflowY: 'auto', height: '100vh', boxSizing: 'border-box', position: 'relative' }}>
+        <div className="pwa-scroll-container pwa-standalone-screen" style={{ padding: isMobileViewport ? '20px 16px' : '44px 54px', overflowY: 'auto', height: isMobileViewport ? '100dvh' : '100vh', boxSizing: 'border-box', position: 'relative' }}>
           {/* Security Shield Tamper Banner */}
           {securityShield.integrityCompromised && (
             <div style={{ background: '#fef2f2', border: 'none', borderRadius: '16px', padding: '16px 20px', color: '#b91c1c', marginBottom: '24px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', boxShadow: 'none' }}>

@@ -25,6 +25,7 @@ export const getNormalizedSongTitle = (s: any) => {
 import { harmonizeAudioList } from '../../../../utils/audioNamingHelper';
 import { parseHomeworkNotesPayload } from '../../../../utils/homeworkSnapshotHelper';
 import { syncSingleBookPageFromMeisterwerk } from '../../../../services/homeworkSyncEngine';
+import { isSpecialHomeworkToken, mergeSpecialHomeworkToken } from './meisterwerkHomeworkTokenHelper';
 
 export interface UseMeisterwerkHomeworkParams {
   student: Student; readOnly: boolean; activeItem: any; topicName: string; setTopicName: (val: string) => void;
@@ -125,8 +126,8 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         }
         const updated = [...prev];
         rawNotesArray.forEach(rn => {
-          if (typeof rn === 'string' && (rn.includes('AUDIO:') || rn.startsWith('SNAPSHOT_'))) {
-            if (!updated.includes(rn)) updated.push(rn);
+          if (isSpecialHomeworkToken(rn) && !updated.includes(rn)) {
+            updated.push(rn);
           }
         });
         return updated;
@@ -452,19 +453,8 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
         }
         if (Array.isArray(existingArr)) {
           existingArr.forEach(exNote => {
-            if (typeof exNote === 'string' && exNote.includes('AUDIO:')) {
-              const exParts = exNote.substring(exNote.indexOf('AUDIO:') + 6).split('|');
-              const exUrl = exParts[0]?.trim();
-              const alreadyPresent = effectiveMergedList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(exUrl));
-              if (!alreadyPresent && exUrl) {
-                effectiveMergedList.push(exNote);
-              }
-            } else if (typeof exNote === 'string' && (exNote.startsWith('SNAPSHOT_LEHRWERKE:') || exNote.startsWith('SNAPSHOT_SONGS:'))) {
-              const prefix = exNote.startsWith('SNAPSHOT_LEHRWERKE:') ? 'SNAPSHOT_LEHRWERKE:' : 'SNAPSHOT_SONGS:';
-              const alreadyHasSnap = effectiveMergedList.some(m => typeof m === 'string' && m.startsWith(prefix));
-              if (!alreadyHasSnap) {
-                effectiveMergedList.push(exNote);
-              }
+            if (typeof exNote === 'string') {
+              mergeSpecialHomeworkToken(effectiveMergedList, exNote);
             }
           });
         }
@@ -645,7 +635,7 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
       ? latestTeacherNotesRef.current
       : teacherNotes) || '';
 
-    const specialNotes = homeworkNotesList.filter(n => typeof n === 'string' && (n.startsWith('AUDIO:') || n.startsWith('STICKER:') || n.startsWith('FEEDBACK:') || n.startsWith('STUDENT_NOTE_')));
+    const specialNotes = homeworkNotesList.filter(isSpecialHomeworkToken);
     const finalNotesList = [...specialNotes];
     if (!isLehrwerkPage && !isSong && (effectiveGeneralNotes || '').trim().length > 0) {
       const noteLines = (effectiveGeneralNotes || '').split('\n').map(s => s.trim()).filter(Boolean);
@@ -680,19 +670,8 @@ export const useMeisterwerkHomework = (params: UseMeisterwerkHomeworkParams) => 
           }
           if (Array.isArray(existingArr)) {
             existingArr.forEach(exNote => {
-              if (typeof exNote === 'string' && exNote.includes('AUDIO:')) {
-                const exParts = exNote.substring(exNote.indexOf('AUDIO:') + 6).split('|');
-                const exUrl = exParts[0]?.trim();
-                const alreadyPresent = finalNotesList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(exUrl));
-                if (!alreadyPresent && exUrl) {
-                  finalNotesList.push(exNote);
-                }
-              } else if (typeof exNote === 'string' && (exNote.startsWith('SNAPSHOT_LEHRWERKE:') || exNote.startsWith('SNAPSHOT_SONGS:'))) {
-                const prefix = exNote.startsWith('SNAPSHOT_LEHRWERKE:') ? 'SNAPSHOT_LEHRWERKE:' : 'SNAPSHOT_SONGS:';
-                const alreadyHasSnap = finalNotesList.some(m => typeof m === 'string' && m.startsWith(prefix));
-                if (!alreadyHasSnap) {
-                  finalNotesList.push(exNote);
-                }
+              if (typeof exNote === 'string') {
+                mergeSpecialHomeworkToken(finalNotesList, exNote);
               }
             });
           }

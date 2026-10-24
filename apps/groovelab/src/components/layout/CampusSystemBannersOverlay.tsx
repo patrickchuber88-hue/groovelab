@@ -152,7 +152,7 @@ export const CampusSystemBannersOverlay: React.FC<CampusSystemBannersOverlayProp
           />
         </Suspense>
       )}
-      {user && (
+      {user && (user.role === 'admin' || user.role === 'secretary') && (
         <Suspense fallback={null}>
           <PasskeyNudgeBanner currentUser={user} />
         </Suspense>

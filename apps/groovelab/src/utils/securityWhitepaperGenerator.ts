@@ -95,7 +95,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
       },
       {
         title: 'B. Zero-Mail IAM, Zero-Knowledge Vault & Duale Kryptografie',
-        desc: 'Vollständiger Verzicht auf anfällige E-Mail-Server. Authentifizierung über FIDO2/WebAuthn Passkeys, unvorhersehbare QR-Tokens, 360° Zero-Knowledge Identity Vault (HMAC-SHA256 Blind-Links & AES-256 PGP; Safe-Harbor gem. Art. 34 Abs. 3 lit. a DSGVO / EuGH C-413/23 P) mit 60s Auto-Curtain Engine und duale Kryptografie (Bcrypt Cost >= 10 in private_auth + PBKDF2 100.000 Runden SHA-512 & AES-256-GCM).'
+        desc: 'Vollständiger Verzicht auf E-Mail-Server. Authentifizierung über Passkeys/QR-Tokens. 360° Zero-Knowledge Vault (blind_student_lastname_vault, PGP-AES-256 Chiffrate, Safe-Harbor Art. 34 Abs. 3 lit. a DSGVO) mit 3-Stufen-Projektion (Peers: NULL gem. EuGH C-413/23 P), Step-Up Leases (private_auth.step_up_leases, 300s TTL), Kernel-Verschlüsselung trg_users_raw_zero_knowledge_vault und Art. 17 Vault-Purge trg_users_raw_vault_purge (Migrations 600–605).'
       },
       {
         title: 'C. 100% PostgreSQL FORCE Row-Level Security (RLS)',
@@ -176,7 +176,7 @@ export async function generateEnterpriseSecurityWhitepaperPDF(options?: { school
         cat: '3. Verfügbarkeit & Löschkonzept (Art. 32 & Art. 17 DSGVO / DIN 66398)',
         items: [
           '• Datensicherung: Stündlich automatisierte, Age X25519 verschlüsselte Datenbank-Backups (RTO <= 45 Min., RPO <= 60 Min.).',
-          '• DIN 66398 Löschkonzept (5 Klassen): 60-Tage Sparmodus-Wechsel auf Basis-Bereitstellung (0,09 €); physische Profillöschung erst 30 Tage nach Exmatrikulation; Meisterwerke kumulativ über Ausbildungsdauer.',
+          '• DIN 66398 Löschkonzept (5 Klassen): 60-Tage Sparmodus-Wechsel auf Basis-Bereitstellung (0,09 €); physische Profillöschung inkl. deterministischer Art. 17 Vault-Purge (trg_users_raw_vault_purge) 30 Tage nach Exmatrikulation; Meisterwerke kumulativ über Ausbildungsdauer.',
           '• Offline-Resilienz: IndexedDB Audio-Tresor (groovelab_audio_vault) für unterbrechungsfreie Musikproben.'
         ]
       }

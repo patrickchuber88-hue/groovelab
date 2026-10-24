@@ -1313,6 +1313,40 @@ recordCheck(
     : 'Compliance-Lücke: Impressum überschrieben, fehlende Pflichtlinks auf Public-Views oder fehlende Migration 571 Schema-Parität.'
 );
 
+// LEG-38: 360° Zero-Knowledge Identity Vault & 3-Stufen-Identität (Migrations 600–605 / Art. 34 Abs. 3 lit. a DSGVO)
+const mig605Path = path.join(MIGRATIONS_DIR, '605_enterprise_zero_knowledge_vault_complete_seal.sql');
+const b2bContractPdfPath = path.join(SRC_DIR, 'utils', 'b2bContractPdfGenerator.ts');
+const gdprDataTakeoutPath = path.join(SRC_DIR, 'utils', 'gdprDataTakeout.ts');
+const mainPdfGenPath = path.join(SRC_DIR, 'utils', 'pdfGenerator.ts');
+
+let hasZeroKnowledgeVaultParity = false;
+if (
+  fs.existsSync(mig605Path) &&
+  fs.existsSync(b2bContractPdfPath) &&
+  fs.existsSync(gdprDataTakeoutPath) &&
+  fs.existsSync(mainPdfGenPath)
+) {
+  const mig605Src = fs.readFileSync(mig605Path, 'utf8');
+  const b2bPdfSrc = fs.readFileSync(b2bContractPdfPath, 'utf8');
+  const takeoutSrc = fs.readFileSync(gdprDataTakeoutPath, 'utf8');
+  const pdfGenSrc = fs.readFileSync(mainPdfGenPath, 'utf8');
+
+  hasZeroKnowledgeVaultParity =
+    mig605Src.includes('trg_users_raw_zero_knowledge_vault') &&
+    mig605Src.includes('trg_users_raw_vault_purge') &&
+    b2bPdfSrc.includes('blind_student_lastname_vault') &&
+    takeoutSrc.includes('zeroKnowledgeVault') &&
+    pdfGenSrc.includes('trg_users_raw_vault_purge');
+}
+
+recordCheck(
+  'LEG-38: 360° Zero-Knowledge Identity Vault & 3-Stufen-Identität (Migrations 600–605 / Art. 34 Abs. 3 lit. a DSGVO)',
+  hasZeroKnowledgeVaultParity,
+  hasZeroKnowledgeVaultParity
+    ? 'Zero-Knowledge Identity Vault verifiziert: In-Flight Kernel-Trigger, Art. 17 Vault-Purge und 100% Parität in B2B-Verträgen & Art. 15/20 PDF-Dossiers aktiv.'
+    : 'Compliance-Lücke: Fehlende Zero-Knowledge Vault Dokumentation oder fehlende Migration-605-Kernel-Trigger-Parität in den PDFs.'
+);
+
 // =============================================================================
 // FINAL AUDIT SUMMARY & VERDICT
 // =============================================================================

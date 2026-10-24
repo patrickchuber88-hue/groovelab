@@ -6,6 +6,7 @@ export interface StudentBriefingSidebarBottomSheetProps extends Omit<StudentBrie
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'appointments' | 'news';
+  onTabChange?: (tab: 'appointments' | 'news') => void;
   appointmentAlertsCount?: number;
   feedAlertsCount?: number;
 }
@@ -21,6 +22,7 @@ export const StudentBriefingSidebarBottomSheet: React.FC<StudentBriefingSidebarB
   isOpen,
   onClose,
   initialTab = 'appointments',
+  onTabChange,
   appointmentAlertsCount = 0,
   feedAlertsCount = 0,
   ...sidebarProps
@@ -269,6 +271,7 @@ export const StudentBriefingSidebarBottomSheet: React.FC<StudentBriefingSidebarB
                 }
               } catch {}
               setActiveTab('appointments');
+              onTabChange?.('appointments');
             }}
             style={{
               flex: 1,
@@ -329,6 +332,7 @@ export const StudentBriefingSidebarBottomSheet: React.FC<StudentBriefingSidebarB
                 }
               } catch {}
               setActiveTab('news');
+              onTabChange?.('news');
             }}
             style={{
               flex: 1,

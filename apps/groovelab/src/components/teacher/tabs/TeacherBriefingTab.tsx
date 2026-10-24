@@ -286,22 +286,22 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           border: 'none'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
               {isRestDay ? 'Schüler' : 'Schüler Heute'}
             </span>
             <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
-              <Users size={14} color="white" />
+              <Users size={17} color="white" />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+            <span style={{ fontSize: '1.75rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
               {isRestDay ? totalTeacherStudentsCount : activeLessonsCount}
             </span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
               {isRestDay ? 'aktiv' : 'UE'}
             </span>
             {!isRestDay && totalActiveStudentsToday > 0 && (
-              <span style={{ fontSize: '0.68rem', fontWeight: 750, opacity: 0.85, color: 'white' }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 750, opacity: 0.85, color: 'white' }}>
                 ({totalActiveStudentsToday} Sch.)
               </span>
             )}
@@ -324,18 +324,18 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           border: 'none'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
               {isRestDay ? 'Ø Fokus' : 'Ø Übe-Zeit'}
             </span>
             <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
-              <Timer size={14} color="white" />
+              <Timer size={17} color="white" />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+            <span style={{ fontSize: '1.75rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
               {avgPracticeTime.value}
             </span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
               {avgPracticeTime.unit}
             </span>
           </div>
@@ -371,18 +371,18 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a' }}>
               {isRestDay ? 'Wochen-Pensum' : 'Tages-Pensum'}
             </span>
             <div style={{ background: 'rgba(15, 23, 42, 0.12)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
-              <Clock size={14} color="#0f172a" />
+              <Clock size={17} color="#0f172a" />
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-            <span style={{ fontSize: '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a' }}>
+            <span style={{ fontSize: '1.75rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: '#0f172a' }}>
               {isRestDay ? regularWeeklyPensum : workloadHoursStr}
             </span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
               {isRestDay ? (regularWeeklyPensum === '0h' ? 'Noch offen' : 'Regulär') : 'Heute'}
             </span>
           </div>
@@ -404,22 +404,22 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           border: 'none'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 900, opacity: 0.95, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'white' }}>
               {isRestDay ? 'Status' : 'Ausfälle'}
             </span>
             <div style={{ background: 'rgba(255, 255, 255, 0.25)', padding: '6px', borderRadius: '10px', flexShrink: 0 }}>
               {isRestDay || cancellationsCount === 0 ? (
-                <ShieldCheck size={14} color="white" />
+                <ShieldCheck size={17} color="white" />
               ) : (
-                <AlertCircle size={14} color="white" />
+                <AlertCircle size={17} color="white" />
               )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
-            <span style={{ fontSize: isRestDay ? '1.25rem' : '1.55rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
+            <span style={{ fontSize: isRestDay ? '1.35rem' : '1.75rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', color: 'white' }}>
               {isRestDay ? 'Frei' : cancellationsCount}
             </span>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
               {isRestDay ? 'Erholung' : (cancellationsCount === 0 ? 'Planmäßig' : 'Heute')}
             </span>
           </div>

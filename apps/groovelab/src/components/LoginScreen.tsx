@@ -6,7 +6,7 @@ import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId, authenticateMasterBiometricPasskey, extractWebAuthnAssertionPayload } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId, authenticateMasterBiometricPasskey, extractWebAuthnAssertionPayload, verifyWebAuthnAssertionAuthoritative, hydrateVerifiedPasskeyProfile } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
 import { setLocalhostDevLegalBypassed } from './LegalConsentGate';
@@ -769,13 +769,18 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [isManagingProfiles, setIsManagingProfiles] = useState<boolean>(false);
 
   useEffect(() => {
-    if (isWebAuthnSupported()) {
-      const profiles = getStoredBiometricProfiles();
-      setBiometricProfiles(profiles);
-      if (profiles.length > 0) {
-        setSelectedBiometricUser(profiles[profiles.length - 1]);
+    const refreshProfiles = () => {
+      if (isWebAuthnSupported()) {
+        const profiles = getStoredBiometricProfiles();
+        setBiometricProfiles(profiles);
+        if (profiles.length > 0) {
+          setSelectedBiometricUser(profiles[profiles.length - 1]);
+        }
       }
-    }
+    };
+    refreshProfiles();
+    window.addEventListener('gl-biometric-vault-updated', refreshProfiles);
+    return () => window.removeEventListener('gl-biometric-vault-updated', refreshProfiles);
   }, []);
 
   const handleTriggerBiometricLogin = async (userId?: string) => {
@@ -841,13 +846,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       const credentialId = assertion.id;
       const assertionPayload = extractWebAuthnAssertionPayload(assertion);
 
-      // 3. 🛡️ Authoritative server verification & session lease minting via authenticate_webauthn_credential
-      const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
-        p_credential_id: credentialId,
-        p_challenge: chalData.challenge,
-        p_school_id: schoolData?.id || null,
-        ...assertionPayload
-      });
+      // 3. 🛡️ Authoritative server verification & session lease minting via BFF & authenticate_webauthn_credential
+      const { data: authResult, error: authErr } = await verifyWebAuthnAssertionAuthoritative(
+        supabase,
+        credentialId,
+        chalData.challenge,
+        schoolData?.id || null,
+        assertionPayload
+      );
 
       if (authErr || !authResult?.success || !authResult?.user) {
         throw new Error(authResult?.error || authErr?.message || 'Biometrischer Passkey konnte nicht verifiziert werden.');
@@ -855,6 +861,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (authResult.lease_token) {
         sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+        }
+      }
+
+      // Auto-hydrate local vault so this device remembers the user profile for rapid passkey login
+      if (authResult.user) {
+        hydrateVerifiedPasskeyProfile(authResult.user, credentialId, schoolData?.name || null);
+        setBiometricProfiles(getStoredBiometricProfiles());
       }
 
       // 4. 🛡️ Finalize login with server-verified profile
@@ -1721,9 +1736,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setExpandedSection('pin');
     } else {
       setExpandedSection('none');
-      if (method === 'passkey') {
-        handleTriggerBiometricLogin();
-      }
     }
   };
 

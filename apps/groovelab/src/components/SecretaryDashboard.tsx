@@ -764,6 +764,7 @@ export function SecretaryDashboard({
         {/* Main scrollable body content (Single Source of Scroll) */}
         <div
           id="secretary-main-scroll-container"
+          className="pwa-scroll-container"
           style={{
             padding: windowWidth <= 768
               ? 'calc(58px + env(safe-area-inset-top, 0px)) 12px calc(92px + env(safe-area-inset-bottom, 20px))'

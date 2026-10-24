@@ -1810,11 +1810,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           background: '#f8fafc',
                           border: 'none',
                           borderRadius: '16px',
-                          padding: '12px 13px',
+                          padding: isMobileView ? '14px 14px' : '12px 13px',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '66px',
+                          minHeight: isMobileView ? '74px' : '66px',
                           cursor: 'pointer',
                           boxSizing: 'border-box',
                           transition: 'all 0.15s ease'
@@ -1822,16 +1822,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         className="hover-scale"
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raumauslastung</span>
-                          <div style={{ background: '#e0e7ff', padding: '4px', borderRadius: '7px', display: 'flex' }}>
-                            <DoorOpen size={12} color="#4f46e5" />
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raumauslastung</span>
+                          <div style={{ background: '#e0e7ff', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                            <DoorOpen size={isMobileView ? 16 : 13} color="#4f46e5" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          <span style={{ fontSize: isMobileView ? '1.5rem' : '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
                             {roomOccupancyRate}%
                           </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 700, color: '#64748b' }}>
                             ({todayAllocations.length} Slots)
                           </span>
                         </div>
@@ -1857,11 +1857,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           background: '#f8fafc',
                           border: 'none',
                           borderRadius: '16px',
-                          padding: '12px 13px',
+                          padding: isMobileView ? '14px 14px' : '12px 13px',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '66px',
+                          minHeight: isMobileView ? '74px' : '66px',
                           cursor: 'pointer',
                           boxSizing: 'border-box',
                           transition: 'all 0.15s ease'
@@ -1869,16 +1869,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         className="hover-scale"
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktivierung</span>
-                          <div style={{ background: '#dcfce7', padding: '4px', borderRadius: '7px', display: 'flex' }}>
-                            <UserCheck size={12} color="#15803d" />
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Aktivierung</span>
+                          <div style={{ background: '#dcfce7', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                            <UserCheck size={isMobileView ? 16 : 13} color="#15803d" />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          <span style={{ fontSize: isMobileView ? '1.5rem' : '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
                             {activationRate}%
                           </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 700, color: '#64748b' }}>
                             ({activeStudentsCount}/{totalStudentsCount})
                           </span>
                         </div>
@@ -1904,11 +1904,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           background: scheduleConflicts.length === 0 ? '#f8fafc' : '#facc15',
                           border: 'none',
                           borderRadius: '16px',
-                          padding: '12px 13px',
+                          padding: isMobileView ? '14px 14px' : '12px 13px',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '66px',
+                          minHeight: isMobileView ? '74px' : '66px',
                           cursor: 'pointer',
                           boxSizing: 'border-box',
                           transition: 'all 0.15s ease'
@@ -1916,16 +1916,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         className="hover-scale"
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#475569' : '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konflikte</span>
-                          <div style={{ background: scheduleConflicts.length === 0 ? '#dcfce7' : 'rgba(15, 23, 42, 0.1)', padding: '4px', borderRadius: '7px', display: 'flex' }}>
-                            <ShieldAlert size={12} color={scheduleConflicts.length === 0 ? '#15803d' : '#0f172a'} />
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#475569' : '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Konflikte</span>
+                          <div style={{ background: scheduleConflicts.length === 0 ? '#dcfce7' : 'rgba(15, 23, 42, 0.1)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                            <ShieldAlert size={isMobileView ? 16 : 13} color={scheduleConflicts.length === 0 ? '#15803d' : '#0f172a'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          <span style={{ fontSize: isMobileView ? '1.5rem' : '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
                             {scheduleConflicts.length}
                           </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#15803d' : '#0f172a' }}>
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: scheduleConflicts.length === 0 ? '#15803d' : '#0f172a' }}>
                             {scheduleConflicts.length === 0 ? 'Stabil ✓' : 'Konflikt'}
                           </span>
                         </div>
@@ -1951,11 +1951,11 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           background: activeAusfallTeachers.length === 0 ? '#f8fafc' : '#ef4444',
                           border: 'none',
                           borderRadius: '16px',
-                          padding: '12px 13px',
+                          padding: isMobileView ? '14px 14px' : '12px 13px',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          minHeight: '66px',
+                          minHeight: isMobileView ? '74px' : '66px',
                           cursor: 'pointer',
                           boxSizing: 'border-box',
                           transition: 'all 0.15s ease'
@@ -1963,16 +1963,16 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         className="hover-scale"
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontSize: '0.60rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#475569' : '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausfälle Heute</span>
-                          <div style={{ background: activeAusfallTeachers.length === 0 ? '#dcfce7' : 'rgba(255, 255, 255, 0.2)', padding: '4px', borderRadius: '7px', display: 'flex' }}>
-                            <CalendarX size={12} color={activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff'} />
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#475569' : '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausfälle Heute</span>
+                          <div style={{ background: activeAusfallTeachers.length === 0 ? '#dcfce7' : 'rgba(255, 255, 255, 0.2)', padding: '5px', borderRadius: '8px', display: 'flex' }}>
+                            <CalendarX size={isMobileView ? 16 : 13} color={activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1.2rem', fontWeight: 900, color: activeAusfallTeachers.length === 0 ? '#0f172a' : '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
+                          <span style={{ fontSize: isMobileView ? '1.5rem' : '1.2rem', fontWeight: 900, color: activeAusfallTeachers.length === 0 ? '#0f172a' : '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>
                             {activeAusfallTeachers.length}
                           </span>
-                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff' }}>
+                          <span style={{ fontSize: isMobileView ? '0.78rem' : '0.68rem', fontWeight: 800, color: activeAusfallTeachers.length === 0 ? '#15803d' : '#ffffff' }}>
                             {activeAusfallTeachers.length === 0 ? 'Planmäßig ✓' : (activeAusfallTeachers.length === 1 ? '1 Ausfall' : `${activeAusfallTeachers.length} Ausfälle`)}
                           </span>
                         </div>

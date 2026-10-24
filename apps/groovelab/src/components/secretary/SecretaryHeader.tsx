@@ -191,12 +191,13 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
               minWidth: '44px',
               minHeight: '44px',
               borderRadius: '12px',
-              border: 'none',
-              background: brandSoftBg,
+              border: '1px solid #2d9248',
+              background: '#34a853',
+              boxShadow: '0 2px 8px rgba(52, 168, 83, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: brandAccentColor,
+              color: '#ffffff',
               cursor: 'pointer',
               padding: 0,
               flexShrink: 0,
@@ -204,7 +205,7 @@ export const SecretaryHeader: React.FC<SecretaryHeaderProps> = ({
               transition: 'transform 0.15s ease'
             }}
           >
-            <Menu size={20} strokeWidth={2.4} />
+            <Menu size={22} strokeWidth={2.6} color="#ffffff" />
           </button>
 
           {/* Center: Dynamic Board Title & Bounded Context Pill */}

@@ -363,28 +363,16 @@ export const GeminiMobileShell: React.FC<GeminiMobileShellProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: activePlatform === 'campus'
-                ? 'rgba(52, 168, 83, 0.15)'
-                : (isSubViewActive && subViewNavState.isStickerAlbum)
-                ? 'rgba(234, 179, 8, 0.22)'
-                : 'rgba(234, 179, 8, 0.14)',
-              border: activePlatform === 'campus'
-                ? '1.5px solid rgba(52, 168, 83, 0.50)'
-                : (isSubViewActive && subViewNavState.isStickerAlbum)
-                ? '1.5px solid rgba(250, 204, 21, 0.70)'
-                : '1.5px solid rgba(234, 179, 8, 0.40)',
-              boxShadow: activePlatform === 'campus'
-                ? '0 2px 8px rgba(52, 168, 83, 0.25)'
-                : (isSubViewActive && subViewNavState.isStickerAlbum)
-                ? '0 2px 8px rgba(234, 179, 8, 0.30)'
-                : '0 1px 4px rgba(234, 179, 8, 0.12)',
+              background: '#34a853',
+              border: '1px solid #2d9248',
+              boxShadow: '0 2px 8px rgba(52, 168, 83, 0.35)',
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <Menu
-              size={24}
+              size={22}
               strokeWidth={2.6}
-              color={activePlatform === 'campus' ? '#34a853' : (isSubViewActive && subViewNavState.isStickerAlbum) ? '#facc15' : '#b45309'}
+              color="#ffffff"
             />
           </div>
         </button>

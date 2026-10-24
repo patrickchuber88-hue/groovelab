@@ -367,9 +367,12 @@ export function useAuthoritativeHomeworkPlan(
       }
     };
 
-    // 1. Identify weekly snapshot containers (sorted newest first)
+    // 1. Identify weekly snapshot containers (sorted newest first, preferring active homework)
     const candidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
     candidates.sort((a: any, b: any) => {
+      if (Boolean(b.is_current_homework) !== Boolean(a.is_current_homework)) {
+        return b.is_current_homework ? 1 : -1;
+      }
       const wA = getItemWeek(a), wB = getItemWeek(b);
       if (wA && wB && wA !== wB) return wB.localeCompare(wA);
       return new Date(b.updated_at || b.created_at || 0).getTime() - new Date(a.updated_at || a.created_at || 0).getTime();

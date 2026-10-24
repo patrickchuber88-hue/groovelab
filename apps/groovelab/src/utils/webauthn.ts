@@ -63,6 +63,11 @@ export const getSanitizedRpId = (): string | undefined => {
   if (!hostname || /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':')) {
     return undefined;
   }
+  // Apple Goldstandard: Normalize any *.campus-groovelab.de domain to the registrable domain 'campus-groovelab.de'
+  // Per W3C WebAuthn spec § 5.4.3, an RP ID can be any registrable domain suffix of the current origin
+  if (hostname === 'campus-groovelab.de' || hostname.endsWith('.campus-groovelab.de')) {
+    return 'campus-groovelab.de';
+  }
   return hostname;
 };
 
@@ -99,7 +104,8 @@ export const registerBiometrics = async (
     authenticatorSelection: {
       authenticatorAttachment: 'platform', // Forces biometrics like TouchID/FaceID
       userVerification: 'required',
-      residentKey: 'preferred',
+      residentKey: 'required',
+      requireResidentKey: true,
     },
     timeout: 60000,
     attestation: 'none',
@@ -183,10 +189,14 @@ export const authenticateBiometrics = async (
   const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
     challenge: challengeToArrayBuffer(challengeFromServer),
     ...(rpId ? { rpId } : {}),
-    allowCredentials: allowedCredentialIds.map((id) => ({
-      id: base64urlToArrayBuffer(id),
-      type: 'public-key',
-    })),
+    ...(allowedCredentialIds && allowedCredentialIds.length > 0
+      ? {
+          allowCredentials: allowedCredentialIds.map((id) => ({
+            id: base64urlToArrayBuffer(id),
+            type: 'public-key' as const,
+          })),
+        }
+      : {}),
     userVerification: 'required',
     timeout: 60000,
   };
@@ -276,6 +286,9 @@ export const saveBiometricProfile = (profile: BiometricVaultProfile): void => {
       current.push(sanitizedProfile);
     }
     localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(current));
+    try {
+      window.dispatchEvent(new CustomEvent('gl-biometric-vault-updated'));
+    } catch {}
   } catch (err) {
     console.error('Failed to save biometric profile to localStorage:', err);
   }
@@ -290,6 +303,9 @@ export const removeBiometricProfile = (userId: string): void => {
     const current = getStoredBiometricProfiles();
     const updated = current.filter((p) => p.userId !== userId);
     localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(updated));
+    try {
+      window.dispatchEvent(new CustomEvent('gl-biometric-vault-updated'));
+    } catch {}
   } catch (err) {
     console.error('Failed to remove biometric profile:', err);
   }
@@ -834,7 +850,7 @@ export const registerAuthoritativeStudentPasskey = async (
   const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
     p_user_id: profile.id,
     p_credential_id: passkeyResult.id,
-    p_public_key: JSON.stringify(passkeyResult.response),
+    p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
     p_device_name: deviceName,
     p_challenge: chalData.challenge
   });
@@ -854,4 +870,110 @@ export const registerAuthoritativeStudentPasskey = async (
     createdAt: new Date().toISOString()
   });
 };
+
+/**
+ * 🛡️ Authoritative Generic Passkey Registration for Teachers, Secretaries, Students and Admins
+ */
+export const registerWebAuthnCredentialAuthoritative = async (
+  supabase: any,
+  params: {
+    userId: string;
+    displayName: string;
+    role?: string;
+    schoolName?: string | null;
+    photoUrl?: string | null;
+    instrument?: string | null;
+  }
+): Promise<{ success: boolean; credentialId?: string; error?: string }> => {
+  if (!isWebAuthnSupported()) {
+    return { success: false, error: 'WebAuthn wird auf diesem Gerät nicht unterstützt.' };
+  }
+
+  const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+    p_user_id: params.userId,
+    p_type: 'register'
+  });
+
+  if (chalErr || !chalData?.challenge) {
+    return {
+      success: false,
+      error: chalErr?.message || 'Sicherheits-Challenge konnte nicht vom Server bezogen werden.'
+    };
+  }
+
+  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+  const deviceName = isIOS ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
+
+  let passkeyResult: any;
+  try {
+    passkeyResult = await registerBiometrics(
+      params.displayName,
+      params.userId,
+      chalData.challenge,
+      params.displayName
+    );
+  } catch (err: any) {
+    if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+      return { success: false, error: 'Passkey-Erstellung vom Benutzer abgebrochen.' };
+    }
+    return { success: false, error: err.message || 'Passkey-Registrierung fehlgeschlagen.' };
+  }
+
+  const spkiPayload = passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response);
+
+  const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+    p_user_id: params.userId,
+    p_credential_id: passkeyResult.id,
+    p_public_key: spkiPayload,
+    p_device_name: deviceName,
+    p_challenge: chalData.challenge
+  });
+
+  if (regErr || !regResult?.success) {
+    return {
+      success: false,
+      error: regErr?.message || regResult?.error || 'Passkey-Registrierung in der Datenbank fehlgeschlagen.'
+    };
+  }
+
+  // Auto-Vault-Hydration in local gl_biometric_device_vault
+  const nameParts = params.displayName.trim().split(/\s+/);
+  const firstName = nameParts[0] || 'User';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  saveBiometricProfile({
+    userId: params.userId,
+    firstName,
+    lastName,
+    role: params.role || 'teacher',
+    schoolName: params.schoolName || null,
+    instrument: params.instrument || null,
+    photoUrl: params.photoUrl || null,
+    credentialId: passkeyResult.id,
+    sessionToken: '',
+    createdAt: new Date().toISOString()
+  });
+
+  return { success: true, credentialId: passkeyResult.id };
+};
+
+export function hydrateVerifiedPasskeyProfile(
+  user: any,
+  credentialId: string,
+  schoolName: string | null
+): void {
+  if (!user) return;
+  saveBiometricProfile({
+    userId: user.id,
+    firstName: user.first_name || '',
+    lastName: user.last_name || '',
+    role: user.role || 'teacher',
+    schoolName: schoolName || null,
+    instrument: user.instrument || null,
+    photoUrl: user.photo_url || user.avatar_url || null,
+    credentialId,
+    sessionToken: '',
+    createdAt: new Date().toISOString()
+  });
+}
 

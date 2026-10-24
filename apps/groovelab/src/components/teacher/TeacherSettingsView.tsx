@@ -898,7 +898,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
                           p_user_id: teacher.id,
                           p_credential_id: passkeyResult.id,
-                          p_public_key: JSON.stringify(passkeyResult.response),
+                          p_public_key: passkeyResult.response?.publicKeySpki || JSON.stringify(passkeyResult.response),
                           p_device_name: deviceName,
                           p_challenge: chalData.challenge
                         });
@@ -913,8 +913,9 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                           firstName: teacher.first_name || '',
                           lastName: teacher.last_name || '',
                           role: teacher.role || 'teacher',
+                          schoolName: schoolData?.name || null,
                           credentialId: passkeyResult.id,
-                          sessionToken: teacher.id,
+                          sessionToken: '',
                           createdAt: new Date().toISOString()
                         });
 

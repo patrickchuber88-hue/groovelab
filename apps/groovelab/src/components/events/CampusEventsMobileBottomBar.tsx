@@ -55,14 +55,12 @@ export const CampusEventsMobileBottomBar: React.FC<CampusEventsMobileBottomBarPr
         right: 0,
         width: '100%',
         zIndex: 900,
-        height: 'calc(52px + max(20px, env(safe-area-inset-bottom, 20px)))',
-        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+        height: 'calc(50px + max(6px, calc(env(safe-area-inset-bottom, 0px) * 0.45)))',
+        paddingBottom: 'max(6px, calc(env(safe-area-inset-bottom, 0px) * 0.45))',
         paddingTop: '6px',
-        background: 'rgba(255, 255, 255, 0.94)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '0.5px solid rgba(0, 0, 0, 0.10)',
-        boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
+        background: '#ffffff',
+        borderTop: '1px solid #e2e8f0',
+        boxShadow: '0 -4px 20px rgba(15, 23, 42, 0.06)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
@@ -107,35 +105,42 @@ export const CampusEventsMobileBottomBar: React.FC<CampusEventsMobileBottomBarPr
               transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              position: 'relative'
             }}
           >
+            {/* 🏛️ 0,1% Goldstandard: Oberer 3px Akzent-Indikator bei Auswahl */}
+            {isActive && (
+              <div style={{ position: 'absolute', top: 0, width: '28px', height: '3px', borderRadius: '999px', background: brandColor }} />
+            )}
+
             {/* ICON SQUIRCLE / PILL INDICATOR */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '40px',
-                height: '24px',
-                borderRadius: '12px',
-                background: isActive ? `${brandColor}18` : 'transparent',
+                width: '46px',
+                height: '26px',
+                borderRadius: '13px',
+                background: isActive ? 'rgba(52, 168, 83, 0.20)' : 'transparent',
+                border: isActive ? '1px solid rgba(52, 168, 83, 0.38)' : '1px solid transparent',
                 transition: 'all 0.2s ease'
               }}
             >
               <TabIcon
-                size={18}
-                color={isActive ? brandColor : '#94a3b8'}
-                strokeWidth={isActive ? 2.4 : 1.9}
+                size={20}
+                color={isActive ? '#15803d' : '#64748b'}
+                strokeWidth={isActive ? 2.5 : 2.0}
               />
             </div>
 
             {/* TAB LABEL */}
             <span
               style={{
-                fontSize: '0.68rem',
+                fontSize: '0.78rem',
                 fontWeight: isActive ? 800 : 600,
-                color: isActive ? brandColor : '#64748b',
+                color: isActive ? '#15803d' : '#64748b',
                 letterSpacing: isActive ? '-0.01em' : '0',
                 transition: 'color 0.15s ease'
               }}

@@ -60,7 +60,7 @@ if [ "$MEM_TOTAL" -gt 0 ]; then
   fi
 fi
 
-# 3. Docker Container Health Check
+# 3. Docker Container & Host Ingress Health Check
 if command -v docker >/dev/null 2>&1; then
   RUNNING_CONTAINERS=$(docker ps --format '{{.Names}}')
   
@@ -73,13 +73,40 @@ if command -v docker >/dev/null 2>&1; then
     ALERT_MESSAGES+=("CRITICAL: Database container is down!")
   fi
 
-  # Check for Web / Reverse-Proxy Container
-  if echo "$RUNNING_CONTAINERS" | grep -qvE 'supabase-db|postgres'; then
-    echo "  ✓ Web/Proxy-Container aktiv (OK)"
+  # Check for BFF & Kong Gateway containers
+  if echo "$RUNNING_CONTAINERS" | grep -qE 'groovelab-bff' && echo "$RUNNING_CONTAINERS" | grep -qE 'supabase-kong'; then
+    echo "  ✓ BFF & Supabase Kong Gateway-Container aktiv (OK)"
   else
-    echo "⚠️  WARNUNG: Kein Web-Container erkannt!"
+    echo "⚠️  WARNUNG: BFF oder Supabase Kong Container nicht aktiv!"
     ALERT_TRIGGERED=1
-    ALERT_MESSAGES+=("Warning: Web container is not running!")
+    ALERT_MESSAGES+=("Warning: BFF or Supabase Kong container is not running!")
+  fi
+fi
+
+# 3b. Host Nginx Ingress & L7 Health Probe (Self-Healing)
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files nginx.service >/dev/null 2>&1; then
+  if systemctl is-active --quiet nginx; then
+    echo "  ✓ Host Nginx Ingress (nginx.service) aktiv (OK)"
+  else
+    echo "🚨 KRITISCH: Host Nginx Ingress (nginx.service) ist INAKTIV! Starte Self-Healing..."
+    ALERT_TRIGGERED=1
+    if /usr/sbin/nginx -t >/dev/null 2>&1 && systemctl restart nginx; then
+      echo "  ✓ Self-Healing erfolgreich: nginx.service wurde automatisch neu gestartet."
+      ALERT_MESSAGES+=("SELF-HEALED: Host nginx.service was down and automatically restarted.")
+    else
+      echo "❌ FEHLER: Self-Healing für nginx.service fehlgeschlagen (nginx -t oder restart Error)!"
+      ALERT_MESSAGES+=("CRITICAL: Host nginx.service is down and automatic restart failed!")
+    fi
+  fi
+
+  # L7 HTTPS Loopback Health Probe
+  HTTP_HEALTH=$(curl -ksS -o /dev/null -w "%{http_code}" --max-time 5 --resolve "campus-groovelab.de:443:127.0.0.1" https://campus-groovelab.de/healthz 2>/dev/null || echo "000")
+  if [ "$HTTP_HEALTH" = "200" ]; then
+    echo "  ✓ L7 HTTPS Loopback Probe (/healthz): HTTP 200 (OK)"
+  else
+    echo "❌ FEHLER: L7 HTTPS Loopback Probe (/healthz) lieferte HTTP $HTTP_HEALTH!"
+    ALERT_TRIGGERED=1
+    ALERT_MESSAGES+=("CRITICAL: L7 HTTPS probe to https://campus-groovelab.de/healthz returned HTTP $HTTP_HEALTH")
   fi
 fi
 

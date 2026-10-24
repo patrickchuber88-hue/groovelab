@@ -62,10 +62,10 @@
   --mobile-breakpoint: 768px;
   --mobile-vh: 100dvh;
   --mobile-header-h: calc(48px + env(safe-area-inset-top, 0px));
-  --mobile-bottom-nav-bar-h: calc(52px + max(20px, env(safe-area-inset-bottom, 20px)));
-  --mobile-bottom-nav-h: calc(52px + max(20px, env(safe-area-inset-bottom, 20px)));
+  --mobile-bottom-nav-bar-h: calc(56px + max(8px, env(safe-area-inset-bottom, 0px)));
+  --mobile-bottom-nav-h: calc(56px + max(8px, env(safe-area-inset-bottom, 0px)));
   --mini-player-h: 0px;
-  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-h) + 16px);
+  --mobile-scroll-clearance-bottom: calc(var(--mobile-bottom-nav-h) + 36px);
   --mobile-scroll-clearance-top: var(--mobile-header-h);
   --mobile-sheet-radius: 28px;
 
@@ -1996,16 +1996,26 @@ select option {
     padding-bottom: 0 !important;
   }
 
-  /* Single Source of Scroll: Standard Boards (Übe-Pfad, Library, Settings) receive clean native safe-area clearance */
+  /* 🏛️ 0,1% Goldstandard: Guaranteed Full Bottom Dock Clearance for all Boards on Mobile */
   #main-content,
-  .main-content {
-    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+  .main-content,
+  #secretary-main-scroll-container {
+    padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+    scroll-padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+    box-sizing: border-box !important;
   }
 
-  /* Specialized Sub-Docks Exception: Events, Homework, and Briefing receive full dock clearance */
-  .main-wrapper.has-mobile-sub-dock #main-content,
-  .main-wrapper.has-mobile-sub-dock .main-content {
-    padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+  /* 🛡️ Uncompressible Flex/Block Spacer: Prevents WebKit/Safari from clipping bottom padding behind fixed bottom docks */
+  #main-content::after,
+  #secretary-main-scroll-container::after,
+  .modal-content-container::after {
+    content: "" !important;
+    display: block !important;
+    width: 100% !important;
+    height: var(--mobile-scroll-clearance-bottom) !important;
+    min-height: var(--mobile-scroll-clearance-bottom) !important;
+    flex-shrink: 0 !important;
+    pointer-events: none !important;
   }
 
   /* Live Lab Exception: Fullscreen Interactive Canvas (No Scroll, No Clearance) */
@@ -2134,11 +2144,31 @@ select option {
   left: 0 !important;
   right: 0 !important;
   width: 100% !important;
-  height: 74px !important;
-  padding-bottom: 24px !important;
+  height: 56px !important;
+  padding-bottom: 8px !important;
   padding-top: 6px !important;
+  background: #ffffff !important;
   box-sizing: border-box !important;
   z-index: 900 !important;
+}
+
+/* 🛡️ 0,1% Goldstandard: Pure White Safe-Area Skirt below Bottom Dock (Eliminates Green Border on Smartphone PWA) */
+.sim-viewport-mobile .meisterwerk-mobile-bottom-dock::after,
+.sim-viewport-mobile .campus-events-mobile-bottom-dock::after,
+.sim-viewport-mobile .student-briefing-mobile-bottom-dock::after,
+.sim-viewport-mobile .mobile-briefing-bottom-dock::after,
+.meisterwerk-mobile-bottom-dock::after,
+.campus-events-mobile-bottom-dock::after,
+.student-briefing-mobile-bottom-dock::after,
+.mobile-briefing-bottom-dock::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 60px !important;
+  background: #ffffff !important;
+  pointer-events: none !important;
 }
 
 /* 🏛️ 0,1% Goldstandard: Tablets strictly suppress all mobile bottom docks */
@@ -2295,11 +2325,11 @@ select option {
 }
 
 /* Single-Page Mobile Scroll Engine: Eliminates inner nested scrollbars across ALL boards on smartphones */
-/* 🛡️ Modal Scroll Immunity: Dialogs, sheets, modals and dedicated scroll containers are 100% exempt */
-.sim-viewport-mobile div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-.sim-viewport-mobile div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-.sim-viewport-mobile div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-.sim-viewport-mobile div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
+/* 🛡️ Modal & Standalone Scroll Immunity: Dialogs, sheets, modals, standalone screens and dedicated scroll containers are 100% exempt */
+.sim-viewport-mobile div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+.sim-viewport-mobile div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
   max-height: none !important;
   height: auto !important;
   overflow-y: visible !important;
@@ -2307,10 +2337,10 @@ select option {
 }
 
 @media (max-width: 768px) {
-  div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-  div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-  div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
-  div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
+  div[style*="maxHeight"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="max-height"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="overflowY"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *),
+  div[style*="overflow-y"]:not(.pwa-modal-drawer):not(.pwa-modal-card):not(.pwa-scroll-container):not(.pwa-standalone-screen):not(#secretary-main-scroll-container):not([data-modal-scroll="true"]):not([role="dialog"]):not([role="dialog"] *):not(.pwa-modal-overlay *) {
     max-height: none !important;
     height: auto !important;
     overflow-y: visible !important;
@@ -2324,6 +2354,7 @@ select option {
 
 /* 🛡️ Tier-1 PWA Modal & Scroll-Container Authority (Correct-by-Construction) */
 .pwa-scroll-container,
+.pwa-standalone-screen,
 [data-modal-scroll="true"],
 .pwa-modal-drawer [style*="overflowY"],
 .pwa-modal-drawer [style*="overflow-y"],
@@ -2338,6 +2369,33 @@ select option {
   touch-action: pan-y !important;
 }
 
+/* 🏛️ 0,1% Goldstandard: Standalone Screen Native Touch Scroller */
+.pwa-standalone-screen {
+  height: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  box-sizing: border-box !important;
+}
+
+/* 🏛️ 0,1% Goldstandard: Mobile Main Menu Button (#mobile-main-menu-trigger) in Solid Campus Green */
+#mobile-main-menu-trigger {
+  background: #34a853 !important;
+  color: #ffffff !important;
+  border: 1px solid #2d9248 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(52, 168, 83, 0.28) !important;
+}
+#mobile-main-menu-trigger svg,
+#mobile-main-menu-trigger svg path,
+#mobile-main-menu-trigger svg line {
+  stroke: #ffffff !important;
+  color: #ffffff !important;
+}
+
 .cg-bottom-nav-item {
   display: flex !important;
   flex-direction: column !important;
@@ -2349,17 +2407,24 @@ select option {
   border: none !important;
   background: transparent !important;
   color: #64748b !important;
-  font-size: 0.7rem !important;
+  font-size: 0.76rem !important;
   font-weight: 700 !important;
   cursor: pointer !important;
 }
 
 .cg-bottom-nav-item.active-campus {
   color: #34a853 !important;
+  font-weight: 800 !important;
 }
 
 .cg-bottom-nav-item.active-groovelab {
   color: #ca8a04 !important;
+  font-weight: 800 !important;
+}
+
+.cg-bottom-nav-item.active-admin {
+  color: #ea4335 !important;
+  font-weight: 800 !important;
 }
 
 /* 3. iPad / Tablet Rail Mode (.sim-viewport-tablet & 769px-1180px) */
